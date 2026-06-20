@@ -1,0 +1,78 @@
+package com.ubisenderpro.service;
+
+import com.ubisenderpro.dto.PageResult;
+import com.ubisenderpro.entity.Article;
+import com.ubisenderpro.entity.MouvementStock;
+
+import javax.ejb.Stateless;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.TypedQuery;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+@Stateless
+public class ArticleService {
+
+    @PersistenceContext(unitName = "ubisenderproPU")
+    private EntityManager em;
+
+    public PageResult<Article> rechercher(String q, Long categorieId, Long marqueId,
+                                          Boolean actif, int offset, int limit) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        List<Object[]> params = new ArrayList<>();
+        if (q != null && !q.isEmpty()) {
+            where.append(" AND (LOWER(a.designation) LIKE :q OR LOWER(a.codeArticle) LIKE :q" +
+                    " OR a.codeBarres LIKE :q OR a.cip LIKE :q)");
+            params.add(new Object[]{"q", "%" + q.toLowerCase() + "%"});
+        }
+        if (categorieId != null) { where.append(" AND a.categorieId = :cat"); params.add(new Object[]{"cat", categorieId}); }
+        if (marqueId != null) { where.append(" AND a.marqueId = :mar"); params.add(new Object[]{"mar", marqueId}); }
+        if (actif != null) { where.append(" AND a.actif = :act"); params.add(new Object[]{"act", actif}); }
+
+        TypedQuery<Article> query = em.createQuery("SELECT a FROM Article a" + where + " ORDER BY a.designation", Article.class);
+        TypedQuery<Long> count = em.createQuery("SELECT COUNT(a) FROM Article a" + where, Long.class);
+        for (Object[] p : params) { query.setParameter((String) p[0], p[1]); count.setParameter((String) p[0], p[1]); }
+
+        return new PageResult<>(query.setFirstResult(offset).setMaxResults(limit).getResultList(), count.getSingleResult());
+    }
+
+    public Optional<Article> parId(Long id) { return Optional.ofNullable(em.find(Article.class, id)); }
+
+    public Optional<Article> parCode(String code) {
+        List<Article> l = em.createQuery("SELECT a FROM Article a WHERE a.codeArticle = :c", Article.class)
+                .setParameter("c", code).setMaxResults(1).getResultList();
+        return l.isEmpty() ? Optional.empty() : Optional.of(l.get(0));
+    }
+
+    public Article creer(Article a) { em.persist(a); return a; }
+
+    public Article modifier(Article a) { a.setUpdatedAt(LocalDateTime.now()); return em.merge(a); }
+
+    public void supprimer(Long id) { parId(id).ifPresent(em::remove); }
+
+    /** Ajuste le stock indicatif et journalise le mouvement (section 15 de la spec). */
+    public Article ajusterStock(Long articleId, BigDecimal nouvelleQuantite, String type,
+                                String commentaire, Long utilisateurId) {
+        Article a = em.find(Article.class, articleId);
+        if (a == null) return null;
+        BigDecimal avant = a.getStockDisponible();
+        a.setStockDisponible(nouvelleQuantite);
+        em.merge(a);
+
+        MouvementStock m = new MouvementStock();
+        m.setArticleId(articleId);
+        m.setTypeMouvement(type == null ? "AJUSTEMENT_POSITIF" : type);
+        m.setQuantiteAvant(avant);
+        m.setQuantiteMouvement(nouvelleQuantite.subtract(avant));
+        m.setQuantiteApres(nouvelleQuantite);
+        m.setSource("MANUEL");
+        m.setCommentaire(commentaire);
+        m.setUtilisateurId(utilisateurId);
+        em.persist(m);
+        return a;
+    }
+}

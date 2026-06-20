@@ -1,0 +1,4 @@
+code_article;designation;code_barres;cip;categorie;marque;prix_vente;prix_promotionnel;stock_disponible;unite;image_url
+ART001;Doliprane 500 mg;3400930101234;3010123;Médicaments;Sanofi;1500;;25;Boîte;https://exemple.com/doliprane.jpg
+ART002;Fervex adulte;3400930205678;3020567;Médicaments;UPSA;3500;3200;12;Boîte;https://exemple.com/fervex.jpg
+ART003;Crème hydratante;3400930301111;;Dermocosmétique;La Roche-Posay;8900;;40;Tube;

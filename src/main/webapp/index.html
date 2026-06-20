@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>UbiSenderPro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <!--
+        ExtJS 4.2 : copiez le dossier "ext" de Prestige
+        (prestige/src/main/webapp/general/ext) dans src/main/webapp/ext.
+        On réutilise le thème Neptune déjà compilé dans ce SDK.
+    -->
+    <link rel="stylesheet" href="ext/packages/ext-theme-neptune/build/resources/ext-theme-neptune-all.css"/>
+    <script src="ext/ext-all.js"></script>
+
+    <script src="app/app.js"></script>
+    <script src="app/importer.js"></script>
+    <script src="app/inbox.js"></script>
+    <script src="app/campaign.js"></script>
+    <script src="app/catalogue.js"></script>
+    <script src="app/crm.js"></script>
+    <script src="app/settings.js"></script>
+</head>
+<body>
+    <!-- Diagnostic : message lisible si le SDK Ext JS n'est pas trouvé (au lieu d'une page blanche). -->
+    <script>
+        window.addEventListener('load', function () {
+            if (typeof Ext === 'undefined') {
+                document.body.innerHTML =
+                    '<div style="font-family:sans-serif;max-width:640px;margin:60px auto;padding:24px;' +
+                    'border:1px solid #e0b4b4;background:#fff6f6;border-radius:8px;color:#912d2b">' +
+                    '<h2>Ext JS 4.2 introuvable</h2>' +
+                    '<p>Le backend fonctionne, mais l\'interface ne peut pas se charger car le SDK ' +
+                    '<b>Ext JS 4.2</b> est absent.</p>' +
+                    '<p>Copiez le dossier <code>ext</code> de Prestige ' +
+                    '(<code>prestige/src/main/webapp/general/ext</code>) dans ' +
+                    '<code>src/main/webapp/ext</code>, puis reconstruisez le WAR. ' +
+                    'Fichiers attendus :</p>' +
+                    '<pre>ext/ext-all.js\next/packages/ext-theme-neptune/build/resources/ext-theme-neptune-all.css</pre>' +
+                    '<p>L\'API REST reste accessible sous <code>/ubisenderpro/api/v1/</code>.</p>' +
+                    '</div>';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE resources PUBLIC
+    "-//GlassFish.org//DTD GlassFish Application Server 3.1 Resource Definitions//EN"
+    "http://glassfish.org/dtds/glassfish-resources_1_5.dtd">
+<resources>
+    <!--
+        Option ACTIVE : pilote MySQL Connector/J (déjà présent sur la Payara de Prestige).
+        Le driver MySQL se connecte sans problème à MariaDB. Aucun jar à ajouter au serveur.
+    -->
+    <jdbc-connection-pool name="UbiSenderProPool"
+                          datasource-classname="com.mysql.jdbc.jdbc2.optional.MysqlDataSource"
+                          res-type="javax.sql.DataSource"
+                          is-isolation-level-guaranteed="false"
+                          steady-pool-size="4"
+                          max-pool-size="32">
+        <property name="url" value="jdbc:mysql://localhost:3306/ubisenderpro_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false"/>
+        <property name="user" value="ubisenderpro"/>
+        <property name="password" value="ubisenderpro"/>
+    </jdbc-connection-pool>
+
+    <jdbc-resource pool-name="UbiSenderProPool" jndi-name="UbiSenderProDS"/>
+
+    <!--
+        Option ALTERNATIVE : pilote MariaDB officiel.
+        À utiliser uniquement si vous déposez mariadb-java-client-2.7.4.jar dans
+        <PAYARA>/glassfish/domains/domain1/lib/. Dans ce cas, commentez le pool
+        MySQL ci-dessus et décommentez celui-ci.
+
+    <jdbc-connection-pool name="UbiSenderProPool"
+                          datasource-classname="org.mariadb.jdbc.MariaDbDataSource"
+                          res-type="javax.sql.DataSource"
+                          steady-pool-size="4" max-pool-size="32">
+        <property name="url" value="jdbc:mariadb://localhost:3306/ubisenderpro_db?useUnicode=true&amp;characterEncoding=UTF-8"/>
+        <property name="user" value="ubisenderpro"/>
+        <property name="password" value="ubisenderpro"/>
+    </jdbc-connection-pool>
+    <jdbc-resource pool-name="UbiSenderProPool" jndi-name="UbiSenderProDS"/>
+    -->
+</resources>
