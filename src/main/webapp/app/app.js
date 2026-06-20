@@ -125,6 +125,45 @@ Usp.showImport = function () {
     });
 };
 
+/* ---------- Tableau de bord ---------- */
+Usp.dashboardPanel = function () {
+    var panel = Ext.create('Ext.panel.Panel', {
+        title: 'Tableau de bord', autoScroll: true, bodyPadding: 16,
+        bodyStyle: 'background:#f4f6f8',
+        html: '<div style="color:#999">Chargement des indicateurs…</div>',
+        tbar: [{ text: 'Rafraîchir', handler: function () { charger(); } }]
+    });
+    var LIBELLES = {
+        comptesClients: 'Comptes clients', contacts: 'Contacts',
+        contactsWhatsapp: 'Contacts WhatsApp', contactsSansWhatsapp: 'Sans WhatsApp',
+        contactsConsentement: 'Consentement', contactsDesabonnes: 'Désabonnés',
+        articles: 'Articles', articlesActifs: 'Articles actifs', articlesRupture: 'En rupture',
+        conversationsOuvertes: 'Conversations ouvertes', conversationsNonLues: 'Non lues',
+        campagnesEnCours: 'Campagnes en cours', campagnesTerminees: 'Campagnes terminées',
+        commandes: 'Commandes', opportunitesOuvertes: 'Opportunités ouvertes', imports: 'Imports'
+    };
+    function carte(lib, val) {
+        return '<div style="display:inline-block;width:180px;margin:6px;padding:14px;background:#fff;' +
+            'border:1px solid #e0e0e0;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)">' +
+            '<div style="font-size:24px;font-weight:bold;color:#1976d2">' + (val == null ? '–' : val) + '</div>' +
+            '<div style="font-size:12px;color:#666">' + lib + '</div></div>';
+    }
+    function charger() {
+        Usp.ajax({
+            url: '/dashboard', method: 'GET',
+            success: function (resp) {
+                var d = Ext.decode(resp.responseText) || {};
+                var html = '';
+                Ext.Object.each(LIBELLES, function (k, lib) { html += carte(lib, d[k]); });
+                panel.update(html);
+            },
+            failure: function () { panel.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+        });
+    }
+    panel.on('afterrender', charger);
+    return panel;
+};
+
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
     Ext.create('Ext.container.Viewport', {
@@ -152,6 +191,7 @@ Usp.showMain = function () {
                 xtype: 'treepanel',
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
+                    fields: ['text', 'view', 'leaf'],
                     root: { expanded: true, children: [
                         { text: 'Tableau de bord', leaf: true, view: 'dashboard' },
                         { text: 'Discussions', leaf: true, view: 'inbox' },
@@ -166,13 +206,15 @@ Usp.showMain = function () {
                 }),
                 listeners: {
                     itemclick: function (v, rec) {
-                        switch (rec.get('view')) {
+                        var vue = rec.get('view') || (rec.raw && rec.raw.view);
+                        switch (vue) {
                             case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
                             case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
                             case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
                             case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
                             case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
                             case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
+                            case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
                             case 'import': Usp.showImport(); break;
                             default: Usp.loadCenter(Usp.clientsPanel());
                         }
@@ -184,7 +226,7 @@ Usp.showMain = function () {
                 xtype: 'panel',
                 itemId: 'center',
                 layout: 'fit',
-                items: [Usp.clientsPanel()]
+                items: [Usp.dashboardPanel()]
             }
         ]
     });
