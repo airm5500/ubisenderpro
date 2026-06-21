@@ -290,7 +290,7 @@ Usp.dashboardPanel = function () {
         title: 'Tableau de bord', autoScroll: true, bodyPadding: 18,
         bodyStyle: 'background:#eef1f5',
         html: '<div style="color:#999">Chargement des indicateurs…</div>',
-        tbar: [{ text: 'Rafraîchir', iconCls: '', handler: function () { charger(); } }]
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
     });
     var SECTIONS = [
         { titre: 'Clients & contacts', items: [
@@ -325,8 +325,8 @@ Usp.dashboardPanel = function () {
         ] }
     ];
     function carte(it, val) {
-        var nav = it.vue ? ' usp-card" data-vue="' + it.vue + '" style="cursor:pointer;' : '" style="';
-        return '<div class="' + nav +
+        var nav = it.vue ? ' data-vue="' + it.vue + '" style="cursor:pointer;' : ' style="';
+        return '<div class="usp-card"' + nav +
             'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:92px;margin:8px;' +
             'padding:14px 16px;background:#fff;border-radius:10px;border-left:5px solid ' + it.couleur + ';' +
             'box-shadow:0 1px 4px rgba(0,0,0,.08)">' +
@@ -392,7 +392,7 @@ Usp.tabPastille = function (tp, active) {
     if (!tp || !tp.items) { return; }
     tp.items.each(function (t) {
         if (t.baseTitle === undefined) { t.baseTitle = t.title; }
-        t.setTitle(t.baseTitle + (t === active ? ' ●' : ''));
+        t.setTitle(t.baseTitle + (t === active ? ' <span style="color:#25d366">●</span>' : ''));
     });
 };
 Usp.tabListeners = {
@@ -451,6 +451,7 @@ Usp.showMain = function () {
                 width: 220,
                 collapsible: true,
                 xtype: 'treepanel',
+                cls: 'usp-menu',
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
                     fields: ['text', 'baseText', 'view', 'leaf'],
