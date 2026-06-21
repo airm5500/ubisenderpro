@@ -9,7 +9,9 @@ import javax.ejb.EJB;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Canal WhatsApp Web (non officiel) : gestion des sessions et connexion par QR.
@@ -65,5 +67,36 @@ public class WaWebResource {
     public Response deconnecter(@PathParam("id") Long id) {
         service.deconnecter(id);
         return Response.noContent().build();
+    }
+
+    // ----- Filtre de numéros (Phase 3) -----
+    @POST
+    @Path("/sessions/{id}/check-numbers")
+    public Response verifier(@PathParam("id") Long id, Map<String, Object> body) {
+        List<String> numeros = new ArrayList<>();
+        Object src = body == null ? null : (body.containsKey("numeros") ? body.get("numeros") : body.get("numbers"));
+        if (src instanceof List) {
+            for (Object o : (List<?>) src) { if (o != null) numeros.add(String.valueOf(o)); }
+        }
+        return Response.ok(service.verifierNumeros(id, numeros)).build();
+    }
+
+    // ----- Extraction (Phase 4) -----
+    @GET
+    @Path("/sessions/{id}/contacts")
+    public Response contacts(@PathParam("id") Long id) {
+        return Response.ok(service.contacts(id)).build();
+    }
+
+    @GET
+    @Path("/sessions/{id}/groups")
+    public Response groupes(@PathParam("id") Long id) {
+        return Response.ok(service.groupes(id)).build();
+    }
+
+    @GET
+    @Path("/sessions/{id}/participants")
+    public Response participants(@PathParam("id") Long id, @QueryParam("jid") String jid) {
+        return Response.ok(service.participants(id, jid)).build();
     }
 }

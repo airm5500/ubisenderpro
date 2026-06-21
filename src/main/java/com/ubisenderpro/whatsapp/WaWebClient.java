@@ -68,6 +68,22 @@ public class WaWebClient {
         return appel("POST", "/sessions/" + sessionId + "/check-numbers", body);
     }
 
+    public JsonNode contacts(String sessionId) {
+        return appel("GET", "/sessions/" + sessionId + "/contacts", null);
+    }
+
+    public JsonNode groups(String sessionId) {
+        return appel("GET", "/sessions/" + sessionId + "/groups", null);
+    }
+
+    public JsonNode groupParticipants(String sessionId, String jid) {
+        return appel("GET", "/sessions/" + sessionId + "/groups/" + encode(jid) + "/participants", null);
+    }
+
+    private String encode(String s) {
+        try { return java.net.URLEncoder.encode(s, "UTF-8"); } catch (Exception e) { return s; }
+    }
+
     private SendResult envoiResultat(String path, Map<String, Object> body) {
         try {
             JsonNode node = appel("POST", path, body);

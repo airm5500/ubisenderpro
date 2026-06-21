@@ -26,6 +26,7 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
+  makeInMemoryStore,
   DisconnectReason
 } = require('@whiskeysockets/baileys');
 
@@ -76,6 +77,10 @@ async function startSession(id) {
   });
   s.sock = sock;
   s.starting = false;
+
+  // Store en mémoire : capture contacts/chats/groupes pour l'extraction.
+  if (!s.store) { s.store = makeInMemoryStore({ logger: pino({ level: 'silent' }) }); }
+  try { s.store.bind(sock.ev); } catch (e) { /* ignore */ }
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -205,6 +210,47 @@ app.post('/sessions/:id/check-numbers', async (req, res) => {
     } catch (e) { out.push({ number: n, exists: false, jid: null, erreur: String(e.message || e) }); }
   }
   res.json({ results: out });
+});
+
+// ----- Extraction (Phase 4) -----
+
+app.get('/sessions/:id/contacts', (req, res) => {
+  const s = requireConnected(req, res); if (!s) { return; }
+  const contacts = (s.store && s.store.contacts) || {};
+  const out = [];
+  for (const jid of Object.keys(contacts)) {
+    if (!jid.endsWith('@s.whatsapp.net')) { continue; }
+    const c = contacts[jid] || {};
+    out.push({
+      numero: jid.split('@')[0],
+      nom: c.name || c.notify || c.verifiedName || null
+    });
+  }
+  res.json({ total: out.length, contacts: out });
+});
+
+app.get('/sessions/:id/groups', async (req, res) => {
+  const s = requireConnected(req, res); if (!s) { return; }
+  try {
+    const map = await s.sock.groupFetchAllParticipating();
+    const out = Object.values(map || {}).map((g) => ({
+      jid: g.id, nom: g.subject || null,
+      taille: (g.participants || []).length
+    }));
+    res.json({ total: out.length, groups: out });
+  } catch (e) { res.status(502).json({ erreur: String(e.message || e) }); }
+});
+
+app.get('/sessions/:id/groups/:jid/participants', async (req, res) => {
+  const s = requireConnected(req, res); if (!s) { return; }
+  try {
+    const meta = await s.sock.groupMetadata(req.params.jid);
+    const out = (meta.participants || []).map((p) => ({
+      numero: String(p.id).split('@')[0],
+      admin: p.admin || null
+    }));
+    res.json({ jid: req.params.jid, nom: meta.subject || null, total: out.length, participants: out });
+  } catch (e) { res.status(502).json({ erreur: String(e.message || e) }); }
 });
 
 app.listen(PORT, () => logger.info('UbiSenderPro WA-Web sur le port ' + PORT));

@@ -70,6 +70,16 @@ public class WaWebSessionService {
         em.merge(s);
     }
 
+    // ----- Filtre de numéros (Phase 3) -----
+    public JsonNode verifierNumeros(Long id, List<String> numeros) {
+        return client.checkNumbers(nodeId(id), numeros);
+    }
+
+    // ----- Extraction (Phase 4) -----
+    public JsonNode contacts(Long id) { return client.contacts(nodeId(id)); }
+    public JsonNode groupes(Long id) { return client.groups(nodeId(id)); }
+    public JsonNode participants(Long id, String jid) { return client.groupParticipants(nodeId(id), jid); }
+
     private void appliquerEtat(WaWebSession s, JsonNode node) {
         if (node == null) return;
         String statut = node.path("status").asText(null);

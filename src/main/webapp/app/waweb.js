@@ -224,9 +224,151 @@ Usp.waweb.err = function (resp, def) {
     return def;
 };
 
+/* Combo des sessions (réutilisé par filtre/extraction). */
+Usp.waweb.sessionComboStore = function () {
+    return Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/wa-web/sessions',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+};
+
+/* Fenêtre d'export : numéros (et nom) prêts à copier / coller dans l'envoi en masse. */
+Usp.waweb.exportNumbers = function (lignes) {
+    Ext.create('Ext.window.Window', {
+        title: 'Numéros (' + lignes.length + ') — copier', width: 420, height: 460, modal: true, layout: 'fit',
+        bodyPadding: 6,
+        items: [{ xtype: 'textareafield', value: lignes.join('\n'), selectOnFocus: true }]
+    }).show();
+};
+
+/* ---------- Phase 3 : Filtre de numéros ---------- */
+Usp.waweb.filterPanel = function () {
+    var resStore = Ext.create('Ext.data.Store', { fields: ['numero', 'exists'] });
+    return {
+        xtype: 'panel', title: 'Filtre de numéros', layout: 'border',
+        items: [
+            { region: 'west', width: 330, xtype: 'form', bodyPadding: 10, border: false,
+              defaults: { anchor: '100%' },
+              items: [
+                { xtype: 'combobox', name: 'sessionId', itemId: 'fSession', fieldLabel: 'Compte', allowBlank: false,
+                  store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle',
+                  queryMode: 'local', editable: false },
+                { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 320,
+                  emptyText: 'Un numéro par ligne (format international)' }
+              ],
+              bbar: ['->', { text: 'Vérifier', handler: function (b) {
+                  var p = b.up('panel'); var f = p.down('form').getForm();
+                  var sid = p.down('#fSession').getValue();
+                  if (!sid) { Ext.Msg.alert('Info', 'Choisissez un compte.'); return; }
+                  var nums = (f.findField('numeros').getValue() || '').split(/\r?\n/)
+                      .map(function (s) { return s.replace(/[^0-9]/g, ''); })
+                      .filter(function (s) { return s.length >= 6; });
+                  if (!nums.length) { Ext.Msg.alert('Info', 'Saisissez des numéros.'); return; }
+                  b.disable();
+                  Usp.ajax({ url: '/wa-web/sessions/' + sid + '/check-numbers', method: 'POST',
+                      jsonData: { numeros: nums },
+                      success: function (resp) {
+                          b.enable();
+                          var r = Ext.decode(resp.responseText);
+                          resStore.loadData((r.results || []).map(function (x) {
+                              return { numero: x.number, exists: !!x.exists };
+                          }));
+                      },
+                      failure: function () { b.enable(); Ext.Msg.alert('Erreur', 'Service WhatsApp Web injoignable ou compte non connecté.'); } });
+              } }]
+            },
+            { region: 'center', xtype: 'grid', store: resStore,
+              columns: [
+                { text: 'Numéro', dataIndex: 'numero', flex: 1 },
+                { text: 'WhatsApp', dataIndex: 'exists', width: 140, renderer: function (v) {
+                    return v ? '<span style="color:#2e7d32">✔ Oui</span>' : '<span style="color:#c62828">✖ Non</span>';
+                } }
+              ],
+              tbar: [{ text: 'Copier les valides', handler: function () {
+                  var out = [];
+                  resStore.each(function (r) { if (r.get('exists')) { out.push(r.get('numero')); } });
+                  if (!out.length) { Ext.Msg.alert('Info', 'Aucun numéro valide.'); return; }
+                  Usp.waweb.exportNumbers(out);
+              } }]
+            }
+        ]
+    };
+};
+
+/* ---------- Phase 4 : Extraction contacts / groupes ---------- */
+Usp.waweb.extractPanel = function () {
+    var groupStore = Ext.create('Ext.data.Store', { fields: ['jid', 'nom', 'taille'] });
+    var resStore = Ext.create('Ext.data.Store', { fields: ['numero', 'info'] });
+    var sessionCombo = { xtype: 'combobox', itemId: 'xSession', fieldLabel: 'Compte', labelWidth: 60, width: 280,
+        store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle',
+        queryMode: 'local', editable: false };
+
+    var sid = function (c) { var v = c.up('panel').down('#xSession').getValue();
+        if (!v) { Ext.Msg.alert('Info', 'Choisissez un compte.'); } return v; };
+
+    return {
+        xtype: 'panel', title: 'Extraction', layout: 'border',
+        tbar: [ sessionCombo,
+            { text: 'Mes contacts', handler: function (b) {
+                var id = sid(b); if (!id) { return; } b.disable();
+                Usp.ajax({ url: '/wa-web/sessions/' + id + '/contacts', method: 'GET',
+                    success: function (resp) { b.enable();
+                        var r = Ext.decode(resp.responseText);
+                        resStore.loadData((r.contacts || []).map(function (c) {
+                            return { numero: c.numero, info: c.nom || '' }; }));
+                    },
+                    failure: function () { b.enable(); Ext.Msg.alert('Erreur', 'Extraction impossible (compte connecté ?).'); } });
+            } },
+            { text: 'Mes groupes', handler: function (b) {
+                var id = sid(b); if (!id) { return; } b.disable();
+                Usp.ajax({ url: '/wa-web/sessions/' + id + '/groups', method: 'GET',
+                    success: function (resp) { b.enable();
+                        var r = Ext.decode(resp.responseText);
+                        groupStore.loadData((r.groups || []).map(function (g) {
+                            return { jid: g.jid, nom: g.nom || g.jid, taille: g.taille }; }));
+                    },
+                    failure: function () { b.enable(); Ext.Msg.alert('Erreur', 'Extraction impossible (compte connecté ?).'); } });
+            } }
+        ],
+        items: [
+            { region: 'west', width: 320, xtype: 'grid', title: 'Groupes', store: groupStore,
+              columns: [
+                { text: 'Groupe', dataIndex: 'nom', flex: 1 },
+                { text: 'Membres', dataIndex: 'taille', width: 80 }
+              ],
+              listeners: { itemclick: function (g, rec) {
+                  var id = g.up('panel').down('#xSession').getValue(); if (!id) { return; }
+                  Usp.ajax({ url: '/wa-web/sessions/' + id + '/participants?jid=' + encodeURIComponent(rec.get('jid')), method: 'GET',
+                      success: function (resp) {
+                          var r = Ext.decode(resp.responseText);
+                          resStore.loadData((r.participants || []).map(function (p) {
+                              return { numero: p.numero, info: p.admin || '' }; }));
+                      },
+                      failure: function () { Ext.Msg.alert('Erreur', 'Membres indisponibles.'); } });
+              } }
+            },
+            { region: 'center', xtype: 'grid', title: 'Numéros', store: resStore,
+              columns: [
+                { text: 'Numéro', dataIndex: 'numero', flex: 1 },
+                { text: 'Nom / rôle', dataIndex: 'info', width: 200 }
+              ],
+              tbar: [{ text: 'Exporter (copier)', handler: function () {
+                  var out = [];
+                  resStore.each(function (r) { out.push(r.get('numero') + (r.get('info') ? ';' + r.get('info') : '')); });
+                  if (!out.length) { Ext.Msg.alert('Info', 'Rien à exporter.'); return; }
+                  Usp.waweb.exportNumbers(out);
+              } }]
+            }
+        ]
+    };
+};
+
 Usp.waweb.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'WhatsApp Web',
-        items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel()]
+        items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel(),
+                Usp.waweb.filterPanel(), Usp.waweb.extractPanel()]
     };
 };
