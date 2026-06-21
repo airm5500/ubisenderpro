@@ -102,12 +102,11 @@ public class ArticleImportService {
     }
 
     private void traiter(Map<String, String> ligne, ImportClientRequest req, ImportReport rapport, int num, Long importId) {
-        String code = val(ligne, req, "code_article");
+        String code = val(ligne, req, "pscode");
         String designation = val(ligne, req, "designation");
         String prix = val(ligne, req, "prix_vente");
 
-        if (code == null || code.isEmpty()) { rejeter(rapport, num, "Code article manquant", ligne, importId); return; }
-        if (designation == null || designation.isEmpty()) { rejeter(rapport, num, "Désignation manquante", ligne, importId); return; }
+        if (code == null || code.isEmpty()) { rejeter(rapport, num, "PS Code manquant", ligne, importId); return; }
 
         Optional<Article> existant = articleService.parCode(code);
         if (existant.isPresent() && "IGNORER".equalsIgnoreCase(req.getMode())) {
@@ -115,21 +114,42 @@ public class ArticleImportService {
             ImportSupport.enregistrerDetail(em, importId, num, "IGNORE", "Doublon ignoré (mode IGNORER)", ligne);
             return;
         }
+        // En création la désignation est requise ; en mise à jour on accepte une partie
+        // des colonnes seulement (mise à jour sélective, ex. dates de promo).
+        if (!existant.isPresent() && (designation == null || designation.isEmpty())) {
+            rejeter(rapport, num, "Désignation manquante", ligne, importId); return;
+        }
         Article a = existant.orElseGet(Article::new);
         boolean creation = !existant.isPresent();
 
-        a.setCodeArticle(code);
-        a.setDesignation(designation);
+        a.setPscode(code);
+        setIfPresent(designation, a::setDesignation);
         if (prix != null && !prix.isEmpty()) a.setPrixVente(parsePrix(prix));
+        String prixPublic = val(ligne, req, "prix_vente_public");
+        if (prixPublic != null && !prixPublic.isEmpty()) a.setPrixVentePublic(parsePrix(prixPublic));
         setIfPresent(val(ligne, req, "code_barres"), a::setCodeBarres);
         setIfPresent(val(ligne, req, "cip"), a::setCip);
         setIfPresent(val(ligne, req, "unite"), a::setUnite);
         setIfPresent(val(ligne, req, "image_url"), a::setImageUrl);
         setIfPresent(val(ligne, req, "lien_produit"), a::setLienProduit);
+        setIfPresent(val(ligne, req, "nom_promo"), a::setNomPromo);
+        setIfPresent(val(ligne, req, "code_promo"), a::setCodePromo);
+        Integer qteCmd = parseEntier(val(ligne, req, "quantite_commandee"));
+        if (qteCmd != null) a.setQuantiteCommandee(qteCmd);
+        Integer qteUg = parseEntier(val(ligne, req, "quantite_ug"));
+        if (qteUg != null) a.setQuantiteUg(qteUg);
         String promo = val(ligne, req, "prix_promotionnel");
         if (promo != null && !promo.isEmpty()) a.setPrixPromotionnel(parsePrix(promo));
         String stock = val(ligne, req, "stock_disponible");
         if (stock != null && !stock.isEmpty()) a.setStockDisponible(parsePrix(stock));
+
+        // Dates de promo composées : Année promo + mois/jour début (et mois/jour fin).
+        java.time.LocalDateTime dDebut = composerDate(val(ligne, req, "promo_annee"),
+                val(ligne, req, "promo_mois_debut"), val(ligne, req, "promo_jour_debut"), false);
+        if (dDebut != null) a.setDateDebutPromotion(dDebut);
+        java.time.LocalDateTime dFin = composerDate(val(ligne, req, "promo_annee"),
+                val(ligne, req, "promo_mois_fin"), val(ligne, req, "promo_jour_fin"), true);
+        if (dFin != null) a.setDateFinPromotion(dFin);
 
         String cat = val(ligne, req, "categorie");
         if (cat != null && !cat.isEmpty()) {
@@ -155,6 +175,22 @@ public class ArticleImportService {
         } catch (Exception e) {
             return BigDecimal.ZERO;
         }
+    }
+
+    private Integer parseEntier(String v) {
+        if (v == null || v.trim().isEmpty()) { return null; }
+        try { return (int) Math.round(Double.parseDouble(v.replaceAll("[^0-9.,-]", "").replace(",", "."))); }
+        catch (Exception e) { return null; }
+    }
+
+    /** Compose une date à partir d'année / mois / jour ; null si l'un manque ou est invalide. */
+    private java.time.LocalDateTime composerDate(String annee, String mois, String jour, boolean finJournee) {
+        Integer a = parseEntier(annee), m = parseEntier(mois), j = parseEntier(jour);
+        if (a == null || m == null || j == null) { return null; }
+        try {
+            java.time.LocalDate d = java.time.LocalDate.of(a, m, j);
+            return finJournee ? d.atTime(23, 59, 59) : d.atStartOfDay();
+        } catch (Exception e) { return null; }
     }
 
     private void rejeter(ImportReport rapport, int num, String msg, Map<String, String> ligne, Long importId) {

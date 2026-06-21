@@ -60,6 +60,7 @@ CREATE TABLE usp_utilisateur (
     id BIGINT NOT NULL AUTO_INCREMENT,
     login VARCHAR(100) NOT NULL,
     nom_complet VARCHAR(255) NOT NULL,
+    avatar VARCHAR(16),
     email VARCHAR(150),
     mot_de_passe_hash VARCHAR(255) NOT NULL,
     actif BOOLEAN NOT NULL DEFAULT TRUE,
@@ -69,6 +70,22 @@ CREATE TABLE usp_utilisateur (
     PRIMARY KEY (id),
     UNIQUE KEY uk_usp_utilisateur_login (login),
     KEY idx_usp_utilisateur_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_connexion_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    utilisateur_id BIGINT,
+    login VARCHAR(100),
+    session_token VARCHAR(120),
+    ip VARCHAR(60),
+    poste VARCHAR(255),
+    lieu VARCHAR(255),
+    connexion_at DATETIME NOT NULL,
+    deconnexion_at DATETIME,
+    duree_secondes BIGINT,
+    PRIMARY KEY (id),
+    KEY idx_usp_conlog_user (utilisateur_id),
+    KEY idx_usp_conlog_date (connexion_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE usp_utilisateur_role (
@@ -340,7 +357,7 @@ CREATE TABLE usp_marque (
 
 CREATE TABLE usp_article (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    code_article VARCHAR(50) NOT NULL,
+    pscode VARCHAR(50) NOT NULL,
     code_barres VARCHAR(50),
     cip VARCHAR(50),
     designation VARCHAR(255) NOT NULL,
@@ -349,7 +366,12 @@ CREATE TABLE usp_article (
     categorie_id BIGINT,
     marque_id BIGINT,
     prix_vente DECIMAL(15,2) NOT NULL DEFAULT 0,
+    prix_vente_public DECIMAL(15,2),
     prix_promotionnel DECIMAL(15,2),
+    quantite_commandee INT,
+    quantite_ug INT,
+    nom_promo VARCHAR(150),
+    code_promo VARCHAR(50),
     date_debut_promotion DATETIME,
     date_fin_promotion DATETIME,
     stock_disponible DECIMAL(15,3) NOT NULL DEFAULT 0,
@@ -363,12 +385,13 @@ CREATE TABLE usp_article (
     created_at DATETIME NOT NULL,
     updated_at DATETIME,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_usp_article_code (code_article),
+    UNIQUE KEY uk_usp_article_code (pscode),
     KEY idx_usp_article_designation (designation),
     KEY idx_usp_article_cip (cip),
     KEY idx_usp_article_barcode (code_barres),
     KEY idx_usp_article_categorie (categorie_id),
     KEY idx_usp_article_marque (marque_id),
+    KEY idx_usp_article_code_promo (code_promo),
     CONSTRAINT fk_usp_article_categorie FOREIGN KEY (categorie_id) REFERENCES usp_categorie_article(id),
     CONSTRAINT fk_usp_article_marque FOREIGN KEY (marque_id) REFERENCES usp_marque(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -848,6 +871,7 @@ CREATE TABLE usp_wa_bulk_job (
     media_type VARCHAR(20),
     media_mime VARCHAR(100),
     media_nom VARCHAR(255),
+    medias_json TEXT,
     attente_min INT NOT NULL DEFAULT 4,
     attente_max INT NOT NULL DEFAULT 8,
     pause_apres INT NOT NULL DEFAULT 10,

@@ -17,6 +17,7 @@ public class WaBulkRequest {
     private String mediaType;
     private String mediaMime;
     private String mediaNom;
+    private String mediasJson; // tableau JSON [{url,type,mime,nom}] (pièces jointes multiples)
     private Integer attenteMin;
     private Integer attenteMax;
     private Integer pauseApres;
@@ -50,6 +51,8 @@ public class WaBulkRequest {
     public void setMediaMime(String mediaMime) { this.mediaMime = mediaMime; }
     public String getMediaNom() { return mediaNom; }
     public void setMediaNom(String mediaNom) { this.mediaNom = mediaNom; }
+    public String getMediasJson() { return mediasJson; }
+    public void setMediasJson(String mediasJson) { this.mediasJson = mediasJson; }
     public Integer getAttenteMin() { return attenteMin; }
     public void setAttenteMin(Integer attenteMin) { this.attenteMin = attenteMin; }
     public Integer getAttenteMax() { return attenteMax; }

@@ -3,6 +3,8 @@ package com.ubisenderpro.rest;
 import com.ubisenderpro.dto.UserRequest;
 import com.ubisenderpro.entity.Role;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.service.ConnexionLogService;
+import com.ubisenderpro.service.JournalService;
 import com.ubisenderpro.service.UserService;
 
 import javax.ejb.EJB;
@@ -23,6 +25,10 @@ public class UserResource {
 
     @EJB
     private UserService userService;
+    @EJB
+    private ConnexionLogService connexionLogService;
+    @EJB
+    private JournalService journalService;
 
     @GET
     public List<Map<String, Object>> lister() {
@@ -67,5 +73,44 @@ public class UserResource {
     public Response desactiver(@PathParam("id") Long id) {
         userService.definirActif(id, false);
         return Response.ok().build();
+    }
+
+    @POST
+    @Path("/{id}/reset-password")
+    public Response reinitialiser(@PathParam("id") Long id, Map<String, Object> body) {
+        String nouveau = body == null ? null : (String) body.get("motDePasse");
+        String applique = userService.reinitialiserMotDePasse(id, nouveau);
+        return applique == null ? Response.status(Response.Status.NOT_FOUND).build()
+                : Response.ok(Map.of("motDePasse", applique)).build();
+    }
+
+    @GET
+    @Path("/connexions")
+    public List<com.ubisenderpro.entity.ConnexionLog> connexions(@QueryParam("limit") Integer limit) {
+        return connexionLogService.lister(limit == null ? 200 : limit);
+    }
+
+    @GET
+    @Path("/journal")
+    public List<com.ubisenderpro.entity.JournalAction> journal(@QueryParam("limit") Integer limit) {
+        return journalService.lister(limit == null ? 200 : limit);
+    }
+
+    /** Activité d'une session : menus parcourus + actions d'un utilisateur sur une fenêtre. */
+    @GET
+    @Path("/activite")
+    public List<com.ubisenderpro.entity.JournalAction> activite(@QueryParam("login") String login,
+                                                                @QueryParam("debut") String debut,
+                                                                @QueryParam("fin") String fin) {
+        return journalService.listerActivite(login, parse(debut), parse(fin));
+    }
+
+    private java.time.LocalDateTime parse(String s) {
+        if (s == null || s.trim().isEmpty()) { return null; }
+        try { return java.time.LocalDateTime.parse(s.trim().replace(' ', 'T').substring(0, 19)); }
+        catch (Exception e) {
+            try { return java.time.LocalDate.parse(s.trim().substring(0, 10)).atStartOfDay(); }
+            catch (Exception e2) { return null; }
+        }
     }
 }

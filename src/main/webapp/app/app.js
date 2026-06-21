@@ -60,6 +60,98 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Export CSV / PDF (réutilisable, sans dépendance) ---------- */
+Usp.export = {};
+
+/* Colonnes exportables d'une grille (avec dataIndex et libellé, hors colonnes d'action). */
+Usp.export.colonnes = function (grid) {
+    return grid.columns.filter(function (c) {
+        return c.dataIndex && c.text && !c.hidden;
+    }).map(function (c) {
+        return { d: c.dataIndex, t: Ext.String.trim(Ext.util.Format.stripTags(String(c.text))) || c.dataIndex };
+    });
+};
+
+Usp.export.valeur = function (rec, d) {
+    var v = rec.get(d);
+    if (v === null || v === undefined) { return ''; }
+    if (v === true) { return 'Oui'; }
+    if (v === false) { return 'Non'; }
+    v = String(v);
+    if (v.length >= 16 && v.charAt(10) === 'T') { v = v.replace('T', ' ').substring(0, 16); } // dates ISO
+    return v;
+};
+
+Usp.export.lignes = function (cols, records) {
+    return records.map(function (r) {
+        return cols.map(function (c) { return Usp.export.valeur(r, c.d); });
+    });
+};
+
+Usp.export.csv = function (titre, cols, records) {
+    var esc = function (s) { s = String(s == null ? '' : s); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    var out = [cols.map(function (c) { return esc(c.t); }).join(';')];
+    Usp.export.lignes(cols, records).forEach(function (row) { out.push(row.map(esc).join(';')); });
+    var blob = new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (titre || 'export') + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+};
+
+/* "PDF" via la boîte d'impression du navigateur (Enregistrer au format PDF). */
+Usp.export.pdf = function (titre, cols, records) {
+    var th = cols.map(function (c) { return '<th>' + Ext.String.htmlEncode(c.t) + '</th>'; }).join('');
+    var trs = Usp.export.lignes(cols, records).map(function (row) {
+        return '<tr>' + row.map(function (v) { return '<td>' + Ext.String.htmlEncode(v) + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    var html = '<html><head><meta charset="utf-8"><title>' + Ext.String.htmlEncode(titre) + '</title>' +
+        '<style>body{font-family:Arial,sans-serif;font-size:12px;margin:18px}h2{color:#1976d2;margin:0 0 4px}' +
+        'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}' +
+        'th{background:#1976d2;color:#fff}tr:nth-child(even){background:#f4f6f8}</style></head><body>' +
+        '<h2>' + Ext.String.htmlEncode(titre) + '</h2>' +
+        '<div style="color:#666;margin-bottom:8px">' + records.length + ' ligne(s) — ' + new Date().toLocaleString() + '</div>' +
+        '<table><thead><tr>' + th + '</tr></thead><tbody>' + trs + '</tbody></table>' +
+        '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>';
+    var w = window.open('', '_blank');
+    if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour générer le PDF.'); return; }
+    w.document.write(html); w.document.close();
+};
+
+/* Récupère toutes les lignes (va chercher le jeu complet si la grille est paginée). */
+Usp.export.recuperer = function (grid, cb) {
+    var store = grid.getStore();
+    var total = store.getTotalCount ? store.getTotalCount() : store.getCount();
+    if (!total || store.getCount() >= total) { cb(store.getRange()); return; }
+    var proxy = store.getProxy();
+    var params = Ext.apply({ start: 0, limit: 100000 }, proxy.extraParams);
+    Usp.ajax({
+        url: String(proxy.url).replace(Usp.apiBase, ''), method: 'GET', params: params,
+        success: function (resp) {
+            var data = Ext.decode(resp.responseText);
+            var rows = Ext.isArray(data) ? data : (data.data || []);
+            cb(rows.map(function (o) { return Ext.create(store.model, o); }));
+        },
+        failure: function () { cb(store.getRange()); }
+    });
+};
+
+/* Boutons « Export CSV » / « Export PDF » à ajouter à la tbar d'une grille. */
+Usp.export.boutons = function (titre) {
+    var faire = function (b, format) {
+        var grid = b.up('grid');
+        Usp.export.recuperer(grid, function (recs) {
+            var cols = Usp.export.colonnes(grid);
+            if (format === 'csv') { Usp.export.csv(titre, cols, recs); } else { Usp.export.pdf(titre, cols, recs); }
+        });
+    };
+    return [
+        { text: 'Export CSV', tooltip: 'Exporter en CSV (Excel)', handler: function (b) { faire(b, 'csv'); } },
+        { text: 'Export PDF', tooltip: 'Exporter en PDF (impression)', handler: function (b) { faire(b, 'pdf'); } }
+    ];
+};
+
 /* ---------- Fenêtre de connexion ---------- */
 Usp.showLogin = function () {
     Ext.create('Ext.window.Window', {
@@ -164,7 +256,7 @@ Usp.clientsPanel = function () {
             '->',
             { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
             { text: 'Importer Excel/CSV', handler: Usp.showImport }
-        ],
+        ].concat(Usp.export.boutons('Comptes clients')),
         bbar: {
             xtype: 'pagingtoolbar',
             store: store,
@@ -311,12 +403,77 @@ Usp.showImport = function () {
     });
 };
 
+/* Colonnes d'export des séries du graphe. */
+Usp.dashboardChart = function () { return Usp.dashboardChart._build(); };
+Usp.dashboardChart.COLS = [
+    { d: 'date', t: 'Jour' }, { d: 'campagnes', t: 'Campagnes' },
+    { d: 'waweb', t: 'WhatsApp Web (masse)' }, { d: 'api', t: 'Messages API' },
+    { d: 'discussions', t: 'Discussions (Web)' }
+];
+
+/* Graphe d'évolution (30 j) : campagnes, WhatsApp Web (masse), API, discussions. */
+Usp.dashboardChart._build = function () {
+    if (!(Ext.chart && Ext.chart.Chart)) { return null; } // graphiques absents du build Ext
+    var serieStore = Ext.create('Ext.data.Store', {
+        fields: ['date', 'campagnes', 'waweb', 'api', 'discussions'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/dashboard/series',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
+            extraParams: { jours: 30 } },
+        autoLoad: false
+    });
+    var ligne = function (champ, titre, couleur) {
+        return { type: 'line', axis: 'left', xField: 'date', yField: champ, title: titre, smooth: true,
+            style: { stroke: couleur, 'stroke-width': 2 },
+            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur } };
+    };
+    return {
+        xtype: 'panel', title: 'Évolution', anchor: '100%', height: 360,
+        margin: '6 0 0 0', layout: 'fit', bodyPadding: 4,
+        serieStore: serieStore,
+        tbar: ['Période :',
+            { xtype: 'combobox', width: 130, editable: false, queryMode: 'local',
+              value: 30, valueField: 'v', displayField: 'l',
+              store: Ext.create('Ext.data.Store', { fields: ['v', 'l'], data: [
+                  { v: 7, l: '7 jours' }, { v: 30, l: '30 jours' }, { v: 90, l: '90 jours' }] }),
+              listeners: { select: function (c) {
+                  serieStore.getProxy().extraParams = { jours: c.getValue() };
+                  serieStore.load();
+              } } },
+            '->',
+            { text: 'Export CSV', handler: function () {
+                Usp.export.csv('evolution', Usp.dashboardChart.COLS, serieStore.getRange()); } },
+            { text: 'Export PDF', handler: function () {
+                Usp.export.pdf('Évolution des envois', Usp.dashboardChart.COLS, serieStore.getRange()); } }
+        ],
+        items: [{
+            xtype: 'chart', store: serieStore, animate: true, shadow: false, insetPadding: 24,
+            legend: { position: 'top' },
+            axes: [
+                { type: 'Numeric', position: 'left', minimum: 0, title: 'Volume', grid: true,
+                  fields: ['campagnes', 'waweb', 'api', 'discussions'] },
+                { type: 'Category', position: 'bottom', fields: ['date'], title: 'Jour',
+                  label: { rotate: { degrees: 315 } } }
+            ],
+            series: [
+                ligne('campagnes', 'Campagnes', '#1976d2'),
+                ligne('waweb', 'WhatsApp Web (masse)', '#25d366'),
+                ligne('api', 'Messages API', '#6a1b9a'),
+                ligne('discussions', 'Discussions (Web)', '#ef6c00')
+            ]
+        }]
+    };
+};
+
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
+    var cartes = Ext.create('Ext.Component', { anchor: '100%',
+        html: '<div style="color:#999">Chargement des indicateurs…</div>' });
+    var graphe = Usp.dashboardChart();
+    var items = [cartes];
+    if (graphe) { items.push(graphe); }
     var panel = Ext.create('Ext.panel.Panel', {
-        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18,
-        bodyStyle: 'background:#eef1f5',
-        html: '<div style="color:#999">Chargement des indicateurs…</div>',
+        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
+        bodyStyle: 'background:#eef1f5', items: items,
         tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
     });
     var SECTIONS = [
@@ -349,6 +506,12 @@ Usp.dashboardPanel = function () {
             { k: 'commandes', lib: 'Commandes', icon: '🛒', couleur: '#6a1b9a' },
             { k: 'opportunitesOuvertes', lib: 'Opportunités ouvertes', icon: '🎯', couleur: '#ef6c00', vue: 'crm' },
             { k: 'imports', lib: 'Imports', icon: '📥', couleur: '#455a64' }
+        ] },
+        { titre: 'Activité & usage', items: [
+            { k: 'connexionsAujourdhui', lib: "Connexions aujourd'hui", icon: '🔑', couleur: '#1976d2', vue: 'users' },
+            { k: 'utilisateursActifs7j', lib: 'Utilisateurs actifs (7 j)', icon: '👥', couleur: '#2e7d32', vue: 'users' },
+            { k: 'sessionsEnCours', lib: 'Sessions en cours', icon: '🟢', couleur: '#00897b', vue: 'users' },
+            { k: 'messagesEnvoyesAujourdhui', lib: "Messages envoyés aujourd'hui", icon: '📤', couleur: '#1976d2', vue: 'historique' }
         ] }
     ];
     function carte(it, val) {
@@ -371,14 +534,15 @@ Usp.dashboardPanel = function () {
             sec.items.forEach(function (it) { html += carte(it, d[it.k]); });
             html += '</div>';
         });
-        panel.update(html);
+        cartes.update(html);
     }
     function charger() {
         Usp.ajax({
             url: '/dashboard', method: 'GET',
             success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
-            failure: function () { panel.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+            failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
         });
+        if (graphe && graphe.serieStore) { graphe.serieStore.load(); }
     }
     panel.on('afterrender', charger);
     // Clic sur une carte « navigable » : ouvre la vue correspondante.
@@ -438,6 +602,14 @@ Usp.menuChildren = function () {
 
 /* Charge la vue correspondante dans la zone centrale (menu + cartes du tableau de bord). */
 Usp.ouvrirVue = function (vue) {
+    // Journalise le menu parcouru (best-effort) pour retracer l'activité de session.
+    try {
+        var m = Usp.MENU.filter(function (x) { return x.view === vue; })[0];
+        if (Usp.token && vue) {
+            Usp.ajax({ url: '/auth/navigation', method: 'POST',
+                jsonData: { vue: vue, libelle: m ? m.text : vue } });
+        }
+    } catch (e) { /* non bloquant */ }
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
@@ -479,8 +651,9 @@ Usp.showMain = function () {
                           "%3C/svg%3E" +
                           '" style="width:18px;height:18px;vertical-align:middle"/>',
                       handler: function () {
-                        Usp.ajax({ url: '/auth/logout', method: 'POST' });
-                        location.reload();
+                        // Recharge seulement APRÈS la déconnexion (sinon la session n'est pas clôturée).
+                        Usp.ajax({ url: '/auth/logout', method: 'POST',
+                            callback: function () { location.reload(); } });
                     } }
                 ]
             },

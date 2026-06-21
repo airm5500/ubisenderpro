@@ -46,6 +46,10 @@ public class WaBulkJob {
     @Column(name = "media_nom", length = 255)
     private String mediaNom;
 
+    /** Pièces jointes multiples : tableau JSON [{url,type,mime,nom}]. */
+    @Column(name = "medias_json", columnDefinition = "TEXT")
+    private String mediasJson;
+
     // Réglages de débit (secondes).
     @Column(name = "attente_min", nullable = false)
     private int attenteMin = 4;
@@ -121,6 +125,8 @@ public class WaBulkJob {
     public void setMediaMime(String mediaMime) { this.mediaMime = mediaMime; }
     public String getMediaNom() { return mediaNom; }
     public void setMediaNom(String mediaNom) { this.mediaNom = mediaNom; }
+    public String getMediasJson() { return mediasJson; }
+    public void setMediasJson(String mediasJson) { this.mediasJson = mediasJson; }
     public int getAttenteMin() { return attenteMin; }
     public void setAttenteMin(int attenteMin) { this.attenteMin = attenteMin; }
     public int getAttenteMax() { return attenteMax; }

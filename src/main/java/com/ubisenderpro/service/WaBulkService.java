@@ -54,6 +54,7 @@ public class WaBulkService {
         j.setMediaType(req.getMediaType());
         j.setMediaMime(req.getMediaMime());
         j.setMediaNom(req.getMediaNom());
+        j.setMediasJson(vide(req.getMediasJson()) ? null : req.getMediasJson());
         if (req.getAttenteMin() != null) j.setAttenteMin(req.getAttenteMin());
         if (req.getAttenteMax() != null) j.setAttenteMax(req.getAttenteMax());
         if (req.getPauseApres() != null) j.setPauseApres(req.getPauseApres());
@@ -67,7 +68,7 @@ public class WaBulkService {
         }
 
         if (vide(j.getMsg1()) && vide(j.getMsg2()) && vide(j.getMsg3())
-                && vide(j.getMsg4()) && vide(j.getMsg5()) && vide(j.getMediaUrl())) {
+                && vide(j.getMsg4()) && vide(j.getMsg5()) && vide(j.getMediaUrl()) && vide(j.getMediasJson())) {
             throw new IllegalArgumentException("Renseignez au moins une variante de message ou une pièce jointe");
         }
 

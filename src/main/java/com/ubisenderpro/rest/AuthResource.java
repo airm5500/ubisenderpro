@@ -5,10 +5,13 @@ import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
 import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.AuthService;
+import com.ubisenderpro.service.ConnexionLogService;
+import com.ubisenderpro.service.GeoIpService;
 import com.ubisenderpro.service.JournalService;
 
 import javax.ejb.EJB;
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
@@ -27,12 +30,16 @@ public class AuthResource {
     private AuthService authService;
     @EJB
     private JournalService journalService;
+    @EJB
+    private ConnexionLogService connexionLogService;
+    @EJB
+    private GeoIpService geoIpService;
     @Inject
     private SessionStore sessionStore;
 
     @POST
     @Path("/login")
-    public Response login(LoginRequest req) {
+    public Response login(LoginRequest req, @Context HttpServletRequest request) {
         Optional<AuthenticatedUser> user = authService.authentifier(req.getLogin(), req.getMotDePasse());
         if (!user.isPresent()) {
             return Response.status(Response.Status.UNAUTHORIZED)
@@ -40,7 +47,10 @@ public class AuthResource {
         }
         AuthenticatedUser u = user.get();
         String token = sessionStore.create(u);
-        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), null, null);
+        String ip = ip(request);
+        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), "Connexion réussie", ip);
+        Long logId = connexionLogService.ouvrir(u.getId(), u.getLogin(), token, ip, poste(request), null);
+        geoIpService.localiser(logId, ip);
 
         Map<String, Object> reponse = new HashMap<>();
         reponse.put("token", token);
@@ -51,9 +61,46 @@ public class AuthResource {
     @POST
     @Path("/logout")
     @Secured
-    public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
-        sessionStore.invalidate(extraireToken(authHeader));
+    public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+                           @Context HttpServletRequest request) {
+        String token = extraireToken(authHeader);
+        AuthenticatedUser u = sessionStore.validate(token);
+        if (u != null) {
+            journalService.tracer(u.getId(), u.getLogin(), "DECONNEXION", "Utilisateur", u.getId(), "Déconnexion", ip(request));
+        }
+        connexionLogService.fermer(token);
+        sessionStore.invalidate(token);
         return Response.ok(Map.of("message", "Déconnecté")).build();
+    }
+
+    /** Journalise un menu parcouru (navigation), pour retracer l'activité d'une session. */
+    @POST
+    @Path("/navigation")
+    @Secured
+    public Response navigation(Map<String, Object> body,
+                               @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+                               @Context HttpServletRequest request) {
+        AuthenticatedUser u = sessionStore.validate(extraireToken(authHeader));
+        if (u != null) {
+            String libelle = body == null ? null : String.valueOf(body.getOrDefault("libelle", body.get("vue")));
+            journalService.tracer(u.getId(), u.getLogin(), "NAVIGATION", "Menu", null, libelle, ip(request));
+        }
+        return Response.ok().build();
+    }
+
+    /** IP cliente, en tenant compte d'un éventuel reverse-proxy (X-Forwarded-For). */
+    private String ip(HttpServletRequest r) {
+        if (r == null) { return null; }
+        String xff = r.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty()) { return xff.split(",")[0].trim(); }
+        return r.getRemoteAddr();
+    }
+
+    /** Nom du poste (résolution inverse de l'IP si le conteneur la fournit). */
+    private String poste(HttpServletRequest r) {
+        if (r == null) { return null; }
+        String h = r.getRemoteHost();
+        return (h != null && !h.equals(r.getRemoteAddr())) ? h : null;
     }
 
     @GET

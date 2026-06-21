@@ -12,8 +12,8 @@ public class Article {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "code_article", nullable = false, unique = true, length = 50)
-    private String codeArticle;
+    @Column(name = "pscode", nullable = false, unique = true, length = 50)
+    private String pscode;
 
     @Column(name = "code_barres", length = 50)
     private String codeBarres;
@@ -39,8 +39,24 @@ public class Article {
     @Column(name = "prix_vente", nullable = false, precision = 15, scale = 2)
     private BigDecimal prixVente = BigDecimal.ZERO;
 
+    @Column(name = "prix_vente_public", precision = 15, scale = 2)
+    private BigDecimal prixVentePublic;
+
     @Column(name = "prix_promotionnel", precision = 15, scale = 2)
     private BigDecimal prixPromotionnel;
+
+    @Column(name = "quantite_commandee")
+    private Integer quantiteCommandee;
+
+    /** Unités gratuites (UG) accordées pour la quantité commandée. */
+    @Column(name = "quantite_ug")
+    private Integer quantiteUg;
+
+    @Column(name = "nom_promo", length = 150)
+    private String nomPromo;
+
+    @Column(name = "code_promo", length = 50)
+    private String codePromo;
 
     @Column(name = "date_debut_promotion")
     private LocalDateTime dateDebutPromotion;
@@ -86,8 +102,8 @@ public class Article {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public String getCodeArticle() { return codeArticle; }
-    public void setCodeArticle(String codeArticle) { this.codeArticle = codeArticle; }
+    public String getPscode() { return pscode; }
+    public void setPscode(String pscode) { this.pscode = pscode; }
     public String getCodeBarres() { return codeBarres; }
     public void setCodeBarres(String codeBarres) { this.codeBarres = codeBarres; }
     public String getCip() { return cip; }
@@ -104,8 +120,18 @@ public class Article {
     public void setMarqueId(Long marqueId) { this.marqueId = marqueId; }
     public BigDecimal getPrixVente() { return prixVente; }
     public void setPrixVente(BigDecimal prixVente) { this.prixVente = prixVente; }
+    public BigDecimal getPrixVentePublic() { return prixVentePublic; }
+    public void setPrixVentePublic(BigDecimal prixVentePublic) { this.prixVentePublic = prixVentePublic; }
     public BigDecimal getPrixPromotionnel() { return prixPromotionnel; }
     public void setPrixPromotionnel(BigDecimal prixPromotionnel) { this.prixPromotionnel = prixPromotionnel; }
+    public Integer getQuantiteCommandee() { return quantiteCommandee; }
+    public void setQuantiteCommandee(Integer quantiteCommandee) { this.quantiteCommandee = quantiteCommandee; }
+    public Integer getQuantiteUg() { return quantiteUg; }
+    public void setQuantiteUg(Integer quantiteUg) { this.quantiteUg = quantiteUg; }
+    public String getNomPromo() { return nomPromo; }
+    public void setNomPromo(String nomPromo) { this.nomPromo = nomPromo; }
+    public String getCodePromo() { return codePromo; }
+    public void setCodePromo(String codePromo) { this.codePromo = codePromo; }
     public LocalDateTime getDateDebutPromotion() { return dateDebutPromotion; }
     public void setDateDebutPromotion(LocalDateTime dateDebutPromotion) { this.dateDebutPromotion = dateDebutPromotion; }
     public LocalDateTime getDateFinPromotion() { return dateFinPromotion; }

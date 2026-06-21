@@ -62,14 +62,7 @@ public class WaBulkSenderTx {
         String sessionId = WaWebSessionService.nodeId(job.getSessionId());
         String texte = personnaliser(choisirVariante(job), d.getNumero(), d.getNom());
 
-        WaWebClient.SendResult res;
-        if (job.getMediaUrl() != null && !job.getMediaUrl().isEmpty()) {
-            res = client.sendMedia(sessionId, d.getNumero(),
-                    job.getMediaType() == null ? "image" : job.getMediaType(),
-                    job.getMediaUrl(), texte, job.getMediaMime(), job.getMediaNom());
-        } else {
-            res = client.sendText(sessionId, d.getNumero(), texte);
-        }
+        WaWebClient.SendResult res = envoyerContenu(job, sessionId, d.getNumero(), texte);
 
         if (res.success) {
             d.setStatut("ENVOYE");
@@ -83,6 +76,55 @@ public class WaBulkSenderTx {
         em.merge(d);
         em.merge(job);
     }
+
+    /**
+     * Envoie le contenu d'un message : pièces jointes multiples (medias_json) si présentes,
+     * sinon média unique, sinon texte. Le texte sert de légende à la 1re pièce jointe.
+     */
+    private WaWebClient.SendResult envoyerContenu(WaBulkJob job, String sessionId, String numero, String texte) {
+        List<Map<String, String>> medias = mediasDuJob(job);
+        if (!medias.isEmpty()) {
+            WaWebClient.SendResult dernier = null;
+            for (int i = 0; i < medias.size(); i++) {
+                Map<String, String> m = medias.get(i);
+                String type = estVide(m.get("type")) ? "image" : m.get("type");
+                String legende = (i == 0) ? texte : null; // légende sur la 1re pièce jointe
+                dernier = client.sendMedia(sessionId, numero, type, m.get("url"), legende, m.get("mime"), m.get("nom"));
+                if (!dernier.success) { return dernier; } // échec dès qu'une pièce jointe échoue
+            }
+            return dernier;
+        }
+        if (job.getMediaUrl() != null && !job.getMediaUrl().isEmpty()) {
+            return client.sendMedia(sessionId, numero,
+                    job.getMediaType() == null ? "image" : job.getMediaType(),
+                    job.getMediaUrl(), texte, job.getMediaMime(), job.getMediaNom());
+        }
+        return client.sendText(sessionId, numero, texte);
+    }
+
+    /** Désérialise medias_json en liste [{url,type,mime,nom}] (vide si absent/illisible). */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, String>> mediasDuJob(WaBulkJob job) {
+        if (job.getMediasJson() == null || job.getMediasJson().trim().isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            List<Map<String, String>> l = MAPPER.readValue(job.getMediasJson(),
+                    new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {});
+            List<Map<String, String>> out = new ArrayList<>();
+            for (Map<String, String> m : l) {
+                if (m != null && m.get("url") != null && !m.get("url").isEmpty()) { out.add(m); }
+            }
+            return out;
+        } catch (Exception e) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private boolean estVide(String s) { return s == null || s.trim().isEmpty(); }
 
     /** Choisit aléatoirement une variante non vide parmi les 5 (anti-spam). */
     private String choisirVariante(WaBulkJob j) {
