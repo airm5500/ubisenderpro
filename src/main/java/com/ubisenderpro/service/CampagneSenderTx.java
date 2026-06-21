@@ -57,7 +57,8 @@ public class CampagneSenderTx {
                 d.getNumeroWhatsapp(),
                 modele.getNomModeleWhatsapp() != null ? modele.getNomModeleWhatsapp() : modele.getNom(),
                 modele.getLangue(),
-                Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()));
+                Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()),
+                modele.getEnteteMediaType(), modele.getEnteteMediaUrl());
 
         Campagne c = em.find(Campagne.class, d.getCampagneId());
         if (res.success) {

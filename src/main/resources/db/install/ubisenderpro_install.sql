@@ -452,6 +452,7 @@ CREATE TABLE usp_modele_message (
     categorie VARCHAR(40),
     entete_texte VARCHAR(255),
     entete_media_type VARCHAR(20),
+    entete_media_url VARCHAR(1000),
     corps TEXT NOT NULL,
     pied_de_page VARCHAR(255),
     boutons_json TEXT,

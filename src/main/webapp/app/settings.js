@@ -85,8 +85,9 @@ Usp.settings.accountForm = function (store, rec) {
 /* ---------- Modèles de messages ---------- */
 Usp.settings.templatesPanel = function () {
     var store = Usp.settings.jsonStore('/templates',
-        ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'corps',
-         'piedDePage', 'nomModeleWhatsapp', 'statutApprobation', 'actif']);
+        ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
+         'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
+         'statutApprobation', 'actif']);
 
     return {
         xtype: 'grid', title: 'Modèles de messages', store: store,
@@ -118,10 +119,17 @@ Usp.settings.templateForm = function (store, rec) {
                           'produit_disponible', 'fidelite'], queryMode: 'local' },
                 { xtype: 'textfield', name: 'langue', fieldLabel: 'Langue', value: 'fr' },
                 { xtype: 'textfield', name: 'categorie', fieldLabel: 'Catégorie' },
-                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête' },
+                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête (texte)' },
+                { xtype: 'combobox', name: 'enteteMediaType', fieldLabel: 'En-tête (média)', value: 'AUCUN',
+                  store: [['AUCUN', 'Aucun'], ['IMAGE', 'Image'], ['VIDEO', 'Vidéo'], ['DOCUMENT', 'Document']],
+                  queryMode: 'local', editable: false },
+                { xtype: 'textfield', name: 'enteteMediaUrl', fieldLabel: 'URL du média',
+                  emptyText: 'https://… (image/vidéo/document de l\'en-tête, pour IMAGE/VIDEO/DOCUMENT)' },
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
                   emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
+                { xtype: 'textareafield', name: 'boutonsJson', fieldLabel: 'Boutons (JSON)', height: 50,
+                  emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]' },
                 { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom du modèle Meta',
                   emptyText: 'Nom approuvé côté Meta (pour les campagnes)' },
                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',

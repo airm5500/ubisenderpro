@@ -106,14 +106,145 @@ Usp.clientsPanel = function () {
                     store.loadPage(1);
                 }, buffer: 400 } },
             '->',
-            { text: 'Importer Excel/CSV', iconCls: 'x-fa', handler: Usp.showImport }
+            { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
+            { text: 'Contacts', tooltip: 'Voir / ajouter les contacts du client sélectionné',
+              handler: function (b) {
+                  var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                  if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un client.'); return; }
+                  Usp.contactsWindow(rec.get('id'), rec.get('nomCompte'));
+              } },
+            { text: 'Importer Excel/CSV', handler: Usp.showImport }
         ],
         bbar: {
             xtype: 'pagingtoolbar',
             store: store,
             displayInfo: true
-        }
+        },
+        listeners: { itemdblclick: function (g, rec) { Usp.clientForm(store, rec); } }
     };
+};
+
+/* ---------- Formulaire client ---------- */
+Usp.segmentationCombo = function (cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'libelle',
+        queryMode: 'local', editable: false, anchor: '100%' }, cfg || {});
+};
+
+Usp.clientForm = function (store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier le client' : 'Nouveau client',
+        width: 520, modal: true, bodyPadding: 12, autoScroll: true,
+        items: [{
+            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            items: [
+                { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
+                { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
+                { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
+                { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
+                { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
+                Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
+                { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
+                { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
+                { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
+                { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
+                  store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
+                { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
+            ]
+        }],
+        buttons: [{
+            text: 'Enregistrer', formBind: true,
+            handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) { return; }
+                Usp.ajax({
+                    url: rec ? '/clients/' + rec.get('id') : '/clients',
+                    method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
+                    success: function () { win.close(); store.load(); },
+                    failure: function (resp) {
+                        Ext.Msg.alert('Erreur', 'Enregistrement impossible (numéro client en doublon ?).');
+                    }
+                });
+            }
+        }]
+    });
+    win.show();
+    if (rec) {
+        Usp.ajax({ url: '/clients/' + rec.get('id'), method: 'GET', success: function (resp) {
+            win.down('form').getForm().setValues(Ext.decode(resp.responseText));
+        } });
+    }
+};
+
+/* ---------- Contacts d'un client ---------- */
+Usp.contactsWindow = function (clientId, nomCompte) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nomComplet', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
+                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
+            reader: { type: 'json', root: 'data', totalProperty: 'total' } },
+        autoLoad: true
+    });
+    Ext.create('Ext.window.Window', {
+        title: 'Contacts — ' + nomCompte, width: 720, height: 420, modal: true, layout: 'fit',
+        items: [{
+            xtype: 'grid', store: store,
+            columns: [
+                { text: 'Nom', dataIndex: 'nomComplet', flex: 1 },
+                { text: 'Fonction', dataIndex: 'fonction', width: 120 },
+                { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 120 },
+                { text: 'WhatsApp', dataIndex: 'numeroWhatsapp', width: 130 },
+                { text: 'Principal', dataIndex: 'contactPrincipal', width: 70, renderer: function (v) { return v ? 'Oui' : ''; } },
+                { text: 'Désab.', dataIndex: 'desabonne', width: 60, renderer: function (v) { return v ? 'Oui' : ''; } }
+            ],
+            tbar: [{ text: 'Nouveau contact', handler: function () { Usp.contactForm(clientId, store, null); } }],
+            listeners: { itemdblclick: function (g, rec) { Usp.contactForm(clientId, store, rec); } }
+        }]
+    }).show();
+};
+
+Usp.contactForm = function (clientId, store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier le contact' : 'Nouveau contact', width: 480, modal: true, bodyPadding: 12,
+        items: [{
+            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            items: [
+                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
+                { xtype: 'textfield', name: 'fonction', fieldLabel: 'Fonction' },
+                { xtype: 'textfield', name: 'telephonePrincipal', fieldLabel: 'Téléphone' },
+                { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',
+                  emptyText: 'Format international, ex. 2250700000000' },
+                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                { xtype: 'checkbox', name: 'contactPrincipal', boxLabel: 'Contact principal' },
+                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' }
+            ]
+        }],
+        buttons: [{
+            text: 'Enregistrer', formBind: true,
+            handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) { return; }
+                var data = form.getValues();
+                data.clientId = clientId;
+                data.contactPrincipal = form.findField('contactPrincipal').getValue();
+                data.consentementWhatsapp = form.findField('consentementWhatsapp').getValue();
+                Usp.ajax({
+                    url: rec ? '/contacts/' + rec.get('id') : '/contacts',
+                    method: rec ? 'PUT' : 'POST', jsonData: data,
+                    success: function () { win.close(); store.load(); },
+                    failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
+                });
+            }
+        }]
+    });
+    win.show();
+    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
 };
 
 /* ---------- Assistant d'import (simplifié) ---------- */
@@ -164,6 +295,31 @@ Usp.dashboardPanel = function () {
     return panel;
 };
 
+/* ---------- Menu filtré par rôle ---------- */
+Usp.MENU = [
+    { text: 'Tableau de bord',     view: 'dashboard',  roles: null },
+    { text: 'Discussions',         view: 'inbox',      roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
+    { text: 'Comptes clients',     view: 'clients',    roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
+    { text: 'Catalogue',           view: 'catalogue',  roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
+    { text: 'Campagnes',           view: 'campaigns',  roles: ['ADMIN', 'MARKETING'] },
+    { text: 'CRM / Opportunités',  view: 'crm',        roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
+    { text: 'Importations',        view: 'import',     roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
+    { text: 'Paramètres',          view: 'settings',   roles: ['ADMIN'] },
+    { text: 'Utilisateurs',        view: 'users',      roles: ['ADMIN'] }
+];
+
+Usp.canSee = function (roles) {
+    if (!roles || roles.length === 0) { return true; }
+    var mine = (Usp.user && Usp.user.roles) || [];
+    if (mine.indexOf('ADMIN') !== -1) { return true; }
+    return roles.some(function (r) { return mine.indexOf(r) !== -1; });
+};
+
+Usp.menuChildren = function () {
+    return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
+        .map(function (m) { return { text: m.text, leaf: true, view: m.view }; });
+};
+
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
     Ext.create('Ext.container.Viewport', {
@@ -192,17 +348,7 @@ Usp.showMain = function () {
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
                     fields: ['text', 'view', 'leaf'],
-                    root: { expanded: true, children: [
-                        { text: 'Tableau de bord', leaf: true, view: 'dashboard' },
-                        { text: 'Discussions', leaf: true, view: 'inbox' },
-                        { text: 'Comptes clients', leaf: true, view: 'clients' },
-                        { text: 'Contacts', leaf: true, view: 'clients' },
-                        { text: 'Catalogue', leaf: true, view: 'catalogue' },
-                        { text: 'Campagnes', leaf: true, view: 'campaigns' },
-                        { text: 'CRM / Opportunités', leaf: true, view: 'crm' },
-                        { text: 'Importations', leaf: true, view: 'import' },
-                        { text: 'Paramètres', leaf: true, view: 'settings' }
-                    ] }
+                    root: { expanded: true, children: Usp.menuChildren() }
                 }),
                 listeners: {
                     itemclick: function (v, rec) {
@@ -214,9 +360,10 @@ Usp.showMain = function () {
                             case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
                             case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
                             case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
+                            case 'users': Usp.loadCenter(Usp.users.panel()); break;
                             case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
                             case 'import': Usp.showImport(); break;
-                            default: Usp.loadCenter(Usp.clientsPanel());
+                            default: Usp.loadCenter(Usp.dashboardPanel());
                         }
                     }
                 }

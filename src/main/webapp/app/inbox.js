@@ -67,6 +67,7 @@ Usp.inbox.panel = function () {
             { xtype: 'textfield', itemId: 'msgInput', flex: 1, emptyText: 'Écrire un message...',
               listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { Usp.inbox.envoyer(f); } } } },
             { xtype: 'button', text: 'Envoyer', handler: function (b) { Usp.inbox.envoyer(b.up('toolbar').down('#msgInput')); } },
+            { xtype: 'button', text: 'Joindre', tooltip: 'Envoyer une image / un document (par URL)', handler: function () { Usp.inbox.media(); } },
             { xtype: 'button', text: 'Note', tooltip: 'Note interne', handler: function (b) { Usp.inbox.note(b.up('toolbar').down('#msgInput')); } }
         ]
     });
@@ -136,6 +137,35 @@ Usp.inbox.envoyer = function (field) {
         success: function () { field.setValue(''); Usp.inbox.reloadMessages(); },
         failure: function () { Ext.Msg.alert('Erreur', 'Envoi impossible (vérifiez le compte WhatsApp et la fenêtre de 24h).'); }
     });
+};
+
+Usp.inbox.media = function () {
+    var conv = Usp.inbox.currentConv;
+    if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Joindre un média', width: 460, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'combobox', name: 'type', fieldLabel: 'Type', value: 'image',
+              store: [['image', 'Image'], ['video', 'Vidéo'], ['document', 'Document'], ['audio', 'Audio']],
+              queryMode: 'local', editable: false },
+            { xtype: 'textfield', name: 'url', fieldLabel: 'URL du fichier', allowBlank: false,
+              emptyText: 'https://… (lien public du fichier)' },
+            { xtype: 'textfield', name: 'legende', fieldLabel: 'Légende' }
+        ] }],
+        buttons: [{ text: 'Envoyer', handler: function (b) {
+            var f = b.up('window').down('form').getForm();
+            if (!f.isValid()) { return; }
+            var v = f.getValues();
+            Usp.ajax({
+                url: '/whatsapp/messages/media', method: 'POST',
+                jsonData: { accountId: conv.get('whatsappAccountId'), numero: conv.get('numeroWhatsapp'),
+                            type: v.type, url: v.url, legende: v.legende },
+                success: function () { win.close(); Usp.inbox.reloadMessages(); },
+                failure: function () { Ext.Msg.alert('Erreur', 'Envoi du média impossible.'); }
+            });
+        } }]
+    });
+    win.show();
 };
 
 Usp.inbox.note = function (field) {

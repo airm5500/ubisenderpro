@@ -1,0 +1,826 @@
+From 7de8cb27c9a1b4190a0ffb420fb3a6d12f62896c Mon Sep 17 00:00:00 2001
+From: airm5500 <nzifranck13@gmail.com>
+Date: Sun, 21 Jun 2026 00:13:22 +0000
+Subject: [PATCH] Modeles avec media, creation client/contacts, gestion
+ utilisateurs + menus par role
+
+- Modeles de message: en-tete media (image/video/document) + URL + boutons; envoi via Cloud API
+- Discussions: bouton "Joindre" pour envoyer un media par URL
+- Creation/edition manuelle de client et de ses contacts depuis la vue
+- Gestion des utilisateurs applicatifs avec roles (UserResource/UserService) reservee ADMIN
+- Menus filtres selon les roles de l'utilisateur connecte
+- Migration V8: colonne entete_media_url; script d'install a jour
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0176p5c2TVsNcUhUftqkef1E
+---
+ .../com/ubisenderpro/dto/UserRequest.java     |  30 +++
+ .../ubisenderpro/entity/ModeleMessage.java    |   5 +
+ .../com/ubisenderpro/rest/UserResource.java   |  71 +++++++
+ .../service/CampagneSenderTx.java             |   3 +-
+ .../com/ubisenderpro/service/UserService.java | 105 +++++++++++
+ .../whatsapp/WhatsappCloudClient.java         |  44 ++++-
+ .../db/install/ubisenderpro_install.sql       |   1 +
+ .../db/migration/V8__modele_media.sql         |   6 +
+ src/main/webapp/app/app.js                    | 175 ++++++++++++++++--
+ src/main/webapp/app/inbox.js                  |  30 +++
+ src/main/webapp/app/settings.js               |  14 +-
+ src/main/webapp/app/users.js                  | 104 +++++++++++
+ src/main/webapp/index.html                    |   3 +-
+ 13 files changed, 566 insertions(+), 25 deletions(-)
+ create mode 100644 src/main/java/com/ubisenderpro/dto/UserRequest.java
+ create mode 100644 src/main/java/com/ubisenderpro/rest/UserResource.java
+ create mode 100644 src/main/java/com/ubisenderpro/service/UserService.java
+ create mode 100644 src/main/resources/db/migration/V8__modele_media.sql
+ create mode 100644 src/main/webapp/app/users.js
+
+diff --git a/src/main/java/com/ubisenderpro/dto/UserRequest.java b/src/main/java/com/ubisenderpro/dto/UserRequest.java
+new file mode 100644
+index 0000000..264f4b0
+--- /dev/null
++++ b/src/main/java/com/ubisenderpro/dto/UserRequest.java
+@@ -0,0 +1,30 @@
++package com.ubisenderpro.dto;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ * Données de création/modification d'un utilisateur applicatif.
++ * roles = liste de codes de rôle (ADMIN, MARKETING, SUPERVISEUR, AGENT, CATALOGUE, LECTURE).
++ */
++public class UserRequest {
++    private String login;
++    private String nomComplet;
++    private String email;
++    private String motDePasse;
++    private Boolean actif;
++    private List<String> roles = new ArrayList<>();
++
++    public String getLogin() { return login; }
++    public void setLogin(String login) { this.login = login; }
++    public String getNomComplet() { return nomComplet; }
++    public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
++    public String getEmail() { return email; }
++    public void setEmail(String email) { this.email = email; }
++    public String getMotDePasse() { return motDePasse; }
++    public void setMotDePasse(String motDePasse) { this.motDePasse = motDePasse; }
++    public Boolean getActif() { return actif; }
++    public void setActif(Boolean actif) { this.actif = actif; }
++    public List<String> getRoles() { return roles; }
++    public void setRoles(List<String> roles) { this.roles = roles; }
++}
+diff --git a/src/main/java/com/ubisenderpro/entity/ModeleMessage.java b/src/main/java/com/ubisenderpro/entity/ModeleMessage.java
+index 634b087..cbff6e6 100644
+--- a/src/main/java/com/ubisenderpro/entity/ModeleMessage.java
++++ b/src/main/java/com/ubisenderpro/entity/ModeleMessage.java
+@@ -29,6 +29,9 @@ public class ModeleMessage {
+     @Column(name = "entete_media_type", length = 20)
+     private String enteteMediaType;
+ 
++    @Column(name = "entete_media_url", length = 1000)
++    private String enteteMediaUrl;
++
+     @Column(name = "corps", nullable = false, columnDefinition = "TEXT")
+     private String corps;
+ 
+@@ -70,6 +73,8 @@ public class ModeleMessage {
+     public void setEnteteTexte(String enteteTexte) { this.enteteTexte = enteteTexte; }
+     public String getEnteteMediaType() { return enteteMediaType; }
+     public void setEnteteMediaType(String enteteMediaType) { this.enteteMediaType = enteteMediaType; }
++    public String getEnteteMediaUrl() { return enteteMediaUrl; }
++    public void setEnteteMediaUrl(String enteteMediaUrl) { this.enteteMediaUrl = enteteMediaUrl; }
+     public String getCorps() { return corps; }
+     public void setCorps(String corps) { this.corps = corps; }
+     public String getPiedDePage() { return piedDePage; }
+diff --git a/src/main/java/com/ubisenderpro/rest/UserResource.java b/src/main/java/com/ubisenderpro/rest/UserResource.java
+new file mode 100644
+index 0000000..fb2e088
+--- /dev/null
++++ b/src/main/java/com/ubisenderpro/rest/UserResource.java
+@@ -0,0 +1,71 @@
++package com.ubisenderpro.rest;
++
++import com.ubisenderpro.dto.UserRequest;
++import com.ubisenderpro.entity.Role;
++import com.ubisenderpro.security.Secured;
++import com.ubisenderpro.service.UserService;
++
++import javax.ejb.EJB;
++import javax.ws.rs.*;
++import javax.ws.rs.core.MediaType;
++import javax.ws.rs.core.Response;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * Gestion des utilisateurs applicatifs — réservée aux administrateurs.
++ */
++@Path("/users")
++@Secured(roles = {"ADMIN"})
++@Produces(MediaType.APPLICATION_JSON)
++@Consumes(MediaType.APPLICATION_JSON)
++public class UserResource {
++
++    @EJB
++    private UserService userService;
++
++    @GET
++    public List<Map<String, Object>> lister() {
++        return userService.lister();
++    }
++
++    @GET
++    @Path("/roles")
++    public List<Role> roles() {
++        return userService.listerRoles();
++    }
++
++    @POST
++    public Response creer(UserRequest req) {
++        if (req.getLogin() == null || req.getLogin().isEmpty()) {
++            return Response.status(Response.Status.BAD_REQUEST)
++                    .entity(Map.of("erreur", "Login obligatoire")).build();
++        }
++        if (userService.loginExiste(req.getLogin(), null)) {
++            return Response.status(Response.Status.CONFLICT)
++                    .entity(Map.of("erreur", "Ce login existe déjà")).build();
++        }
++        return Response.status(Response.Status.CREATED).entity(userService.creer(req)).build();
++    }
++
++    @PUT
++    @Path("/{id}")
++    public Response modifier(@PathParam("id") Long id, UserRequest req) {
++        Map<String, Object> u = userService.modifier(id, req);
++        return u == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(u).build();
++    }
++
++    @POST
++    @Path("/{id}/activate")
++    public Response activer(@PathParam("id") Long id) {
++        userService.definirActif(id, true);
++        return Response.ok().build();
++    }
++
++    @POST
++    @Path("/{id}/deactivate")
++    public Response desactiver(@PathParam("id") Long id) {
++        userService.definirActif(id, false);
++        return Response.ok().build();
++    }
++}
+diff --git a/src/main/java/com/ubisenderpro/service/CampagneSenderTx.java b/src/main/java/com/ubisenderpro/service/CampagneSenderTx.java
+index 0584db1..9d047a8 100644
+--- a/src/main/java/com/ubisenderpro/service/CampagneSenderTx.java
++++ b/src/main/java/com/ubisenderpro/service/CampagneSenderTx.java
+@@ -57,7 +57,8 @@ public class CampagneSenderTx {
+                 d.getNumeroWhatsapp(),
+                 modele.getNomModeleWhatsapp() != null ? modele.getNomModeleWhatsapp() : modele.getNom(),
+                 modele.getLangue(),
+-                Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()));
++                Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()),
++                modele.getEnteteMediaType(), modele.getEnteteMediaUrl());
+ 
+         Campagne c = em.find(Campagne.class, d.getCampagneId());
+         if (res.success) {
+diff --git a/src/main/java/com/ubisenderpro/service/UserService.java b/src/main/java/com/ubisenderpro/service/UserService.java
+new file mode 100644
+index 0000000..82eb35d
+--- /dev/null
++++ b/src/main/java/com/ubisenderpro/service/UserService.java
+@@ -0,0 +1,105 @@
++package com.ubisenderpro.service;
++
++import com.ubisenderpro.dto.UserRequest;
++import com.ubisenderpro.entity.Role;
++import com.ubisenderpro.entity.Utilisateur;
++import com.ubisenderpro.security.PasswordHasher;
++
++import javax.ejb.Stateless;
++import javax.persistence.EntityManager;
++import javax.persistence.PersistenceContext;
++import java.util.HashSet;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Optional;
++import java.util.Set;
++import java.util.stream.Collectors;
++
++/**
++ * Gestion des utilisateurs applicatifs et de leurs rôles (section 26 de la spec).
++ */
++@Stateless
++public class UserService {
++
++    @PersistenceContext(unitName = "ubisenderproPU")
++    private EntityManager em;
++
++    public List<Role> listerRoles() {
++        return em.createQuery("SELECT r FROM Role r WHERE r.actif = true ORDER BY r.libelle", Role.class)
++                .getResultList();
++    }
++
++    /** Liste des utilisateurs sans exposer le hash du mot de passe. */
++    public List<Map<String, Object>> lister() {
++        List<Utilisateur> users = em.createQuery(
++                "SELECT u FROM Utilisateur u ORDER BY u.login", Utilisateur.class).getResultList();
++        return users.stream().map(this::toMap).collect(Collectors.toList());
++    }
++
++    public Map<String, Object> toMap(Utilisateur u) {
++        Map<String, Object> m = new LinkedHashMap<>();
++        m.put("id", u.getId());
++        m.put("login", u.getLogin());
++        m.put("nomComplet", u.getNomComplet());
++        m.put("email", u.getEmail());
++        m.put("actif", u.isActif());
++        m.put("derniereConnexion", u.getDerniereConnexion());
++        m.put("roles", u.getRoles().stream().map(Role::getCode).collect(Collectors.toList()));
++        return m;
++    }
++
++    public Optional<Utilisateur> parId(Long id) { return Optional.ofNullable(em.find(Utilisateur.class, id)); }
++
++    public boolean loginExiste(String login, Long exclureId) {
++        List<Utilisateur> l = em.createQuery(
++                "SELECT u FROM Utilisateur u WHERE u.login = :l", Utilisateur.class)
++                .setParameter("l", login).getResultList();
++        return l.stream().anyMatch(u -> exclureId == null || !u.getId().equals(exclureId));
++    }
++
++    public Map<String, Object> creer(UserRequest req) {
++        Utilisateur u = new Utilisateur();
++        u.setLogin(req.getLogin());
++        u.setNomComplet(req.getNomComplet());
++        u.setEmail(req.getEmail());
++        u.setActif(req.getActif() == null || req.getActif());
++        String mdp = (req.getMotDePasse() == null || req.getMotDePasse().isEmpty())
++                ? "Change@2026" : req.getMotDePasse();
++        u.setMotDePasseHash(PasswordHasher.hash(mdp));
++        u.setRoles(resoudreRoles(req.getRoles()));
++        em.persist(u);
++        return toMap(u);
++    }
++
++    public Map<String, Object> modifier(Long id, UserRequest req) {
++        Utilisateur u = em.find(Utilisateur.class, id);
++        if (u == null) return null;
++        if (req.getNomComplet() != null) u.setNomComplet(req.getNomComplet());
++        if (req.getEmail() != null) u.setEmail(req.getEmail());
++        if (req.getActif() != null) u.setActif(req.getActif());
++        if (req.getMotDePasse() != null && !req.getMotDePasse().isEmpty()) {
++            u.setMotDePasseHash(PasswordHasher.hash(req.getMotDePasse()));
++        }
++        if (req.getRoles() != null && !req.getRoles().isEmpty()) {
++            u.setRoles(resoudreRoles(req.getRoles()));
++        }
++        em.merge(u);
++        return toMap(u);
++    }
++
++    public void definirActif(Long id, boolean actif) {
++        parId(id).ifPresent(u -> { u.setActif(actif); em.merge(u); });
++    }
++
++    private Set<Role> resoudreRoles(List<String> codes) {
++        Set<Role> roles = new HashSet<>();
++        if (codes == null) return roles;
++        for (String code : codes) {
++            List<Role> r = em.createQuery("SELECT r FROM Role r WHERE r.code = :c", Role.class)
++                    .setParameter("c", code).setMaxResults(1).getResultList();
++            if (!r.isEmpty()) roles.add(r.get(0));
++        }
++        return roles;
++    }
++}
+diff --git a/src/main/java/com/ubisenderpro/whatsapp/WhatsappCloudClient.java b/src/main/java/com/ubisenderpro/whatsapp/WhatsappCloudClient.java
+index 5c89594..8b7e9c4 100644
+--- a/src/main/java/com/ubisenderpro/whatsapp/WhatsappCloudClient.java
++++ b/src/main/java/com/ubisenderpro/whatsapp/WhatsappCloudClient.java
+@@ -65,10 +65,21 @@ public class WhatsappCloudClient {
+     }
+ 
+     /**
+-     * Envoie un message à partir d'un modèle approuvé par Meta.
+-     * Les variables du corps sont passées dans l'ordre.
++     * Envoie un message à partir d'un modèle approuvé par Meta (corps seul).
+      */
+     public SendResult envoyerModele(String destinataire, String nomModele, String langue, List<String> variables) {
++        return envoyerModele(destinataire, nomModele, langue, variables, null, null);
++    }
++
++    /**
++     * Envoie un modèle avec, en option, un média d'en-tête (IMAGE, VIDEO ou DOCUMENT)
++     * fourni par URL publique.
++     *
++     * @param enteteMediaType IMAGE | VIDEO | DOCUMENT (ou null/TEXTE/AUCUN pour aucun média)
++     * @param enteteMediaUrl  URL publique du média d'en-tête
++     */
++    public SendResult envoyerModele(String destinataire, String nomModele, String langue,
++                                    List<String> variables, String enteteMediaType, String enteteMediaUrl) {
+         Map<String, Object> body = baseBody(destinataire, "template");
+         Map<String, Object> template = new HashMap<>();
+         template.put("name", nomModele);
+@@ -76,17 +87,38 @@ public class WhatsappCloudClient {
+         language.put("code", langue == null ? "fr" : langue);
+         template.put("language", language);
+ 
++        List<Object> components = new java.util.ArrayList<>();
++
++        // En-tête média éventuel.
++        String type = enteteMediaType == null ? "" : enteteMediaType.trim().toUpperCase();
++        if (enteteMediaUrl != null && !enteteMediaUrl.isEmpty()
++                && (type.equals("IMAGE") || type.equals("VIDEO") || type.equals("DOCUMENT"))) {
++            Map<String, Object> media = new HashMap<>();
++            media.put("link", enteteMediaUrl);
++            Map<String, Object> param = new HashMap<>();
++            param.put("type", type.toLowerCase());
++            param.put(type.toLowerCase(), media);
++            Map<String, Object> header = new HashMap<>();
++            header.put("type", "header");
++            header.put("parameters", new Object[]{param});
++            components.add(header);
++        }
++
+         if (variables != null && !variables.isEmpty()) {
+-            Map<String, Object> component = new HashMap<>();
+-            component.put("type", "body");
++            Map<String, Object> bodyComp = new HashMap<>();
++            bodyComp.put("type", "body");
+             Object[] params = variables.stream().map(v -> {
+                 Map<String, Object> p = new HashMap<>();
+                 p.put("type", "text");
+                 p.put("text", v);
+                 return p;
+             }).toArray();
+-            component.put("parameters", params);
+-            template.put("components", new Object[]{component});
++            bodyComp.put("parameters", params);
++            components.add(bodyComp);
++        }
++
++        if (!components.isEmpty()) {
++            template.put("components", components.toArray());
+         }
+         body.put("template", template);
+         return envoyer(body);
+diff --git a/src/main/resources/db/install/ubisenderpro_install.sql b/src/main/resources/db/install/ubisenderpro_install.sql
+index 1de8883..df1f4bd 100644
+--- a/src/main/resources/db/install/ubisenderpro_install.sql
++++ b/src/main/resources/db/install/ubisenderpro_install.sql
+@@ -452,6 +452,7 @@ CREATE TABLE usp_modele_message (
+     categorie VARCHAR(40),
+     entete_texte VARCHAR(255),
+     entete_media_type VARCHAR(20),
++    entete_media_url VARCHAR(1000),
+     corps TEXT NOT NULL,
+     pied_de_page VARCHAR(255),
+     boutons_json TEXT,
+diff --git a/src/main/resources/db/migration/V8__modele_media.sql b/src/main/resources/db/migration/V8__modele_media.sql
+new file mode 100644
+index 0000000..29e482a
+--- /dev/null
++++ b/src/main/resources/db/migration/V8__modele_media.sql
+@@ -0,0 +1,6 @@
++-- =====================================================================
++-- UbiSenderPro - V8 : média d'en-tête des modèles de message
++-- =====================================================================
++
++ALTER TABLE usp_modele_message
++    ADD COLUMN entete_media_url VARCHAR(1000) AFTER entete_media_type;
+diff --git a/src/main/webapp/app/app.js b/src/main/webapp/app/app.js
+index aa37215..a9b71cb 100644
+--- a/src/main/webapp/app/app.js
++++ b/src/main/webapp/app/app.js
+@@ -106,16 +106,147 @@ Usp.clientsPanel = function () {
+                     store.loadPage(1);
+                 }, buffer: 400 } },
+             '->',
+-            { text: 'Importer Excel/CSV', iconCls: 'x-fa', handler: Usp.showImport }
++            { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
++            { text: 'Contacts', tooltip: 'Voir / ajouter les contacts du client sélectionné',
++              handler: function (b) {
++                  var rec = b.up('grid').getSelectionModel().getSelection()[0];
++                  if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un client.'); return; }
++                  Usp.contactsWindow(rec.get('id'), rec.get('nomCompte'));
++              } },
++            { text: 'Importer Excel/CSV', handler: Usp.showImport }
+         ],
+         bbar: {
+             xtype: 'pagingtoolbar',
+             store: store,
+             displayInfo: true
+-        }
++        },
++        listeners: { itemdblclick: function (g, rec) { Usp.clientForm(store, rec); } }
+     };
+ };
+ 
++/* ---------- Formulaire client ---------- */
++Usp.segmentationCombo = function (cfg) {
++    var store = Ext.create('Ext.data.Store', {
++        fields: ['id', 'libelle'],
++        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
++            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
++        autoLoad: true
++    });
++    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'libelle',
++        queryMode: 'local', editable: false, anchor: '100%' }, cfg || {});
++};
++
++Usp.clientForm = function (store, rec) {
++    var win = Ext.create('Ext.window.Window', {
++        title: rec ? 'Modifier le client' : 'Nouveau client',
++        width: 520, modal: true, bodyPadding: 12, autoScroll: true,
++        items: [{
++            xtype: 'form', border: false, defaults: { anchor: '100%' },
++            items: [
++                { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
++                { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
++                { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
++                { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
++                { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
++                Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
++                { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
++                { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
++                { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
++                { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
++                  store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
++                { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
++            ]
++        }],
++        buttons: [{
++            text: 'Enregistrer', formBind: true,
++            handler: function (b) {
++                var form = b.up('window').down('form').getForm();
++                if (!form.isValid()) { return; }
++                Usp.ajax({
++                    url: rec ? '/clients/' + rec.get('id') : '/clients',
++                    method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
++                    success: function () { win.close(); store.load(); },
++                    failure: function (resp) {
++                        Ext.Msg.alert('Erreur', 'Enregistrement impossible (numéro client en doublon ?).');
++                    }
++                });
++            }
++        }]
++    });
++    win.show();
++    if (rec) {
++        Usp.ajax({ url: '/clients/' + rec.get('id'), method: 'GET', success: function (resp) {
++            win.down('form').getForm().setValues(Ext.decode(resp.responseText));
++        } });
++    }
++};
++
++/* ---------- Contacts d'un client ---------- */
++Usp.contactsWindow = function (clientId, nomCompte) {
++    var store = Ext.create('Ext.data.Store', {
++        fields: ['id', 'nomComplet', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
++                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne'],
++        proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
++            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
++            reader: { type: 'json', root: 'data', totalProperty: 'total' } },
++        autoLoad: true
++    });
++    Ext.create('Ext.window.Window', {
++        title: 'Contacts — ' + nomCompte, width: 720, height: 420, modal: true, layout: 'fit',
++        items: [{
++            xtype: 'grid', store: store,
++            columns: [
++                { text: 'Nom', dataIndex: 'nomComplet', flex: 1 },
++                { text: 'Fonction', dataIndex: 'fonction', width: 120 },
++                { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 120 },
++                { text: 'WhatsApp', dataIndex: 'numeroWhatsapp', width: 130 },
++                { text: 'Principal', dataIndex: 'contactPrincipal', width: 70, renderer: function (v) { return v ? 'Oui' : ''; } },
++                { text: 'Désab.', dataIndex: 'desabonne', width: 60, renderer: function (v) { return v ? 'Oui' : ''; } }
++            ],
++            tbar: [{ text: 'Nouveau contact', handler: function () { Usp.contactForm(clientId, store, null); } }],
++            listeners: { itemdblclick: function (g, rec) { Usp.contactForm(clientId, store, rec); } }
++        }]
++    }).show();
++};
++
++Usp.contactForm = function (clientId, store, rec) {
++    var win = Ext.create('Ext.window.Window', {
++        title: rec ? 'Modifier le contact' : 'Nouveau contact', width: 480, modal: true, bodyPadding: 12,
++        items: [{
++            xtype: 'form', border: false, defaults: { anchor: '100%' },
++            items: [
++                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
++                { xtype: 'textfield', name: 'fonction', fieldLabel: 'Fonction' },
++                { xtype: 'textfield', name: 'telephonePrincipal', fieldLabel: 'Téléphone' },
++                { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',
++                  emptyText: 'Format international, ex. 2250700000000' },
++                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
++                { xtype: 'checkbox', name: 'contactPrincipal', boxLabel: 'Contact principal' },
++                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' }
++            ]
++        }],
++        buttons: [{
++            text: 'Enregistrer', formBind: true,
++            handler: function (b) {
++                var form = b.up('window').down('form').getForm();
++                if (!form.isValid()) { return; }
++                var data = form.getValues();
++                data.clientId = clientId;
++                data.contactPrincipal = form.findField('contactPrincipal').getValue();
++                data.consentementWhatsapp = form.findField('consentementWhatsapp').getValue();
++                Usp.ajax({
++                    url: rec ? '/contacts/' + rec.get('id') : '/contacts',
++                    method: rec ? 'PUT' : 'POST', jsonData: data,
++                    success: function () { win.close(); store.load(); },
++                    failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
++                });
++            }
++        }]
++    });
++    win.show();
++    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
++};
++
+ /* ---------- Assistant d'import (simplifié) ---------- */
+ Usp.showImport = function () {
+     // Délègue à l'assistant d'import générique (mapping, modèles, rejets).
+@@ -164,6 +295,31 @@ Usp.dashboardPanel = function () {
+     return panel;
+ };
+ 
++/* ---------- Menu filtré par rôle ---------- */
++Usp.MENU = [
++    { text: 'Tableau de bord',     view: 'dashboard',  roles: null },
++    { text: 'Discussions',         view: 'inbox',      roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
++    { text: 'Comptes clients',     view: 'clients',    roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
++    { text: 'Catalogue',           view: 'catalogue',  roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
++    { text: 'Campagnes',           view: 'campaigns',  roles: ['ADMIN', 'MARKETING'] },
++    { text: 'CRM / Opportunités',  view: 'crm',        roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
++    { text: 'Importations',        view: 'import',     roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
++    { text: 'Paramètres',          view: 'settings',   roles: ['ADMIN'] },
++    { text: 'Utilisateurs',        view: 'users',      roles: ['ADMIN'] }
++];
++
++Usp.canSee = function (roles) {
++    if (!roles || roles.length === 0) { return true; }
++    var mine = (Usp.user && Usp.user.roles) || [];
++    if (mine.indexOf('ADMIN') !== -1) { return true; }
++    return roles.some(function (r) { return mine.indexOf(r) !== -1; });
++};
++
++Usp.menuChildren = function () {
++    return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
++        .map(function (m) { return { text: m.text, leaf: true, view: m.view }; });
++};
++
+ /* ---------- Viewport principal ---------- */
+ Usp.showMain = function () {
+     Ext.create('Ext.container.Viewport', {
+@@ -192,17 +348,7 @@ Usp.showMain = function () {
+                 rootVisible: false,
+                 store: Ext.create('Ext.data.TreeStore', {
+                     fields: ['text', 'view', 'leaf'],
+-                    root: { expanded: true, children: [
+-                        { text: 'Tableau de bord', leaf: true, view: 'dashboard' },
+-                        { text: 'Discussions', leaf: true, view: 'inbox' },
+-                        { text: 'Comptes clients', leaf: true, view: 'clients' },
+-                        { text: 'Contacts', leaf: true, view: 'clients' },
+-                        { text: 'Catalogue', leaf: true, view: 'catalogue' },
+-                        { text: 'Campagnes', leaf: true, view: 'campaigns' },
+-                        { text: 'CRM / Opportunités', leaf: true, view: 'crm' },
+-                        { text: 'Importations', leaf: true, view: 'import' },
+-                        { text: 'Paramètres', leaf: true, view: 'settings' }
+-                    ] }
++                    root: { expanded: true, children: Usp.menuChildren() }
+                 }),
+                 listeners: {
+                     itemclick: function (v, rec) {
+@@ -214,9 +360,10 @@ Usp.showMain = function () {
+                             case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
+                             case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
+                             case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
++                            case 'users': Usp.loadCenter(Usp.users.panel()); break;
+                             case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
+                             case 'import': Usp.showImport(); break;
+-                            default: Usp.loadCenter(Usp.clientsPanel());
++                            default: Usp.loadCenter(Usp.dashboardPanel());
+                         }
+                     }
+                 }
+diff --git a/src/main/webapp/app/inbox.js b/src/main/webapp/app/inbox.js
+index 1cb3f13..d2ecb0f 100644
+--- a/src/main/webapp/app/inbox.js
++++ b/src/main/webapp/app/inbox.js
+@@ -67,6 +67,7 @@ Usp.inbox.panel = function () {
+             { xtype: 'textfield', itemId: 'msgInput', flex: 1, emptyText: 'Écrire un message...',
+               listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { Usp.inbox.envoyer(f); } } } },
+             { xtype: 'button', text: 'Envoyer', handler: function (b) { Usp.inbox.envoyer(b.up('toolbar').down('#msgInput')); } },
++            { xtype: 'button', text: 'Joindre', tooltip: 'Envoyer une image / un document (par URL)', handler: function () { Usp.inbox.media(); } },
+             { xtype: 'button', text: 'Note', tooltip: 'Note interne', handler: function (b) { Usp.inbox.note(b.up('toolbar').down('#msgInput')); } }
+         ]
+     });
+@@ -138,6 +139,35 @@ Usp.inbox.envoyer = function (field) {
+     });
+ };
+ 
++Usp.inbox.media = function () {
++    var conv = Usp.inbox.currentConv;
++    if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
++    var win = Ext.create('Ext.window.Window', {
++        title: 'Joindre un média', width: 460, modal: true, bodyPadding: 12,
++        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
++            { xtype: 'combobox', name: 'type', fieldLabel: 'Type', value: 'image',
++              store: [['image', 'Image'], ['video', 'Vidéo'], ['document', 'Document'], ['audio', 'Audio']],
++              queryMode: 'local', editable: false },
++            { xtype: 'textfield', name: 'url', fieldLabel: 'URL du fichier', allowBlank: false,
++              emptyText: 'https://… (lien public du fichier)' },
++            { xtype: 'textfield', name: 'legende', fieldLabel: 'Légende' }
++        ] }],
++        buttons: [{ text: 'Envoyer', handler: function (b) {
++            var f = b.up('window').down('form').getForm();
++            if (!f.isValid()) { return; }
++            var v = f.getValues();
++            Usp.ajax({
++                url: '/whatsapp/messages/media', method: 'POST',
++                jsonData: { accountId: conv.get('whatsappAccountId'), numero: conv.get('numeroWhatsapp'),
++                            type: v.type, url: v.url, legende: v.legende },
++                success: function () { win.close(); Usp.inbox.reloadMessages(); },
++                failure: function () { Ext.Msg.alert('Erreur', 'Envoi du média impossible.'); }
++            });
++        } }]
++    });
++    win.show();
++};
++
+ Usp.inbox.note = function (field) {
+     var conv = Usp.inbox.currentConv;
+     if (!conv || !field.getValue()) { return; }
+diff --git a/src/main/webapp/app/settings.js b/src/main/webapp/app/settings.js
+index 072c921..9c47e13 100644
+--- a/src/main/webapp/app/settings.js
++++ b/src/main/webapp/app/settings.js
+@@ -85,8 +85,9 @@ Usp.settings.accountForm = function (store, rec) {
+ /* ---------- Modèles de messages ---------- */
+ Usp.settings.templatesPanel = function () {
+     var store = Usp.settings.jsonStore('/templates',
+-        ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'corps',
+-         'piedDePage', 'nomModeleWhatsapp', 'statutApprobation', 'actif']);
++        ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
++         'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
++         'statutApprobation', 'actif']);
+ 
+     return {
+         xtype: 'grid', title: 'Modèles de messages', store: store,
+@@ -118,10 +119,17 @@ Usp.settings.templateForm = function (store, rec) {
+                           'produit_disponible', 'fidelite'], queryMode: 'local' },
+                 { xtype: 'textfield', name: 'langue', fieldLabel: 'Langue', value: 'fr' },
+                 { xtype: 'textfield', name: 'categorie', fieldLabel: 'Catégorie' },
+-                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête' },
++                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête (texte)' },
++                { xtype: 'combobox', name: 'enteteMediaType', fieldLabel: 'En-tête (média)', value: 'AUCUN',
++                  store: [['AUCUN', 'Aucun'], ['IMAGE', 'Image'], ['VIDEO', 'Vidéo'], ['DOCUMENT', 'Document']],
++                  queryMode: 'local', editable: false },
++                { xtype: 'textfield', name: 'enteteMediaUrl', fieldLabel: 'URL du média',
++                  emptyText: 'https://… (image/vidéo/document de l\'en-tête, pour IMAGE/VIDEO/DOCUMENT)' },
+                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
+                   emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
+                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
++                { xtype: 'textareafield', name: 'boutonsJson', fieldLabel: 'Boutons (JSON)', height: 50,
++                  emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]' },
+                 { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom du modèle Meta',
+                   emptyText: 'Nom approuvé côté Meta (pour les campagnes)' },
+                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',
+diff --git a/src/main/webapp/app/users.js b/src/main/webapp/app/users.js
+new file mode 100644
+index 0000000..97cd226
+--- /dev/null
++++ b/src/main/webapp/app/users.js
+@@ -0,0 +1,104 @@
++/*
++ * UbiSenderPro - Gestion des utilisateurs applicatifs (section 26 de la spec).
++ * Réservé au rôle ADMIN. Dépend de app.js (objet Usp).
++ */
++Ext.define('Usp.users', { singleton: true });
++
++Usp.users.ROLES = [
++    ['ADMIN', 'Administrateur'], ['MARKETING', 'Responsable marketing'],
++    ['SUPERVISEUR', 'Superviseur'], ['AGENT', 'Agent'],
++    ['CATALOGUE', 'Gestionnaire catalogue'], ['LECTURE', 'Lecture seule']
++];
++
++Usp.users.panel = function () {
++    var store = Ext.create('Ext.data.Store', {
++        fields: ['id', 'login', 'nomComplet', 'email', 'actif', 'roles', 'derniereConnexion'],
++        proxy: { type: 'ajax', url: Usp.apiBase + '/users',
++            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
++        autoLoad: true
++    });
++
++    return {
++        xtype: 'grid', title: 'Utilisateurs', store: store,
++        columns: [
++            { text: 'Login', dataIndex: 'login', width: 140 },
++            { text: 'Nom complet', dataIndex: 'nomComplet', flex: 1 },
++            { text: 'E-mail', dataIndex: 'email', width: 200 },
++            { text: 'Rôles', dataIndex: 'roles', flex: 1,
++              renderer: function (v) { return Ext.isArray(v) ? v.join(', ') : (v || ''); } },
++            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
++        ],
++        tbar: [
++            { text: 'Nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
++            { text: 'Activer / Désactiver', handler: function (b) {
++                var rec = b.up('grid').getSelectionModel().getSelection()[0];
++                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un utilisateur.'); return; }
++                var action = rec.get('actif') ? 'deactivate' : 'activate';
++                Usp.ajax({ url: '/users/' + rec.get('id') + '/' + action, method: 'POST',
++                    success: function () { store.load(); } });
++            } },
++            { text: 'Rafraîchir', handler: function () { store.load(); } }
++        ],
++        listeners: { itemdblclick: function (g, rec) { Usp.users.form(store, rec); } }
++    };
++};
++
++Usp.users.form = function (store, rec) {
++    var roleItems = Usp.users.ROLES.map(function (r) {
++        return { boxLabel: r[1], name: 'role_' + r[0], inputValue: r[0] };
++    });
++    var win = Ext.create('Ext.window.Window', {
++        title: rec ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur',
++        width: 460, modal: true, bodyPadding: 12, autoScroll: true,
++        items: [{
++            xtype: 'form', border: false, defaults: { anchor: '100%' },
++            items: [
++                { xtype: 'textfield', name: 'login', fieldLabel: 'Login', allowBlank: false, disabled: !!rec },
++                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
++                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
++                { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
++                  emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
++                { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: roleItems }
++            ]
++        }],
++        buttons: [{
++            text: 'Enregistrer', formBind: true,
++            handler: function (b) {
++                var form = b.up('window').down('form').getForm();
++                if (!form.isValid()) { return; }
++                var roles = [];
++                Usp.users.ROLES.forEach(function (r) {
++                    var cb = form.findField('role_' + r[0]);
++                    if (cb && cb.getValue()) { roles.push(r[0]); }
++                });
++                var data = {
++                    login: form.findField('login').getValue(),
++                    nomComplet: form.findField('nomComplet').getValue(),
++                    email: form.findField('email').getValue(),
++                    motDePasse: form.findField('motDePasse').getValue(),
++                    roles: roles
++                };
++                Usp.ajax({
++                    url: rec ? '/users/' + rec.get('id') : '/users',
++                    method: rec ? 'PUT' : 'POST', jsonData: data,
++                    success: function () { win.close(); store.load(); },
++                    failure: function (resp) {
++                        var msg = 'Enregistrement impossible.';
++                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
++                        Ext.Msg.alert('Erreur', msg);
++                    }
++                });
++            }
++        }]
++    });
++    win.show();
++    if (rec) {
++        var form = win.down('form').getForm();
++        form.setValues({ nomComplet: rec.get('nomComplet'), email: rec.get('email') });
++        var roles = rec.get('roles') || [];
++        roles.forEach(function (code) {
++            var cb = form.findField('role_' + code);
++            if (cb) { cb.setValue(true); }
++        });
++    }
++};
+diff --git a/src/main/webapp/index.html b/src/main/webapp/index.html
+index 27ad346..0161d84 100644
+--- a/src/main/webapp/index.html
++++ b/src/main/webapp/index.html
+@@ -8,7 +8,7 @@
+     <!--
+         ExtJS 4.2 : copiez le dossier "ext" de Prestige
+         (prestige/src/main/webapp/general/ext) dans src/main/webapp/ext.
+-        On réutilise le thème Neptune déjà compilé dans ce SDK..
++        On réutilise le thème Neptune déjà compilé dans ce SDK.
+     -->
+     <link rel="stylesheet" href="ext/packages/ext-theme-neptune/build/resources/ext-theme-neptune-all.css"/>
+     <script src="ext/ext-all.js"></script>
+@@ -20,6 +20,7 @@
+     <script src="app/catalogue.js"></script>
+     <script src="app/crm.js"></script>
+     <script src="app/settings.js"></script>
++    <script src="app/users.js"></script>
+ </head>
+ <body>
+     <!-- Diagnostic : message lisible si le SDK Ext JS n'est pas trouvé (au lieu d'une page blanche). -->
+-- 
+2.43.0
+

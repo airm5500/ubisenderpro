@@ -65,10 +65,21 @@ public class WhatsappCloudClient {
     }
 
     /**
-     * Envoie un message à partir d'un modèle approuvé par Meta.
-     * Les variables du corps sont passées dans l'ordre.
+     * Envoie un message à partir d'un modèle approuvé par Meta (corps seul).
      */
     public SendResult envoyerModele(String destinataire, String nomModele, String langue, List<String> variables) {
+        return envoyerModele(destinataire, nomModele, langue, variables, null, null);
+    }
+
+    /**
+     * Envoie un modèle avec, en option, un média d'en-tête (IMAGE, VIDEO ou DOCUMENT)
+     * fourni par URL publique.
+     *
+     * @param enteteMediaType IMAGE | VIDEO | DOCUMENT (ou null/TEXTE/AUCUN pour aucun média)
+     * @param enteteMediaUrl  URL publique du média d'en-tête
+     */
+    public SendResult envoyerModele(String destinataire, String nomModele, String langue,
+                                    List<String> variables, String enteteMediaType, String enteteMediaUrl) {
         Map<String, Object> body = baseBody(destinataire, "template");
         Map<String, Object> template = new HashMap<>();
         template.put("name", nomModele);
@@ -76,17 +87,38 @@ public class WhatsappCloudClient {
         language.put("code", langue == null ? "fr" : langue);
         template.put("language", language);
 
+        List<Object> components = new java.util.ArrayList<>();
+
+        // En-tête média éventuel.
+        String type = enteteMediaType == null ? "" : enteteMediaType.trim().toUpperCase();
+        if (enteteMediaUrl != null && !enteteMediaUrl.isEmpty()
+                && (type.equals("IMAGE") || type.equals("VIDEO") || type.equals("DOCUMENT"))) {
+            Map<String, Object> media = new HashMap<>();
+            media.put("link", enteteMediaUrl);
+            Map<String, Object> param = new HashMap<>();
+            param.put("type", type.toLowerCase());
+            param.put(type.toLowerCase(), media);
+            Map<String, Object> header = new HashMap<>();
+            header.put("type", "header");
+            header.put("parameters", new Object[]{param});
+            components.add(header);
+        }
+
         if (variables != null && !variables.isEmpty()) {
-            Map<String, Object> component = new HashMap<>();
-            component.put("type", "body");
+            Map<String, Object> bodyComp = new HashMap<>();
+            bodyComp.put("type", "body");
             Object[] params = variables.stream().map(v -> {
                 Map<String, Object> p = new HashMap<>();
                 p.put("type", "text");
                 p.put("text", v);
                 return p;
             }).toArray();
-            component.put("parameters", params);
-            template.put("components", new Object[]{component});
+            bodyComp.put("parameters", params);
+            components.add(bodyComp);
+        }
+
+        if (!components.isEmpty()) {
+            template.put("components", components.toArray());
         }
         body.put("template", template);
         return envoyer(body);

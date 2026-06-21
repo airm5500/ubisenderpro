@@ -29,6 +29,9 @@ public class ModeleMessage {
     @Column(name = "entete_media_type", length = 20)
     private String enteteMediaType;
 
+    @Column(name = "entete_media_url", length = 1000)
+    private String enteteMediaUrl;
+
     @Column(name = "corps", nullable = false, columnDefinition = "TEXT")
     private String corps;
 
@@ -70,6 +73,8 @@ public class ModeleMessage {
     public void setEnteteTexte(String enteteTexte) { this.enteteTexte = enteteTexte; }
     public String getEnteteMediaType() { return enteteMediaType; }
     public void setEnteteMediaType(String enteteMediaType) { this.enteteMediaType = enteteMediaType; }
+    public String getEnteteMediaUrl() { return enteteMediaUrl; }
+    public void setEnteteMediaUrl(String enteteMediaUrl) { this.enteteMediaUrl = enteteMediaUrl; }
     public String getCorps() { return corps; }
     public void setCorps(String corps) { this.corps = corps; }
     public String getPiedDePage() { return piedDePage; }
