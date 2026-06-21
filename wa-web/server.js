@@ -171,12 +171,13 @@ async function startSession(id) {
       const code = lastDisconnect && lastDisconnect.error
         && lastDisconnect.error.output && lastDisconnect.error.output.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
+      s.sock = null; // libère le socket fermé (sinon la garde anti-doublon bloque la reconnexion)
       s.status = loggedOut ? 'DECONNECTE' : 'CONNEXION';
       s.qr = null;
       logger.warn({ id, code, loggedOut }, 'Connexion fermée');
       postCallback('/status', { sessionId: id, status: s.status });
       if (!loggedOut) {
-        setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 3000);
+        setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 2000);
       } else {
         try { fs.rmSync(sessionDir(id), { recursive: true, force: true }); } catch (e) { /* ignore */ }
         sessions.delete(id);
