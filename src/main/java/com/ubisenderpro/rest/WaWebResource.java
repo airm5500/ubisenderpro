@@ -53,13 +53,13 @@ public class WaWebResource {
     @Path("/sessions/{id}/start")
     public Response demarrer(@PathParam("id") Long id) {
         JsonNode etat = service.demarrer(id);
-        return Response.ok(etat).build();
+        return Response.ok(etat.toString()).build();
     }
 
     @GET
     @Path("/sessions/{id}/status")
     public Response statut(@PathParam("id") Long id) {
-        return Response.ok(service.statut(id)).build();
+        return Response.ok(service.statut(id).toString()).build();
     }
 
     @POST
@@ -78,7 +78,7 @@ public class WaWebResource {
         if (src instanceof List) {
             for (Object o : (List<?>) src) { if (o != null) numeros.add(String.valueOf(o)); }
         }
-        return Response.ok(service.verifierNumeros(id, numeros)).build();
+        return Response.ok(service.verifierNumeros(id, numeros).toString()).build();
     }
 
     // ----- Envoi unitaire (composeur dual-canal) -----
@@ -106,18 +106,18 @@ public class WaWebResource {
     @GET
     @Path("/sessions/{id}/contacts")
     public Response contacts(@PathParam("id") Long id) {
-        return Response.ok(service.contacts(id)).build();
+        return Response.ok(service.contacts(id).toString()).build();
     }
 
     @GET
     @Path("/sessions/{id}/groups")
     public Response groupes(@PathParam("id") Long id) {
-        return Response.ok(service.groupes(id)).build();
+        return Response.ok(service.groupes(id).toString()).build();
     }
 
     @GET
     @Path("/sessions/{id}/participants")
     public Response participants(@PathParam("id") Long id, @QueryParam("jid") String jid) {
-        return Response.ok(service.participants(id, jid)).build();
+        return Response.ok(service.participants(id, jid).toString()).build();
     }
 }
