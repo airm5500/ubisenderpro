@@ -44,14 +44,19 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 /** Notifie UbiSenderPro d'un événement (message entrant, statut). Best-effort. */
 async function postCallback(chemin, body) {
-  if (!CALLBACK) { return; }
+  if (!CALLBACK) { logger.warn('UBISENDER_CALLBACK non défini : événement ' + chemin + ' ignoré'); return; }
   try {
-    await fetch(CALLBACK + '/api/v1/webhooks/wa-web' + chemin, {
+    const resp = await fetch(CALLBACK + '/api/v1/webhooks/wa-web' + chemin, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Api-Token': API_TOKEN },
       body: JSON.stringify(body)
     });
-  } catch (e) { logger.warn('Callback ' + chemin + ' : ' + (e.message || e)); }
+    if (!resp.ok) {
+      logger.warn('Callback ' + chemin + ' -> HTTP ' + resp.status + ' (' + (CALLBACK + '/api/v1/webhooks/wa-web' + chemin) + ')');
+    } else {
+      logger.info('Callback ' + chemin + ' OK');
+    }
+  } catch (e) { logger.warn('Callback ' + chemin + ' injoignable : ' + (e.message || e)); }
 }
 
 function texteMessage(m) {
@@ -140,6 +145,7 @@ async function startSession(id) {
       if (!jid.endsWith('@s.whatsapp.net')) { continue; } // ignore groupes/diffusions
       const contenu = texteMessage(m);
       if (!contenu) { continue; }
+      logger.info({ id, from: jid.split('@')[0], type: contenu.type }, 'Message entrant');
       postCallback('/message', {
         sessionId: id, from: jid.split('@')[0], name: m.pushName || null,
         type: contenu.type, text: contenu.text, id: m.key.id
