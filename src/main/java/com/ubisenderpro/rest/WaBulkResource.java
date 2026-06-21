@@ -35,6 +35,12 @@ public class WaBulkResource {
                 .orElse(Response.status(Response.Status.NOT_FOUND).build());
     }
 
+    @GET
+    @Path("/{id}/destinataires")
+    public java.util.List<com.ubisenderpro.entity.WaBulkDestinataire> destinataires(@PathParam("id") Long id) {
+        return service.destinataires(id);
+    }
+
     @POST
     public Response creer(WaBulkRequest req) {
         try {

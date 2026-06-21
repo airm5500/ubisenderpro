@@ -82,6 +82,12 @@ public class WaBulkService {
 
     public Optional<WaBulkJob> parId(Long id) { return Optional.ofNullable(em.find(WaBulkJob.class, id)); }
 
+    public List<WaBulkDestinataire> destinataires(Long jobId) {
+        return em.createQuery(
+                "SELECT d FROM WaBulkDestinataire d WHERE d.jobId = :j ORDER BY d.id", WaBulkDestinataire.class)
+                .setParameter("j", jobId).getResultList();
+    }
+
     private boolean vide(String s) { return s == null || s.trim().isEmpty(); }
 
     private String[] decouper(String texte) {

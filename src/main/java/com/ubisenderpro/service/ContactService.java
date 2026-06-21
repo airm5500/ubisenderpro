@@ -6,8 +6,12 @@ import com.ubisenderpro.entity.ClientContact;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Stateless
@@ -15,6 +19,38 @@ public class ContactService {
 
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
+
+    /**
+     * Contacts disposant d'un numéro WhatsApp (non désabonnés), pour la sélection
+     * de destinataires. Filtrable par segmentation du client et par recherche.
+     */
+    public List<Map<String, Object>> pourSelection(Long segmentationId, String q, int offset, int limit) {
+        StringBuilder jpql = new StringBuilder(
+                "SELECT ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte FROM ClientContact ct, Client cl " +
+                "WHERE ct.clientId = cl.id AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
+                "AND ct.desabonne = false ");
+        boolean hasSeg = segmentationId != null;
+        boolean hasQ = q != null && !q.trim().isEmpty();
+        if (hasSeg) { jpql.append("AND cl.segmentationId = :seg "); }
+        if (hasQ) { jpql.append("AND (LOWER(ct.nomComplet) LIKE :q OR LOWER(cl.nomCompte) LIKE :q) "); }
+        jpql.append("ORDER BY cl.nomCompte, ct.nomComplet");
+
+        Query query = em.createQuery(jpql.toString());
+        if (hasSeg) { query.setParameter("seg", segmentationId); }
+        if (hasQ) { query.setParameter("q", "%" + q.trim().toLowerCase() + "%"); }
+        query.setFirstResult(Math.max(0, offset)).setMaxResults(limit <= 0 ? 500 : limit);
+
+        List<Object[]> rows = query.getResultList();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] r : rows) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("numero", r[0]);
+            m.put("nom", r[1]);
+            m.put("client", r[2]);
+            out.add(m);
+        }
+        return out;
+    }
 
     public PageResult<ClientContact> parClient(Long clientId, int offset, int limit) {
         List<ClientContact> data = em.createQuery(

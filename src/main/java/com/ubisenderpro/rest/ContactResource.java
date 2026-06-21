@@ -8,6 +8,8 @@ import javax.ejb.EJB;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Path("/contacts")
@@ -18,6 +20,16 @@ public class ContactResource {
 
     @EJB
     private ContactService contactService;
+
+    /** Contacts WhatsApp pour la sélection de destinataires (filtre segmentation + recherche). */
+    @GET
+    @Path("/selection")
+    public List<Map<String, Object>> selection(@QueryParam("segmentationId") Long segmentationId,
+                                               @QueryParam("q") String q,
+                                               @QueryParam("start") @DefaultValue("0") int start,
+                                               @QueryParam("limit") @DefaultValue("500") int limit) {
+        return contactService.pourSelection(segmentationId, q, start, limit);
+    }
 
     @GET
     @Path("/{id}")

@@ -230,19 +230,34 @@ Usp.settings.generalPanel = function () {
             { xtype: 'displayfield',
               value: '<span style="color:#888">API : conforme, nécessite un compte Meta. ' +
                      'WEB : sans Meta (scan QR), à débit lent. Ce choix présélectionne le canal ' +
-                     'dans le composeur « Nouveau message ».</span>' }
+                     'dans le composeur « Nouveau message ».</span>' },
+            { xtype: 'textfield', name: 'prefixe', itemId: 'prefixeField', fieldLabel: 'Préfixe pays', width: 360,
+              value: '225', maskRe: /[0-9]/,
+              emptyText: 'Ex. 225 (Côte d\'Ivoire), 226, 33…' },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Pré-rempli automatiquement dans les champs « numéro » ' +
+                     'et ajouté aux numéros saisis en format local.</span>' }
         ],
         bbar: ['->', { text: 'Enregistrer', handler: function (b) {
-            var val = b.up('panel').down('#modeField').getValue();
-            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: val },
-                success: function () { Usp.mode = val; Ext.Msg.alert('OK', 'Mode enregistré : ' + val + '.'); },
+            var p = b.up('panel');
+            var mode = p.down('#modeField').getValue();
+            var prefixe = (p.down('#prefixeField').getValue() || '').replace(/[^0-9]/g, '');
+            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: mode },
+                success: function () {
+                    Usp.mode = mode;
+                    Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'PUT', jsonData: { valeur: prefixe },
+                        success: function () { Usp.prefixe = prefixe; Ext.Msg.alert('OK', 'Paramètres enregistrés.'); },
+                        failure: function () { Ext.Msg.alert('Erreur', 'Préfixe non enregistré.'); } });
+                },
                 failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
         } }]
     });
     form.on('afterrender', function () {
         Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (resp) {
-            var v = (Ext.decode(resp.responseText) || {}).valeur;
-            form.down('#modeField').setValue(v || 'API');
+            form.down('#modeField').setValue((Ext.decode(resp.responseText) || {}).valeur || 'API');
+        } });
+        Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET', success: function (resp) {
+            form.down('#prefixeField').setValue((Ext.decode(resp.responseText) || {}).valeur || '225');
         } });
     });
     return form;

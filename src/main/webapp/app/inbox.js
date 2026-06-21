@@ -272,21 +272,27 @@ Usp.inbox.nouveauMessage = function () {
               store: apiStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false },
             { xtype: 'combobox', itemId: 'cibleWeb', name: 'sessionId', fieldLabel: 'Compte (Web)',
               store: webStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false, hidden: true },
-            { xtype: 'textfield', name: 'numero', fieldLabel: 'Numéro', allowBlank: false,
-              emptyText: 'Ex. 2250700000000 (format international, sans +)' },
+            { xtype: 'textfield', name: 'numero', fieldLabel: 'Numéro(s)', allowBlank: false, value: Usp.prefixe,
+              emptyText: 'Un ou plusieurs séparés par ;  ex. 2250102030405;2250506070809' },
             { xtype: 'textareafield', name: 'texte', fieldLabel: 'Message', height: 80,
               emptyText: 'Texte du message (ou légende de l\'image)' },
             { xtype: 'fieldcontainer', fieldLabel: 'Image / fichier', layout: 'hbox', items: [
                 { xtype: 'filefield', name: 'fichier', buttonOnly: true, hideLabel: true, buttonText: 'Parcourir...',
                   listeners: { change: function (f) {
                       var file = f.fileInputEl.dom.files[0];
+                      var info = f.up('fieldcontainer').down('#njInfo');
                       if (!file) { return; }
                       fileData.nom = file.name; fileData.mime = file.type || 'application/octet-stream';
                       var reader = new FileReader();
-                      reader.onload = function (e) { fileData.base64 = e.target.result.split(',')[1]; };
+                      reader.onload = function (e) {
+                          fileData.base64 = e.target.result.split(',')[1];
+                          if (info) { info.update('<span style="color:#2e7d32;font-size:11px">✔ ' +
+                              Ext.String.htmlEncode(file.name) + '</span>'); }
+                      };
                       reader.readAsDataURL(file);
                   } } },
-                { xtype: 'box', margin: '4 0 0 8', html: '<span style="color:#888;font-size:11px">optionnel</span>' }
+                { xtype: 'component', itemId: 'njInfo', margin: '4 0 0 8',
+                  html: '<span style="color:#888;font-size:11px">optionnel</span>' }
             ] }
         ] }],
         buttons: [{ text: 'Envoyer', formBind: true, handler: function (b) {
@@ -296,56 +302,61 @@ Usp.inbox.nouveauMessage = function () {
             var web = v.canal === 'WEB';
             var cible = web ? v.sessionId : v.accountId;
             if (!cible) { Ext.Msg.alert('Info', 'Choisissez un compte ' + (web ? 'WhatsApp Web' : 'API') + '.'); return; }
+            var numeros = String(v.numero || '').split(/[;,\n]/)
+                .map(function (n) { return Usp.normNumero(n); })
+                .filter(function (n) { return n.length >= 8; });
+            if (!numeros.length) { Ext.Msg.alert('Info', 'Aucun numéro valide (format international, ex. 2250102030405).'); return; }
             if (!fileData.base64 && !v.texte) { Ext.Msg.alert('Info', 'Saisissez un texte ou joignez un fichier.'); return; }
             b.disable();
-            var apresEnvoi = function () { win.close(); if (Usp.inbox.convStore) { Usp.inbox.convStore.load(); } };
-            var echec = function (msg) { b.enable(); Ext.Msg.alert('Erreur', msg || 'Envoi impossible.'); };
-            // Réponse {success,...} (WEB) : succès HTTP mais peut contenir success=false.
-            var okWeb = function (resp) {
-                var r = Ext.decode(resp.responseText) || {};
-                if (r.success) { apresEnvoi(); } else { echec(r.erreur); }
+
+            var res = { ok: 0, ko: 0 };
+            var termine = function () {
+                b.enable();
+                if (Usp.inbox.convStore) { Usp.inbox.convStore.load(); }
+                Ext.Msg.alert('Envoi terminé', numeros.length + ' destinataire(s) : ' +
+                    res.ok + ' envoyé(s), ' + res.ko + ' échec(s).');
+                if (res.ok > 0) { win.close(); }
             };
-
-            if (web) {
-                if (fileData.base64) {
-                    Usp.ajax({ url: '/media/upload', method: 'POST',
-                        jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
-                        success: function (resp) {
-                            var up = Ext.decode(resp.responseText);
-                            Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send-media', method: 'POST',
-                                jsonData: { numero: v.numero, type: Usp.inbox.typeMedia(fileData.mime),
-                                            mediaUrl: up.url, mimeType: fileData.mime, fileName: fileData.nom, caption: v.texte || null },
-                                success: okWeb, failure: function () { echec('Service WhatsApp Web injoignable.'); } });
-                        },
-                        failure: function () { echec('Téléversement impossible.'); } });
-                } else {
+            var envoyerUn = function (numero, mediaRef, next) {
+                var okCb = function () { res.ok++; next(); };
+                var koCb = function () { res.ko++; next(); };
+                var okWeb = function (resp) { var r = Ext.decode(resp.responseText) || {}; if (r.success) { okCb(); } else { koCb(); } };
+                if (web && fileData.base64) {
+                    Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send-media', method: 'POST',
+                        jsonData: { numero: numero, type: Usp.inbox.typeMedia(fileData.mime), mediaUrl: mediaRef,
+                                    mimeType: fileData.mime, fileName: fileData.nom, caption: v.texte || null },
+                        success: okWeb, failure: koCb });
+                } else if (web) {
                     Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send', method: 'POST',
-                        jsonData: { numero: v.numero, texte: v.texte },
-                        success: okWeb, failure: function () { echec('Service WhatsApp Web injoignable.'); } });
+                        jsonData: { numero: numero, texte: v.texte }, success: okWeb, failure: koCb });
+                } else if (fileData.base64) {
+                    Usp.ajax({ url: '/whatsapp/messages/media', method: 'POST',
+                        jsonData: { accountId: cible, numero: numero, type: Usp.inbox.typeMedia(fileData.mime),
+                                    mediaId: mediaRef, mimeType: fileData.mime, nomFichier: fileData.nom, legende: v.texte || null },
+                        success: okCb, failure: koCb });
+                } else {
+                    Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
+                        jsonData: { accountId: cible, numero: numero, texte: v.texte }, success: okCb, failure: koCb });
                 }
-                return;
-            }
+            };
+            var lancer = function (mediaRef) {
+                var i = 0;
+                var next = function () { if (i >= numeros.length) { termine(); return; } envoyerUn(numeros[i++], mediaRef, next); };
+                next();
+            };
+            var echecUpload = function () { b.enable(); Ext.Msg.alert('Erreur', 'Téléversement du fichier impossible.'); };
 
-            // Canal API officielle.
-            if (fileData.base64) {
+            // Téléverse le média une seule fois (mediaId pour API, url pour WEB) puis itère.
+            if (fileData.base64 && web) {
+                Usp.ajax({ url: '/media/upload', method: 'POST',
+                    jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                    success: function (resp) { lancer((Ext.decode(resp.responseText) || {}).url); }, failure: echecUpload });
+            } else if (fileData.base64) {
                 Usp.ajax({ url: '/whatsapp/media', method: 'POST',
                     jsonData: { accountId: cible, fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
-                    success: function (resp) {
-                        var up = Ext.decode(resp.responseText);
-                        Usp.ajax({ url: '/whatsapp/messages/media', method: 'POST',
-                            jsonData: { accountId: cible, numero: v.numero, type: Usp.inbox.typeMedia(fileData.mime),
-                                        mediaId: up.mediaId, mimeType: fileData.mime, nomFichier: fileData.nom, legende: v.texte || null },
-                            success: apresEnvoi, failure: function () { echec('Envoi du média impossible (fenêtre de 24 h ?).'); } });
-                    },
-                    failure: function (resp) {
-                        var msg = 'Téléversement impossible.';
-                        try { var r = Ext.decode(resp.responseText); if (r && r.erreur) { msg = r.erreur; } } catch (e) {}
-                        echec(msg);
-                    } });
+                    success: function (resp) { lancer((Ext.decode(resp.responseText) || {}).mediaId); }, failure: echecUpload });
             } else {
-                Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
-                    jsonData: { accountId: cible, numero: v.numero, texte: v.texte },
-                    success: apresEnvoi, failure: function () { echec('Envoi impossible (fenêtre de 24 h ?).'); } });
+                lancer(null);
             }
         } }]
     });

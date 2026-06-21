@@ -9,7 +9,19 @@ var Usp = {
     apiBase: 'api/v1',
     token: null,
     user: null,
-    mode: 'API'   // mode d'envoi par défaut (API officielle | WEB) — chargé à la connexion
+    mode: 'API',   // mode d'envoi par défaut (API officielle | WEB) — chargé à la connexion
+    prefixe: '225' // préfixe pays par défaut — chargé à la connexion
+};
+
+/* Normalise un numéro : chiffres seuls ; préfixe pays ajouté si saisie locale. */
+Usp.normNumero = function (n) {
+    var d = String(n || '').replace(/[^0-9]/g, '');
+    if (!d) { return ''; }
+    var p = Usp.prefixe || '';
+    if (p && d.indexOf(p) !== 0 && d.length <= 10) {
+        d = p + d.replace(/^0+/, '');
+    }
+    return d;
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
@@ -59,14 +71,18 @@ Usp.showLogin = function () {
                         Usp.token = data.token;
                         Usp.user = data.user;
                         win.close();
-                        // Charge le mode d'envoi global puis ouvre l'application.
+                        // Charge les paramètres globaux (mode + préfixe) puis ouvre l'application.
+                        var ouvrir = function () { Usp.showMain(); };
                         Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
                             success: function (r) {
-                                var v = (Ext.decode(r.responseText) || {}).valeur;
-                                Usp.mode = v || 'API';
-                                Usp.showMain();
+                                Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
+                                Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
+                                    success: function (r2) {
+                                        Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
+                                        ouvrir();
+                                    }, failure: ouvrir });
                             },
-                            failure: function () { Usp.showMain(); } });
+                            failure: ouvrir });
                     },
                     failure: function () {
                         Ext.Msg.alert('Erreur', 'Identifiants invalides.');
@@ -394,6 +410,13 @@ Usp.loadCenter = function (cmp) {
     center.removeAll();
     center.add(cmp);
 };
+
+/* Validation des numéros WhatsApp (chiffres, format international). */
+Ext.apply(Ext.form.field.VTypes, {
+    numwa: function (v) { return /^[0-9]{6,15}$/.test(v); },
+    numwaText: 'Numéro international en chiffres uniquement, ex. 2250102030405',
+    numwaMask: /[0-9]/
+});
 
 Ext.onReady(function () {
     Ext.QuickTips.init();

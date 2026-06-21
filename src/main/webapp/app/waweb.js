@@ -17,7 +17,10 @@ Usp.waweb.sessionStore = function () {
 
 Usp.waweb.sessionsPanel = function () {
     var store = Usp.waweb.sessionStore();
-    var selected = function (g) { return g.up('grid').getSelectionModel().getSelection()[0]; };
+    var ico = function (act, titre, emoji) {
+        return '<span class="wa-act" data-act="' + act + '" title="' + titre +
+            '" style="cursor:pointer;font-size:17px;margin:0 5px">' + emoji + '</span>';
+    };
     return {
         xtype: 'grid', title: 'Comptes WhatsApp Web', store: store,
         columns: [
@@ -26,7 +29,13 @@ Usp.waweb.sessionsPanel = function () {
             { text: 'Statut', dataIndex: 'statut', width: 120, renderer: function (v) {
                 var c = v === 'CONNECTE' ? '#2e7d32' : (v === 'QR' ? '#ef6c00' : '#999');
                 return '<span style="color:' + c + '">' + (v || '') + '</span>';
-            } }
+            } },
+            { text: 'Actions', width: 130, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return ico('connect', 'Connecter (scanner le QR)', '🔗') +
+                         ico('logout', 'Déconnecter', '⏏️') +
+                         ico('delete', 'Supprimer', '🗑️');
+              } }
         ],
         tbar: [
             { text: 'Nouveau compte', handler: function () {
@@ -37,28 +46,28 @@ Usp.waweb.sessionsPanel = function () {
                     }
                 });
             } },
-            { text: 'Connecter (QR)', handler: function (b) {
-                var rec = selected(b); if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un compte.'); return; }
-                Usp.waweb.connect(rec.get('id'), store);
-            } },
-            { text: 'Déconnecter', handler: function (b) {
-                var rec = selected(b); if (!rec) { return; }
-                Usp.ajax({ url: '/wa-web/sessions/' + rec.get('id') + '/logout', method: 'POST',
-                    success: function () { store.load(); } });
-            } },
-            { text: 'Supprimer', handler: function (b) {
-                var rec = selected(b); if (!rec) { return; }
-                Ext.Msg.confirm('Supprimer', 'Supprimer ce compte ?', function (btn) {
-                    if (btn === 'yes') {
-                        Usp.ajax({ url: '/wa-web/sessions/' + rec.get('id'), method: 'DELETE',
-                            success: function () { store.load(); } });
-                    }
-                });
-            } },
             '->',
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ],
-        listeners: { itemdblclick: function (g, rec) { Usp.waweb.connect(rec.get('id'), store); } }
+        listeners: {
+            cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
+                var el = e.getTarget('.wa-act'); if (!el) { return; }
+                var act = el.getAttribute('data-act');
+                if (act === 'connect') {
+                    Usp.waweb.connect(rec.get('id'), store);
+                } else if (act === 'logout') {
+                    Usp.ajax({ url: '/wa-web/sessions/' + rec.get('id') + '/logout', method: 'POST',
+                        success: function () { store.load(); } });
+                } else if (act === 'delete') {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer ce compte ?', function (btn) {
+                        if (btn === 'yes') {
+                            Usp.ajax({ url: '/wa-web/sessions/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); } });
+                        }
+                    });
+                }
+            }
+        }
     };
 };
 
@@ -111,12 +120,6 @@ Usp.waweb.connect = function (id, store) {
 
 /* ---------- Envoi en masse ---------- */
 Usp.waweb.bulkPanel = function () {
-    var jobStore = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom', 'statut', 'total', 'envoyes', 'echoues'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/wa-bulk',
-            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true
-    });
     var sessionCombo = Ext.create('Ext.data.Store', {
         fields: ['id', 'libelle'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/wa-web/sessions',
@@ -124,22 +127,36 @@ Usp.waweb.bulkPanel = function () {
         autoLoad: true
     });
     var media = { url: null, type: null, mime: null, nom: null };
+    var modeleStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'corps'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
 
-    var form = {
-        xtype: 'form', region: 'center', autoScroll: true, bodyPadding: 12, border: false,
+    return {
+        xtype: 'form', title: 'Envoi en masse', autoScroll: true, bodyPadding: 12,
         defaults: { anchor: '100%' },
         items: [
             { xtype: 'combobox', name: 'sessionId', fieldLabel: 'Compte WhatsApp Web', allowBlank: false,
               store: sessionCombo, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false },
             { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom de l\'envoi' },
-            { xtype: 'displayfield', value: '<b>Variantes</b> — une au hasard est envoyée à chaque contact (anti-spam). ' +
-              'Utilisez <b>[NAME]</b> pour insérer le nom.' },
-            { xtype: 'textareafield', name: 'msg1', fieldLabel: 'Message 1', height: 60,
+            { xtype: 'combobox', name: 'modeleId', fieldLabel: 'Modèle (option)', store: modeleStore,
+              valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false,
+              emptyText: 'Pré-remplir la variante 1 depuis un modèle…',
+              listeners: { select: function (c, recs) {
+                  var rec = recs && recs[0]; if (!rec) { return; }
+                  var corps = rec.get('corps'); if (corps) { c.up('form').down('[name=msg1]').setValue(corps); }
+              } } },
+            { xtype: 'displayfield', value: '<b>Variantes du message</b> — pour limiter le marquage « spam », ' +
+              'une variante est tirée <b>au hasard</b> pour chaque contact. Une seule suffit ; les autres sont ' +
+              'facultatives. Utilisez <b>[NAME]</b> pour insérer le nom du contact.' },
+            { xtype: 'textareafield', name: 'msg1', fieldLabel: 'Variante 1', height: 60,
               emptyText: 'Bonjour [NAME], ...' },
-            { xtype: 'textareafield', name: 'msg2', fieldLabel: 'Message 2', height: 50 },
-            { xtype: 'textareafield', name: 'msg3', fieldLabel: 'Message 3', height: 50 },
-            { xtype: 'textareafield', name: 'msg4', fieldLabel: 'Message 4', height: 50 },
-            { xtype: 'textareafield', name: 'msg5', fieldLabel: 'Message 5', height: 50 },
+            { xtype: 'textareafield', name: 'msg2', fieldLabel: 'Variante 2 (option)', height: 45 },
+            { xtype: 'textareafield', name: 'msg3', fieldLabel: 'Variante 3 (option)', height: 45 },
+            { xtype: 'textareafield', name: 'msg4', fieldLabel: 'Variante 4 (option)', height: 45 },
+            { xtype: 'textareafield', name: 'msg5', fieldLabel: 'Variante 5 (option)', height: 45 },
             { xtype: 'fieldcontainer', fieldLabel: 'Pièce jointe', layout: 'hbox', items: [
                 { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Parcourir...',
                   listeners: { change: function (f) { Usp.waweb.uploadPiece(f, media); } } },
@@ -156,7 +173,13 @@ Usp.waweb.bulkPanel = function () {
                 { xtype: 'numberfield', name: 'pauseMin', fieldLabel: 'msgs:', value: 10, minValue: 0, labelWidth: 40 },
                 { xtype: 'numberfield', name: 'pauseMax', fieldLabel: 'à', value: 20, minValue: 0, labelWidth: 20 }
             ] },
-            { xtype: 'textareafield', name: 'destinatairesTexte', fieldLabel: 'Destinataires', height: 110,
+            { xtype: 'fieldcontainer', fieldLabel: 'Destinataires', layout: 'hbox', items: [
+                { xtype: 'button', text: 'Choisir des clients…', handler: function (b) {
+                    Usp.waweb.choisirClients(b.up('form')); } },
+                { xtype: 'component', itemId: 'destCount', margin: '5 0 0 10',
+                  html: '<span style="color:#888;font-size:11px">ou saisie manuelle ci-dessous</span>' }
+            ] },
+            { xtype: 'textareafield', name: 'destinatairesTexte', height: 110,
               emptyText: 'Une ligne par contact : numero;nom\nEx. 2250700000000;Awa' }
         ],
         bbar: ['->',
@@ -171,7 +194,7 @@ Usp.waweb.bulkPanel = function () {
                         Usp.ajax({ url: '/wa-bulk/' + job.id + '/launch', method: 'POST',
                             success: function () {
                                 Ext.Msg.alert('Lancé', 'Envoi en masse démarré (' + job.total + ' destinataires).');
-                                jobStore.load();
+                                if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); }
                             },
                             failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Lancement impossible.')); } });
                     },
@@ -179,20 +202,37 @@ Usp.waweb.bulkPanel = function () {
             } }
         ]
     };
+};
 
-    var jobs = {
-        xtype: 'grid', region: 'south', height: 200, title: 'Envois', store: jobStore, split: true,
+/* ---------- Historique des envois ---------- */
+Usp.waweb.historyPanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'statut', 'total', 'envoyes', 'echoues'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/wa-bulk',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    Usp.waweb._jobStore = store;
+    return {
+        xtype: 'grid', title: 'Historique des envois', store: store,
         columns: [
+            { text: '#', dataIndex: 'id', width: 50 },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Statut', dataIndex: 'statut', width: 110 },
             { text: 'Total', dataIndex: 'total', width: 70 },
-            { text: 'Envoyés', dataIndex: 'envoyes', width: 80 },
-            { text: 'Échoués', dataIndex: 'echoues', width: 80 }
+            { text: 'Envoyés', dataIndex: 'envoyes', width: 90, renderer: function (v) {
+                return '<span style="color:#2e7d32;font-weight:bold">' + (v || 0) + '</span>'; } },
+            { text: 'Échoués', dataIndex: 'echoues', width: 90, renderer: function (v) {
+                return v ? '<span style="color:#c62828;font-weight:bold">' + v + '</span>' : '0'; } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { jobStore.load(); } }]
+        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } },
+               { text: 'Voir le détail', handler: function (b) {
+                   var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                   if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un envoi.'); return; }
+                   Usp.waweb.detailEnvoi(rec.get('id'));
+               } }],
+        listeners: { itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); } }
     };
-
-    return { xtype: 'panel', title: 'Envoi en masse', layout: 'border', items: [form, jobs] };
 };
 
 Usp.waweb.uploadPiece = function (f, media) {
@@ -365,10 +405,109 @@ Usp.waweb.extractPanel = function () {
     };
 };
 
+/* Sélecteur de clients (recherche + filtre segmentation + cocher) -> remplit les destinataires. */
+Usp.waweb.choisirClients = function (formPanel) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['numero', 'nom', 'client'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var segStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
+    var charger = function (win) {
+        store.getProxy().extraParams = {
+            segmentationId: win.down('#segF').getValue() || '',
+            q: win.down('#qF').getValue() || ''
+        };
+        store.load();
+    };
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Choisir des clients', width: 640, height: 480, modal: true, layout: 'fit',
+        items: [{
+            xtype: 'grid', store: store, selModel: sm,
+            columns: [
+                { text: 'Numéro', dataIndex: 'numero', width: 150 },
+                { text: 'Contact', dataIndex: 'nom', flex: 1 },
+                { text: 'Client', dataIndex: 'client', flex: 1 }
+            ],
+            tbar: [
+                { xtype: 'combobox', itemId: 'segF', emptyText: 'Segmentation…', width: 180,
+                  store: segStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false },
+                { xtype: 'textfield', itemId: 'qF', emptyText: 'Recherche…', width: 160,
+                  listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { charger(win); } } } },
+                { text: 'Filtrer', handler: function () { charger(win); } },
+                '->',
+                { text: 'Tout sélectionner', handler: function () { sm.selectAll(); } },
+                { text: 'Tout désélectionner', handler: function () { sm.deselectAll(); } }
+            ]
+        }],
+        buttons: [
+            { text: 'Ajouter aux destinataires', handler: function () {
+                var recs = sm.getSelection();
+                if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un client.'); return; }
+                var lignes = recs.map(function (r) {
+                    return r.get('numero') + (r.get('nom') ? ';' + r.get('nom') : '');
+                });
+                var champ = formPanel.down('[name=destinatairesTexte]');
+                var actuel = champ.getValue();
+                champ.setValue((actuel ? actuel.replace(/\s*$/, '') + '\n' : '') + lignes.join('\n'));
+                win.close();
+            } },
+            { text: 'Annuler', handler: function () { win.close(); } }
+        ]
+    });
+    win.show();
+    charger(win);
+};
+
+/* Détail d'un envoi : contenu + statut par destinataire (réussi/échoué). */
+Usp.waweb.detailEnvoi = function (jobId) {
+    var dStore = Ext.create('Ext.data.Store', {
+        fields: ['numero', 'nom', 'statut', 'erreur'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/wa-bulk/' + jobId + '/destinataires',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    Usp.ajax({ url: '/wa-bulk/' + jobId, method: 'GET', success: function (resp) {
+        var j = Ext.decode(resp.responseText) || {};
+        var variantes = [j.msg1, j.msg2, j.msg3, j.msg4, j.msg5].filter(function (m) { return m && m.trim(); });
+        var contenu = '<b>' + Ext.String.htmlEncode(j.nom || ('Envoi #' + jobId)) + '</b> — statut : ' + (j.statut || '') +
+            '<br/>Total : ' + j.total + ' · <span style="color:#2e7d32">Envoyés : ' + j.envoyes + '</span> · ' +
+            '<span style="color:#c62828">Échoués : ' + j.echoues + '</span><hr/>' +
+            (j.mediaUrl ? '<div>📎 Pièce jointe : ' + Ext.String.htmlEncode(j.mediaNom || j.mediaType || '') + '</div>' : '') +
+            '<div style="color:#555"><b>Variantes :</b></div>' +
+            variantes.map(function (m) { return '<div style="margin:2px 0;padding:4px;background:#f4f4f4;border-radius:4px">' +
+                Ext.String.htmlEncode(m) + '</div>'; }).join('');
+        Ext.create('Ext.window.Window', {
+            title: 'Détail de l\'envoi #' + jobId, width: 680, height: 520, modal: true, layout: 'border',
+            items: [
+                { region: 'north', xtype: 'panel', bodyPadding: 10, autoScroll: true, height: 180, html: contenu },
+                { region: 'center', xtype: 'grid', store: dStore, title: 'Destinataires',
+                  columns: [
+                    { text: 'Numéro', dataIndex: 'numero', width: 150 },
+                    { text: 'Nom', dataIndex: 'nom', flex: 1 },
+                    { text: 'Statut', dataIndex: 'statut', width: 100, renderer: function (v) {
+                        var c = v === 'ENVOYE' ? '#2e7d32' : (v === 'ECHEC' ? '#c62828' : '#999');
+                        return '<span style="color:' + c + '">' + (v || '') + '</span>'; } },
+                    { text: 'Erreur', dataIndex: 'erreur', flex: 1, renderer: function (v) {
+                        return v ? '<span style="color:#c62828">' + Ext.String.htmlEncode(v) + '</span>' : ''; } }
+                  ],
+                  tbar: [{ text: 'Rafraîchir', handler: function () { dStore.load(); } }]
+                }
+            ]
+        }).show();
+    } });
+};
+
 Usp.waweb.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'WhatsApp Web',
-        items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel(),
+        items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel(), Usp.waweb.historyPanel(),
                 Usp.waweb.filterPanel(), Usp.waweb.extractPanel()]
     };
 };
