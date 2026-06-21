@@ -132,6 +132,7 @@ INSERT INTO usp_parametre (cle, valeur, description, categorie, created_at) VALU
  ('whatsapp.prefixe_pays','225',          'Préfixe pays par défaut (CI)',     'WHATSAPP', NOW()),
  ('import.taille_max_mo','10',            'Taille maximale d''un import (Mo)','IMPORT', NOW()),
  ('session.expiration_min','60',          'Expiration de session (minutes)',  'SECURITE', NOW()),
+ ('whatsapp.mode_envoi',  'API',           'Mode d''envoi par défaut : API (Cloud officielle) ou WEB (WhatsApp Web)','WHATSAPP', NOW()),
  ('admin.mot_de_passe_initial','Admin@2026','Mot de passe initial du compte admin (haché au 1er démarrage puis ignoré)','SECURITE', NOW());
 
 -- ===== V2__clients =====
@@ -438,6 +439,7 @@ CREATE TABLE usp_whatsapp_account (
     verify_token VARCHAR(150),
     api_version VARCHAR(20) NOT NULL DEFAULT 'v19.0',
     actif BOOLEAN NOT NULL DEFAULT TRUE,
+    mode_test BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL,
     updated_at DATETIME,
     PRIMARY KEY (id),
@@ -547,6 +549,16 @@ CREATE TABLE usp_message_media (
     PRIMARY KEY (id),
     KEY idx_usp_message_media (message_id),
     CONSTRAINT fk_usp_message_media FOREIGN KEY (message_id) REFERENCES usp_message(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_media_fichier (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    nom_fichier VARCHAR(255),
+    mime_type VARCHAR(100),
+    taille BIGINT,
+    contenu LONGBLOB NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE usp_webhook_event (
@@ -803,6 +815,54 @@ CREATE TABLE usp_desabonnement (
     PRIMARY KEY (id),
     KEY idx_usp_desab_contact (contact_id),
     CONSTRAINT fk_usp_desab_contact FOREIGN KEY (contact_id) REFERENCES usp_client_contact(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Canal WhatsApp Web (non officiel) + envoi en masse
+CREATE TABLE usp_wa_web_session (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    libelle VARCHAR(150) NOT NULL,
+    numero VARCHAR(30),
+    statut VARCHAR(20) NOT NULL DEFAULT 'DECONNECTE',
+    actif BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_wa_bulk_job (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_id BIGINT NOT NULL,
+    nom VARCHAR(150),
+    msg1 TEXT, msg2 TEXT, msg3 TEXT, msg4 TEXT, msg5 TEXT,
+    media_url VARCHAR(1000),
+    media_type VARCHAR(20),
+    media_mime VARCHAR(100),
+    media_nom VARCHAR(255),
+    attente_min INT NOT NULL DEFAULT 4,
+    attente_max INT NOT NULL DEFAULT 8,
+    pause_apres INT NOT NULL DEFAULT 10,
+    pause_min INT NOT NULL DEFAULT 10,
+    pause_max INT NOT NULL DEFAULT 20,
+    statut VARCHAR(20) NOT NULL DEFAULT 'BROUILLON',
+    total INT NOT NULL DEFAULT 0,
+    envoyes INT NOT NULL DEFAULT 0,
+    echoues INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_usp_bulk_session (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_wa_bulk_destinataire (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    job_id BIGINT NOT NULL,
+    numero VARCHAR(30) NOT NULL,
+    nom VARCHAR(255),
+    statut VARCHAR(20) NOT NULL DEFAULT 'EN_ATTENTE',
+    erreur VARCHAR(500),
+    sent_at DATETIME,
+    PRIMARY KEY (id),
+    KEY idx_usp_bulk_dest_job (job_id),
+    CONSTRAINT fk_usp_bulk_dest_job FOREIGN KEY (job_id) REFERENCES usp_wa_bulk_job(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Automatisations d'exemple (section 22)

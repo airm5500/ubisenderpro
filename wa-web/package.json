@@ -1,0 +1,20 @@
+{
+  "name": "ubisender-wa-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Service compagnon WhatsApp Web (Baileys) pour UbiSenderPro - canal non officiel : connexion par QR, envoi texte/média, filtre de numéros.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.19.2",
+    "pino": "^9.3.2",
+    "qrcode": "^1.5.4"
+  }
+}

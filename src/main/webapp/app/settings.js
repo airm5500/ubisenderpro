@@ -18,7 +18,7 @@ Usp.settings.jsonStore = function (url, fields) {
 Usp.settings.accountsPanel = function () {
     var store = Usp.settings.jsonStore('/whatsapp/accounts',
         ['id', 'libelle', 'phoneNumberId', 'businessAccountId', 'numeroAffiche',
-         'accessToken', 'verifyToken', 'apiVersion', 'actif']);
+         'accessToken', 'verifyToken', 'apiVersion', 'actif', 'modeTest']);
 
     return {
         xtype: 'grid', title: 'Comptes WhatsApp', store: store,
@@ -27,7 +27,9 @@ Usp.settings.accountsPanel = function () {
             { text: 'Phone Number ID', dataIndex: 'phoneNumberId', width: 160 },
             { text: 'Numéro affiché', dataIndex: 'numeroAffiche', width: 150 },
             { text: 'API', dataIndex: 'apiVersion', width: 70 },
-            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+            { text: 'Mode test', dataIndex: 'modeTest', width: 80,
+              renderer: function (v) { return v ? '🧪 Oui' : 'Non'; } }
         ],
         tbar: [
             { text: 'Nouveau compte', handler: function () { Usp.settings.accountForm(store, null); } },
@@ -59,7 +61,9 @@ Usp.settings.accountForm = function (store, rec) {
                 { xtype: 'textareafield', name: 'accessToken', fieldLabel: 'Access token', height: 60 },
                 { xtype: 'textfield', name: 'verifyToken', fieldLabel: 'Verify token (webhook)' },
                 { xtype: 'textfield', name: 'apiVersion', fieldLabel: 'Version API', value: 'v19.0' },
-                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: true }
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: true },
+                { xtype: 'checkbox', name: 'modeTest', fieldLabel: 'Mode test',
+                  boxLabel: 'Simuler les envois (aucun appel à Meta) — pour tester sans token' }
             ]
         }],
         buttons: [{
@@ -69,6 +73,7 @@ Usp.settings.accountForm = function (store, rec) {
                 if (!form.isValid()) { return; }
                 var data = form.getValues();
                 data.actif = form.findField('actif').getValue();
+                data.modeTest = form.findField('modeTest').getValue();
                 Usp.ajax({
                     url: rec ? '/whatsapp/accounts/' + rec.get('id') : '/whatsapp/accounts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
@@ -124,7 +129,16 @@ Usp.settings.templateForm = function (store, rec) {
                   store: [['AUCUN', 'Aucun'], ['IMAGE', 'Image'], ['VIDEO', 'Vidéo'], ['DOCUMENT', 'Document']],
                   queryMode: 'local', editable: false },
                 { xtype: 'textfield', name: 'enteteMediaUrl', fieldLabel: 'URL du média',
-                  emptyText: 'https://… (image/vidéo/document de l\'en-tête, pour IMAGE/VIDEO/DOCUMENT)' },
+                  emptyText: 'https://… ou importez un fichier ci-dessous' },
+                { xtype: 'fieldcontainer', fieldLabel: 'Importer un fichier', layout: 'hbox',
+                  items: [
+                    { xtype: 'filefield', name: 'mediaFichier', buttonOnly: true, hideLabel: true,
+                      buttonText: 'Parcourir...',
+                      listeners: { change: function (f) { Usp.settings.uploadMedia(f); } } },
+                    { xtype: 'box', margin: '4 0 0 8',
+                      html: '<span style="color:#888;font-size:11px">image / vidéo / document depuis votre ordinateur</span>' }
+                  ] },
+                { xtype: 'component', itemId: 'mediaPreview', margin: '0 0 6 0', html: '' },
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
                   emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
@@ -154,12 +168,89 @@ Usp.settings.templateForm = function (store, rec) {
         }]
     });
     win.show();
-    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    if (rec) {
+        win.down('form').getForm().setValues(rec.getData());
+        Usp.settings.previewMedia(win.down('form'), rec.get('enteteMediaUrl'), rec.get('enteteMediaType'));
+    }
+};
+
+/* Téléverse le fichier choisi vers l'app, remplit l'URL et le type d'en-tête, affiche l'aperçu. */
+Usp.settings.uploadMedia = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var form = f.up('form');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/media/upload', method: 'POST',
+            jsonData: { fichierBase64: b64, mimeType: file.type || 'application/octet-stream', nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText);
+                var mime = file.type || '';
+                var t = mime.indexOf('image/') === 0 ? 'IMAGE'
+                      : mime.indexOf('video/') === 0 ? 'VIDEO' : 'DOCUMENT';
+                form.down('[name=enteteMediaUrl]').setValue(r.url);
+                form.down('[name=enteteMediaType]').setValue(t);
+                Usp.settings.previewMedia(form, r.url, t);
+            },
+            failure: function (resp) {
+                var msg = 'Téléversement impossible.';
+                try { var r = Ext.decode(resp.responseText); if (r && r.erreur) { msg = r.erreur; } } catch (ex) {}
+                Ext.Msg.alert('Erreur', msg);
+            }
+        });
+    };
+    reader.readAsDataURL(file);
+};
+
+/* Aperçu du média d'en-tête (vignette pour une image, lien sinon). */
+Usp.settings.previewMedia = function (form, url, type) {
+    var c = form.down('#mediaPreview');
+    if (!c) { return; }
+    if (!url) { c.update(''); return; }
+    if (type === 'IMAGE') {
+        c.update('<img src="' + url + '" style="max-height:90px;border:1px solid #ddd;border-radius:4px"/>');
+    } else {
+        c.update('<a href="' + url + '" target="_blank">Média importé ✔ (ouvrir)</a>');
+    }
+};
+
+/* ---------- Général : mode de fonctionnement ---------- */
+Usp.settings.generalPanel = function () {
+    var form = Ext.create('Ext.form.Panel', {
+        title: 'Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
+        items: [
+            { xtype: 'displayfield',
+              value: '<b>Mode de fonctionnement</b> : choisissez le canal d\'envoi par défaut.' },
+            { xtype: 'combobox', name: 'mode', itemId: 'modeField', fieldLabel: 'Mode d\'envoi par défaut',
+              width: 520, value: 'API', editable: false, queryMode: 'local',
+              store: [['API', 'API officielle (WhatsApp Cloud API / Meta)'],
+                      ['WEB', 'WhatsApp Web (non officiel, scan QR — risque de bannissement)']] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">API : conforme, nécessite un compte Meta. ' +
+                     'WEB : sans Meta (scan QR), à débit lent. Ce choix présélectionne le canal ' +
+                     'dans le composeur « Nouveau message ».</span>' }
+        ],
+        bbar: ['->', { text: 'Enregistrer', handler: function (b) {
+            var val = b.up('panel').down('#modeField').getValue();
+            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: val },
+                success: function () { Usp.mode = val; Ext.Msg.alert('OK', 'Mode enregistré : ' + val + '.'); },
+                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
+        } }]
+    });
+    form.on('afterrender', function () {
+        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (resp) {
+            var v = (Ext.decode(resp.responseText) || {}).valeur;
+            form.down('#modeField').setValue(v || 'API');
+        } });
+    });
+    return form;
 };
 
 Usp.settings.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'Paramètres',
-        items: [Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
+        items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
     };
 };

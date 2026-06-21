@@ -56,6 +56,7 @@ public class WhatsappService {
         c.setNomAffiche(nomAffiche);
         c.setStatut("OUVERTE");
         em.persist(c);
+        em.flush(); // génère l'identifiant (IDENTITY) avant utilisation comme clé étrangère
         return c;
     }
 

@@ -42,6 +42,7 @@ Usp.inbox.renderMessage = function (rec) {
 
 Usp.inbox.panel = function () {
     var convStore = Usp.inbox.conversationStore();
+    Usp.inbox.convStore = convStore;
 
     var msgStore = Ext.create('Ext.data.Store', {
         fields: ['id', 'direction', 'typeMessage', 'contenu', 'statut', 'noteInterne', 'erreur', 'createdAt'],
@@ -114,6 +115,7 @@ Usp.inbox.panel = function () {
                     }
                 }],
                 tbar: [
+                    { xtype: 'button', text: 'Nouveau', tooltip: 'Composer un message (texte/image) hors modèle', handler: function () { Usp.inbox.nouveauMessage(); } },
                     { xtype: 'button', text: 'Toutes', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
                     { xtype: 'button', text: 'Non lues', handler: function () { convStore.getProxy().extraParams = { statut: 'OUVERTE' }; convStore.load(); } },
                     '->',
@@ -237,6 +239,118 @@ Usp.inbox.joindre = function () {
         }]
     });
     win.show();
+};
+
+/* Composer un message (texte et/ou image) hors modèle, via le canal choisi (API officielle / WhatsApp Web). */
+Usp.inbox.nouveauMessage = function () {
+    var fileData = { base64: null, nom: null, mime: null };
+    var jsonStore = function (url) {
+        return Ext.create('Ext.data.Store', { fields: ['id', 'libelle'],
+            proxy: { type: 'ajax', url: Usp.apiBase + url,
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+            autoLoad: true });
+    };
+    var apiStore = jsonStore('/whatsapp/accounts');
+    var webStore = jsonStore('/wa-web/sessions');
+
+    var maj = function (win) {
+        var web = win.down('#canal').getValue().canal === 'WEB';
+        win.down('#cibleApi').setVisible(!web).setDisabled(web);
+        win.down('#cibleWeb').setVisible(web).setDisabled(!web);
+    };
+
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Nouveau message', width: 480, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'radiogroup', itemId: 'canal', fieldLabel: 'Canal', columns: 2,
+              items: [
+                { boxLabel: 'API officielle', name: 'canal', inputValue: 'API', checked: Usp.mode !== 'WEB' },
+                { boxLabel: 'WhatsApp Web', name: 'canal', inputValue: 'WEB', checked: Usp.mode === 'WEB' }
+              ],
+              listeners: { change: function (g) { maj(g.up('window')); } } },
+            { xtype: 'combobox', itemId: 'cibleApi', name: 'accountId', fieldLabel: 'Compte (API)',
+              store: apiStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false },
+            { xtype: 'combobox', itemId: 'cibleWeb', name: 'sessionId', fieldLabel: 'Compte (Web)',
+              store: webStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false, hidden: true },
+            { xtype: 'textfield', name: 'numero', fieldLabel: 'Numéro', allowBlank: false,
+              emptyText: 'Ex. 2250700000000 (format international, sans +)' },
+            { xtype: 'textareafield', name: 'texte', fieldLabel: 'Message', height: 80,
+              emptyText: 'Texte du message (ou légende de l\'image)' },
+            { xtype: 'fieldcontainer', fieldLabel: 'Image / fichier', layout: 'hbox', items: [
+                { xtype: 'filefield', name: 'fichier', buttonOnly: true, hideLabel: true, buttonText: 'Parcourir...',
+                  listeners: { change: function (f) {
+                      var file = f.fileInputEl.dom.files[0];
+                      if (!file) { return; }
+                      fileData.nom = file.name; fileData.mime = file.type || 'application/octet-stream';
+                      var reader = new FileReader();
+                      reader.onload = function (e) { fileData.base64 = e.target.result.split(',')[1]; };
+                      reader.readAsDataURL(file);
+                  } } },
+                { xtype: 'box', margin: '4 0 0 8', html: '<span style="color:#888;font-size:11px">optionnel</span>' }
+            ] }
+        ] }],
+        buttons: [{ text: 'Envoyer', formBind: true, handler: function (b) {
+            var form = b.up('window').down('form').getForm();
+            if (!form.isValid()) { return; }
+            var v = form.getValues();
+            var web = v.canal === 'WEB';
+            var cible = web ? v.sessionId : v.accountId;
+            if (!cible) { Ext.Msg.alert('Info', 'Choisissez un compte ' + (web ? 'WhatsApp Web' : 'API') + '.'); return; }
+            if (!fileData.base64 && !v.texte) { Ext.Msg.alert('Info', 'Saisissez un texte ou joignez un fichier.'); return; }
+            b.disable();
+            var apresEnvoi = function () { win.close(); if (Usp.inbox.convStore) { Usp.inbox.convStore.load(); } };
+            var echec = function (msg) { b.enable(); Ext.Msg.alert('Erreur', msg || 'Envoi impossible.'); };
+            // Réponse {success,...} (WEB) : succès HTTP mais peut contenir success=false.
+            var okWeb = function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                if (r.success) { apresEnvoi(); } else { echec(r.erreur); }
+            };
+
+            if (web) {
+                if (fileData.base64) {
+                    Usp.ajax({ url: '/media/upload', method: 'POST',
+                        jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                        success: function (resp) {
+                            var up = Ext.decode(resp.responseText);
+                            Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send-media', method: 'POST',
+                                jsonData: { numero: v.numero, type: Usp.inbox.typeMedia(fileData.mime),
+                                            mediaUrl: up.url, mimeType: fileData.mime, fileName: fileData.nom, caption: v.texte || null },
+                                success: okWeb, failure: function () { echec('Service WhatsApp Web injoignable.'); } });
+                        },
+                        failure: function () { echec('Téléversement impossible.'); } });
+                } else {
+                    Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send', method: 'POST',
+                        jsonData: { numero: v.numero, texte: v.texte },
+                        success: okWeb, failure: function () { echec('Service WhatsApp Web injoignable.'); } });
+                }
+                return;
+            }
+
+            // Canal API officielle.
+            if (fileData.base64) {
+                Usp.ajax({ url: '/whatsapp/media', method: 'POST',
+                    jsonData: { accountId: cible, fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                    success: function (resp) {
+                        var up = Ext.decode(resp.responseText);
+                        Usp.ajax({ url: '/whatsapp/messages/media', method: 'POST',
+                            jsonData: { accountId: cible, numero: v.numero, type: Usp.inbox.typeMedia(fileData.mime),
+                                        mediaId: up.mediaId, mimeType: fileData.mime, nomFichier: fileData.nom, legende: v.texte || null },
+                            success: apresEnvoi, failure: function () { echec('Envoi du média impossible (fenêtre de 24 h ?).'); } });
+                    },
+                    failure: function (resp) {
+                        var msg = 'Téléversement impossible.';
+                        try { var r = Ext.decode(resp.responseText); if (r && r.erreur) { msg = r.erreur; } } catch (e) {}
+                        echec(msg);
+                    } });
+            } else {
+                Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
+                    jsonData: { accountId: cible, numero: v.numero, texte: v.texte },
+                    success: apresEnvoi, failure: function () { echec('Envoi impossible (fenêtre de 24 h ?).'); } });
+            }
+        } }]
+    });
+    win.show();
+    maj(win);
 };
 
 Usp.inbox.note = function (field) {

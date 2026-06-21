@@ -8,7 +8,8 @@ Ext.Loader.setConfig({ enabled: true });
 var Usp = {
     apiBase: 'api/v1',
     token: null,
-    user: null
+    user: null,
+    mode: 'API'   // mode d'envoi par défaut (API officielle | WEB) — chargé à la connexion
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
@@ -58,7 +59,14 @@ Usp.showLogin = function () {
                         Usp.token = data.token;
                         Usp.user = data.user;
                         win.close();
-                        Usp.showMain();
+                        // Charge le mode d'envoi global puis ouvre l'application.
+                        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
+                            success: function (r) {
+                                var v = (Ext.decode(r.responseText) || {}).valeur;
+                                Usp.mode = v || 'API';
+                                Usp.showMain();
+                            },
+                            failure: function () { Usp.showMain(); } });
                     },
                     failure: function () {
                         Ext.Msg.alert('Erreur', 'Identifiants invalides.');
@@ -302,6 +310,7 @@ Usp.MENU = [
     { text: 'Comptes clients',     view: 'clients',    roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
     { text: 'Catalogue',           view: 'catalogue',  roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
     { text: 'Campagnes',           view: 'campaigns',  roles: ['ADMIN', 'MARKETING'] },
+    { text: 'WhatsApp Web',        view: 'waweb',      roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Importations',        view: 'import',     roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Paramètres',          view: 'settings',   roles: ['ADMIN'] },
@@ -357,6 +366,7 @@ Usp.showMain = function () {
                             case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
                             case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
                             case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
+                            case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
                             case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
                             case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
                             case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;

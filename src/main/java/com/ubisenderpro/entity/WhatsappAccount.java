@@ -35,6 +35,9 @@ public class WhatsappAccount {
     @Column(name = "actif", nullable = false)
     private boolean actif = true;
 
+    @Column(name = "mode_test", nullable = false)
+    private boolean modeTest = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -62,6 +65,8 @@ public class WhatsappAccount {
     public void setApiVersion(String apiVersion) { this.apiVersion = apiVersion; }
     public boolean isActif() { return actif; }
     public void setActif(boolean actif) { this.actif = actif; }
+    public boolean isModeTest() { return modeTest; }
+    public void setModeTest(boolean modeTest) { this.modeTest = modeTest; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
