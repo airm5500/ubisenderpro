@@ -131,5 +131,6 @@ déjà vérifié.
 | `WA_WEB_URL` | Payara (env ou `-D`) | `http://localhost:3000` | URL du service WhatsApp Web |
 | `WA_WEB_TOKEN` | Payara + service Node | *(vide)* | token partagé d'authentification |
 | `WA_WEB_DATA` | service Node | `/app/data` | dossier des sessions persistées |
+| `UBISENDER_CALLBACK` | service Node | *(vide)* | base UbiSenderPro pour recevoir les **réponses** des clients et l'état de session (ex. `http://localhost:8080/ubisenderpro` ; en Docker Desktop : `http://host.docker.internal:8080/ubisenderpro`). Si vide, pas de réception. |
 | `PORT` | service Node | `3000` | port d'écoute |
 | `UBISENDERPRO_SKIP_FLYWAY` | Payara | `false` | désactive Flyway si base pré-installée |

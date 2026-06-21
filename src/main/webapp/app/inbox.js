@@ -10,7 +10,7 @@ Usp.inbox.msgStore = null;
 
 Usp.inbox.conversationStore = function () {
     return Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroWhatsapp', 'nomAffiche', 'statut', 'agentId',
+        fields: ['id', 'numeroWhatsapp', 'nomAffiche', 'statut', 'agentId', 'canal', 'waWebSessionId',
                  'nonLu', 'dernierMessage', 'dateDernierMessage', 'whatsappAccountId', 'contactId'],
         proxy: {
             type: 'ajax',
@@ -108,9 +108,11 @@ Usp.inbox.panel = function () {
                     renderer: function (v, m, rec) {
                         var titre = Ext.String.htmlEncode(v || rec.get('numeroWhatsapp') || '');
                         var apercu = Ext.String.htmlEncode(rec.get('dernierMessage') || '');
+                        var canal = rec.get('canal') === 'WEB'
+                            ? '<span style="background:#e8f0fe;color:#1967d2;border-radius:3px;padding:0 4px;font-size:10px;margin-right:4px">Web</span>' : '';
                         var badge = rec.get('nonLu') > 0
                             ? '<span style="float:right;background:#25d366;color:#fff;border-radius:10px;padding:0 6px;font-size:11px">' + rec.get('nonLu') + '</span>' : '';
-                        return '<div><b>' + titre + '</b>' + badge + '</div>' +
+                        return '<div>' + canal + '<b>' + titre + '</b>' + badge + '</div>' +
                             '<div style="color:#888;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + apercu + '</div>';
                     }
                 }],
@@ -134,12 +136,18 @@ Usp.inbox.envoyer = function (field) {
     if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
     var texte = field.getValue();
     if (!texte) { return; }
-    Usp.ajax({
-        url: '/whatsapp/messages/text', method: 'POST',
-        jsonData: { accountId: conv.get('whatsappAccountId'), numero: conv.get('numeroWhatsapp'), texte: texte },
-        success: function () { field.setValue(''); Usp.inbox.reloadMessages(); },
-        failure: function () { Ext.Msg.alert('Erreur', 'Envoi impossible (vérifiez le compte WhatsApp et la fenêtre de 24h).'); }
-    });
+    var apres = function () { field.setValue(''); Usp.inbox.reloadMessages(); };
+    var echec = function () { Ext.Msg.alert('Erreur', 'Envoi impossible (compte/connexion ou fenêtre de 24h).'); };
+    if (conv.get('canal') === 'WEB') {
+        Usp.ajax({ url: '/wa-web/sessions/' + conv.get('waWebSessionId') + '/send', method: 'POST',
+            jsonData: { numero: conv.get('numeroWhatsapp'), texte: texte },
+            success: function (resp) { var r = Ext.decode(resp.responseText) || {}; if (r.success) { apres(); } else { echec(); } },
+            failure: echec });
+    } else {
+        Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
+            jsonData: { accountId: conv.get('whatsappAccountId'), numero: conv.get('numeroWhatsapp'), texte: texte },
+            success: apres, failure: echec });
+    }
 };
 
 /* Envoi d'un média par URL publique (lien hébergé). */
@@ -213,6 +221,22 @@ Usp.inbox.joindre = function () {
                 if (!fileData.base64) { Ext.Msg.alert('Erreur', 'Sélectionnez un fichier.'); return; }
                 var legende = b.up('window').down('[name=legende]').getValue();
                 b.disable();
+                var web = conv.get('canal') === 'WEB';
+                var koMedia = function () { b.enable(); Ext.Msg.alert('Erreur', 'Envoi du média impossible (connexion ou fenêtre de 24h).'); };
+                if (web) {
+                    Usp.ajax({ url: '/media/upload', method: 'POST',
+                        jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                        success: function (resp) {
+                            var up = Ext.decode(resp.responseText);
+                            Usp.ajax({ url: '/wa-web/sessions/' + conv.get('waWebSessionId') + '/send-media', method: 'POST',
+                                jsonData: { numero: conv.get('numeroWhatsapp'), type: Usp.inbox.typeMedia(fileData.mime),
+                                            mediaUrl: up.url, mimeType: fileData.mime, fileName: fileData.nom, caption: legende || null },
+                                success: function (r2) { var r = Ext.decode(r2.responseText) || {}; if (r.success) { win.close(); Usp.inbox.reloadMessages(); } else { koMedia(); } },
+                                failure: koMedia });
+                        },
+                        failure: koMedia });
+                    return;
+                }
                 Usp.ajax({
                     url: '/whatsapp/media', method: 'POST',
                     jsonData: { accountId: conv.get('whatsappAccountId'), fichierBase64: fileData.base64,

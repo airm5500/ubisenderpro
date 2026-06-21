@@ -43,7 +43,9 @@ Usp.campaign.show = function () {
         title: '2. Destinataires', bodyPadding: 12, border: false,
         defaults: { anchor: '100%' },
         items: [
-            { xtype: 'displayfield', value: 'Choisissez une liste statique et/ou un segment dynamique.' },
+            { xtype: 'displayfield', value: 'Ciblez par segmentation client, et/ou liste statique, et/ou segment dynamique.' },
+            Usp.campaign.combo('/segmentations', '', 'id', 'libelle',
+                { name: 'segmentationId', fieldLabel: 'Segmentation client' }),
             Usp.campaign.combo('/lists', '', 'id', 'nom',
                 { name: 'listeId', fieldLabel: 'Liste de diffusion' }),
             Usp.campaign.combo('/segments', '', 'id', 'nom',
@@ -126,6 +128,7 @@ Usp.campaign.build = function (wizard) {
         nom: v.nom, objectif: v.objectif, description: v.description,
         whatsappAccountId: v.whatsappAccountId, modeleId: v.modeleId,
         listeId: v.listeId || null, segmentId: v.segmentId || null,
+        segmentationId: v.segmentationId || null,
         statut: 'BROUILLON'
     };
 

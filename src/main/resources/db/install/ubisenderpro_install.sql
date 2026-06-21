@@ -471,7 +471,9 @@ CREATE TABLE usp_modele_message (
 
 CREATE TABLE usp_conversation (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    whatsapp_account_id BIGINT NOT NULL,
+    canal VARCHAR(10) NOT NULL DEFAULT 'API',
+    whatsapp_account_id BIGINT,
+    wa_web_session_id BIGINT,
     contact_id BIGINT,
     client_id BIGINT,
     numero_whatsapp VARCHAR(25) NOT NULL,
@@ -639,6 +641,7 @@ CREATE TABLE usp_campagne (
     modele_id BIGINT,
     liste_id BIGINT,
     segment_id BIGINT,
+    segmentation_id BIGINT,
     statut VARCHAR(20) NOT NULL DEFAULT 'BROUILLON',
     date_programmee DATETIME,
     fuseau_horaire VARCHAR(60),

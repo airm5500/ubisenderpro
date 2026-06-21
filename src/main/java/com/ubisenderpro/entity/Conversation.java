@@ -11,8 +11,15 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "whatsapp_account_id", nullable = false)
+    /** Canal de la conversation : API (Cloud officielle) ou WEB (WhatsApp Web). */
+    @Column(name = "canal", nullable = false, length = 10)
+    private String canal = "API";
+
+    @Column(name = "whatsapp_account_id")
     private Long whatsappAccountId;
+
+    @Column(name = "wa_web_session_id")
+    private Long waWebSessionId;
 
     @Column(name = "contact_id")
     private Long contactId;
@@ -58,6 +65,10 @@ public class Conversation {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public String getCanal() { return canal; }
+    public void setCanal(String canal) { this.canal = canal; }
+    public Long getWaWebSessionId() { return waWebSessionId; }
+    public void setWaWebSessionId(Long waWebSessionId) { this.waWebSessionId = waWebSessionId; }
     public Long getWhatsappAccountId() { return whatsappAccountId; }
     public void setWhatsappAccountId(Long whatsappAccountId) { this.whatsappAccountId = whatsappAccountId; }
     public Long getContactId() { return contactId; }

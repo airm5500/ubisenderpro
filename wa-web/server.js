@@ -38,7 +38,32 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const API_TOKEN = process.env.WA_WEB_TOKEN || '';
 const DATA_DIR = process.env.WA_WEB_DATA || path.join(__dirname, 'data');
+// Base UbiSenderPro pour renvoyer les messages entrants / l'état (ex. http://localhost:8080/ubisenderpro)
+const CALLBACK = (process.env.UBISENDER_CALLBACK || '').replace(/\/+$/, '');
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+/** Notifie UbiSenderPro d'un événement (message entrant, statut). Best-effort. */
+async function postCallback(chemin, body) {
+  if (!CALLBACK) { return; }
+  try {
+    await fetch(CALLBACK + '/api/v1/webhooks/wa-web' + chemin, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Token': API_TOKEN },
+      body: JSON.stringify(body)
+    });
+  } catch (e) { logger.warn('Callback ' + chemin + ' : ' + (e.message || e)); }
+}
+
+function texteMessage(m) {
+  var msg = m && m.message; if (!msg) { return null; }
+  if (msg.conversation) { return { type: 'TEXTE', text: msg.conversation }; }
+  if (msg.extendedTextMessage && msg.extendedTextMessage.text) { return { type: 'TEXTE', text: msg.extendedTextMessage.text }; }
+  if (msg.imageMessage) { return { type: 'IMAGE', text: msg.imageMessage.caption || '[image]' }; }
+  if (msg.videoMessage) { return { type: 'VIDEO', text: msg.videoMessage.caption || '[vidéo]' }; }
+  if (msg.documentMessage) { return { type: 'DOCUMENT', text: msg.documentMessage.fileName || '[document]' }; }
+  if (msg.audioMessage) { return { type: 'AUDIO', text: '[audio]' }; }
+  return { type: 'TEXTE', text: '[message]' };
+}
 
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
 
@@ -106,6 +131,22 @@ async function startSession(id) {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // Messages entrants -> remontée vers UbiSenderPro (réponses des clients).
+  sock.ev.on('messages.upsert', (ev) => {
+    if (!ev || ev.type !== 'notify' || !Array.isArray(ev.messages)) { return; }
+    for (const m of ev.messages) {
+      if (!m || !m.key || m.key.fromMe) { continue; }
+      const jid = m.key.remoteJid || '';
+      if (!jid.endsWith('@s.whatsapp.net')) { continue; } // ignore groupes/diffusions
+      const contenu = texteMessage(m);
+      if (!contenu) { continue; }
+      postCallback('/message', {
+        sessionId: id, from: jid.split('@')[0], name: m.pushName || null,
+        type: contenu.type, text: contenu.text, id: m.key.id
+      });
+    }
+  });
+
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
@@ -118,6 +159,7 @@ async function startSession(id) {
       s.qr = null;
       s.me = sock.user ? { id: sock.user.id, name: sock.user.name } : null;
       logger.info({ id, me: s.me }, 'Session connectée');
+      postCallback('/status', { sessionId: id, status: 'CONNECTE' });
     }
     if (connection === 'close') {
       const code = lastDisconnect && lastDisconnect.error
@@ -126,6 +168,7 @@ async function startSession(id) {
       s.status = loggedOut ? 'DECONNECTE' : 'CONNEXION';
       s.qr = null;
       logger.warn({ id, code, loggedOut }, 'Connexion fermée');
+      postCallback('/status', { sessionId: id, status: s.status });
       if (!loggedOut) {
         setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 3000);
       } else {
