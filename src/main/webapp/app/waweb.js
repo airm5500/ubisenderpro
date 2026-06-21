@@ -5,6 +5,48 @@
  */
 Ext.define('Usp.waweb', { singleton: true });
 
+/* Catalogue des variables insérables dans un message (token + description). */
+Usp.waweb.VARIABLES = [
+    { t: 'NOM', d: 'Nom du contact destinataire' },
+    { t: 'SOCIETE_CLIENT', d: 'Société / compte du client' },
+    { t: 'SEGMENTATION', d: 'Segmentation du client' },
+    { t: 'SOCIETE', d: 'Votre société émettrice (Paramètres → Général)' }
+];
+
+/* Barre de boutons « variables » : insère [TOKEN] dans la dernière variante éditée. */
+Usp.waweb.barreVariables = function () {
+    return {
+        xtype: 'fieldcontainer', fieldLabel: 'Variables', layout: { type: 'hbox', wrap: true },
+        defaults: { margin: '0 4 4 0' },
+        items: Usp.waweb.VARIABLES.map(function (v) {
+            return { xtype: 'button', text: '[' + v.t + ']', tooltip: v.d,
+                     handler: function (b) { Usp.waweb.insertVar(v.t, b); } };
+        })
+    };
+};
+
+/* Insère [token] à la position du curseur dans la dernière variante éditée (sinon Variante 1). */
+Usp.waweb.insertVar = function (token, btn) {
+    var f = Usp.waweb._lastMsgField;
+    if (!f || typeof f.isXType !== 'function' || !f.isXType('textareafield')) {
+        f = btn.up('form').down('[name=msg1]');
+    }
+    if (!f) { return; }
+    var ins = '[' + token + ']';
+    var el = f.inputEl && f.inputEl.dom;
+    var val = f.getValue() || '';
+    if (el && typeof el.selectionStart === 'number') {
+        var s = el.selectionStart, e = el.selectionEnd;
+        f.setValue(val.substring(0, s) + ins + val.substring(e));
+        var pos = s + ins.length;
+        f.focus();
+        Ext.defer(function () { try { el.selectionStart = el.selectionEnd = pos; } catch (ex) {} }, 20);
+    } else {
+        f.setValue(val + ins);
+        f.focus();
+    }
+};
+
 /* ---------- Comptes WhatsApp Web ---------- */
 Usp.waweb.sessionStore = function () {
     return Ext.create('Ext.data.Store', {
@@ -131,7 +173,11 @@ Usp.waweb.bulkPanel = function () {
         fields: ['id', 'nom', 'corps'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true
+        autoLoad: true,
+        listeners: { load: function (s) {
+            // Option « aucun modèle » pour pouvoir effacer la sélection.
+            if (s.findExact('id', '') === -1) { s.insert(0, { id: '', nom: '— Aucun modèle —', corps: '' }); }
+        } }
     });
 
     return {
@@ -146,17 +192,24 @@ Usp.waweb.bulkPanel = function () {
               emptyText: 'Pré-remplir la variante 1 depuis un modèle…',
               listeners: { select: function (c, recs) {
                   var rec = recs && recs[0]; if (!rec) { return; }
-                  var corps = rec.get('corps'); if (corps) { c.up('form').down('[name=msg1]').setValue(corps); }
+                  var corps = rec.get('corps');
+                  if (corps) { c.up('form').down('[name=msg1]').setValue(corps); }
               } } },
             { xtype: 'displayfield', value: '<b>Variantes du message</b> — pour limiter le marquage « spam », ' +
               'une variante est tirée <b>au hasard</b> pour chaque contact. Une seule suffit ; les autres sont ' +
-              'facultatives. Utilisez <b>[NAME]</b> pour insérer le nom du contact.' },
+              'facultatives. Cliquez sur une variable ci-dessous pour l\'insérer.' },
+            Usp.waweb.barreVariables(),
             { xtype: 'textareafield', name: 'msg1', fieldLabel: 'Variante 1', height: 60,
-              emptyText: 'Bonjour [NAME], ...' },
-            { xtype: 'textareafield', name: 'msg2', fieldLabel: 'Variante 2 (option)', height: 45 },
-            { xtype: 'textareafield', name: 'msg3', fieldLabel: 'Variante 3 (option)', height: 45 },
-            { xtype: 'textareafield', name: 'msg4', fieldLabel: 'Variante 4 (option)', height: 45 },
-            { xtype: 'textareafield', name: 'msg5', fieldLabel: 'Variante 5 (option)', height: 45 },
+              emptyText: 'Bonjour [NOM], bienvenue chez [SOCIETE].',
+              listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
+            { xtype: 'textareafield', name: 'msg2', fieldLabel: 'Variante 2 (option)', height: 45,
+              listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
+            { xtype: 'textareafield', name: 'msg3', fieldLabel: 'Variante 3 (option)', height: 45,
+              listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
+            { xtype: 'textareafield', name: 'msg4', fieldLabel: 'Variante 4 (option)', height: 45,
+              listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
+            { xtype: 'textareafield', name: 'msg5', fieldLabel: 'Variante 5 (option)', height: 45,
+              listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
             { xtype: 'fieldcontainer', fieldLabel: 'Pièce jointe', layout: 'hbox', items: [
                 { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Parcourir...',
                   listeners: { change: function (f) { Usp.waweb.uploadPiece(f, media); } } },
@@ -223,15 +276,20 @@ Usp.waweb.historyPanel = function () {
             { text: 'Envoyés', dataIndex: 'envoyes', width: 90, renderer: function (v) {
                 return '<span style="color:#2e7d32;font-weight:bold">' + (v || 0) + '</span>'; } },
             { text: 'Échoués', dataIndex: 'echoues', width: 90, renderer: function (v) {
-                return v ? '<span style="color:#c62828;font-weight:bold">' + v + '</span>' : '0'; } }
+                return v ? '<span style="color:#c62828;font-weight:bold">' + v + '</span>' : '0'; } },
+            { text: 'Détail', width: 90, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="wa-det" title="Voir le détail (contenu + statuts)" ' +
+                      'style="cursor:pointer;font-size:16px">🔍 voir</span>';
+              } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } },
-               { text: 'Voir le détail', handler: function (b) {
-                   var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                   if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un envoi.'); return; }
-                   Usp.waweb.detailEnvoi(rec.get('id'));
-               } }],
-        listeners: { itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); } }
+        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }],
+        listeners: {
+            cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
+                if (e.getTarget('.wa-det')) { Usp.waweb.detailEnvoi(rec.get('id')); }
+            },
+            itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); }
+        }
     };
 };
 

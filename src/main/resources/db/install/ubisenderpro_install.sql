@@ -129,6 +129,7 @@ SELECT u.id, r.id FROM usp_utilisateur u, usp_role r WHERE u.login = 'admin' AND
 -- ----- Paramètres par défaut -----
 INSERT INTO usp_parametre (cle, valeur, description, categorie, created_at) VALUES
  ('app.nom',             'UbiSenderPro',  'Nom de l''application',            'GENERAL', NOW()),
+ ('app.societe',         'UbiSenderPro',  'Société émettrice (variable [SOCIETE])','GENERAL', NOW()),
  ('whatsapp.prefixe_pays','225',          'Préfixe pays par défaut (CI)',     'WHATSAPP', NOW()),
  ('import.taille_max_mo','10',            'Taille maximale d''un import (Mo)','IMPORT', NOW()),
  ('session.expiration_min','60',          'Expiration de session (minutes)',  'SECURITE', NOW()),

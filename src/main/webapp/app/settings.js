@@ -236,29 +236,39 @@ Usp.settings.generalPanel = function () {
               emptyText: 'Ex. 225 (Côte d\'Ivoire), 226, 33…' },
             { xtype: 'displayfield',
               value: '<span style="color:#888">Pré-rempli automatiquement dans les champs « numéro » ' +
-                     'et ajouté aux numéros saisis en format local.</span>' }
+                     'et ajouté aux numéros saisis en format local.</span>' },
+            { xtype: 'textfield', name: 'societe', itemId: 'societeField', fieldLabel: 'Société émettrice', width: 520,
+              emptyText: 'Nom de votre société (variable [SOCIETE] dans les messages)' }
         ],
         bbar: ['->', { text: 'Enregistrer', handler: function (b) {
             var p = b.up('panel');
             var mode = p.down('#modeField').getValue();
             var prefixe = (p.down('#prefixeField').getValue() || '').replace(/[^0-9]/g, '');
-            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: mode },
-                success: function () {
-                    Usp.mode = mode;
-                    Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'PUT', jsonData: { valeur: prefixe },
-                        success: function () { Usp.prefixe = prefixe; Ext.Msg.alert('OK', 'Paramètres enregistrés.'); },
-                        failure: function () { Ext.Msg.alert('Erreur', 'Préfixe non enregistré.'); } });
-                },
-                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
+            var societe = p.down('#societeField').getValue() || '';
+            var put = function (cle, valeur) {
+                return function (cb) {
+                    Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: valeur },
+                        success: cb, failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (' + cle + ').'); } });
+                };
+            };
+            put('whatsapp.mode_envoi', mode)(function () {
+                Usp.mode = mode;
+                put('whatsapp.prefixe_pays', prefixe)(function () {
+                    Usp.prefixe = prefixe;
+                    put('app.societe', societe)(function () { Ext.Msg.alert('OK', 'Paramètres enregistrés.'); });
+                });
+            });
         } }]
     });
     form.on('afterrender', function () {
-        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (resp) {
-            form.down('#modeField').setValue((Ext.decode(resp.responseText) || {}).valeur || 'API');
-        } });
-        Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET', success: function (resp) {
-            form.down('#prefixeField').setValue((Ext.decode(resp.responseText) || {}).valeur || '225');
-        } });
+        var charger = function (cle, itemId, defaut) {
+            Usp.ajax({ url: '/parametres/' + cle, method: 'GET', success: function (resp) {
+                form.down('#' + itemId).setValue((Ext.decode(resp.responseText) || {}).valeur || defaut);
+            } });
+        };
+        charger('whatsapp.mode_envoi', 'modeField', 'API');
+        charger('whatsapp.prefixe_pays', 'prefixeField', '225');
+        charger('app.societe', 'societeField', '');
     });
     return form;
 };
