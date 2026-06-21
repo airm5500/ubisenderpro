@@ -58,6 +58,10 @@ public class Article {
     @Column(name = "code_promo", length = 50)
     private String codePromo;
 
+    /** Promotion associée (réf. usp_promotion) ; null = pas de promotion. */
+    @Column(name = "promotion_id")
+    private Long promotionId;
+
     @Column(name = "date_debut_promotion")
     private LocalDateTime dateDebutPromotion;
 
@@ -132,6 +136,8 @@ public class Article {
     public void setNomPromo(String nomPromo) { this.nomPromo = nomPromo; }
     public String getCodePromo() { return codePromo; }
     public void setCodePromo(String codePromo) { this.codePromo = codePromo; }
+    public Long getPromotionId() { return promotionId; }
+    public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
     public LocalDateTime getDateDebutPromotion() { return dateDebutPromotion; }
     public void setDateDebutPromotion(LocalDateTime dateDebutPromotion) { this.dateDebutPromotion = dateDebutPromotion; }
     public LocalDateTime getDateFinPromotion() { return dateFinPromotion; }

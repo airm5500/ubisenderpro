@@ -76,26 +76,51 @@ Usp.catalogue.articleForm = function (store, rec) {
                     { xtype: 'numberfield', name: 'quantiteCommandee', fieldLabel: 'Commandée', minValue: 0 },
                     { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'UG', minValue: 0, labelWidth: 30, width: 110, margin: '0 0 0 8' }
                 ] },
-                { xtype: 'textfield', name: 'nomPromo', fieldLabel: 'Nom promo' },
-                { xtype: 'textfield', name: 'codePromo', fieldLabel: 'Code promo' },
-                { xtype: 'numberfield', name: 'stockDisponible', fieldLabel: 'Stock disponible', minValue: 0 },
+                { xtype: 'combobox', name: 'promotionId', fieldLabel: 'Promotion', queryMode: 'local',
+                  editable: false, emptyText: 'Aucune promotion',
+                  store: Usp.catalogue.promotionStore(), valueField: 'id', displayField: 'nom',
+                  listConfig: { getInnerTpl: function () {
+                      return '{nom} <span style="color:#888">({code})</span>'; } },
+                  triggers: { clear: { cls: 'x-form-clear-trigger', handler: function (c) { c.clearValue(); } } } },
+                { xtype: 'numberfield', name: 'stockDisponible', fieldLabel: 'Stock disponible (facultatif)', minValue: 0 },
                 { xtype: 'textfield', name: 'unite', fieldLabel: 'Unité' },
                 { xtype: 'textfield', name: 'imageUrl', fieldLabel: 'Image URL' },
                 { xtype: 'checkbox', name: 'publiable', fieldLabel: 'Publiable', checked: true }
             ]
         }],
         buttons: [{
-            text: 'Enregistrer', formBind: true,
+            text: 'Enregistrer',
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
-                if (!form.isValid()) { return; }
-                var data = form.getValues();
-                data.publiable = form.findField('publiable').getValue();
+                if (!form.isValid()) {
+                    var manquant = form.getFields().findBy(function (f) { return !f.isValid(); });
+                    if (manquant) {
+                        manquant.focus(true, 50);
+                        Ext.Msg.alert('Champ obligatoire',
+                            'Veuillez renseigner : <b>' + (manquant.fieldLabel || manquant.getName()) +
+                            '</b> (les champs requis sont en rouge).');
+                    }
+                    return;
+                }
+                // N'envoie que les valeurs renseignées (un champ numérique vide ne doit pas être transmis).
+                var data = {};
+                form.getFields().each(function (f) {
+                    var n = f.getName();
+                    if (!n) { return; }
+                    var v = f.getValue();
+                    if (f.isXType('checkboxfield')) { data[n] = v; return; }
+                    if (v === null || v === '' || (Ext.isArray(v) && !v.length)) { return; }
+                    data[n] = v;
+                });
                 Usp.ajax({
                     url: rec ? '/articles/' + rec.get('id') : '/articles',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
                     success: function () { win.close(); store.load(); },
-                    failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (code en doublon ?).'); }
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    }
                 });
             }
         }]
@@ -189,6 +214,85 @@ Usp.catalogue.majPromo = function (store) {
         }]
     });
     win.show();
+};
+
+/* ---------- Promotions ---------- */
+Usp.catalogue.promotionStore = function () {
+    return Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'nom'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/promotions',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+};
+
+Usp.catalogue.promotionsPanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'nom', 'description', 'dateDebut', 'dateFin', 'actif'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/promotions',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var fdate = function (v) { return v ? String(v).substring(0, 10) : ''; };
+    return {
+        xtype: 'grid', title: 'Promotions', store: store,
+        columns: [
+            { text: 'Code', dataIndex: 'code', width: 110 },
+            { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Début', dataIndex: 'dateDebut', width: 110, renderer: fdate },
+            { text: 'Fin', dataIndex: 'dateFin', width: 110, renderer: fdate },
+            { text: 'Active', dataIndex: 'actif', width: 70, align: 'center',
+              renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+        ],
+        tbar: [
+            { text: 'Nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } },
+            { text: 'Rafraîchir', handler: function () { store.load(); } }
+        ].concat(Usp.export.boutons('Promotions')),
+        listeners: { itemdblclick: function (g, rec) { Usp.catalogue.promotionForm(store, rec); } }
+    };
+};
+
+Usp.catalogue.promotionForm = function (store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier la promotion' : 'Nouvelle promotion',
+        width: 460, modal: true, bodyPadding: 12,
+        items: [{
+            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            items: [
+                { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, emptyText: 'ex. 6553' },
+                { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
+                { xtype: 'textfield', name: 'description', fieldLabel: 'Description' },
+                { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false },
+                { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false },
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
+            ]
+        }],
+        buttons: [{
+            text: 'Enregistrer',
+            handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) {
+                    var manquant = form.getFields().findBy(function (f) { return !f.isValid(); });
+                    if (manquant) { manquant.focus(true, 50);
+                        Ext.Msg.alert('Champ obligatoire', 'Veuillez renseigner : <b>' +
+                            (manquant.fieldLabel || manquant.getName()) + '</b>.'); }
+                    return;
+                }
+                var data = form.getValues();
+                data.actif = form.findField('actif').getValue();
+                Usp.ajax({
+                    url: rec ? '/promotions/' + rec.get('id') : '/promotions',
+                    method: rec ? 'PUT' : 'POST', jsonData: data,
+                    success: function () { win.close(); store.load(); },
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    }
+                });
+            }
+        }]
+    });
+    win.show();
+    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
 };
 
 /* ---------- Catégories et marques ---------- */

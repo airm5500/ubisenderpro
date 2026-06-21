@@ -70,7 +70,19 @@ public class ArticleService {
                 .setParameter("c", codePromo.trim()).executeUpdate();
     }
 
-    public Article creer(Article a) { em.persist(a); return a; }
+    public Article creer(Article a) {
+        if (a.getPscode() == null || a.getPscode().trim().isEmpty()) {
+            throw new IllegalArgumentException("Le PS Code est obligatoire");
+        }
+        if (a.getDesignation() == null || a.getDesignation().trim().isEmpty()) {
+            throw new IllegalArgumentException("La désignation est obligatoire");
+        }
+        if (parCode(a.getPscode()).isPresent()) {
+            throw new IllegalArgumentException("Un article avec le PS Code « " + a.getPscode() + " » existe déjà");
+        }
+        em.persist(a);
+        return a;
+    }
 
     public Article modifier(Article a) { a.setUpdatedAt(LocalDateTime.now()); return em.merge(a); }
 
