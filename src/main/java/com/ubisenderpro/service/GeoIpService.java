@@ -27,21 +27,37 @@ public class GeoIpService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Renseigne le lieu de la connexion de façon asynchrone (ne bloque pas le login). */
+    /** Renseigne lieu + nom du poste de la connexion de façon asynchrone (ne bloque pas le login). */
     @Asynchronous
     public void localiser(Long connexionLogId, String ip) {
         if (connexionLogId == null) { return; }
         String lieu = resoudre(ip);
-        if (lieu == null || lieu.isEmpty()) { return; }
-        enregistrer(connexionLogId, lieu);
+        String poste = resoudrePoste(ip);
+        enregistrer(connexionLogId, lieu, poste);
     }
 
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
-    public void enregistrer(Long id, String lieu) {
+    public void enregistrer(Long id, String lieu, String poste) {
         try {
             ConnexionLog c = em.find(ConnexionLog.class, id);
-            if (c != null) { c.setLieu(lieu); em.merge(c); }
+            if (c == null) { return; }
+            if (lieu != null && !lieu.isEmpty()) { c.setLieu(lieu); }
+            if (poste != null && !poste.isEmpty() && (c.getPoste() == null || c.getPoste().isEmpty())) {
+                c.setPoste(poste);
+            }
+            em.merge(c);
         } catch (Exception ignore) { /* non bloquant */ }
+    }
+
+    /** Résolution inverse de l'IP en nom de poste (best-effort). */
+    private String resoudrePoste(String ip) {
+        if (ip == null || ip.isEmpty()) { return null; }
+        try {
+            java.net.InetAddress addr = java.net.InetAddress.getByName(ip);
+            String host = addr.getCanonicalHostName();
+            if (host != null && !host.isEmpty() && !host.equals(ip)) { return host; }
+        } catch (Exception ignore) { /* pas de DNS inverse */ }
+        return null;
     }
 
     /** @return "Ville, Pays" ou "Réseau local" ; null si indéterminé. */

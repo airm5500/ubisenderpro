@@ -48,7 +48,7 @@ public class AuthResource {
         AuthenticatedUser u = user.get();
         String token = sessionStore.create(u);
         String ip = ip(request);
-        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), null, ip);
+        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), "Connexion réussie", ip);
         Long logId = connexionLogService.ouvrir(u.getId(), u.getLogin(), token, ip, poste(request), null);
         geoIpService.localiser(logId, ip);
 
@@ -61,11 +61,31 @@ public class AuthResource {
     @POST
     @Path("/logout")
     @Secured
-    public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+    public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+                           @Context HttpServletRequest request) {
         String token = extraireToken(authHeader);
+        AuthenticatedUser u = sessionStore.validate(token);
+        if (u != null) {
+            journalService.tracer(u.getId(), u.getLogin(), "DECONNEXION", "Utilisateur", u.getId(), "Déconnexion", ip(request));
+        }
         connexionLogService.fermer(token);
         sessionStore.invalidate(token);
         return Response.ok(Map.of("message", "Déconnecté")).build();
+    }
+
+    /** Journalise un menu parcouru (navigation), pour retracer l'activité d'une session. */
+    @POST
+    @Path("/navigation")
+    @Secured
+    public Response navigation(Map<String, Object> body,
+                               @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+                               @Context HttpServletRequest request) {
+        AuthenticatedUser u = sessionStore.validate(extraireToken(authHeader));
+        if (u != null) {
+            String libelle = body == null ? null : String.valueOf(body.getOrDefault("libelle", body.get("vue")));
+            journalService.tracer(u.getId(), u.getLogin(), "NAVIGATION", "Menu", null, libelle, ip(request));
+        }
+        return Response.ok().build();
     }
 
     /** IP cliente, en tenant compte d'un éventuel reverse-proxy (X-Forwarded-For). */

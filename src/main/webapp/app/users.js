@@ -194,12 +194,59 @@ Usp.users.connexionsPanel = function () {
             { text: 'Déconnexion', dataIndex: 'deconnexionAt', width: 140, renderer: function (v) {
                 return v ? Usp.users.fmtDate(v) : '<span style="color:#1976d2">session active</span>'; } },
             { text: 'Temps de travail', dataIndex: 'dureeSecondes', width: 120, renderer: Usp.users.fmtDuree },
-            { text: 'Adresse IP', dataIndex: 'ip', width: 130 },
-            { text: 'Poste', dataIndex: 'poste', width: 160, renderer: function (v) { return v || ''; } },
-            { text: 'Lieu', dataIndex: 'lieu', flex: 1, renderer: function (v) { return v || ''; } }
+            { text: 'Adresse IP', dataIndex: 'ip', width: 120 },
+            { text: 'Poste', dataIndex: 'poste', width: 150, renderer: function (v) { return v || ''; } },
+            { text: 'Lieu', dataIndex: 'lieu', flex: 1, renderer: function (v) { return v || ''; } },
+            { text: 'Détails', width: 70, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'login',
+              renderer: function () {
+                  return '<span class="con-det" title="Menus parcourus et actions de cette session" ' +
+                      'style="cursor:pointer;font-size:15px">🔍</span>';
+              } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.con-det')) { Usp.users.activiteSession(rec); }
+            },
+            itemdblclick: function (g, rec) { Usp.users.activiteSession(rec); }
+        }
     };
+};
+
+/* Détail d'une session : menus parcourus et actions effectuées entre connexion et déconnexion. */
+Usp.users.activiteSession = function (rec) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['action', 'entite', 'details', 'createdAt'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/activite',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
+            extraParams: {
+                login: rec.get('login'),
+                debut: rec.get('connexionAt') || '',
+                fin: rec.get('deconnexionAt') || ''
+            } },
+        autoLoad: true
+    });
+    var libelle = function (a) {
+        if (a === 'NAVIGATION') { return '📂 Menu'; }
+        if (a === 'CONNEXION') { return '🔑 Connexion'; }
+        if (a === 'DECONNEXION') { return '🚪 Déconnexion'; }
+        return '⚙️ ' + Ext.String.htmlEncode(a || '');
+    };
+    Ext.create('Ext.window.Window', {
+        title: 'Activité de ' + Ext.String.htmlEncode(rec.get('login')) +
+            ' — session du ' + Usp.users.fmtDate(rec.get('connexionAt')),
+        width: 620, height: 460, modal: true, layout: 'fit',
+        items: [{
+            xtype: 'grid', store: store,
+            columns: [
+                { text: 'Heure', dataIndex: 'createdAt', width: 140, renderer: Usp.users.fmtDate },
+                { text: 'Type', dataIndex: 'action', width: 150, renderer: libelle },
+                { text: 'Élément', dataIndex: 'entite', width: 110 },
+                { text: 'Détails', dataIndex: 'details', flex: 1, renderer: function (v) {
+                    return v ? Ext.String.htmlEncode(v) : ''; } }
+            ]
+        }]
+    }).show();
 };
 
 /* ---------- Journal d'actions ---------- */

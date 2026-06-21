@@ -438,6 +438,14 @@ Usp.menuChildren = function () {
 
 /* Charge la vue correspondante dans la zone centrale (menu + cartes du tableau de bord). */
 Usp.ouvrirVue = function (vue) {
+    // Journalise le menu parcouru (best-effort) pour retracer l'activité de session.
+    try {
+        var m = Usp.MENU.filter(function (x) { return x.view === vue; })[0];
+        if (Usp.token && vue) {
+            Usp.ajax({ url: '/auth/navigation', method: 'POST',
+                jsonData: { vue: vue, libelle: m ? m.text : vue } });
+        }
+    } catch (e) { /* non bloquant */ }
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
@@ -479,8 +487,9 @@ Usp.showMain = function () {
                           "%3C/svg%3E" +
                           '" style="width:18px;height:18px;vertical-align:middle"/>',
                       handler: function () {
-                        Usp.ajax({ url: '/auth/logout', method: 'POST' });
-                        location.reload();
+                        // Recharge seulement APRÈS la déconnexion (sinon la session n'est pas clôturée).
+                        Usp.ajax({ url: '/auth/logout', method: 'POST',
+                            callback: function () { location.reload(); } });
                     } }
                 ]
             },

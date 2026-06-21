@@ -95,4 +95,22 @@ public class UserResource {
     public List<com.ubisenderpro.entity.JournalAction> journal(@QueryParam("limit") Integer limit) {
         return journalService.lister(limit == null ? 200 : limit);
     }
+
+    /** Activité d'une session : menus parcourus + actions d'un utilisateur sur une fenêtre. */
+    @GET
+    @Path("/activite")
+    public List<com.ubisenderpro.entity.JournalAction> activite(@QueryParam("login") String login,
+                                                                @QueryParam("debut") String debut,
+                                                                @QueryParam("fin") String fin) {
+        return journalService.listerActivite(login, parse(debut), parse(fin));
+    }
+
+    private java.time.LocalDateTime parse(String s) {
+        if (s == null || s.trim().isEmpty()) { return null; }
+        try { return java.time.LocalDateTime.parse(s.trim().replace(' ', 'T').substring(0, 19)); }
+        catch (Exception e) {
+            try { return java.time.LocalDate.parse(s.trim().substring(0, 10)).atStartOfDay(); }
+            catch (Exception e2) { return null; }
+        }
+    }
 }
