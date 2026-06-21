@@ -521,18 +521,22 @@ Usp.waweb.exportNumbers = function (lignes) {
 
 /* ---------- Phase 3 : Filtre de numéros ---------- */
 Usp.waweb.filterPanel = function () {
-    var resStore = Ext.create('Ext.data.Store', { fields: ['numero', 'exists'] });
+    var resStore = Ext.create('Ext.data.Store', { fields: ['numero', 'format', 'exists'] });
     return {
-        xtype: 'panel', title: 'Filtre de numéros', layout: 'border',
+        xtype: 'panel', title: 'Vérification de numéros', layout: 'border',
         items: [
-            { region: 'west', width: 330, xtype: 'form', bodyPadding: 10, border: false,
+            { region: 'west', width: 340, xtype: 'form', bodyPadding: 10, border: false,
               defaults: { anchor: '100%' },
               items: [
                 { xtype: 'combobox', name: 'sessionId', itemId: 'fSession', fieldLabel: 'Compte', allowBlank: false,
                   store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle',
                   queryMode: 'local', editable: false },
-                { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 320,
-                  emptyText: 'Un numéro par ligne (format international)' }
+                { xtype: 'fieldcontainer', fieldLabel: 'Importer', layout: 'hbox', items: [
+                    { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Charger un fichier (.csv/.xlsx)…',
+                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } }
+                  ] },
+                { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 300,
+                  emptyText: 'Un numéro par ligne (format international)\nou chargez un fichier ci-dessus' }
               ],
               bbar: ['->', { text: 'Vérifier', handler: function (b) {
                   var p = b.up('panel'); var f = p.down('form').getForm();
@@ -542,15 +546,22 @@ Usp.waweb.filterPanel = function () {
                       .map(function (s) { return s.replace(/[^0-9]/g, ''); })
                       .filter(function (s) { return s.length >= 6; });
                   if (!nums.length) { Ext.Msg.alert('Info', 'Saisissez des numéros.'); return; }
+                  // Format vérifié côté client (mêmes règles que l'envoi).
+                  resStore.loadData(nums.map(function (n) {
+                      return { numero: n, format: !Usp.waweb._motifNumero(n), exists: null };
+                  }));
                   b.disable();
                   Usp.ajax({ url: '/wa-web/sessions/' + sid + '/check-numbers', method: 'POST',
                       jsonData: { numeros: nums },
                       success: function (resp) {
                           b.enable();
                           var r = Ext.decode(resp.responseText);
-                          resStore.loadData((r.results || []).map(function (x) {
-                              return { numero: x.number, exists: !!x.exists };
-                          }));
+                          var presence = {};
+                          (r.results || []).forEach(function (x) { presence[String(x.number).replace(/[^0-9]/g, '')] = !!x.exists; });
+                          resStore.each(function (rec) {
+                              var k = String(rec.get('numero')).replace(/[^0-9]/g, '');
+                              rec.set('exists', presence.hasOwnProperty(k) ? presence[k] : false);
+                          });
                       },
                       failure: function () { b.enable(); Ext.Msg.alert('Erreur', 'Service WhatsApp Web injoignable ou compte non connecté.'); } });
               } }]
@@ -558,19 +569,58 @@ Usp.waweb.filterPanel = function () {
             { region: 'center', xtype: 'grid', store: resStore,
               columns: [
                 { text: 'Numéro', dataIndex: 'numero', flex: 1 },
-                { text: 'WhatsApp', dataIndex: 'exists', width: 140, renderer: function (v) {
+                { text: 'Format', dataIndex: 'format', width: 110, renderer: function (v) {
+                    return v ? '<span style="color:#2e7d32">✔ OK</span>' : '<span style="color:#c62828">✖ Non conforme</span>';
+                } },
+                { text: 'WhatsApp', dataIndex: 'exists', width: 130, renderer: function (v) {
+                    if (v === null || v === undefined) { return '<span style="color:#999">—</span>'; }
                     return v ? '<span style="color:#2e7d32">✔ Oui</span>' : '<span style="color:#c62828">✖ Non</span>';
                 } }
               ],
-              tbar: [{ text: 'Copier les valides', handler: function () {
-                  var out = [];
-                  resStore.each(function (r) { if (r.get('exists')) { out.push(r.get('numero')); } });
-                  if (!out.length) { Ext.Msg.alert('Info', 'Aucun numéro valide.'); return; }
-                  Usp.waweb.exportNumbers(out);
-              } }]
+              tbar: [
+                { text: 'Copier les valides', handler: function () {
+                    var out = [];
+                    resStore.each(function (r) { if (r.get('exists')) { out.push(r.get('numero')); } });
+                    if (!out.length) { Ext.Msg.alert('Info', 'Aucun numéro présent sur WhatsApp.'); return; }
+                    Usp.waweb.exportNumbers(out);
+                } },
+                { text: 'Exporter (CSV)', handler: function () {
+                    if (!resStore.getCount()) { Ext.Msg.alert('Info', 'Rien à exporter.'); return; }
+                    var lignes = ['numero;format;whatsapp'];
+                    resStore.each(function (r) {
+                        lignes.push(r.get('numero') + ';' + (r.get('format') ? 'OK' : 'NON') + ';' +
+                            (r.get('exists') === null ? '' : (r.get('exists') ? 'OUI' : 'NON')));
+                    });
+                    var uri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lignes.join('\n'));
+                    var a = document.createElement('a'); a.href = uri; a.download = 'verification_numeros.csv';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                } }
+              ]
             }
         ]
     };
+};
+
+/* Charge des numéros depuis un fichier CSV/Excel (réutilise l'analyse de l'envoi de masse). */
+Usp.waweb.chargerNumerosFichier = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var ta = f.up('form').down('[name=numeros]');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({ url: '/wa-bulk/preparer-fichier', method: 'POST',
+            jsonData: { fichierBase64: b64, nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                var nums = (r.valides || []).map(function (v) { return v.numero; })
+                    .concat((r.invalides || []).map(function (v) { return v.numero; }));
+                ta.setValue(nums.join('\n'));
+                Ext.Msg.alert('Fichier chargé', nums.length + ' numéro(s) importé(s). Cliquez sur « Vérifier ».');
+            },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.waweb.err(resp, 'Lecture du fichier impossible.')); } });
+    };
+    reader.readAsDataURL(file);
 };
 
 /* ---------- Phase 4 : Extraction contacts / groupes ---------- */

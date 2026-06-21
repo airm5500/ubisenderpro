@@ -1,7 +1,9 @@
 package com.ubisenderpro.dto;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Rapport d'import (sections 10.6 et 25.6 de la spec).
@@ -19,10 +21,24 @@ public class ImportReport {
     private int lignesIgnorees;
     private int lignesRejetees;
     private final List<String> erreurs = new ArrayList<>();
+    /** Lignes dont le numéro WhatsApp est non conforme : {ligne, nom, numero, raison}. */
+    private final List<Map<String, Object>> lignesInvalidesNumero = new ArrayList<>();
 
     public void ajouterErreur(int ligne, String message) {
         erreurs.add("Ligne " + ligne + " : " + message);
     }
+
+    /** Mémorise une ligne au numéro WhatsApp non conforme (pour correction côté interface). */
+    public void ajouterNumeroInvalide(int ligne, String nom, String numero, String raison) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("ligne", ligne);
+        m.put("nom", nom == null ? "" : nom);
+        m.put("numero", numero == null ? "" : numero);
+        m.put("raison", raison == null ? "" : raison);
+        lignesInvalidesNumero.add(m);
+    }
+
+    public List<Map<String, Object>> getLignesInvalidesNumero() { return lignesInvalidesNumero; }
 
     public Long getImportId() { return importId; }
     public void setImportId(Long importId) { this.importId = importId; }

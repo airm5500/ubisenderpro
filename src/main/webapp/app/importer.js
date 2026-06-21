@@ -160,22 +160,28 @@ Usp.importer.run = function (win, type, url, champs, fileData, onDone) {
         mode: win.down('[name=mode]').getValue(),
         simulation: win.down('[name=simulation]').getValue(),
         creerSegmentation: true,
-        fichierBase64: fileData.base64
+        fichierBase64: fileData.base64,
+        correctionsNumero: {}
     };
+    win.close();
+    Usp.importer.executer(payload, url, onDone);
+};
+
+/* Lance l'import (ou la simulation) avec un payload, puis affiche le rapport. */
+Usp.importer.executer = function (payload, url, onDone) {
     Usp.ajax({
         url: url, method: 'POST', jsonData: payload,
         success: function (resp) {
-            var r = Ext.decode(resp.responseText);
-            win.close();
-            Usp.importer.rapport(r);
+            Usp.importer.rapport(Ext.decode(resp.responseText), payload, url, onDone);
             if (onDone) { onDone(); }
         },
         failure: function () { Ext.Msg.alert('Erreur', 'Import en échec.'); }
     });
 };
 
-Usp.importer.rapport = function (r) {
+Usp.importer.rapport = function (r, payload, url, onDone) {
     var html =
+        (payload && payload.simulation ? '<b style="color:#1976d2">Simulation (aucun enregistrement)</b><br/><br/>' : '') +
         'Lignes lues : ' + r.lignesLues + '<br/>' +
         'Comptes/articles créés : ' + r.comptesCrees + '<br/>' +
         'Mis à jour : ' + r.comptesMisAJour + '<br/>' +
@@ -184,9 +190,59 @@ Usp.importer.rapport = function (r) {
         'Lignes ignorées : ' + (r.lignesIgnorees || 0) + '<br/>' +
         '<b>Lignes rejetées : ' + r.lignesRejetees + '</b>';
 
+    var invalides = r.lignesInvalidesNumero || [];
+    var items = [{ xtype: 'component', padding: 14, html: html }];
+    var store = null;
+
+    if (invalides.length) {
+        store = Ext.create('Ext.data.Store', {
+            fields: ['ligne', 'nom', 'numero', 'raison'], data: invalides
+        });
+        items.push({
+            xtype: 'grid', flex: 1, store: store, title: invalides.length + ' numéro(s) WhatsApp non conforme(s)',
+            plugins: [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })],
+            tbar: [{ xtype: 'tbtext',
+                text: 'Corrigez les numéros (double-clic) puis réimportez les lignes corrigées :' }],
+            columns: [
+                { text: 'Ligne', dataIndex: 'ligne', width: 60 },
+                { text: 'Nom', dataIndex: 'nom', flex: 1 },
+                { text: 'Numéro', dataIndex: 'numero', width: 180, editor: { xtype: 'textfield' } },
+                { text: 'Motif', dataIndex: 'raison', width: 160, renderer: function (v) {
+                    return '<span style="color:#c62828">' + Ext.String.htmlEncode(v || '') + '</span>'; } }
+            ]
+        });
+    }
+
     Ext.create('Ext.window.Window', {
-        title: 'Rapport d\'import', width: 420, modal: true, bodyPadding: 14, html: html,
+        title: 'Rapport d\'import', width: invalides.length ? 640 : 420,
+        height: invalides.length ? 460 : undefined,
+        modal: true, layout: invalides.length ? 'vbox' : 'auto',
+        defaults: invalides.length ? { width: '100%' } : undefined,
+        bodyPadding: invalides.length ? 0 : 0, items: items,
         buttons: [
+            { text: 'Exporter les non conformes (CSV)', hidden: !invalides.length, handler: function () {
+                var lignes = ['ligne;nom;numero;motif'];
+                store.each(function (rec) {
+                    lignes.push(rec.get('ligne') + ';' + (rec.get('nom') || '') + ';' +
+                        (rec.get('numero') || '') + ';' + (rec.get('raison') || ''));
+                });
+                var uri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lignes.join('\n'));
+                var a = document.createElement('a'); a.href = uri; a.download = 'import_numeros_non_conformes.csv';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            } },
+            { text: 'Réimporter les lignes corrigées', hidden: !(invalides.length && payload && url),
+              handler: function (b) {
+                var corrections = {};
+                store.each(function (rec) {
+                    var n = (rec.get('numero') || '').trim();
+                    if (n) { corrections[String(rec.get('ligne'))] = n; }
+                });
+                var p = Ext.apply({}, payload);
+                p.simulation = false;
+                p.correctionsNumero = corrections;
+                b.up('window').close();
+                Usp.importer.executer(p, url, onDone);
+            } },
             { text: 'Télécharger les rejets',
               hidden: !(r.importId && (r.lignesRejetees > 0 || r.lignesIgnorees > 0)),
               handler: function () { Usp.importer.downloadRejets(r.importId); } },

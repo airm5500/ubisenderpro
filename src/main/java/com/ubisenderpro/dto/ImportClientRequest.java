@@ -21,6 +21,11 @@ public class ImportClientRequest {
     private String fichierBase64;
     /** Comportement en cas de doublon : AJOUT_MAJ, IGNORER, COMPLETER_VIDES. */
     private String mode = "AJOUT_MAJ";
+    /** Corrections de numéro WhatsApp par ligne (clé = n° de ligne, valeur = numéro corrigé). */
+    private Map<String, String> correctionsNumero = new HashMap<>();
+
+    public Map<String, String> getCorrectionsNumero() { return correctionsNumero; }
+    public void setCorrectionsNumero(Map<String, String> correctionsNumero) { this.correctionsNumero = correctionsNumero; }
 
     public String getNomFichier() { return nomFichier; }
     public void setNomFichier(String nomFichier) { this.nomFichier = nomFichier; }

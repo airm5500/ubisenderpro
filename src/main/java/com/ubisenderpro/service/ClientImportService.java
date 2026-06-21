@@ -175,6 +175,12 @@ public class ClientImportService {
 
         String telephone = val(ligne, req, "telephone_principal");
         String whatsappBrut = val(ligne, req, "numero_whatsapp");
+        // Correction éventuelle saisie à l'écran d'aperçu (clé = n° de ligne).
+        String correction = req.getCorrectionsNumero() == null ? null
+                : req.getCorrectionsNumero().get(String.valueOf(numLigne));
+        if (correction != null && !correction.trim().isEmpty()) {
+            whatsappBrut = correction.trim();
+        }
         String whatsappNorm = null;
         if (whatsappBrut != null && !whatsappBrut.isEmpty()) {
             PhoneNormalizer.Result r = PhoneNormalizer.normaliser(whatsappBrut, prefixePays);
@@ -182,6 +188,7 @@ public class ClientImportService {
                 whatsappNorm = r.valeurNormalisee;
             } else {
                 rapport.ajouterErreur(numLigne, "WhatsApp : " + r.message);
+                rapport.ajouterNumeroInvalide(numLigne, nomContact, whatsappBrut, r.message);
             }
         }
 
