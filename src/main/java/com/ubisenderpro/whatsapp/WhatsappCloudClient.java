@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ubisenderpro.entity.WhatsappAccount;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.UUID;
 
 /**
  * Client de la WhatsApp Business Cloud API (Meta Graph API).
@@ -42,6 +44,18 @@ public class WhatsappCloudClient {
         }
     }
 
+    public static class UploadResult {
+        public final boolean success;
+        public final String mediaId;
+        public final String erreur;
+
+        public UploadResult(boolean success, String mediaId, String erreur) {
+            this.success = success;
+            this.mediaId = mediaId;
+            this.erreur = erreur;
+        }
+    }
+
     /** Envoie un message texte simple (fenêtre de service de 24h requise). */
     public SendResult envoyerTexte(String destinataire, String texte) {
         Map<String, Object> body = baseBody(destinataire, "text");
@@ -54,14 +68,98 @@ public class WhatsappCloudClient {
 
     /** Envoie un média par URL (image, video, document, audio). */
     public SendResult envoyerMedia(String destinataire, String type, String url, String legende) {
+        return envoyerMedia(destinataire, type, "link", url, legende);
+    }
+
+    /**
+     * Envoie un média déjà téléversé sur les serveurs de Meta, à partir de son media_id.
+     * Cette voie évite l'hébergement public du fichier exigé par l'envoi par URL.
+     */
+    public SendResult envoyerMediaParId(String destinataire, String type, String mediaId, String legende) {
+        return envoyerMedia(destinataire, type, "id", mediaId, legende);
+    }
+
+    private SendResult envoyerMedia(String destinataire, String type, String cle, String valeur, String legende) {
         Map<String, Object> body = baseBody(destinataire, type);
         Map<String, Object> media = new HashMap<>();
-        media.put("link", url);
+        media.put(cle, valeur);
         if (legende != null && ("image".equals(type) || "video".equals(type) || "document".equals(type))) {
             media.put("caption", legende);
         }
         body.put(type, media);
         return envoyer(body);
+    }
+
+    /**
+     * Téléverse un fichier binaire vers l'API WhatsApp (endpoint /media) et renvoie le media_id.
+     * Le fichier reste disponible une trentaine de jours côté Meta et peut être réutilisé
+     * pour l'envoi de messages média sans hébergement public.
+     */
+    public UploadResult uploadMedia(byte[] contenu, String mimeType, String nomFichier) {
+        HttpURLConnection conn = null;
+        try {
+            String endpoint = String.format("https://graph.facebook.com/%s/%s/media",
+                    account.getApiVersion(), account.getPhoneNumberId());
+            String boundary = "----UbiSenderPro" + UUID.randomUUID().toString().replace("-", "");
+            byte[] payload = corpsMultipart(boundary, contenu, mimeType,
+                    nomFichier == null || nomFichier.isEmpty() ? "fichier" : nomFichier);
+
+            conn = (HttpURLConnection) new URL(endpoint).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(60000);
+            conn.setRequestProperty("Authorization", "Bearer " + account.getAccessToken());
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload);
+            }
+
+            int code = conn.getResponseCode();
+            String reponse = lire(code >= 400 ? conn.getErrorStream() : conn.getInputStream());
+            if (code >= 200 && code < 300) {
+                JsonNode node = MAPPER.readTree(reponse);
+                String id = node.path("id").asText(null);
+                if (id == null || id.isEmpty()) {
+                    return new UploadResult(false, null, "Réponse sans media_id : " + reponse);
+                }
+                return new UploadResult(true, id, null);
+            }
+            return new UploadResult(false, null, "HTTP " + code + " : " + reponse);
+        } catch (Exception e) {
+            return new UploadResult(false, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private byte[] corpsMultipart(String boundary, byte[] contenu, String mimeType, String nomFichier)
+            throws Exception {
+        String tiret = "--";
+        String crlf = "\r\n";
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        out.write((tiret + boundary + crlf).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Disposition: form-data; name=\"messaging_product\"" + crlf + crlf)
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(("whatsapp" + crlf).getBytes(StandardCharsets.UTF_8));
+
+        out.write((tiret + boundary + crlf).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Disposition: form-data; name=\"type\"" + crlf + crlf)
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(((mimeType == null ? "application/octet-stream" : mimeType) + crlf)
+                .getBytes(StandardCharsets.UTF_8));
+
+        out.write((tiret + boundary + crlf).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + nomFichier + "\"" + crlf)
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Type: " + (mimeType == null ? "application/octet-stream" : mimeType) + crlf + crlf)
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(contenu);
+        out.write(crlf.getBytes(StandardCharsets.UTF_8));
+
+        out.write((tiret + boundary + tiret + crlf).getBytes(StandardCharsets.UTF_8));
+        return out.toByteArray();
     }
 
     /**
