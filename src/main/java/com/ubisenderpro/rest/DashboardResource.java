@@ -46,6 +46,13 @@ public class DashboardResource {
         d.put("commandes", compter("usp_commande"));
         d.put("opportunitesOuvertes", compter("usp_opportunite WHERE statut NOT IN ('PERDU','CLIENT_FIDELISE')"));
         d.put("imports", compter("usp_import"));
+        // Indicateurs d'usage / adoption.
+        d.put("connexionsAujourdhui", compter("usp_connexion_log WHERE connexion_at >= CURDATE()"));
+        d.put("utilisateursActifs7j", compter("(SELECT DISTINCT utilisateur_id FROM usp_connexion_log " +
+                "WHERE connexion_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) t"));
+        d.put("sessionsEnCours", compter("usp_connexion_log WHERE deconnexion_at IS NULL"));
+        d.put("messagesEnvoyesAujourdhui", compter("usp_message WHERE direction = 'SORTANT' " +
+                "AND note_interne = 0 AND created_at >= CURDATE()"));
         return d;
     }
 

@@ -349,6 +349,12 @@ Usp.dashboardPanel = function () {
             { k: 'commandes', lib: 'Commandes', icon: '🛒', couleur: '#6a1b9a' },
             { k: 'opportunitesOuvertes', lib: 'Opportunités ouvertes', icon: '🎯', couleur: '#ef6c00', vue: 'crm' },
             { k: 'imports', lib: 'Imports', icon: '📥', couleur: '#455a64' }
+        ] },
+        { titre: 'Activité & usage', items: [
+            { k: 'connexionsAujourdhui', lib: "Connexions aujourd'hui", icon: '🔑', couleur: '#1976d2', vue: 'users' },
+            { k: 'utilisateursActifs7j', lib: 'Utilisateurs actifs (7 j)', icon: '👥', couleur: '#2e7d32', vue: 'users' },
+            { k: 'sessionsEnCours', lib: 'Sessions en cours', icon: '🟢', couleur: '#00897b', vue: 'users' },
+            { k: 'messagesEnvoyesAujourdhui', lib: "Messages envoyés aujourd'hui", icon: '📤', couleur: '#1976d2', vue: 'historique' }
         ] }
     ];
     function carte(it, val) {
