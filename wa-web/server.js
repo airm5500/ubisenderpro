@@ -138,6 +138,16 @@ async function startSession(id) {
 
   // Messages entrants -> remontée vers UbiSenderPro (réponses des clients).
   sock.ev.on('messages.upsert', (ev) => {
+    // Diagnostic : tracer tout ce qui arrive (type, jids, fromMe).
+    try {
+      logger.info({
+        id, type: ev && ev.type,
+        msgs: (ev && ev.messages ? ev.messages : []).map(function (m) {
+          var k = m && m.key ? m.key : {};
+          return { jid: k.remoteJid, fromMe: !!k.fromMe, part: k.participant || null };
+        })
+      }, 'upsert reçu');
+    } catch (e) { /* ignore */ }
     if (!ev || ev.type !== 'notify' || !Array.isArray(ev.messages)) { return; }
     for (const m of ev.messages) {
       if (!m || !m.key || m.key.fromMe) { continue; }
