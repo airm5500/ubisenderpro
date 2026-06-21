@@ -113,21 +113,22 @@ public class WaBulkSenderTx {
     /** Construit la table des variables disponibles pour un destinataire. */
     private Map<String, String> resoudreVariables(String numero, String nomDest) {
         String nom = nomDest == null ? "" : nomDest;
-        String societeClient = "";
-        String segmentation = "";
+        String tel = "", email = "", societeClient = "", segmentation = "", ville = "", region = "";
 
         // Résolution du contact/client par numéro (si présent en base).
         try {
             List<Object[]> rows = em.createQuery(
-                    "SELECT ct.nomComplet, cl.nomCompte, cl.segmentationId FROM ClientContact ct, Client cl " +
+                    "SELECT ct.nomComplet, ct.telephonePrincipal, ct.email, cl.nomCompte, " +
+                    "cl.segmentationId, cl.ville, cl.region FROM ClientContact ct, Client cl " +
                     "WHERE ct.clientId = cl.id AND ct.numeroWhatsapp = :n", Object[].class)
                     .setParameter("n", numero).setMaxResults(1).getResultList();
             if (!rows.isEmpty()) {
                 Object[] r = rows.get(0);
                 if ((nom == null || nom.isEmpty()) && r[0] != null) { nom = (String) r[0]; }
-                societeClient = r[1] == null ? "" : (String) r[1];
-                if (r[2] != null) {
-                    SegmentationClient s = em.find(SegmentationClient.class, (Long) r[2]);
+                tel = vide(r[1]); email = vide(r[2]); societeClient = vide(r[3]);
+                ville = vide(r[5]); region = vide(r[6]);
+                if (r[4] != null) {
+                    SegmentationClient s = em.find(SegmentationClient.class, (Long) r[4]);
                     if (s != null) { segmentation = s.getLibelle(); }
                 }
             }
@@ -137,14 +138,18 @@ public class WaBulkSenderTx {
                 parametreService.valeur("app.nom", ""));
 
         Map<String, String> vars = new HashMap<>();
-        // Contact / client
         vars.put("NOM", nom);
         vars.put("NAME", nom);            // compat
         vars.put("NOM_CONTACT", nom);     // compat {{nom_contact}}
+        vars.put("TELEPHONE", tel);
+        vars.put("EMAIL", email);
         vars.put("SOCIETE_CLIENT", societeClient);
         vars.put("SEGMENTATION", segmentation);
-        // Société émettrice
+        vars.put("VILLE", ville);
+        vars.put("REGION", region);
         vars.put("SOCIETE", societeEmettrice);
         return vars;
     }
+
+    private String vide(Object o) { return o == null ? "" : String.valueOf(o); }
 }

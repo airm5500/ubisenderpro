@@ -8,28 +8,32 @@ Ext.define('Usp.waweb', { singleton: true });
 /* Catalogue des variables insérables dans un message (token + description). */
 Usp.waweb.VARIABLES = [
     { t: 'NOM', d: 'Nom du contact destinataire' },
+    { t: 'TELEPHONE', d: 'Téléphone du contact' },
+    { t: 'EMAIL', d: 'E-mail du contact' },
     { t: 'SOCIETE_CLIENT', d: 'Société / compte du client' },
     { t: 'SEGMENTATION', d: 'Segmentation du client' },
+    { t: 'VILLE', d: 'Ville du client' },
+    { t: 'REGION', d: 'Région du client' },
     { t: 'SOCIETE', d: 'Votre société émettrice (Paramètres → Général)' }
 ];
 
-/* Barre de boutons « variables » : insère [TOKEN] dans la dernière variante éditée. */
-Usp.waweb.barreVariables = function () {
+/* Barre de boutons « variables » : insère [TOKEN] dans le champ édité (sinon le champ par défaut). */
+Usp.waweb.barreVariables = function (fallbackName) {
     return {
         xtype: 'fieldcontainer', fieldLabel: 'Variables', layout: { type: 'hbox', wrap: true },
         defaults: { margin: '0 4 4 0' },
         items: Usp.waweb.VARIABLES.map(function (v) {
             return { xtype: 'button', text: '[' + v.t + ']', tooltip: v.d,
-                     handler: function (b) { Usp.waweb.insertVar(v.t, b); } };
+                     handler: function (b) { Usp.waweb.insertVar(v.t, b, fallbackName); } };
         })
     };
 };
 
-/* Insère [token] à la position du curseur dans la dernière variante éditée (sinon Variante 1). */
-Usp.waweb.insertVar = function (token, btn) {
+/* Insère [token] à la position du curseur dans le dernier champ édité (sinon champ par défaut). */
+Usp.waweb.insertVar = function (token, btn, fallbackName) {
     var f = Usp.waweb._lastMsgField;
     if (!f || typeof f.isXType !== 'function' || !f.isXType('textareafield')) {
-        f = btn.up('form').down('[name=msg1]');
+        f = btn.up('form').down('[name=' + (fallbackName || 'msg1') + ']');
     }
     if (!f) { return; }
     var ins = '[' + token + ']';
@@ -170,7 +174,7 @@ Usp.waweb.bulkPanel = function () {
     });
     var media = { url: null, type: null, mime: null, nom: null };
     var modeleStore = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom', 'corps'],
+        fields: ['id', 'nom', 'corps', 'enteteMediaUrl', 'enteteMediaType', 'boutonsJson'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true,
@@ -192,13 +196,26 @@ Usp.waweb.bulkPanel = function () {
               emptyText: 'Pré-remplir la variante 1 depuis un modèle…',
               listeners: { select: function (c, recs) {
                   var rec = recs && recs[0]; if (!rec) { return; }
-                  var corps = rec.get('corps');
-                  if (corps) { c.up('form').down('[name=msg1]').setValue(corps); }
+                  var corps = rec.get('corps') || '';
+                  if (!corps && !rec.get('enteteMediaUrl')) { return; } // « — Aucun modèle — »
+                  // Corps + liens des boutons (le lien vient après le message).
+                  c.up('form').down('[name=msg1]').setValue(corps + Usp.waweb.boutonsTexte(rec.get('boutonsJson')));
+                  // Pièce jointe du modèle (média d'en-tête) reprise comme pièce jointe de l'envoi.
+                  var url = rec.get('enteteMediaUrl');
+                  var info = c.up('form').down('#pjInfo');
+                  if (url) {
+                      media.url = url; media.mime = null; media.nom = null;
+                      media.type = (rec.get('enteteMediaType') || 'IMAGE').toLowerCase();
+                      if (info) { info.update('<span style="color:#2e7d32;font-size:11px">✔ pièce jointe du modèle</span>'); }
+                  } else {
+                      media.url = null; media.type = null;
+                      if (info) { info.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                  }
               } } },
             { xtype: 'displayfield', value: '<b>Variantes du message</b> — pour limiter le marquage « spam », ' +
               'une variante est tirée <b>au hasard</b> pour chaque contact. Une seule suffit ; les autres sont ' +
               'facultatives. Cliquez sur une variable ci-dessous pour l\'insérer.' },
-            Usp.waweb.barreVariables(),
+            Usp.waweb.barreVariables('msg1'),
             { xtype: 'textareafield', name: 'msg1', fieldLabel: 'Variante 1', height: 60,
               emptyText: 'Bonjour [NOM], bienvenue chez [SOCIETE].',
               listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
@@ -315,6 +332,19 @@ Usp.waweb.uploadPiece = function (f, media) {
             failure: function () { Ext.Msg.alert('Erreur', 'Téléversement de la pièce jointe impossible.'); } });
     };
     reader.readAsDataURL(file);
+};
+
+/* Convertit des boutons JSON ([{type:'URL',text,url}]) en lignes de lien à ajouter après le message. */
+Usp.waweb.boutonsTexte = function (json) {
+    if (!json) { return ''; }
+    var arr;
+    try { arr = Ext.decode(json); } catch (e) { return ''; }
+    if (!Ext.isArray(arr)) { return ''; }
+    var lignes = [];
+    arr.forEach(function (b) {
+        if (b && b.url) { lignes.push((b.text ? b.text + ' : ' : '') + b.url); }
+    });
+    return lignes.length ? '\n\n' + lignes.join('\n') : '';
 };
 
 Usp.waweb.err = function (resp, def) {

@@ -139,8 +139,10 @@ Usp.settings.templateForm = function (store, rec) {
                       html: '<span style="color:#888;font-size:11px">image / vidéo / document depuis votre ordinateur</span>' }
                   ] },
                 { xtype: 'component', itemId: 'mediaPreview', margin: '0 0 6 0', html: '' },
+                Usp.waweb.barreVariables('corps'),
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
-                  emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
+                  emptyText: 'Bonjour [NOM], bienvenue chez [SOCIETE].',
+                  listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
                 { xtype: 'textareafield', name: 'boutonsJson', fieldLabel: 'Boutons (JSON)', height: 50,
                   emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]' },
