@@ -125,8 +125,11 @@ Usp.users.form = function (store, rec) {
                 { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
                 { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
                   emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
-                { xtype: 'fieldset', title: 'Rôles (accès aux menus)', layout: 'column',
-                  defaults: { columnWidth: 0.5, margin: '0 0 4 0' }, items: roleItems }
+                { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
+                    { xtype: 'displayfield',
+                      value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
+                    { xtype: 'checkboxgroup', columns: 2, items: roleItems }
+                ] }
             ]
         }],
         buttons: [{
