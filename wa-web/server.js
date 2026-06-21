@@ -52,6 +52,20 @@ function jidOf(numero) {
   return clean + '@s.whatsapp.net';
 }
 
+/**
+ * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
+ * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
+ */
+async function resolveJid(sock, numero) {
+  const clean = String(numero).replace(/[^0-9]/g, '');
+  if (clean.length < 6) { return null; }
+  try {
+    const r = await sock.onWhatsApp(clean);
+    if (r && r[0] && r[0].exists) { return r[0].jid; }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
 function publicState(s) {
   return s ? { status: s.status, qr: s.qr || null, me: s.me || null }
            : { status: 'DECONNECTE', qr: null, me: null };
@@ -191,7 +205,9 @@ function requireConnected(req, res) {
 app.post('/sessions/:id/send', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
-    const r = await s.sock.sendMessage(jidOf(req.body.to), { text: String(req.body.text || '') });
+    const jid = await resolveJid(s.sock, req.body.to);
+    if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
+    const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
     res.json({ success: true, id: r && r.key ? r.key.id : null });
   } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -199,8 +215,10 @@ app.post('/sessions/:id/send', async (req, res) => {
 app.post('/sessions/:id/send-media', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
+    const jid = await resolveJid(s.sock, req.body.to);
+    if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
-    const r = await s.sock.sendMessage(jidOf(req.body.to), contenuMedia(req.body.type, buffer, req.body));
+    const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
     res.json({ success: true, id: r && r.key ? r.key.id : null });
   } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
