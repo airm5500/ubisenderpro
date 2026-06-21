@@ -549,6 +549,16 @@ CREATE TABLE usp_message_media (
     CONSTRAINT fk_usp_message_media FOREIGN KEY (message_id) REFERENCES usp_message(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE usp_media_fichier (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    nom_fichier VARCHAR(255),
+    mime_type VARCHAR(100),
+    taille BIGINT,
+    contenu LONGBLOB NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE usp_webhook_event (
     id BIGINT NOT NULL AUTO_INCREMENT,
     source VARCHAR(40) NOT NULL DEFAULT 'WHATSAPP',

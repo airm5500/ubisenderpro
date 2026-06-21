@@ -124,7 +124,16 @@ Usp.settings.templateForm = function (store, rec) {
                   store: [['AUCUN', 'Aucun'], ['IMAGE', 'Image'], ['VIDEO', 'Vidéo'], ['DOCUMENT', 'Document']],
                   queryMode: 'local', editable: false },
                 { xtype: 'textfield', name: 'enteteMediaUrl', fieldLabel: 'URL du média',
-                  emptyText: 'https://… (image/vidéo/document de l\'en-tête, pour IMAGE/VIDEO/DOCUMENT)' },
+                  emptyText: 'https://… ou importez un fichier ci-dessous' },
+                { xtype: 'fieldcontainer', fieldLabel: 'Importer un fichier', layout: 'hbox',
+                  items: [
+                    { xtype: 'filefield', name: 'mediaFichier', buttonOnly: true, hideLabel: true,
+                      buttonText: 'Parcourir...',
+                      listeners: { change: function (f) { Usp.settings.uploadMedia(f); } } },
+                    { xtype: 'box', margin: '4 0 0 8',
+                      html: '<span style="color:#888;font-size:11px">image / vidéo / document depuis votre ordinateur</span>' }
+                  ] },
+                { xtype: 'component', itemId: 'mediaPreview', margin: '0 0 6 0', html: '' },
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
                   emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
@@ -154,7 +163,52 @@ Usp.settings.templateForm = function (store, rec) {
         }]
     });
     win.show();
-    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    if (rec) {
+        win.down('form').getForm().setValues(rec.getData());
+        Usp.settings.previewMedia(win.down('form'), rec.get('enteteMediaUrl'), rec.get('enteteMediaType'));
+    }
+};
+
+/* Téléverse le fichier choisi vers l'app, remplit l'URL et le type d'en-tête, affiche l'aperçu. */
+Usp.settings.uploadMedia = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var form = f.up('form');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/media/upload', method: 'POST',
+            jsonData: { fichierBase64: b64, mimeType: file.type || 'application/octet-stream', nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText);
+                var mime = file.type || '';
+                var t = mime.indexOf('image/') === 0 ? 'IMAGE'
+                      : mime.indexOf('video/') === 0 ? 'VIDEO' : 'DOCUMENT';
+                form.down('[name=enteteMediaUrl]').setValue(r.url);
+                form.down('[name=enteteMediaType]').setValue(t);
+                Usp.settings.previewMedia(form, r.url, t);
+            },
+            failure: function (resp) {
+                var msg = 'Téléversement impossible.';
+                try { var r = Ext.decode(resp.responseText); if (r && r.erreur) { msg = r.erreur; } } catch (ex) {}
+                Ext.Msg.alert('Erreur', msg);
+            }
+        });
+    };
+    reader.readAsDataURL(file);
+};
+
+/* Aperçu du média d'en-tête (vignette pour une image, lien sinon). */
+Usp.settings.previewMedia = function (form, url, type) {
+    var c = form.down('#mediaPreview');
+    if (!c) { return; }
+    if (!url) { c.update(''); return; }
+    if (type === 'IMAGE') {
+        c.update('<img src="' + url + '" style="max-height:90px;border:1px solid #ddd;border-radius:4px"/>');
+    } else {
+        c.update('<a href="' + url + '" target="_blank">Média importé ✔ (ouvrir)</a>');
+    }
 };
 
 Usp.settings.tabs = function () {
