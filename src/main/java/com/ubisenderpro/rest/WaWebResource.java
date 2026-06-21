@@ -81,6 +81,27 @@ public class WaWebResource {
         return Response.ok(service.verifierNumeros(id, numeros)).build();
     }
 
+    // ----- Envoi unitaire (composeur dual-canal) -----
+    @POST
+    @Path("/sessions/{id}/send")
+    public Response envoyerTexte(@PathParam("id") Long id, Map<String, Object> body) {
+        String numero = body == null ? null : String.valueOf(body.get("numero"));
+        String texte = body == null ? "" : String.valueOf(body.getOrDefault("texte", ""));
+        return Response.ok(service.envoyerTexte(id, numero, texte)).build();
+    }
+
+    @POST
+    @Path("/sessions/{id}/send-media")
+    public Response envoyerMedia(@PathParam("id") Long id, Map<String, Object> body) {
+        String numero = body == null ? null : String.valueOf(body.get("numero"));
+        String type = body != null && body.get("type") != null ? String.valueOf(body.get("type")) : "image";
+        String url = body != null && body.get("mediaUrl") != null ? String.valueOf(body.get("mediaUrl")) : null;
+        String caption = body != null && body.get("caption") != null ? String.valueOf(body.get("caption")) : null;
+        String mime = body != null && body.get("mimeType") != null ? String.valueOf(body.get("mimeType")) : null;
+        String nom = body != null && body.get("fileName") != null ? String.valueOf(body.get("fileName")) : null;
+        return Response.ok(service.envoyerMedia(id, numero, type, url, caption, mime, nom)).build();
+    }
+
     // ----- Extraction (Phase 4) -----
     @GET
     @Path("/sessions/{id}/contacts")

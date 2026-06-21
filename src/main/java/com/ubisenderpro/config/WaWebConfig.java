@@ -11,12 +11,19 @@ public final class WaWebConfig {
     private WaWebConfig() { }
 
     public static String url() {
-        String v = System.getenv("WA_WEB_URL");
+        String v = conf("WA_WEB_URL");
         return (v == null || v.isEmpty()) ? "http://localhost:3000" : v.replaceAll("/+$", "");
     }
 
     public static String token() {
-        String v = System.getenv("WA_WEB_TOKEN");
+        String v = conf("WA_WEB_TOKEN");
         return v == null ? "" : v;
+    }
+
+    /** Variable d'environnement OS, sinon propriété JVM (-Dxxx) — pratique sur Payara. */
+    private static String conf(String cle) {
+        String v = System.getenv(cle);
+        if (v == null || v.isEmpty()) { v = System.getProperty(cle); }
+        return v;
     }
 }

@@ -8,7 +8,8 @@ Ext.Loader.setConfig({ enabled: true });
 var Usp = {
     apiBase: 'api/v1',
     token: null,
-    user: null
+    user: null,
+    mode: 'API'   // mode d'envoi par défaut (API officielle | WEB) — chargé à la connexion
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
@@ -58,7 +59,14 @@ Usp.showLogin = function () {
                         Usp.token = data.token;
                         Usp.user = data.user;
                         win.close();
-                        Usp.showMain();
+                        // Charge le mode d'envoi global puis ouvre l'application.
+                        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
+                            success: function (r) {
+                                var v = (Ext.decode(r.responseText) || {}).valeur;
+                                Usp.mode = v || 'API';
+                                Usp.showMain();
+                            },
+                            failure: function () { Usp.showMain(); } });
                     },
                     failure: function () {
                         Ext.Msg.alert('Erreur', 'Identifiants invalides.');

@@ -132,6 +132,7 @@ INSERT INTO usp_parametre (cle, valeur, description, categorie, created_at) VALU
  ('whatsapp.prefixe_pays','225',          'Préfixe pays par défaut (CI)',     'WHATSAPP', NOW()),
  ('import.taille_max_mo','10',            'Taille maximale d''un import (Mo)','IMPORT', NOW()),
  ('session.expiration_min','60',          'Expiration de session (minutes)',  'SECURITE', NOW()),
+ ('whatsapp.mode_envoi',  'API',           'Mode d''envoi par défaut : API (Cloud officielle) ou WEB (WhatsApp Web)','WHATSAPP', NOW()),
  ('admin.mot_de_passe_initial','Admin@2026','Mot de passe initial du compte admin (haché au 1er démarrage puis ignoré)','SECURITE', NOW());
 
 -- ===== V2__clients =====

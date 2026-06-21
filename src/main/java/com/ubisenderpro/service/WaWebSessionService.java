@@ -75,6 +75,24 @@ public class WaWebSessionService {
         return client.checkNumbers(nodeId(id), numeros);
     }
 
+    // ----- Envoi unitaire (composeur dual-canal) -----
+    public java.util.Map<String, Object> envoyerTexte(Long id, String numero, String texte) {
+        return resultat(client.sendText(nodeId(id), numero, texte));
+    }
+
+    public java.util.Map<String, Object> envoyerMedia(Long id, String numero, String type, String mediaUrl,
+                                                      String caption, String mime, String nom) {
+        return resultat(client.sendMedia(nodeId(id), numero, type, mediaUrl, caption, mime, nom));
+    }
+
+    private java.util.Map<String, Object> resultat(WaWebClient.SendResult r) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("success", r.success);
+        m.put("id", r.id);
+        m.put("erreur", r.erreur);
+        return m;
+    }
+
     // ----- Extraction (Phase 4) -----
     public JsonNode contacts(Long id) { return client.contacts(nodeId(id)); }
     public JsonNode groupes(Long id) { return client.groups(nodeId(id)); }

@@ -216,9 +216,41 @@ Usp.settings.previewMedia = function (form, url, type) {
     }
 };
 
+/* ---------- Général : mode de fonctionnement ---------- */
+Usp.settings.generalPanel = function () {
+    var form = Ext.create('Ext.form.Panel', {
+        title: 'Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
+        items: [
+            { xtype: 'displayfield',
+              value: '<b>Mode de fonctionnement</b> : choisissez le canal d\'envoi par défaut.' },
+            { xtype: 'combobox', name: 'mode', itemId: 'modeField', fieldLabel: 'Mode d\'envoi par défaut',
+              width: 520, value: 'API', editable: false, queryMode: 'local',
+              store: [['API', 'API officielle (WhatsApp Cloud API / Meta)'],
+                      ['WEB', 'WhatsApp Web (non officiel, scan QR — risque de bannissement)']] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">API : conforme, nécessite un compte Meta. ' +
+                     'WEB : sans Meta (scan QR), à débit lent. Ce choix présélectionne le canal ' +
+                     'dans le composeur « Nouveau message ».</span>' }
+        ],
+        bbar: ['->', { text: 'Enregistrer', handler: function (b) {
+            var val = b.up('panel').down('#modeField').getValue();
+            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: val },
+                success: function () { Usp.mode = val; Ext.Msg.alert('OK', 'Mode enregistré : ' + val + '.'); },
+                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
+        } }]
+    });
+    form.on('afterrender', function () {
+        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (resp) {
+            var v = (Ext.decode(resp.responseText) || {}).valeur;
+            form.down('#modeField').setValue(v || 'API');
+        } });
+    });
+    return form;
+};
+
 Usp.settings.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'Paramètres',
-        items: [Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
+        items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
     };
 };
