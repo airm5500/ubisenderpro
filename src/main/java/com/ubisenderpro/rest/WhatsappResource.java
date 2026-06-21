@@ -1,5 +1,6 @@
 package com.ubisenderpro.rest;
 
+import com.ubisenderpro.dto.MediaUploadRequest;
 import com.ubisenderpro.entity.Message;
 import com.ubisenderpro.entity.WhatsappAccount;
 import com.ubisenderpro.security.Secured;
@@ -9,6 +10,7 @@ import javax.ejb.EJB;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,9 +60,48 @@ public class WhatsappResource {
         Long accountId = Long.valueOf(String.valueOf(body.get("accountId")));
         String numero = String.valueOf(body.get("numero"));
         String type = String.valueOf(body.getOrDefault("type", "image"));
-        String url = String.valueOf(body.get("url"));
         String legende = body.get("legende") == null ? null : String.valueOf(body.get("legende"));
-        Message m = whatsappService.envoyerMedia(accountId, numero, type, url, legende, null);
+        Object mediaId = body.get("mediaId");
+        Message m;
+        if (mediaId != null && !String.valueOf(mediaId).isEmpty()) {
+            String mimeType = body.get("mimeType") == null ? null : String.valueOf(body.get("mimeType"));
+            String nomFichier = body.get("nomFichier") == null ? null : String.valueOf(body.get("nomFichier"));
+            m = whatsappService.envoyerMediaParId(accountId, numero, type, String.valueOf(mediaId),
+                    legende, mimeType, nomFichier, null);
+        } else {
+            String url = String.valueOf(body.get("url"));
+            m = whatsappService.envoyerMedia(accountId, numero, type, url, legende, null);
+        }
         return Response.ok(m).build();
+    }
+
+    /**
+     * Téléverse un fichier binaire vers l'API WhatsApp (/media) et renvoie son media_id,
+     * réutilisable pour l'envoi de messages média sans hébergement public.
+     */
+    @POST
+    @Path("/media")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
+    public Response uploadMedia(MediaUploadRequest req) {
+        try {
+            String mediaId = whatsappService.uploadMedia(req);
+            Map<String, Object> result = new HashMap<>();
+            result.put("mediaId", mediaId);
+            result.put("mimeType", req.getMimeType());
+            result.put("nomFichier", req.getNomFichier());
+            return Response.ok(result).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(erreur(e.getMessage())).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.BAD_GATEWAY)
+                    .entity(erreur(e.getMessage())).build();
+        }
+    }
+
+    private Map<String, Object> erreur(String message) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("erreur", message);
+        return m;
     }
 }

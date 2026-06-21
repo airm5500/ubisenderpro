@@ -67,7 +67,8 @@ Usp.inbox.panel = function () {
             { xtype: 'textfield', itemId: 'msgInput', flex: 1, emptyText: 'Écrire un message...',
               listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { Usp.inbox.envoyer(f); } } } },
             { xtype: 'button', text: 'Envoyer', handler: function (b) { Usp.inbox.envoyer(b.up('toolbar').down('#msgInput')); } },
-            { xtype: 'button', text: 'Joindre', tooltip: 'Envoyer une image / un document (par URL)', handler: function () { Usp.inbox.media(); } },
+            { xtype: 'button', text: 'Lien', tooltip: 'Envoyer un média par URL publique', handler: function () { Usp.inbox.media(); } },
+            { xtype: 'button', text: 'Joindre', tooltip: 'Téléverser et envoyer un fichier', handler: function () { Usp.inbox.joindre(); } },
             { xtype: 'button', text: 'Note', tooltip: 'Note interne', handler: function (b) { Usp.inbox.note(b.up('toolbar').down('#msgInput')); } }
         ]
     });
@@ -139,6 +140,7 @@ Usp.inbox.envoyer = function (field) {
     });
 };
 
+/* Envoi d'un média par URL publique (lien hébergé). */
 Usp.inbox.media = function () {
     var conv = Usp.inbox.currentConv;
     if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
@@ -164,6 +166,75 @@ Usp.inbox.media = function () {
                 failure: function () { Ext.Msg.alert('Erreur', 'Envoi du média impossible.'); }
             });
         } }]
+    });
+    win.show();
+};
+
+/* Déduit le type WhatsApp (image/video/audio/document) à partir du type MIME. */
+Usp.inbox.typeMedia = function (mime) {
+    mime = mime || '';
+    if (mime.indexOf('image/') === 0) { return 'image'; }
+    if (mime.indexOf('video/') === 0) { return 'video'; }
+    if (mime.indexOf('audio/') === 0) { return 'audio'; }
+    return 'document';
+};
+
+/* Téléverse un fichier local vers l'API WhatsApp (/media) puis l'envoie dans la conversation. */
+Usp.inbox.joindre = function () {
+    var conv = Usp.inbox.currentConv;
+    if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
+    var fileData = { base64: null, nom: null, mime: null };
+
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Téléverser un fichier', width: 460, modal: true, bodyPadding: 12,
+        items: [{
+            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            items: [
+                { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier', buttonText: 'Parcourir...',
+                  allowBlank: false,
+                  listeners: { change: function (f) {
+                      var file = f.fileInputEl.dom.files[0];
+                      if (!file) { return; }
+                      fileData.nom = file.name;
+                      fileData.mime = file.type || 'application/octet-stream';
+                      var reader = new FileReader();
+                      reader.onload = function (e) { fileData.base64 = e.target.result.split(',')[1]; };
+                      reader.readAsDataURL(file);
+                  } } },
+                { xtype: 'textfield', name: 'legende', fieldLabel: 'Légende',
+                  emptyText: 'Optionnelle (image, vidéo, document)' }
+            ]
+        }],
+        buttons: [{
+            text: 'Envoyer', formBind: true,
+            handler: function (b) {
+                if (!fileData.base64) { Ext.Msg.alert('Erreur', 'Sélectionnez un fichier.'); return; }
+                var legende = b.up('window').down('[name=legende]').getValue();
+                b.disable();
+                Usp.ajax({
+                    url: '/whatsapp/media', method: 'POST',
+                    jsonData: { accountId: conv.get('whatsappAccountId'), fichierBase64: fileData.base64,
+                                mimeType: fileData.mime, nomFichier: fileData.nom },
+                    success: function (resp) {
+                        var up = Ext.decode(resp.responseText);
+                        Usp.ajax({
+                            url: '/whatsapp/messages/media', method: 'POST',
+                            jsonData: { accountId: conv.get('whatsappAccountId'), numero: conv.get('numeroWhatsapp'),
+                                        type: Usp.inbox.typeMedia(fileData.mime), mediaId: up.mediaId,
+                                        mimeType: fileData.mime, nomFichier: fileData.nom, legende: legende || null },
+                            success: function () { win.close(); Usp.inbox.reloadMessages(); },
+                            failure: function () { b.enable(); Ext.Msg.alert('Erreur', 'Envoi du média impossible (vérifiez la fenêtre de 24h).'); }
+                        });
+                    },
+                    failure: function (resp) {
+                        b.enable();
+                        var msg = 'Téléversement impossible.';
+                        try { var r = Ext.decode(resp.responseText); if (r && r.erreur) { msg = r.erreur; } } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    }
+                });
+            }
+        }]
     });
     win.show();
 };
