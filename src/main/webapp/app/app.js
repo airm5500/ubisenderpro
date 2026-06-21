@@ -121,7 +121,12 @@ Usp.clientsPanel = function () {
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 150 },
             { text: 'E-mail', dataIndex: 'emailPrincipal', width: 200 },
-            { text: 'Statut', dataIndex: 'statut', width: 90 }
+            { text: 'Statut', dataIndex: 'statut', width: 90 },
+            { text: 'Contacts', width: 100, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="cli-contacts" title="Voir / ajouter les contacts" ' +
+                      'style="cursor:pointer;color:#1976d2">👥 contacts</span>';
+              } }
         ],
         tbar: [
             { xtype: 'textfield', emptyText: 'Rechercher...', width: 220, listeners: {
@@ -131,12 +136,6 @@ Usp.clientsPanel = function () {
                 }, buffer: 400 } },
             '->',
             { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
-            { text: 'Contacts', tooltip: 'Voir / ajouter les contacts du client sélectionné',
-              handler: function (b) {
-                  var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                  if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un client.'); return; }
-                  Usp.contactsWindow(rec.get('id'), rec.get('nomCompte'));
-              } },
             { text: 'Importer Excel/CSV', handler: Usp.showImport }
         ],
         bbar: {
@@ -144,7 +143,12 @@ Usp.clientsPanel = function () {
             store: store,
             displayInfo: true
         },
-        listeners: { itemdblclick: function (g, rec) { Usp.clientForm(store, rec); } }
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.clientForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); }
+            }
+        }
     };
 };
 
@@ -328,7 +332,6 @@ Usp.MENU = [
     { text: 'Campagnes',           view: 'campaigns',  roles: ['ADMIN', 'MARKETING'] },
     { text: 'WhatsApp Web',        view: 'waweb',      roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
-    { text: 'Importations',        view: 'import',     roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Paramètres',          view: 'settings',   roles: ['ADMIN'] },
     { text: 'Utilisateurs',        view: 'users',      roles: ['ADMIN'] }
 ];
@@ -340,9 +343,22 @@ Usp.canSee = function (roles) {
     return roles.some(function (r) { return mine.indexOf(r) !== -1; });
 };
 
+/* Pastille sur l'onglet actif d'un tabpanel. */
+Usp.tabPastille = function (tp, active) {
+    if (!tp || !tp.items) { return; }
+    tp.items.each(function (t) {
+        if (t.baseTitle === undefined) { t.baseTitle = t.title; }
+        t.setTitle(t.baseTitle + (t === active ? ' ●' : ''));
+    });
+};
+Usp.tabListeners = {
+    afterrender: function (tp) { Usp.tabPastille(tp, tp.getActiveTab()); },
+    tabchange: function (tp, nc) { Usp.tabPastille(tp, nc); }
+};
+
 Usp.menuChildren = function () {
     return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
-        .map(function (m) { return { text: m.text, leaf: true, view: m.view }; });
+        .map(function (m) { return { text: m.text, baseText: m.text, leaf: true, view: m.view }; });
 };
 
 /* ---------- Viewport principal ---------- */
@@ -372,11 +388,20 @@ Usp.showMain = function () {
                 xtype: 'treepanel',
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
-                    fields: ['text', 'view', 'leaf'],
+                    fields: ['text', 'baseText', 'view', 'leaf'],
                     root: { expanded: true, children: Usp.menuChildren() }
                 }),
                 listeners: {
                     itemclick: function (v, rec) {
+                        // Pastille sur le menu actif.
+                        var root = v.getStore().getRootNode();
+                        root.eachChild(function (n) {
+                            if (!n.data.baseText) { n.data.baseText = n.get('text'); }
+                            n.set('text', n.data.baseText);
+                        });
+                        if (!rec.data.baseText) { rec.data.baseText = rec.get('text'); }
+                        rec.set('text', rec.data.baseText + ' <span style="color:#25d366">●</span>');
+
                         var vue = rec.get('view') || (rec.raw && rec.raw.view);
                         switch (vue) {
                             case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;

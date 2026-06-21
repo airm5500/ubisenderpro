@@ -113,9 +113,9 @@ Usp.settings.templatesPanel = function () {
 Usp.settings.templateForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le modèle' : 'Nouveau modèle',
-        width: 560, modal: true, bodyPadding: 12,
+        width: 680, height: 600, modal: true, layout: 'fit',
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' },
             items: [
                 { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
                 { xtype: 'combobox', name: 'typeModele', fieldLabel: 'Type', value: 'marketing',
@@ -277,7 +277,7 @@ Usp.settings.generalPanel = function () {
 
 Usp.settings.tabs = function () {
     return {
-        xtype: 'tabpanel', title: 'Paramètres',
+        xtype: 'tabpanel', title: 'Paramètres', listeners: Usp.tabListeners,
         items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
     };
 };

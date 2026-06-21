@@ -88,6 +88,22 @@ public class WaBulkService {
 
     public Optional<WaBulkJob> parId(Long id) { return Optional.ofNullable(em.find(WaBulkJob.class, id)); }
 
+    /** Remet les destinataires en échec en attente et relance l'envoi (réussis non touchés). */
+    public WaBulkJob relancerEchecs(Long jobId) {
+        WaBulkJob j = em.find(WaBulkJob.class, jobId);
+        if (j == null) throw new IllegalArgumentException("Travail introuvable");
+        int n = em.createQuery(
+                "UPDATE WaBulkDestinataire d SET d.statut = 'EN_ATTENTE', d.erreur = NULL " +
+                "WHERE d.jobId = :j AND d.statut = 'ECHEC'")
+                .setParameter("j", jobId).executeUpdate();
+        if (n == 0) throw new IllegalArgumentException("Aucun échec à renvoyer");
+        j.setEchoues(0);
+        j.setStatut("EN_COURS");
+        em.merge(j);
+        sender.lancer(jobId);
+        return j;
+    }
+
     public List<WaBulkDestinataire> destinataires(Long jobId) {
         return em.createQuery(
                 "SELECT d FROM WaBulkDestinataire d WHERE d.jobId = :j ORDER BY d.id", WaBulkDestinataire.class)

@@ -134,5 +134,5 @@ Usp.crm.ordersPanel = function () {
 };
 
 Usp.crm.tabs = function () {
-    return { xtype: 'tabpanel', title: 'CRM', items: [Usp.crm.panel(), Usp.crm.ordersPanel()] };
+    return { xtype: 'tabpanel', title: 'CRM', listeners: Usp.tabListeners, items: [Usp.crm.panel(), Usp.crm.ordersPanel()] };
 };

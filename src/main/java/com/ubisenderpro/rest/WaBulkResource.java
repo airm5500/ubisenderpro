@@ -52,6 +52,16 @@ public class WaBulkResource {
     }
 
     @POST
+    @Path("/{id}/relancer")
+    public Response relancerEchecs(@PathParam("id") Long id) {
+        try {
+            return Response.ok(service.relancerEchecs(id)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
+        }
+    }
+
+    @POST
     @Path("/{id}/launch")
     public Response lancer(@PathParam("id") Long id) {
         try {

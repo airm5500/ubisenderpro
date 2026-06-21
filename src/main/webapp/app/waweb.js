@@ -307,7 +307,8 @@ Usp.waweb.bulkPanel = function () {
         ],
         bbar: ['->',
             { text: 'Créer / lancer', formBind: true, handler: function (b) {
-                var f = b.up('form').getForm();
+                var formPanel = b.up('form');
+                var f = formPanel.getForm();
                 if (!f.isValid()) { return; }
                 var v = f.getValues();
                 v.mediaUrl = media.url; v.mediaType = media.type; v.mediaMime = media.mime; v.mediaNom = media.nom;
@@ -317,24 +318,32 @@ Usp.waweb.bulkPanel = function () {
                     if (!v.dateProg) { Ext.Msg.alert('Info', 'Choisissez une date de programmation.'); return; }
                     v.dateProgrammee = v.dateProg + ' ' + (v.heureProg || '09:00');
                 }
+                formPanel.setLoading('Traitement en cours…');
+                var fini = function (msgTitre, msgTexte) {
+                    formPanel.setLoading(false);
+                    if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); }
+                    Ext.Msg.confirm(msgTitre, msgTexte + '<br/><br/>Réinitialiser la vue ?', function (btn) {
+                        if (btn === 'yes') {
+                            f.reset();
+                            media.url = null; media.type = null; media.mime = null; media.nom = null;
+                            var pj = formPanel.down('#pjInfo');
+                            if (pj) { pj.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                        }
+                    });
+                };
+                var echec = function (r, def) { formPanel.setLoading(false); Ext.Msg.alert('Erreur', Usp.waweb.err(r, def)); };
                 Usp.ajax({ url: '/wa-bulk', method: 'POST', jsonData: v,
                     success: function (resp) {
                         var job = Ext.decode(resp.responseText);
-                        var fini = function () { if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); } };
                         if (planifie) {
-                            Ext.Msg.alert('Planifié', 'Envoi planifié (' + job.total + ' destinataires) pour le ' +
-                                v.dateProgrammee + '.');
-                            fini();
+                            fini('Planifié', 'Envoi planifié (' + job.total + ' destinataires) pour le ' + v.dateProgrammee + '.');
                         } else {
                             Usp.ajax({ url: '/wa-bulk/' + job.id + '/launch', method: 'POST',
-                                success: function () {
-                                    Ext.Msg.alert('Lancé', 'Envoi démarré (' + job.total + ' destinataires).');
-                                    fini();
-                                },
-                                failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Lancement impossible.')); } });
+                                success: function () { fini('Lancé', 'Envoi démarré (' + job.total + ' destinataires).'); },
+                                failure: function (r) { echec(r, 'Lancement impossible.'); } });
                         }
                     },
-                    failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Création impossible.')); } });
+                    failure: function (r) { echec(r, 'Création impossible.'); } });
             } }
         ]
     };
@@ -360,18 +369,30 @@ Usp.waweb.historyPanel = function () {
                 return '<span style="color:#2e7d32;font-weight:bold">' + (v || 0) + '</span>'; } },
             { text: 'Échoués', dataIndex: 'echoues', width: 90, renderer: function (v) {
                 return v ? '<span style="color:#c62828;font-weight:bold">' + v + '</span>' : '0'; } },
-            { text: 'Détail', width: 90, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Détail', width: 80, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
                   return '<span class="wa-det" title="Voir le détail (contenu + statuts)" ' +
-                      'style="cursor:pointer;font-size:16px">🔍 voir</span>';
+                      'style="cursor:pointer;font-size:16px">🔍</span>';
+              } },
+            { text: 'Renvoi échecs', width: 110, sortable: false, menuDisabled: true, dataIndex: 'echoues',
+              renderer: function (v) {
+                  return v > 0 ? '<span class="wa-relancer" title="Renvoyer uniquement les échecs" ' +
+                      'style="cursor:pointer;color:#c62828">🔄 ' + v + '</span>' : '';
               } }
         ],
         tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }],
         listeners: {
             cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
+                if (e.getTarget('.wa-relancer')) { Usp.waweb.relancerEchecs(rec.get('id'), store); return; }
                 if (e.getTarget('.wa-det')) { Usp.waweb.detailEnvoi(rec.get('id')); }
             },
-            itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); }
+            itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); },
+            afterrender: function () {
+                Usp.waweb._histTask = Ext.TaskManager.start({ interval: 8000, run: function () { store.load(); } });
+            },
+            beforedestroy: function () {
+                if (Usp.waweb._histTask) { try { Ext.TaskManager.stop(Usp.waweb._histTask); } catch (e) {} Usp.waweb._histTask = null; }
+            }
         }
     };
 };
@@ -411,6 +432,16 @@ Usp.waweb.boutonsTexte = function (json) {
         if (b && b.url) { lignes.push((b.text ? b.text + ' : ' : '') + b.url); }
     });
     return lignes.length ? '\n\n' + lignes.join('\n') : '';
+};
+
+/* Renvoie uniquement les destinataires en échec d'un envoi (sans retoucher les réussis). */
+Usp.waweb.relancerEchecs = function (jobId, store) {
+    Ext.Msg.confirm('Renvoyer les échecs', 'Renvoyer uniquement les destinataires en échec de cet envoi ?', function (btn) {
+        if (btn !== 'yes') { return; }
+        Usp.ajax({ url: '/wa-bulk/' + jobId + '/relancer', method: 'POST',
+            success: function () { Ext.Msg.alert('OK', 'Renvoi des échecs lancé.'); if (store) { store.load(); } },
+            failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Renvoi impossible.')); } });
+    });
 };
 
 Usp.waweb.err = function (resp, def) {
@@ -660,7 +691,7 @@ Usp.waweb.detailEnvoi = function (jobId) {
 
 Usp.waweb.tabs = function () {
     return {
-        xtype: 'tabpanel', title: 'WhatsApp Web',
+        xtype: 'tabpanel', title: 'WhatsApp Web', listeners: Usp.tabListeners,
         items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel(), Usp.waweb.historyPanel(),
                 Usp.waweb.filterPanel(), Usp.waweb.extractPanel()]
     };
