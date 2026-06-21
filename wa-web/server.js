@@ -104,8 +104,8 @@ function publicState(s) {
 /** Démarre (ou relance) une session Baileys et câble les événements. */
 async function startSession(id) {
   let s = sessions.get(id);
-  if (s && s.starting) { return s; }
-  if (s && (s.status === 'CONNECTE' || s.status === 'QR')) { return s; }
+  // Évite d'ouvrir un 2e socket sur les mêmes clés (cause de « Bad MAC »).
+  if (s && (s.starting || (s.sock && s.status !== 'DECONNECTE'))) { return s; }
 
   s = s || {};
   s.starting = true;
