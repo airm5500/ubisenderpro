@@ -71,4 +71,27 @@ public class ArticleResource {
         articleService.supprimer(id);
         return Response.noContent().build();
     }
+
+    /** Mise à jour sélective des dates d'une promotion (tous les articles du code promo). */
+    @POST
+    @Path("/promo")
+    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    public Response majPromo(Map<String, Object> body) {
+        try {
+            String code = body == null ? null : (String) body.get("codePromo");
+            java.time.LocalDateTime debut = parseDate(body == null ? null : (String) body.get("dateDebut"), false);
+            java.time.LocalDateTime fin = parseDate(body == null ? null : (String) body.get("dateFin"), true);
+            int n = articleService.majDatesPromo(code, debut, fin);
+            return Response.ok(Map.of("misAJour", n)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", e.getMessage())).build();
+        }
+    }
+
+    /** "yyyy-MM-dd" -> début (00:00) ou fin (23:59) de journée ; null si vide. */
+    private java.time.LocalDateTime parseDate(String s, boolean finJournee) {
+        if (s == null || s.trim().isEmpty()) { return null; }
+        java.time.LocalDate d = java.time.LocalDate.parse(s.trim().substring(0, 10));
+        return finJournee ? d.atTime(23, 59, 59) : d.atStartOfDay();
+    }
 }

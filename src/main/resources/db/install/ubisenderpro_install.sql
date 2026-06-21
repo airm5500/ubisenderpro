@@ -357,7 +357,7 @@ CREATE TABLE usp_marque (
 
 CREATE TABLE usp_article (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    code_article VARCHAR(50) NOT NULL,
+    pscode VARCHAR(50) NOT NULL,
     code_barres VARCHAR(50),
     cip VARCHAR(50),
     designation VARCHAR(255) NOT NULL,
@@ -366,7 +366,12 @@ CREATE TABLE usp_article (
     categorie_id BIGINT,
     marque_id BIGINT,
     prix_vente DECIMAL(15,2) NOT NULL DEFAULT 0,
+    prix_vente_public DECIMAL(15,2),
     prix_promotionnel DECIMAL(15,2),
+    quantite_commandee INT,
+    quantite_ug INT,
+    nom_promo VARCHAR(150),
+    code_promo VARCHAR(50),
     date_debut_promotion DATETIME,
     date_fin_promotion DATETIME,
     stock_disponible DECIMAL(15,3) NOT NULL DEFAULT 0,
@@ -380,12 +385,13 @@ CREATE TABLE usp_article (
     created_at DATETIME NOT NULL,
     updated_at DATETIME,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_usp_article_code (code_article),
+    UNIQUE KEY uk_usp_article_code (pscode),
     KEY idx_usp_article_designation (designation),
     KEY idx_usp_article_cip (cip),
     KEY idx_usp_article_barcode (code_barres),
     KEY idx_usp_article_categorie (categorie_id),
     KEY idx_usp_article_marque (marque_id),
+    KEY idx_usp_article_code_promo (code_promo),
     CONSTRAINT fk_usp_article_categorie FOREIGN KEY (categorie_id) REFERENCES usp_categorie_article(id),
     CONSTRAINT fk_usp_article_marque FOREIGN KEY (marque_id) REFERENCES usp_marque(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

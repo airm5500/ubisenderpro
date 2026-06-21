@@ -18,9 +18,16 @@ Usp.importer.CHAMPS = {
         ['consentement_whatsapp', 'Consentement WhatsApp']
     ],
     ARTICLES: [
-        ['code_article', 'Code article *'], ['designation', 'Désignation *'],
-        ['prix_vente', 'Prix de vente *'], ['code_barres', 'Code-barres'], ['cip', 'CIP'],
-        ['categorie', 'Catégorie'], ['marque', 'Marque'], ['prix_promotionnel', 'Prix promotionnel'],
+        ['pscode', 'PS Code *'], ['designation', 'Désignation *'],
+        ['prix_vente', 'Prix de vente'], ['prix_vente_public', 'Prix de vente public'],
+        ['prix_promotionnel', 'Prix promotionnel'],
+        ['quantite_commandee', 'Quantité commandée'], ['quantite_ug', 'Quantité UG'],
+        ['nom_promo', 'Nom promo'], ['code_promo', 'Code promo'],
+        ['promo_annee', 'Année promo'], ['promo_mois_debut', 'Mois début promo'],
+        ['promo_jour_debut', 'Jour début promo'], ['promo_mois_fin', 'Mois fin promo'],
+        ['promo_jour_fin', 'Jour fin promo'],
+        ['code_barres', 'Code-barres'], ['cip', 'CIP'],
+        ['categorie', 'Catégorie'], ['marque', 'Marque'],
         ['stock_disponible', 'Stock disponible'], ['unite', 'Unité'],
         ['image_url', 'Image URL'], ['lien_produit', 'Lien produit']
     ]

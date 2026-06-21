@@ -19,25 +19,29 @@ Usp.catalogue.store = function (url, fields, root) {
 /* ---------- Articles ---------- */
 Usp.catalogue.articlesPanel = function () {
     var store = Usp.catalogue.store('/articles',
-        ['id', 'codeArticle', 'designation', 'cip', 'codeBarres', 'prixVente',
-         'prixPromotionnel', 'stockDisponible', 'unite', 'actif', 'publiable']);
+        ['id', 'pscode', 'designation', 'cip', 'codeBarres', 'prixVente', 'prixVentePublic',
+         'prixPromotionnel', 'quantiteCommandee', 'quantiteUg', 'nomPromo', 'codePromo',
+         'dateDebutPromotion', 'dateFinPromotion', 'stockDisponible', 'unite', 'actif', 'publiable']);
+
+    var prix = function (v) { return v ? Ext.util.Format.number(v, '0,000') + ' F' : ''; };
 
     return {
         xtype: 'grid', title: 'Articles', store: store,
         columns: [
-            { text: 'Code', dataIndex: 'codeArticle', width: 100 },
+            { text: 'PS Code', dataIndex: 'pscode', width: 100 },
             { text: 'Désignation', dataIndex: 'designation', flex: 1 },
-            { text: 'CIP', dataIndex: 'cip', width: 90 },
-            { text: 'Prix', dataIndex: 'prixVente', width: 90, align: 'right',
-              renderer: function (v) { return Ext.util.Format.number(v, '0,000') + ' F'; } },
-            { text: 'Promo', dataIndex: 'prixPromotionnel', width: 90, align: 'right',
-              renderer: function (v) { return v ? Ext.util.Format.number(v, '0,000') + ' F' : ''; } },
-            { text: 'Stock', dataIndex: 'stockDisponible', width: 80, align: 'right' },
-            { text: 'Unité', dataIndex: 'unite', width: 70 },
-            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+            { text: 'CIP', dataIndex: 'cip', width: 80 },
+            { text: 'Prix', dataIndex: 'prixVente', width: 85, align: 'right', renderer: prix },
+            { text: 'Prix public', dataIndex: 'prixVentePublic', width: 90, align: 'right', renderer: prix },
+            { text: 'Promo', dataIndex: 'prixPromotionnel', width: 85, align: 'right', renderer: prix },
+            { text: 'Qté cmd', dataIndex: 'quantiteCommandee', width: 75, align: 'right' },
+            { text: 'UG', dataIndex: 'quantiteUg', width: 55, align: 'right' },
+            { text: 'Code promo', dataIndex: 'codePromo', width: 95 },
+            { text: 'Stock', dataIndex: 'stockDisponible', width: 75, align: 'right' },
+            { text: 'Actif', dataIndex: 'actif', width: 55, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
         ],
         tbar: [
-            { xtype: 'textfield', emptyText: 'Rechercher...', width: 220, listeners: {
+            { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
                 change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
             '->',
             { text: 'Nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } },
@@ -46,6 +50,7 @@ Usp.catalogue.articlesPanel = function () {
                 if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un article.'); return; }
                 Usp.catalogue.stockForm(store, rec);
             } },
+            { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } },
             { text: 'Importer', handler: function () { Usp.catalogue.importArticles(store); } }
         ],
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
@@ -60,12 +65,19 @@ Usp.catalogue.articleForm = function (store, rec) {
         items: [{
             xtype: 'form', border: false, defaults: { anchor: '100%' },
             items: [
-                { xtype: 'textfield', name: 'codeArticle', fieldLabel: 'Code article', allowBlank: false },
+                { xtype: 'textfield', name: 'pscode', fieldLabel: 'PS Code', allowBlank: false },
                 { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false },
                 { xtype: 'textfield', name: 'cip', fieldLabel: 'CIP' },
                 { xtype: 'textfield', name: 'codeBarres', fieldLabel: 'Code-barres' },
                 { xtype: 'numberfield', name: 'prixVente', fieldLabel: 'Prix de vente', allowBlank: false, minValue: 0 },
+                { xtype: 'numberfield', name: 'prixVentePublic', fieldLabel: 'Prix de vente public', minValue: 0 },
                 { xtype: 'numberfield', name: 'prixPromotionnel', fieldLabel: 'Prix promotionnel', minValue: 0 },
+                { xtype: 'fieldcontainer', fieldLabel: 'Quantités', layout: 'hbox', defaults: { labelWidth: 70, width: 150 }, items: [
+                    { xtype: 'numberfield', name: 'quantiteCommandee', fieldLabel: 'Commandée', minValue: 0 },
+                    { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'UG', minValue: 0, labelWidth: 30, width: 110, margin: '0 0 0 8' }
+                ] },
+                { xtype: 'textfield', name: 'nomPromo', fieldLabel: 'Nom promo' },
+                { xtype: 'textfield', name: 'codePromo', fieldLabel: 'Code promo' },
                 { xtype: 'numberfield', name: 'stockDisponible', fieldLabel: 'Stock disponible', minValue: 0 },
                 { xtype: 'textfield', name: 'unite', fieldLabel: 'Unité' },
                 { xtype: 'textfield', name: 'imageUrl', fieldLabel: 'Image URL' },
@@ -106,6 +118,46 @@ Usp.catalogue.stockForm = function (store, rec) {
 
 Usp.catalogue.importArticles = function (store) {
     Usp.importer.show('ARTICLES', '/imports/articles', function () { store.load(); });
+};
+
+/* Mise à jour sélective des dates d'une promotion (tous les articles du code promo). */
+Usp.catalogue.majPromo = function (store) {
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Mettre à jour une promotion', width: 420, modal: true, bodyPadding: 12,
+        items: [{
+            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            items: [
+                { xtype: 'displayfield',
+                  value: 'Applique les dates à <b>tous les articles</b> portant ce code promo.' },
+                { xtype: 'textfield', name: 'codePromo', fieldLabel: 'Code promo', allowBlank: false,
+                  emptyText: 'ex. 6553' },
+                { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y',
+                  submitFormat: 'Y-m-d', editable: false },
+                { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y',
+                  submitFormat: 'Y-m-d', editable: false }
+            ]
+        }],
+        buttons: [{
+            text: 'Valider', formBind: true, handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) { return; }
+                var v = f.getValues();
+                Usp.ajax({ url: '/articles/promo', method: 'POST',
+                    jsonData: { codePromo: v.codePromo, dateDebut: v.dateDebut || null, dateFin: v.dateFin || null },
+                    success: function (resp) {
+                        var r = Ext.decode(resp.responseText) || {};
+                        win.close(); store.load();
+                        Ext.Msg.alert('Promotion mise à jour', (r.misAJour || 0) + ' article(s) mis à jour.');
+                    },
+                    failure: function (resp) {
+                        var msg = 'Mise à jour impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    } });
+            }
+        }]
+    });
+    win.show();
 };
 
 /* ---------- Catégories et marques ---------- */
