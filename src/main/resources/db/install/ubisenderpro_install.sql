@@ -130,6 +130,9 @@ SELECT u.id, r.id FROM usp_utilisateur u, usp_role r WHERE u.login = 'admin' AND
 INSERT INTO usp_parametre (cle, valeur, description, categorie, created_at) VALUES
  ('app.nom',             'UbiSenderPro',  'Nom de l''application',            'GENERAL', NOW()),
  ('app.societe',         'UbiSenderPro',  'Société émettrice (variable [SOCIETE])','GENERAL', NOW()),
+ ('app.societe_tel',     '',              'Téléphone(s) société, séparés par ; (variable [TEL_SOCIETE])','GENERAL', NOW()),
+ ('app.site',            '',              'Lien du site société (variable [SITE])','GENERAL', NOW()),
+ ('app.lien_commande',   '',              'Lien de commande société (variable [LIEN_COMMANDE])','GENERAL', NOW()),
  ('whatsapp.prefixe_pays','225',          'Préfixe pays par défaut (CI)',     'WHATSAPP', NOW()),
  ('import.taille_max_mo','10',            'Taille maximale d''un import (Mo)','IMPORT', NOW()),
  ('session.expiration_min','60',          'Expiration de session (minutes)',  'SECURITE', NOW()),
@@ -460,6 +463,7 @@ CREATE TABLE usp_modele_message (
     pied_de_page VARCHAR(255),
     boutons_json TEXT,
     nom_modele_whatsapp VARCHAR(150),
+    segmentation_id BIGINT,
     statut_approbation VARCHAR(30) NOT NULL DEFAULT 'BROUILLON',
     actif BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL,

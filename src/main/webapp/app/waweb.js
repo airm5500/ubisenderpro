@@ -14,7 +14,10 @@ Usp.waweb.VARIABLES = [
     { t: 'SEGMENTATION', d: 'Segmentation du client' },
     { t: 'VILLE', d: 'Ville du client' },
     { t: 'REGION', d: 'Région du client' },
-    { t: 'SOCIETE', d: 'Votre société émettrice (Paramètres → Général)' }
+    { t: 'SOCIETE', d: 'Votre société émettrice (Paramètres → Général)' },
+    { t: 'TEL_SOCIETE', d: 'Téléphone(s) société (Paramètres → Général)' },
+    { t: 'SITE', d: 'Lien du site société (Paramètres → Général)' },
+    { t: 'LIEN_COMMANDE', d: 'Lien de commande société (Paramètres → Général)' }
 ];
 
 /* Barre de boutons « variables » : insère [TOKEN] dans le champ édité (sinon le champ par défaut). */
@@ -32,7 +35,8 @@ Usp.waweb.barreVariables = function (fallbackName) {
 /* Insère [token] à la position du curseur dans le dernier champ édité (sinon champ par défaut). */
 Usp.waweb.insertVar = function (token, btn, fallbackName) {
     var f = Usp.waweb._lastMsgField;
-    if (!f || typeof f.isXType !== 'function' || !f.isXType('textareafield')) {
+    if (!f || typeof f.isXType !== 'function' ||
+            !(f.isXType('textareafield') || f.isXType('textfield'))) {
         f = btn.up('form').down('[name=' + (fallbackName || 'msg1') + ']');
     }
     if (!f) { return; }

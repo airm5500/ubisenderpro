@@ -138,6 +138,9 @@ public class WaBulkSenderTx {
                 parametreService.valeur("app.nom", ""));
 
         Map<String, String> vars = new HashMap<>();
+        vars.put("TEL_SOCIETE", parametreService.valeur("app.societe_tel", ""));
+        vars.put("SITE", parametreService.valeur("app.site", ""));
+        vars.put("LIEN_COMMANDE", parametreService.valeur("app.lien_commande", ""));
         vars.put("NOM", nom);
         vars.put("NAME", nom);            // compat
         vars.put("NOM_CONTACT", nom);     // compat {{nom_contact}}
