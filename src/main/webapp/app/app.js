@@ -77,6 +77,11 @@ Usp.export.valeur = function (rec, d) {
     if (v === null || v === undefined) { return ''; }
     if (v === true) { return 'Oui'; }
     if (v === false) { return 'Non'; }
+    if (Ext.isArray(v)) {
+        return v.map(function (x) {
+            return (x && (x.nom || x.code || x.libelle)) || x;
+        }).join(' / ');
+    }
     v = String(v);
     if (v.length >= 16 && v.charAt(10) === 'T') { v = v.replace('T', ' ').substring(0, 16); } // dates ISO
     return v;

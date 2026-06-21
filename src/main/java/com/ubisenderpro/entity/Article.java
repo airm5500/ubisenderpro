@@ -58,9 +58,20 @@ public class Article {
     @Column(name = "code_promo", length = 50)
     private String codePromo;
 
-    /** Promotion associée (réf. usp_promotion) ; null = pas de promotion. */
+    /** Promotion associée (réf. usp_promotion) ; null = pas de promotion. (Hérité V22, conservé) */
     @Column(name = "promotion_id")
     private Long promotionId;
+
+    /** Promotions associées (un article peut être dans plusieurs promotions). */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "usp_article_promotion",
+            joinColumns = @JoinColumn(name = "article_id"),
+            inverseJoinColumns = @JoinColumn(name = "promotion_id"))
+    private java.util.Set<Promotion> promotions = new java.util.HashSet<>();
+
+    /** Ids des promotions reçus du client (écriture) ; null = ne pas modifier les associations. */
+    @Transient
+    private java.util.List<Long> promotionIds;
 
     @Column(name = "date_debut_promotion")
     private LocalDateTime dateDebutPromotion;
@@ -138,6 +149,10 @@ public class Article {
     public void setCodePromo(String codePromo) { this.codePromo = codePromo; }
     public Long getPromotionId() { return promotionId; }
     public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
+    public java.util.Set<Promotion> getPromotions() { return promotions; }
+    public void setPromotions(java.util.Set<Promotion> promotions) { this.promotions = promotions; }
+    public java.util.List<Long> getPromotionIds() { return promotionIds; }
+    public void setPromotionIds(java.util.List<Long> promotionIds) { this.promotionIds = promotionIds; }
     public LocalDateTime getDateDebutPromotion() { return dateDebutPromotion; }
     public void setDateDebutPromotion(LocalDateTime dateDebutPromotion) { this.dateDebutPromotion = dateDebutPromotion; }
     public LocalDateTime getDateFinPromotion() { return dateFinPromotion; }

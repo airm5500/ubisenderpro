@@ -80,11 +80,27 @@ public class ArticleService {
         if (parCode(a.getPscode()).isPresent()) {
             throw new IllegalArgumentException("Un article avec le PS Code « " + a.getPscode() + " » existe déjà");
         }
+        appliquerPromotions(a);
         em.persist(a);
         return a;
     }
 
-    public Article modifier(Article a) { a.setUpdatedAt(LocalDateTime.now()); return em.merge(a); }
+    /** Résout les promotions depuis promotionIds (écriture). Null = ne pas toucher aux associations. */
+    private void appliquerPromotions(Article a) {
+        if (a.getPromotionIds() == null) { return; }
+        java.util.Set<com.ubisenderpro.entity.Promotion> set = new java.util.HashSet<>();
+        for (Long pid : a.getPromotionIds()) {
+            com.ubisenderpro.entity.Promotion p = em.find(com.ubisenderpro.entity.Promotion.class, pid);
+            if (p != null) { set.add(p); }
+        }
+        a.setPromotions(set);
+    }
+
+    public Article modifier(Article a) {
+        appliquerPromotions(a);
+        a.setUpdatedAt(LocalDateTime.now());
+        return em.merge(a);
+    }
 
     public void supprimer(Long id) { parId(id).ifPresent(em::remove); }
 

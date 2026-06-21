@@ -20,8 +20,13 @@ Usp.catalogue.store = function (url, fields, root) {
 Usp.catalogue.articlesPanel = function () {
     var store = Usp.catalogue.store('/articles',
         ['id', 'pscode', 'designation', 'cip', 'codeBarres', 'prixVente', 'prixVentePublic',
-         'prixPromotionnel', 'quantiteCommandee', 'quantiteUg', 'nomPromo', 'codePromo',
+         'prixPromotionnel', 'quantiteCommandee', 'quantiteUg', 'nomPromo', 'codePromo', 'promotions',
          'dateDebutPromotion', 'dateFinPromotion', 'stockDisponible', 'unite', 'actif', 'publiable']);
+
+    var promoNoms = function (v) {
+        if (!Ext.isArray(v) || !v.length) { return ''; }
+        return Ext.String.htmlEncode(v.map(function (p) { return p.nom || p.code; }).join(', '));
+    };
 
     var prix = function (v) { return v ? Ext.util.Format.number(v, '0,000') + ' F' : ''; };
 
@@ -36,7 +41,7 @@ Usp.catalogue.articlesPanel = function () {
             { text: 'Promo', dataIndex: 'prixPromotionnel', width: 85, align: 'right', renderer: prix },
             { text: 'Qté cmd', dataIndex: 'quantiteCommandee', width: 75, align: 'right' },
             { text: 'UG', dataIndex: 'quantiteUg', width: 55, align: 'right' },
-            { text: 'Code promo', dataIndex: 'codePromo', width: 95 },
+            { text: 'Promotions', dataIndex: 'promotions', width: 160, sortable: false, renderer: promoNoms },
             { text: 'Stock', dataIndex: 'stockDisponible', width: 75, align: 'right' },
             { text: 'Actif', dataIndex: 'actif', width: 55, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
         ],
@@ -76,12 +81,10 @@ Usp.catalogue.articleForm = function (store, rec) {
                     { xtype: 'numberfield', name: 'quantiteCommandee', fieldLabel: 'Commandée', minValue: 0 },
                     { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'UG', minValue: 0, labelWidth: 30, width: 110, margin: '0 0 0 8' }
                 ] },
-                { xtype: 'combobox', name: 'promotionId', fieldLabel: 'Promotion', queryMode: 'local',
-                  editable: false, emptyText: 'Aucune promotion',
+                { xtype: 'combobox', name: 'promotionIds', itemId: 'promoCombo', fieldLabel: 'Promotions',
+                  queryMode: 'local', editable: false, multiSelect: true, emptyText: 'Aucune promotion',
                   store: Usp.catalogue.promotionStore(), valueField: 'id', displayField: 'nom',
-                  listConfig: { getInnerTpl: function () {
-                      return '{nom} <span style="color:#888">({code})</span>'; } },
-                  triggers: { clear: { cls: 'x-form-clear-trigger', handler: function (c) { c.clearValue(); } } } },
+                  listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#888">({code})</span>'; } } },
                 { xtype: 'numberfield', name: 'stockDisponible', fieldLabel: 'Stock disponible (facultatif)', minValue: 0 },
                 { xtype: 'textfield', name: 'unite', fieldLabel: 'Unité' },
                 { xtype: 'textfield', name: 'imageUrl', fieldLabel: 'Image URL' },
@@ -109,6 +112,7 @@ Usp.catalogue.articleForm = function (store, rec) {
                     if (!n) { return; }
                     var v = f.getValue();
                     if (f.isXType('checkboxfield')) { data[n] = v; return; }
+                    if (n === 'promotionIds') { data[n] = Ext.isArray(v) ? v : (v != null ? [v] : []); return; }
                     if (v === null || v === '' || (Ext.isArray(v) && !v.length)) { return; }
                     data[n] = v;
                 });
@@ -126,7 +130,11 @@ Usp.catalogue.articleForm = function (store, rec) {
         }]
     });
     win.show();
-    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    if (rec) {
+        win.down('form').getForm().setValues(rec.getData());
+        var promos = rec.get('promotions') || [];
+        win.down('#promoCombo').setValue(promos.map(function (p) { return p.id; }));
+    }
 };
 
 Usp.catalogue.stockForm = function (store, rec) {

@@ -412,6 +412,13 @@ CREATE TABLE usp_article (
     CONSTRAINT fk_usp_article_marque FOREIGN KEY (marque_id) REFERENCES usp_marque(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE usp_article_promotion (
+    article_id BIGINT NOT NULL,
+    promotion_id BIGINT NOT NULL,
+    PRIMARY KEY (article_id, promotion_id),
+    KEY idx_usp_artpromo_promo (promotion_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE usp_article_media (
     id BIGINT NOT NULL AUTO_INCREMENT,
     article_id BIGINT NOT NULL,
