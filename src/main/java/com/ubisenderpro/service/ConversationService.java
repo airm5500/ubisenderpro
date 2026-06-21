@@ -55,6 +55,19 @@ public class ConversationService {
         return true;
     }
 
+    /** @return parmi les numéros donnés, ceux sans aucune conversation existante (premiers contacts). */
+    public java.util.List<String> nouveauxContacts(java.util.List<String> numeros) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (numeros == null) { return out; }
+        for (String n : numeros) {
+            if (n == null || n.isEmpty()) { continue; }
+            long c = em.createQuery("SELECT COUNT(c) FROM Conversation c WHERE c.numeroWhatsapp = :n", Long.class)
+                    .setParameter("n", n).getSingleResult();
+            if (c == 0) { out.add(n); }
+        }
+        return out;
+    }
+
     public void changerStatut(Long conversationId, String statut) {
         parId(conversationId).ifPresent(c -> {
             c.setStatut(statut);

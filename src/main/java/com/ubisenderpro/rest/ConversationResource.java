@@ -43,6 +43,20 @@ public class ConversationResource {
         return conversationService.messages(id);
     }
 
+    /** Indique, parmi les numéros donnés, lesquels sont des premiers contacts (aucune conversation). */
+    @POST
+    @Path("/premier-contact")
+    public Map<String, Object> premierContact(Map<String, Object> body) {
+        Object n = body == null ? null : body.get("numeros");
+        List<String> numeros = new java.util.ArrayList<>();
+        if (n instanceof List) {
+            for (Object o : (List<?>) n) { if (o != null) { numeros.add(String.valueOf(o)); } }
+        }
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("nouveaux", conversationService.nouveauxContacts(numeros));
+        return out;
+    }
+
     @DELETE
     @Path("/{id}")
     @Secured(roles = {"ADMIN", "SUPERVISEUR", "MARKETING"})

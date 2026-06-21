@@ -395,65 +395,103 @@ Usp.inbox.nouveauMessage = function () {
             var form = b.up('window').down('form').getForm();
             if (!form.isValid()) { return; }
             var v = form.getValues();
-            var web = v.canal === 'WEB';
-            var cible = web ? v.sessionId : v.accountId;
-            if (!cible) { Ext.Msg.alert('Info', 'Choisissez un compte ' + (web ? 'WhatsApp Web' : 'API') + '.'); return; }
+            var webSel = v.canal === 'WEB';
+            var cibleSel = webSel ? v.sessionId : v.accountId;
+            if (!cibleSel) { Ext.Msg.alert('Info', 'Choisissez un compte ' + (webSel ? 'WhatsApp Web' : 'API') + '.'); return; }
             var numeros = String(v.numero || '').split(/[;,\n]/)
                 .map(function (n) { return Usp.normNumero(n); })
                 .filter(function (n) { return n.length >= 8; });
             if (!numeros.length) { Ext.Msg.alert('Info', 'Aucun numéro valide (format international, ex. 2250102030405).'); return; }
             if (!fileData.base64 && !v.texte) { Ext.Msg.alert('Info', 'Saisissez un texte ou joignez un fichier.'); return; }
-            b.disable();
+            var apiId = apiStore.getCount() ? apiStore.getAt(0).get('id') : null;
 
-            var res = { ok: 0, ko: 0 };
-            var termine = function () {
-                b.enable();
-                if (Usp.inbox.convStore) { Usp.inbox.convStore.load(); }
-                Ext.Msg.alert('Envoi terminé', numeros.length + ' destinataire(s) : ' +
-                    res.ok + ' envoyé(s), ' + res.ko + ' échec(s).');
-                if (res.ok > 0) { win.close(); }
+            // Exécute l'envoi selon un routage [{numero, canal, cible}] (1er contact -> API).
+            var demarrer = function (routage) {
+                b.disable();
+                var res = { ok: 0, ko: 0 };
+                var media = { webUrl: null, apiMediaId: null };
+                var termine = function () {
+                    b.enable();
+                    if (Usp.inbox.convStore) { Usp.inbox.convStore.load(); }
+                    Ext.Msg.alert('Envoi terminé', routage.length + ' destinataire(s) : ' +
+                        res.ok + ' envoyé(s), ' + res.ko + ' échec(s).');
+                    if (res.ok > 0) { win.close(); }
+                };
+                var envoyerUn = function (item, next) {
+                    var okCb = function () { res.ok++; next(); };
+                    var koCb = function () { res.ko++; next(); };
+                    var okWeb = function (resp) { var r = Ext.decode(resp.responseText) || {}; if (r.success) { okCb(); } else { koCb(); } };
+                    if (item.canal === 'WEB' && fileData.base64) {
+                        Usp.ajax({ url: '/wa-web/sessions/' + item.cible + '/send-media', method: 'POST',
+                            jsonData: { numero: item.numero, type: Usp.inbox.typeMedia(fileData.mime), mediaUrl: media.webUrl,
+                                        mimeType: fileData.mime, fileName: fileData.nom, caption: v.texte || null },
+                            success: okWeb, failure: koCb });
+                    } else if (item.canal === 'WEB') {
+                        Usp.ajax({ url: '/wa-web/sessions/' + item.cible + '/send', method: 'POST',
+                            jsonData: { numero: item.numero, texte: v.texte }, success: okWeb, failure: koCb });
+                    } else if (fileData.base64) {
+                        Usp.ajax({ url: '/whatsapp/messages/media', method: 'POST',
+                            jsonData: { accountId: item.cible, numero: item.numero, type: Usp.inbox.typeMedia(fileData.mime),
+                                        mediaId: media.apiMediaId, mimeType: fileData.mime, nomFichier: fileData.nom, legende: v.texte || null },
+                            success: okCb, failure: koCb });
+                    } else {
+                        Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
+                            jsonData: { accountId: item.cible, numero: item.numero, texte: v.texte }, success: okCb, failure: koCb });
+                    }
+                };
+                var lancer = function () {
+                    var i = 0;
+                    var next = function () { if (i >= routage.length) { termine(); return; } envoyerUn(routage[i++], next); };
+                    next();
+                };
+                var echecUpload = function () { b.enable(); Ext.Msg.alert('Erreur', 'Téléversement du fichier impossible.'); };
+                var besoinWeb = fileData.base64 && routage.some(function (r) { return r.canal === 'WEB'; });
+                var besoinApi = fileData.base64 && routage.some(function (r) { return r.canal === 'API'; });
+                // Téléverse le média vers les canaux réellement utilisés, puis itère.
+                var etapeApi = function () {
+                    if (!besoinApi) { lancer(); return; }
+                    Usp.ajax({ url: '/whatsapp/media', method: 'POST',
+                        jsonData: { accountId: apiId, fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                        success: function (resp) { media.apiMediaId = (Ext.decode(resp.responseText) || {}).mediaId; lancer(); },
+                        failure: echecUpload });
+                };
+                if (besoinWeb) {
+                    Usp.ajax({ url: '/media/upload', method: 'POST',
+                        jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
+                        success: function (resp) { media.webUrl = (Ext.decode(resp.responseText) || {}).url; etapeApi(); },
+                        failure: echecUpload });
+                } else { etapeApi(); }
             };
-            var envoyerUn = function (numero, mediaRef, next) {
-                var okCb = function () { res.ok++; next(); };
-                var koCb = function () { res.ko++; next(); };
-                var okWeb = function (resp) { var r = Ext.decode(resp.responseText) || {}; if (r.success) { okCb(); } else { koCb(); } };
-                if (web && fileData.base64) {
-                    Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send-media', method: 'POST',
-                        jsonData: { numero: numero, type: Usp.inbox.typeMedia(fileData.mime), mediaUrl: mediaRef,
-                                    mimeType: fileData.mime, fileName: fileData.nom, caption: v.texte || null },
-                        success: okWeb, failure: koCb });
-                } else if (web) {
-                    Usp.ajax({ url: '/wa-web/sessions/' + cible + '/send', method: 'POST',
-                        jsonData: { numero: numero, texte: v.texte }, success: okWeb, failure: koCb });
-                } else if (fileData.base64) {
-                    Usp.ajax({ url: '/whatsapp/messages/media', method: 'POST',
-                        jsonData: { accountId: cible, numero: numero, type: Usp.inbox.typeMedia(fileData.mime),
-                                    mediaId: mediaRef, mimeType: fileData.mime, nomFichier: fileData.nom, legende: v.texte || null },
-                        success: okCb, failure: koCb });
-                } else {
-                    Usp.ajax({ url: '/whatsapp/messages/text', method: 'POST',
-                        jsonData: { accountId: cible, numero: numero, texte: v.texte }, success: okCb, failure: koCb });
-                }
-            };
-            var lancer = function (mediaRef) {
-                var i = 0;
-                var next = function () { if (i >= numeros.length) { termine(); return; } envoyerUn(numeros[i++], mediaRef, next); };
-                next();
-            };
-            var echecUpload = function () { b.enable(); Ext.Msg.alert('Erreur', 'Téléversement du fichier impossible.'); };
 
-            // Téléverse le média une seule fois (mediaId pour API, url pour WEB) puis itère.
-            if (fileData.base64 && web) {
-                Usp.ajax({ url: '/media/upload', method: 'POST',
-                    jsonData: { fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
-                    success: function (resp) { lancer((Ext.decode(resp.responseText) || {}).url); }, failure: echecUpload });
-            } else if (fileData.base64) {
-                Usp.ajax({ url: '/whatsapp/media', method: 'POST',
-                    jsonData: { accountId: cible, fichierBase64: fileData.base64, mimeType: fileData.mime, nomFichier: fileData.nom },
-                    success: function (resp) { lancer((Ext.decode(resp.responseText) || {}).mediaId); }, failure: echecUpload });
-            } else {
-                lancer(null);
-            }
+            var routageDefaut = numeros.map(function (n) { return { numero: n, canal: v.canal, cible: cibleSel }; });
+
+            // Canal WEB + compte API disponible : on propose de router les 1ers contacts via l'API (notification fiable).
+            if (webSel && apiId) {
+                Usp.ajax({ url: '/conversations/premier-contact', method: 'POST', jsonData: { numeros: numeros },
+                    success: function (resp) {
+                        var nouveaux = (Ext.decode(resp.responseText) || {}).nouveaux || [];
+                        if (!nouveaux.length) { demarrer(routageDefaut); return; }
+                        Ext.Msg.show({
+                            title: 'Premier contact détecté',
+                            msg: nouveaux.length + ' premier(s) contact(s) sans historique. WhatsApp Web ne garantit pas ' +
+                                 'la notification du 1<sup>er</sup> message. Router ces premiers contacts via l\'API officielle ' +
+                                 '(notification fiable) ?<br/><br/><span style="color:#888">Rappel : pour un tout premier message, ' +
+                                 'l\'API Meta peut exiger un modèle approuvé.</span>',
+                            width: 520, buttons: Ext.Msg.YESNO, icon: Ext.Msg.QUESTION,
+                            fn: function (btn) {
+                                if (btn === 'yes') {
+                                    demarrer(numeros.map(function (n) {
+                                        return nouveaux.indexOf(n) >= 0
+                                            ? { numero: n, canal: 'API', cible: apiId }
+                                            : { numero: n, canal: 'WEB', cible: cibleSel };
+                                    }));
+                                } else { demarrer(routageDefaut); }
+                            }
+                        });
+                    },
+                    failure: function () { demarrer(routageDefaut); }
+                });
+            } else { demarrer(routageDefaut); }
         } }]
     });
     win.show();
