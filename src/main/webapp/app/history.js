@@ -124,7 +124,7 @@ Usp.history.panel = function () {
             } },
             '->',
             { text: 'Rafraîchir', handler: function (b) { recharger(b.up('grid')); } }
-        ],
+        ].concat(Usp.export.boutons('Historique des envois')),
         listeners: {
             cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
                 if (e.getTarget('.hist-det')) { Usp.history.detail(rec); }

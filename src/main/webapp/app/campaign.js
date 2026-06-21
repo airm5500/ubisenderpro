@@ -199,6 +199,6 @@ Usp.campaign.listPanel = function () {
         tbar: [
             { text: 'Nouvelle campagne', handler: Usp.campaign.show },
             { text: 'Rafraîchir', handler: function () { store.load(); } }
-        ]
+        ].concat(Usp.export.boutons('Campagnes'))
     };
 };

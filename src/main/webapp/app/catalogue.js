@@ -52,7 +52,7 @@ Usp.catalogue.articlesPanel = function () {
             } },
             { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } },
             { text: 'Importer', handler: function () { Usp.catalogue.importArticles(store); } }
-        ],
+        ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: { itemdblclick: function (g, rec) { Usp.catalogue.articleForm(store, rec); } }
     };
