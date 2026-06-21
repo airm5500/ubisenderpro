@@ -42,6 +42,7 @@ public class UserService {
         m.put("id", u.getId());
         m.put("login", u.getLogin());
         m.put("nomComplet", u.getNomComplet());
+        m.put("avatar", u.getAvatar());
         m.put("email", u.getEmail());
         m.put("actif", u.isActif());
         m.put("derniereConnexion", u.getDerniereConnexion());
@@ -62,6 +63,7 @@ public class UserService {
         Utilisateur u = new Utilisateur();
         u.setLogin(req.getLogin());
         u.setNomComplet(req.getNomComplet());
+        u.setAvatar(req.getAvatar());
         u.setEmail(req.getEmail());
         u.setActif(req.getActif() == null || req.getActif());
         String mdp = (req.getMotDePasse() == null || req.getMotDePasse().isEmpty())
@@ -76,6 +78,7 @@ public class UserService {
         Utilisateur u = em.find(Utilisateur.class, id);
         if (u == null) return null;
         if (req.getNomComplet() != null) u.setNomComplet(req.getNomComplet());
+        if (req.getAvatar() != null) u.setAvatar(req.getAvatar());
         if (req.getEmail() != null) u.setEmail(req.getEmail());
         if (req.getActif() != null) u.setActif(req.getActif());
         if (req.getMotDePasse() != null && !req.getMotDePasse().isEmpty()) {
@@ -90,6 +93,16 @@ public class UserService {
 
     public void definirActif(Long id, boolean actif) {
         parId(id).ifPresent(u -> { u.setActif(actif); em.merge(u); });
+    }
+
+    /** Réinitialise le mot de passe (valeur fournie ou « Change@2026 »). @return le mot de passe appliqué. */
+    public String reinitialiserMotDePasse(Long id, String nouveau) {
+        Utilisateur u = em.find(Utilisateur.class, id);
+        if (u == null) { return null; }
+        String mdp = (nouveau == null || nouveau.trim().isEmpty()) ? "Change@2026" : nouveau.trim();
+        u.setMotDePasseHash(PasswordHasher.hash(mdp));
+        em.merge(u);
+        return mdp;
     }
 
     private Set<Role> resoudreRoles(List<String> codes) {

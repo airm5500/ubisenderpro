@@ -5,10 +5,12 @@ import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
 import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.AuthService;
+import com.ubisenderpro.service.ConnexionLogService;
 import com.ubisenderpro.service.JournalService;
 
 import javax.ejb.EJB;
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
@@ -27,12 +29,14 @@ public class AuthResource {
     private AuthService authService;
     @EJB
     private JournalService journalService;
+    @EJB
+    private ConnexionLogService connexionLogService;
     @Inject
     private SessionStore sessionStore;
 
     @POST
     @Path("/login")
-    public Response login(LoginRequest req) {
+    public Response login(LoginRequest req, @Context HttpServletRequest request) {
         Optional<AuthenticatedUser> user = authService.authentifier(req.getLogin(), req.getMotDePasse());
         if (!user.isPresent()) {
             return Response.status(Response.Status.UNAUTHORIZED)
@@ -41,6 +45,7 @@ public class AuthResource {
         AuthenticatedUser u = user.get();
         String token = sessionStore.create(u);
         journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), null, null);
+        connexionLogService.ouvrir(u.getId(), u.getLogin(), token, ip(request), poste(request), null);
 
         Map<String, Object> reponse = new HashMap<>();
         reponse.put("token", token);
@@ -52,8 +57,25 @@ public class AuthResource {
     @Path("/logout")
     @Secured
     public Response logout(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
-        sessionStore.invalidate(extraireToken(authHeader));
+        String token = extraireToken(authHeader);
+        connexionLogService.fermer(token);
+        sessionStore.invalidate(token);
         return Response.ok(Map.of("message", "Déconnecté")).build();
+    }
+
+    /** IP cliente, en tenant compte d'un éventuel reverse-proxy (X-Forwarded-For). */
+    private String ip(HttpServletRequest r) {
+        if (r == null) { return null; }
+        String xff = r.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty()) { return xff.split(",")[0].trim(); }
+        return r.getRemoteAddr();
+    }
+
+    /** Nom du poste (résolution inverse de l'IP si le conteneur la fournit). */
+    private String poste(HttpServletRequest r) {
+        if (r == null) { return null; }
+        String h = r.getRemoteHost();
+        return (h != null && !h.equals(r.getRemoteAddr())) ? h : null;
     }
 
     @GET

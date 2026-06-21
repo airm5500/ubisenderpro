@@ -60,6 +60,7 @@ CREATE TABLE usp_utilisateur (
     id BIGINT NOT NULL AUTO_INCREMENT,
     login VARCHAR(100) NOT NULL,
     nom_complet VARCHAR(255) NOT NULL,
+    avatar VARCHAR(16),
     email VARCHAR(150),
     mot_de_passe_hash VARCHAR(255) NOT NULL,
     actif BOOLEAN NOT NULL DEFAULT TRUE,
@@ -69,6 +70,22 @@ CREATE TABLE usp_utilisateur (
     PRIMARY KEY (id),
     UNIQUE KEY uk_usp_utilisateur_login (login),
     KEY idx_usp_utilisateur_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_connexion_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    utilisateur_id BIGINT,
+    login VARCHAR(100),
+    session_token VARCHAR(120),
+    ip VARCHAR(60),
+    poste VARCHAR(255),
+    lieu VARCHAR(255),
+    connexion_at DATETIME NOT NULL,
+    deconnexion_at DATETIME,
+    duree_secondes BIGINT,
+    PRIMARY KEY (id),
+    KEY idx_usp_conlog_user (utilisateur_id),
+    KEY idx_usp_conlog_date (connexion_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE usp_utilisateur_role (

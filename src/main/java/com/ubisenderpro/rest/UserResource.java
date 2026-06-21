@@ -3,6 +3,7 @@ package com.ubisenderpro.rest;
 import com.ubisenderpro.dto.UserRequest;
 import com.ubisenderpro.entity.Role;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.service.ConnexionLogService;
 import com.ubisenderpro.service.UserService;
 
 import javax.ejb.EJB;
@@ -23,6 +24,8 @@ public class UserResource {
 
     @EJB
     private UserService userService;
+    @EJB
+    private ConnexionLogService connexionLogService;
 
     @GET
     public List<Map<String, Object>> lister() {
@@ -67,5 +70,20 @@ public class UserResource {
     public Response desactiver(@PathParam("id") Long id) {
         userService.definirActif(id, false);
         return Response.ok().build();
+    }
+
+    @POST
+    @Path("/{id}/reset-password")
+    public Response reinitialiser(@PathParam("id") Long id, Map<String, Object> body) {
+        String nouveau = body == null ? null : (String) body.get("motDePasse");
+        String applique = userService.reinitialiserMotDePasse(id, nouveau);
+        return applique == null ? Response.status(Response.Status.NOT_FOUND).build()
+                : Response.ok(Map.of("motDePasse", applique)).build();
+    }
+
+    @GET
+    @Path("/connexions")
+    public List<com.ubisenderpro.entity.ConnexionLog> connexions(@QueryParam("limit") Integer limit) {
+        return connexionLogService.lister(limit == null ? 200 : limit);
     }
 }

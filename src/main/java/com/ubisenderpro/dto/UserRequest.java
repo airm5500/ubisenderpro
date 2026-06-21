@@ -10,6 +10,7 @@ import java.util.List;
 public class UserRequest {
     private String login;
     private String nomComplet;
+    private String avatar;
     private String email;
     private String motDePasse;
     private Boolean actif;
@@ -19,6 +20,8 @@ public class UserRequest {
     public void setLogin(String login) { this.login = login; }
     public String getNomComplet() { return nomComplet; }
     public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
+    public String getAvatar() { return avatar; }
+    public void setAvatar(String avatar) { this.avatar = avatar; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     public String getMotDePasse() { return motDePasse; }
