@@ -75,11 +75,25 @@ Usp.inbox.panel = function () {
     });
 
     msgStore.on('load', function (store) {
+        // Ne rafraîchit l'affichage que si le contenu a changé (évite le clignotement au polling).
+        var convId = Usp.inbox.currentConv ? Usp.inbox.currentConv.get('id') : 0;
+        var sig = convId + ':' + store.getCount();
+        if (sig === Usp.inbox._msgSig) { return; }
+        Usp.inbox._msgSig = sig;
         var html = '';
         store.each(function (r) { html += Usp.inbox.renderMessage(r); });
         discussion.update(html || '<div style="padding:20px;color:#999">Aucun message</div>');
         var el = discussion.body; if (el) { el.scroll('bottom', 100000); }
     });
+
+    var convReselect = function () {
+        if (!Usp.inbox.currentConv) { return; }
+        var g = Ext.ComponentQuery.query('#convGrid')[0];
+        if (!g) { return; }
+        var idx = convStore.findExact('id', Usp.inbox.currentConv.get('id'));
+        if (idx >= 0) { g.getSelectionModel().select(idx, false, true); }
+    };
+    convStore.on('load', convReselect);
 
     var contactPanel = Ext.create('Ext.panel.Panel', {
         region: 'east', title: 'Fiche contact', width: 280, collapsible: true, bodyPadding: 10,
@@ -88,6 +102,7 @@ Usp.inbox.panel = function () {
 
     var loadConversation = function (rec) {
         Usp.inbox.currentConv = rec;
+        Usp.inbox._msgSig = null; // force le rafraîchissement à l'ouverture
         msgStore.getProxy().url = Usp.apiBase + '/conversations/' + rec.get('id') + '/messages';
         msgStore.load();
         Usp.ajax({ url: '/conversations/' + rec.get('id') + '/read', method: 'POST' });
@@ -99,9 +114,13 @@ Usp.inbox.panel = function () {
 
     return {
         xtype: 'panel', title: 'Discussions', layout: 'border',
+        listeners: {
+            afterrender: function () { Usp.inbox.demarrerAutoRefresh(convStore); },
+            beforedestroy: function () { Usp.inbox.arreterAutoRefresh(); }
+        },
         items: [
             {
-                region: 'west', width: 300, xtype: 'grid', title: 'Conversations', hideHeaders: true,
+                region: 'west', width: 300, xtype: 'grid', itemId: 'convGrid', title: 'Conversations', hideHeaders: true,
                 store: convStore,
                 columns: [{
                     flex: 1, dataIndex: 'nomAffiche',
@@ -178,6 +197,27 @@ Usp.inbox.media = function () {
         } }]
     });
     win.show();
+};
+
+/* Rafraîchissement automatique de l'inbox (messages toutes les 6 s, liste toutes les 12 s). */
+Usp.inbox.demarrerAutoRefresh = function (convStore) {
+    Usp.inbox.arreterAutoRefresh();
+    var tick = 0;
+    Usp.inbox._task = Ext.TaskManager.start({
+        interval: 6000,
+        run: function () {
+            if (Usp.inbox.currentConv && Usp.inbox.msgStore) { Usp.inbox.msgStore.load(); }
+            tick++;
+            if (tick % 2 === 0 && convStore) { convStore.load(); }
+        }
+    });
+};
+
+Usp.inbox.arreterAutoRefresh = function () {
+    if (Usp.inbox._task) {
+        try { Ext.TaskManager.stop(Usp.inbox._task); } catch (e) { /* ignore */ }
+        Usp.inbox._task = null;
+    }
 };
 
 /* Déduit le type WhatsApp (image/video/audio/document) à partir du type MIME. */
