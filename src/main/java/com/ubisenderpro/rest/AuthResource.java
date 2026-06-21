@@ -6,6 +6,7 @@ import com.ubisenderpro.security.Secured;
 import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.AuthService;
 import com.ubisenderpro.service.ConnexionLogService;
+import com.ubisenderpro.service.GeoIpService;
 import com.ubisenderpro.service.JournalService;
 
 import javax.ejb.EJB;
@@ -31,6 +32,8 @@ public class AuthResource {
     private JournalService journalService;
     @EJB
     private ConnexionLogService connexionLogService;
+    @EJB
+    private GeoIpService geoIpService;
     @Inject
     private SessionStore sessionStore;
 
@@ -44,8 +47,10 @@ public class AuthResource {
         }
         AuthenticatedUser u = user.get();
         String token = sessionStore.create(u);
-        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), null, null);
-        connexionLogService.ouvrir(u.getId(), u.getLogin(), token, ip(request), poste(request), null);
+        String ip = ip(request);
+        journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), null, ip);
+        Long logId = connexionLogService.ouvrir(u.getId(), u.getLogin(), token, ip, poste(request), null);
+        geoIpService.localiser(logId, ip);
 
         Map<String, Object> reponse = new HashMap<>();
         reponse.put("token", token);

@@ -29,7 +29,7 @@ Usp.users.fmtDuree = function (s) {
 Usp.users.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Utilisateurs', listeners: Usp.tabListeners,
-        items: [Usp.users.gridPanel(), Usp.users.connexionsPanel()]
+        items: [Usp.users.gridPanel(), Usp.users.connexionsPanel(), Usp.users.journalPanel()]
     };
 };
 
@@ -197,6 +197,31 @@ Usp.users.connexionsPanel = function () {
             { text: 'Adresse IP', dataIndex: 'ip', width: 130 },
             { text: 'Poste', dataIndex: 'poste', width: 160, renderer: function (v) { return v || ''; } },
             { text: 'Lieu', dataIndex: 'lieu', flex: 1, renderer: function (v) { return v || ''; } }
+        ],
+        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+    };
+};
+
+/* ---------- Journal d'actions ---------- */
+Usp.users.journalPanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['login', 'action', 'entite', 'entiteId', 'details', 'adresseIp', 'createdAt'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/journal',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
+            extraParams: { limit: 300 } },
+        autoLoad: true
+    });
+    return {
+        xtype: 'grid', title: 'Journal d\'actions', store: store,
+        columns: [
+            { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: Usp.users.fmtDate },
+            { text: 'Utilisateur', dataIndex: 'login', width: 130 },
+            { text: 'Action', dataIndex: 'action', width: 150 },
+            { text: 'Entité', dataIndex: 'entite', width: 130 },
+            { text: 'Réf.', dataIndex: 'entiteId', width: 60 },
+            { text: 'Détails', dataIndex: 'details', flex: 1, renderer: function (v) {
+                return v ? Ext.String.htmlEncode(v) : ''; } },
+            { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 }
         ],
         tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
     };

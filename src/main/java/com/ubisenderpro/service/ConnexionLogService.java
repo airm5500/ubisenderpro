@@ -20,9 +20,10 @@ public class ConnexionLogService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
-    /** Enregistre une connexion. Best-effort : ne doit jamais bloquer l'authentification. */
+    /** Enregistre une connexion. Best-effort : ne doit jamais bloquer l'authentification.
+     *  @return l'id de la ligne créée (pour enrichir le lieu en asynchrone), ou null. */
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
-    public void ouvrir(Long utilisateurId, String login, String token, String ip, String poste, String lieu) {
+    public Long ouvrir(Long utilisateurId, String login, String token, String ip, String poste, String lieu) {
         try {
             ConnexionLog c = new ConnexionLog();
             c.setUtilisateurId(utilisateurId);
@@ -33,7 +34,9 @@ public class ConnexionLogService {
             c.setLieu(lieu);
             c.setConnexionAt(LocalDateTime.now());
             em.persist(c);
-        } catch (Exception ignore) { /* journalisation non bloquante */ }
+            em.flush();
+            return c.getId();
+        } catch (Exception ignore) { /* journalisation non bloquante */ return null; }
     }
 
     /** Clôture la session correspondant au jeton (déconnexion + temps de travail). */

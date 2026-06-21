@@ -7,6 +7,7 @@ import javax.ejb.TransactionAttribute;
 import javax.ejb.TransactionAttributeType;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.util.List;
 
 /**
  * Journalise les opérations sensibles (objectif 24 et section 26.3 de la spec).
@@ -29,5 +30,11 @@ public class JournalService {
         ja.setDetails(details);
         ja.setAdresseIp(ip);
         em.persist(ja);
+    }
+
+    /** Journal d'actions le plus récent (consultation administrateur). */
+    public List<JournalAction> lister(int limit) {
+        return em.createQuery("SELECT j FROM JournalAction j ORDER BY j.createdAt DESC", JournalAction.class)
+                .setMaxResults(limit <= 0 ? 200 : limit).getResultList();
     }
 }

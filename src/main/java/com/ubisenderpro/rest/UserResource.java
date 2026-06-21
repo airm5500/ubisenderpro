@@ -4,6 +4,7 @@ import com.ubisenderpro.dto.UserRequest;
 import com.ubisenderpro.entity.Role;
 import com.ubisenderpro.security.Secured;
 import com.ubisenderpro.service.ConnexionLogService;
+import com.ubisenderpro.service.JournalService;
 import com.ubisenderpro.service.UserService;
 
 import javax.ejb.EJB;
@@ -26,6 +27,8 @@ public class UserResource {
     private UserService userService;
     @EJB
     private ConnexionLogService connexionLogService;
+    @EJB
+    private JournalService journalService;
 
     @GET
     public List<Map<String, Object>> lister() {
@@ -85,5 +88,11 @@ public class UserResource {
     @Path("/connexions")
     public List<com.ubisenderpro.entity.ConnexionLog> connexions(@QueryParam("limit") Integer limit) {
         return connexionLogService.lister(limit == null ? 200 : limit);
+    }
+
+    @GET
+    @Path("/journal")
+    public List<com.ubisenderpro.entity.JournalAction> journal(@QueryParam("limit") Integer limit) {
+        return journalService.lister(limit == null ? 200 : limit);
     }
 }
