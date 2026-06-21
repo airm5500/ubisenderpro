@@ -39,7 +39,7 @@ Usp.history._badgeStatut = function (v) {
 Usp.history.store = function () {
     return Ext.create('Ext.data.Store', {
         fields: ['type', 'canal', 'sourceId', 'parentId', 'libelle', 'numero', 'nom',
-                 'apercu', 'statut', 'erreur', 'date'],
+                 'utilisateur', 'apercu', 'statut', 'erreur', 'date'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/historique',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
             extraParams: { limit: 300 } },
@@ -67,30 +67,38 @@ Usp.history.panel = function () {
               renderer: Usp.history._badgeCanal },
             { text: 'Type', dataIndex: 'type', width: 120, renderer: Usp.history._libelleType },
             { text: 'Regroupement', dataIndex: 'libelle', width: 160 },
-            { text: 'Numéro', dataIndex: 'numero', width: 140 },
-            { text: 'Nom', dataIndex: 'nom', width: 150 },
+            { text: 'Numéro destinataire', dataIndex: 'numero', width: 150 },
+            { text: 'Nom', dataIndex: 'nom', width: 140 },
+            { text: 'Utilisateur', dataIndex: 'utilisateur', width: 130,
+              renderer: function (v) { return v ? Ext.String.htmlEncode(v) : '<span style="color:#bbb">—</span>'; } },
             { text: 'Aperçu / erreur', flex: 1, dataIndex: 'apercu', sortable: false,
               renderer: function (v, m, rec) {
                   if (rec.get('erreur')) {
-                      return '<span style="color:#c62828">' + Ext.String.htmlEncode(rec.get('erreur')) + '</span>';
+                      var err = rec.get('erreur');
+                      m.tdAttr = 'data-qtip="' + Ext.String.htmlEncode(err).replace(/"/g, '&quot;') + '"';
+                      return '<span style="color:#c62828">' + Ext.String.htmlEncode(err) + '</span>';
                   }
-                  return Ext.String.htmlEncode(v || '');
+                  if (!v) { return ''; }
+                  m.tdAttr = 'data-qtip="' + Ext.String.htmlEncode(v).replace(/"/g, '&quot;') + '"';
+                  return '<span style="color:#1976d2;cursor:help">' + Ext.String.htmlEncode(v) + '</span>';
               } },
             { text: 'Statut', dataIndex: 'statut', width: 100, renderer: Usp.history._badgeStatut },
-            { text: '', width: 50, sortable: false, menuDisabled: true, dataIndex: 'sourceId',
+            { text: 'Détail', width: 60, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'sourceId',
               renderer: function () {
-                  return '<span class="hist-det" title="Voir le détail" ' +
-                      'style="cursor:pointer;font-size:15px">🔍</span>';
+                  return '<span class="hist-det" data-qtip="Voir le détail complet de cet envoi" ' +
+                      'title="Voir le détail complet de cet envoi" style="cursor:pointer;font-size:15px">🔍</span>';
               } }
         ],
         tbar: [
             { xtype: 'combobox', itemId: 'fCanal', fieldLabel: 'Canal', labelWidth: 40, width: 150,
               emptyText: 'Tous', editable: false, queryMode: 'local',
-              store: [['', 'Tous'], ['API', 'API officielle'], ['WEB', 'WhatsApp Web']] },
+              store: [['', 'Tous'], ['API', 'API officielle'], ['WEB', 'WhatsApp Web']],
+              listeners: { select: function (c) { recharger(c.up('grid')); } } },
             { xtype: 'combobox', itemId: 'fType', fieldLabel: 'Type', labelWidth: 40, width: 190,
               emptyText: 'Tous', editable: false, queryMode: 'local',
               store: [['', 'Tous'], ['DISCUSSION', 'Discussion'],
-                      ['CAMPAGNE', 'Campagne'], ['ENVOI_MASSE', 'Envoi de masse']] },
+                      ['CAMPAGNE', 'Campagne'], ['ENVOI_MASSE', 'Envoi de masse']],
+              listeners: { select: function (c) { recharger(c.up('grid')); } } },
             { xtype: 'textfield', itemId: 'fRecherche', emptyText: 'Numéro, nom, contenu…', width: 220,
               listeners: { specialkey: function (f, e) {
                   if (e.getKey() === e.ENTER) { recharger(f.up('grid')); } } } },
@@ -123,6 +131,7 @@ Usp.history.detail = function (rec) {
         ['Type', Usp.history._libelleType(rec.get('type'))],
         ['Regroupement', rec.get('libelle')],
         ['Destinataire', (rec.get('nom') || '') + ' — ' + (rec.get('numero') || '')],
+        ['Utilisateur', rec.get('utilisateur') || '—'],
         ['Date', String(rec.get('date') || '').replace('T', ' ').substring(0, 16)],
         ['Statut', rec.get('statut')]
     ];

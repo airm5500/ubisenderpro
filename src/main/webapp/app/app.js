@@ -13,6 +13,17 @@ var Usp = {
     prefixe: '225' // préfixe pays par défaut — chargé à la connexion
 };
 
+/* Logo WhatsApp (SVG en data-URI) pour l'entrée de menu « WhatsApp Web ». */
+Usp.ICON_WA = '<img src="data:image/svg+xml,' +
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E" +
+    "%3Cpath fill='%2325d366' d='M16 0a16 16 0 0 0-13.7 24.2L0 32l8-2.1A16 16 0 1 0 16 0z'/%3E" +
+    "%3Cpath fill='%23fff' d='M12 8c-.3-.7-.6-.7-.9-.7h-.8c-.3 0-.7.1-1 .5-.4.4-1.3 1.3-1.3 " +
+    "3.1s1.4 3.6 1.5 3.9c.2.3 2.6 4.1 6.4 5.6 3.2 1.2 3.8 1 4.5.9.7-.1 2.2-.9 2.5-1.7.3-.9.3-1.6.2-1.7" +
+    "-.1-.2-.3-.2-.7-.4-.4-.2-2.2-1.1-2.5-1.2-.3-.1-.6-.2-.8.2-.2.3-.9 1.2-1.1 1.4-.2.2-.4.2-.7.1" +
+    "-.4-.2-1.6-.6-3-1.8-1.1-1-1.8-2.2-2.1-2.6-.2-.4 0-.6.2-.7.2-.2.4-.4.5-.6.2-.2.2-.3.4-.6.1-.2.1-.4 0-.6" +
+    "-.1-.2-.8-1.9-1-2.6z'/%3E%3C/svg%3E" +
+    '" style="width:15px;height:15px;vertical-align:middle"/>';
+
 /* Normalise un numéro : chiffres seuls ; préfixe pays ajouté si saisie locale. */
 Usp.normNumero = function (n) {
     var d = String(n || '').replace(/[^0-9]/g, '');
@@ -22,6 +33,18 @@ Usp.normNumero = function (n) {
         d = p + d.replace(/^0+/, '');
     }
     return d;
+};
+
+/* Applique une icône d'application personnalisée (favicon). Vide = garde l'icône par défaut. */
+Usp.appliquerFavicon = function (url) {
+    if (!url) { return; }
+    var lien = document.querySelector('link[rel="icon"]');
+    if (!lien) {
+        lien = document.createElement('link');
+        lien.rel = 'icon';
+        document.head.appendChild(lien);
+    }
+    lien.href = url;
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
@@ -79,7 +102,11 @@ Usp.showLogin = function () {
                                 Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
                                     success: function (r2) {
                                         Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
-                                        ouvrir();
+                                        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
+                                            success: function (r3) {
+                                                Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
+                                                ouvrir();
+                                            }, failure: ouvrir });
                                     }, failure: ouvrir });
                             },
                             failure: ouvrir });
@@ -373,7 +400,7 @@ Usp.MENU = [
     { text: 'Comptes clients',     view: 'clients',    icon: '🏢', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
     { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
     { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
-    { text: 'WhatsApp Web',        view: 'waweb',      icon: '📱', roles: ['ADMIN', 'MARKETING'] },
+    { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
@@ -403,7 +430,8 @@ Usp.tabListeners = {
 Usp.menuChildren = function () {
     return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
         .map(function (m) {
-            var t = (m.icon ? m.icon + '  ' : '') + m.text;
+            var pre = m.iconHtml ? m.iconHtml + ' ' : (m.icon ? m.icon + '  ' : '');
+            var t = pre + m.text;
             return { text: t, baseText: t, leaf: true, view: m.view };
         });
 };
@@ -439,7 +467,7 @@ Usp.showMain = function () {
                     { xtype: 'tbtext', text: '<b>UbiSenderPro</b>' },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
-                    { text: 'Déconnexion', handler: function () {
+                    { text: 'Déconnexion', cls: 'usp-logout', handler: function () {
                         Usp.ajax({ url: '/auth/logout', method: 'POST' });
                         location.reload();
                     } }

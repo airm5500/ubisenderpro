@@ -270,7 +270,22 @@ Usp.settings.generalPanel = function () {
               emptyText: 'https://… (variable [SITE])' },
             { xtype: 'textfield', name: 'lienCommande', itemId: 'lienCommandeField',
               fieldLabel: 'Lien de commande', width: 520,
-              emptyText: 'https://… (variable [LIEN_COMMANDE])' }
+              emptyText: 'https://… (variable [LIEN_COMMANDE])' },
+            { xtype: 'fieldcontainer', fieldLabel: 'Icône de l\'application', layout: 'hbox', items: [
+                { xtype: 'hiddenfield', itemId: 'faviconField' },
+                { xtype: 'component', itemId: 'faviconApercu', margin: '0 8 0 0',
+                  html: '<span style="color:#888;font-size:11px">icône par défaut</span>' },
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Choisir une image…',
+                  listeners: { change: function (f) { Usp.settings.uploadFavicon(f); } } },
+                { xtype: 'button', text: 'Réinitialiser', margin: '0 0 0 6', handler: function (b) {
+                    var p = b.up('panel');
+                    p.down('#faviconField').setValue('');
+                    p.down('#faviconApercu').update('<span style="color:#888;font-size:11px">icône par défaut</span>');
+                } }
+            ] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Image affichée dans l\'onglet du navigateur ' +
+                     '(PNG/SVG conseillé). Vide = icône verte par défaut. Appliquée après enregistrement.</span>' }
         ],
         bbar: ['->', { text: 'Enregistrer', handler: function (b) {
             var p = b.up('panel');
@@ -280,6 +295,7 @@ Usp.settings.generalPanel = function () {
             var societeTel = p.down('#societeTelField').getValue() || '';
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
+            var favicon = p.down('#faviconField').getValue() || '';
             var put = function (cle, valeur) {
                 return function (cb) {
                     Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: valeur },
@@ -294,7 +310,10 @@ Usp.settings.generalPanel = function () {
                     put('app.societe_tel', societeTel)(function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
+                            put('app.favicon', favicon)(function () {
+                                Usp.appliquerFavicon(favicon);
                                 Ext.Msg.alert('OK', 'Paramètres enregistrés.');
+                            });
                             });
                         });
                     });
@@ -315,8 +334,39 @@ Usp.settings.generalPanel = function () {
         charger('app.societe_tel', 'societeTelField', '');
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
+        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET', success: function (resp) {
+            var url = (Ext.decode(resp.responseText) || {}).valeur || '';
+            form.down('#faviconField').setValue(url);
+            if (url) {
+                form.down('#faviconApercu').update('<img src="' + url +
+                    '" style="height:24px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            }
+        } });
     });
     return form;
+};
+
+/* Téléverse l'icône d'application choisie et l'affiche en aperçu. */
+Usp.settings.uploadFavicon = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var panel = f.up('panel');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/media/upload', method: 'POST',
+            jsonData: { fichierBase64: b64, mimeType: file.type || 'image/png', nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText);
+                panel.down('#faviconField').setValue(r.url);
+                panel.down('#faviconApercu').update('<img src="' + r.url +
+                    '" style="height:24px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Téléversement de l\'icône impossible.'); }
+        });
+    };
+    reader.readAsDataURL(file);
 };
 
 Usp.settings.tabs = function () {

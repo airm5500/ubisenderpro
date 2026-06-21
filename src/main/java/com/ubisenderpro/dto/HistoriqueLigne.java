@@ -20,6 +20,8 @@ public class HistoriqueLigne {
     private String libelle;
     private String numero;
     private String nom;
+    /** Utilisateur émetteur (discussions) ; vide si non tracé (campagnes / envois de masse). */
+    private String utilisateur;
     private String apercu;
     private String statut;
     private String erreur;
@@ -28,11 +30,11 @@ public class HistoriqueLigne {
     public HistoriqueLigne() { }
 
     public HistoriqueLigne(String type, String canal, Long sourceId, Long parentId, String libelle,
-                           String numero, String nom, String apercu, String statut, String erreur,
-                           LocalDateTime date) {
+                           String numero, String nom, String utilisateur, String apercu, String statut,
+                           String erreur, LocalDateTime date) {
         this.type = type; this.canal = canal; this.sourceId = sourceId; this.parentId = parentId;
-        this.libelle = libelle; this.numero = numero; this.nom = nom; this.apercu = apercu;
-        this.statut = statut; this.erreur = erreur; this.date = date;
+        this.libelle = libelle; this.numero = numero; this.nom = nom; this.utilisateur = utilisateur;
+        this.apercu = apercu; this.statut = statut; this.erreur = erreur; this.date = date;
     }
 
     public String getType() { return type; }
@@ -49,6 +51,8 @@ public class HistoriqueLigne {
     public void setNumero(String numero) { this.numero = numero; }
     public String getNom() { return nom; }
     public void setNom(String nom) { this.nom = nom; }
+    public String getUtilisateur() { return utilisateur; }
+    public void setUtilisateur(String utilisateur) { this.utilisateur = utilisateur; }
     public String getApercu() { return apercu; }
     public void setApercu(String apercu) { this.apercu = apercu; }
     public String getStatut() { return statut; }

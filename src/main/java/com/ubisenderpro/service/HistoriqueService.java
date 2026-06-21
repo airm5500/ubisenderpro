@@ -8,7 +8,9 @@ import javax.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Historique global des envois : agrège les messages sortants des discussions,
@@ -64,16 +66,28 @@ public class HistoriqueService {
     private List<HistoriqueLigne> discussions() {
         List<Object[]> rows = em.createQuery(
                 "SELECT m.createdAt, c.canal, c.numeroWhatsapp, c.nomAffiche, m.contenu, " +
-                "m.statut, m.erreur, m.id FROM Message m, Conversation c " +
+                "m.statut, m.erreur, m.id, m.expediteurId FROM Message m, Conversation c " +
                 "WHERE m.conversationId = c.id AND m.direction = 'SORTANT' AND m.noteInterne = false " +
                 "ORDER BY m.createdAt DESC")
                 .setMaxResults(PAR_SOURCE).getResultList();
+        Map<Long, String> users = utilisateurs();
         List<HistoriqueLigne> out = new ArrayList<>();
         for (Object[] r : rows) {
+            String u = r[8] == null ? "" : users.getOrDefault((Long) r[8], "");
             out.add(new HistoriqueLigne("DISCUSSION", str(r[1], "API"), (Long) r[7], null, "Discussion",
-                    str(r[2], ""), str(r[3], ""), apercu(r[4]), str(r[5], ""), str(r[6], null), (LocalDateTime) r[0]));
+                    str(r[2], ""), str(r[3], ""), u, apercu(r[4]), str(r[5], ""), str(r[6], null), (LocalDateTime) r[0]));
         }
         return out;
+    }
+
+    /** Cache id → nom complet des utilisateurs (pour la colonne « émetteur »). */
+    @SuppressWarnings("unchecked")
+    private Map<Long, String> utilisateurs() {
+        Map<Long, String> m = new HashMap<>();
+        List<Object[]> rows = em.createQuery(
+                "SELECT u.id, u.nomComplet FROM Utilisateur u", Object[].class).getResultList();
+        for (Object[] r : rows) { m.put((Long) r[0], str(r[1], "")); }
+        return m;
     }
 
     @SuppressWarnings("unchecked")
@@ -87,7 +101,7 @@ public class HistoriqueService {
         for (Object[] r : rows) {
             LocalDateTime date = r[0] != null ? (LocalDateTime) r[0] : (LocalDateTime) r[1];
             out.add(new HistoriqueLigne("CAMPAGNE", "API", (Long) r[7], (Long) r[8], str(r[4], "Campagne"),
-                    str(r[2], ""), str(r[3], ""), null, str(r[5], ""), str(r[6], null), date));
+                    str(r[2], ""), str(r[3], ""), "", null, str(r[5], ""), str(r[6], null), date));
         }
         return out;
     }
@@ -102,7 +116,7 @@ public class HistoriqueService {
         List<HistoriqueLigne> out = new ArrayList<>();
         for (Object[] r : rows) {
             out.add(new HistoriqueLigne("ENVOI_MASSE", "WEB", (Long) r[6], (Long) r[7], str(r[3], "Envoi de masse"),
-                    str(r[1], ""), str(r[2], ""), null, str(r[4], ""), str(r[5], null), (LocalDateTime) r[0]));
+                    str(r[1], ""), str(r[2], ""), "", null, str(r[4], ""), str(r[5], null), (LocalDateTime) r[0]));
         }
         return out;
     }

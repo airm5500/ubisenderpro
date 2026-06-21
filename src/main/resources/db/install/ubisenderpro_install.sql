@@ -133,6 +133,7 @@ INSERT INTO usp_parametre (cle, valeur, description, categorie, created_at) VALU
  ('app.societe_tel',     '',              'Téléphone(s) société, séparés par ; (variable [TEL_SOCIETE])','GENERAL', NOW()),
  ('app.site',            '',              'Lien du site société (variable [SITE])','GENERAL', NOW()),
  ('app.lien_commande',   '',              'Lien de commande société (variable [LIEN_COMMANDE])','GENERAL', NOW()),
+ ('app.favicon',         '',              'Icône personnalisée de l''application (URL ; vide = icône par défaut)','GENERAL', NOW()),
  ('whatsapp.prefixe_pays','225',          'Préfixe pays par défaut (CI)',     'WHATSAPP', NOW()),
  ('import.taille_max_mo','10',            'Taille maximale d''un import (Mo)','IMPORT', NOW()),
  ('session.expiration_min','60',          'Expiration de session (minutes)',  'SECURITE', NOW()),
