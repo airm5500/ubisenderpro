@@ -311,12 +311,54 @@ Usp.showImport = function () {
     });
 };
 
+/* Graphe d'évolution (30 j) : campagnes, WhatsApp Web (masse), API, discussions. */
+Usp.dashboardChart = function () {
+    if (!(Ext.chart && Ext.chart.Chart)) { return null; } // graphiques absents du build Ext
+    var serieStore = Ext.create('Ext.data.Store', {
+        fields: ['date', 'campagnes', 'waweb', 'api', 'discussions'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/dashboard/series',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
+            extraParams: { jours: 30 } },
+        autoLoad: false
+    });
+    var ligne = function (champ, titre, couleur) {
+        return { type: 'line', axis: 'left', xField: 'date', yField: champ, title: titre, smooth: true,
+            style: { stroke: couleur, 'stroke-width': 2 },
+            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur } };
+    };
+    return {
+        xtype: 'panel', title: 'Évolution sur 30 jours', anchor: '100%', height: 360,
+        margin: '6 0 0 0', layout: 'fit', bodyPadding: 4,
+        serieStore: serieStore,
+        items: [{
+            xtype: 'chart', store: serieStore, animate: true, shadow: false, insetPadding: 24,
+            legend: { position: 'top' },
+            axes: [
+                { type: 'Numeric', position: 'left', minimum: 0, title: 'Volume', grid: true,
+                  fields: ['campagnes', 'waweb', 'api', 'discussions'] },
+                { type: 'Category', position: 'bottom', fields: ['date'], title: 'Jour',
+                  label: { rotate: { degrees: 315 } } }
+            ],
+            series: [
+                ligne('campagnes', 'Campagnes', '#1976d2'),
+                ligne('waweb', 'WhatsApp Web (masse)', '#25d366'),
+                ligne('api', 'Messages API', '#6a1b9a'),
+                ligne('discussions', 'Discussions (Web)', '#ef6c00')
+            ]
+        }]
+    };
+};
+
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
+    var cartes = Ext.create('Ext.Component', { anchor: '100%',
+        html: '<div style="color:#999">Chargement des indicateurs…</div>' });
+    var graphe = Usp.dashboardChart();
+    var items = [cartes];
+    if (graphe) { items.push(graphe); }
     var panel = Ext.create('Ext.panel.Panel', {
-        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18,
-        bodyStyle: 'background:#eef1f5',
-        html: '<div style="color:#999">Chargement des indicateurs…</div>',
+        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
+        bodyStyle: 'background:#eef1f5', items: items,
         tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
     });
     var SECTIONS = [
@@ -377,14 +419,15 @@ Usp.dashboardPanel = function () {
             sec.items.forEach(function (it) { html += carte(it, d[it.k]); });
             html += '</div>';
         });
-        panel.update(html);
+        cartes.update(html);
     }
     function charger() {
         Usp.ajax({
             url: '/dashboard', method: 'GET',
             success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
-            failure: function () { panel.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+            failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
         });
+        if (graphe && graphe.serieStore) { graphe.serieStore.load(); }
     }
     panel.on('afterrender', charger);
     // Clic sur une carte « navigable » : ouvre la vue correspondante.
