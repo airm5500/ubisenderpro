@@ -213,7 +213,7 @@ Usp.waweb.bulkPanel = function () {
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
     });
-    var media = { url: null, type: null, mime: null, nom: null };
+    var medias = []; // pièces jointes multiples : [{url,type,mime,nom}]
     var modeleStore = Ext.create('Ext.data.Store', {
         fields: ['id', 'nom', 'corps', 'enteteMediaUrl', 'enteteMediaType', 'boutonsJson'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
@@ -243,15 +243,14 @@ Usp.waweb.bulkPanel = function () {
                   c.up('form').down('[name=msg1]').setValue(corps + Usp.waweb.boutonsTexte(rec.get('boutonsJson')));
                   // Pièce jointe du modèle (média d'en-tête) reprise comme pièce jointe de l'envoi.
                   var url = rec.get('enteteMediaUrl');
-                  var info = c.up('form').down('#pjInfo');
                   if (url) {
-                      media.url = url; media.mime = null; media.nom = null;
-                      media.type = (rec.get('enteteMediaType') || 'IMAGE').toLowerCase();
-                      if (info) { info.update('<span style="color:#2e7d32;font-size:11px">✔ pièce jointe du modèle</span>'); }
+                      medias.length = 0;
+                      medias.push({ url: url, type: (rec.get('enteteMediaType') || 'IMAGE').toLowerCase(),
+                          mime: null, nom: 'pièce jointe du modèle' });
                   } else {
-                      media.url = null; media.type = null;
-                      if (info) { info.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                      medias.length = 0;
                   }
+                  Usp.waweb.majPjList(c.up('form'), medias);
               } } },
             { xtype: 'displayfield', value: '<b>Variantes du message</b> — pour limiter le marquage « spam », ' +
               'une variante est tirée <b>au hasard</b> pour chaque contact. Une seule suffit ; les autres sont ' +
@@ -268,11 +267,13 @@ Usp.waweb.bulkPanel = function () {
               listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
             { xtype: 'textareafield', name: 'msg5', fieldLabel: 'Variante 5 (option)', height: 45,
               listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
-            { xtype: 'fieldcontainer', fieldLabel: 'Pièce jointe', layout: 'hbox', items: [
-                { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Parcourir...',
-                  listeners: { change: function (f) { Usp.waweb.uploadPiece(f, media); } } },
+            { xtype: 'fieldcontainer', fieldLabel: 'Pièces jointes', layout: 'hbox', items: [
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Ajouter un fichier…',
+                  listeners: { change: function (f) { Usp.waweb.uploadPiece(f, medias); } } },
+                { xtype: 'button', text: 'Vider', margin: '0 0 0 6', handler: function (b) {
+                    medias.length = 0; Usp.waweb.majPjList(b.up('form'), medias); } },
                 { xtype: 'component', itemId: 'pjInfo', margin: '4 0 0 8',
-                  html: '<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>' }
+                  html: '<span style="color:#888;font-size:11px">optionnel — plusieurs fichiers possibles (image/vidéo/document)</span>' }
             ] },
             { xtype: 'fieldcontainer', fieldLabel: 'Débit', layout: 'hbox', defaults: { width: 120, labelWidth: 70 }, items: [
                 { xtype: 'numberfield', name: 'attenteMin', fieldLabel: 'Attente', value: 4, minValue: 0 },
@@ -322,7 +323,7 @@ Usp.waweb.bulkPanel = function () {
                 var f = formPanel.getForm();
                 if (!f.isValid()) { return; }
                 var v = f.getValues();
-                v.mediaUrl = media.url; v.mediaType = media.type; v.mediaMime = media.mime; v.mediaNom = media.nom;
+                v.mediasJson = medias.length ? Ext.encode(medias) : null;
                 var planifie = v.envoiMode === 'plan';
                 v.planifier = planifie;
                 if (planifie) {
@@ -341,9 +342,8 @@ Usp.waweb.bulkPanel = function () {
                         fn: function (btn) {
                             if (btn === 'yes') {
                                 f.reset();
-                                media.url = null; media.type = null; media.mime = null; media.nom = null;
-                                var pj = formPanel.down('#pjInfo');
-                                if (pj) { pj.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                                medias.length = 0;
+                                Usp.waweb.majPjList(formPanel, medias);
                             }
                         }
                     });
@@ -448,10 +448,23 @@ Usp.waweb.historyPanel = function () {
     };
 };
 
-Usp.waweb.uploadPiece = function (f, media) {
+/* Met à jour l'affichage de la liste des pièces jointes de l'envoi de masse. */
+Usp.waweb.majPjList = function (formPanel, medias) {
+    var info = formPanel.down('#pjInfo');
+    if (!info) { return; }
+    if (!medias || !medias.length) {
+        info.update('<span style="color:#888;font-size:11px">optionnel — plusieurs fichiers possibles (image/vidéo/document)</span>');
+        return;
+    }
+    var noms = medias.map(function (m) { return Ext.String.htmlEncode(m.nom || m.type || 'fichier'); });
+    info.update('<span style="color:#2e7d32;font-size:11px">✔ ' + medias.length + ' pièce(s) jointe(s) : ' +
+        noms.join(', ') + '</span>');
+};
+
+Usp.waweb.uploadPiece = function (f, medias) {
     var file = f.fileInputEl.dom.files[0];
     if (!file) { return; }
-    var info = f.up('fieldcontainer').down('#pjInfo');
+    var formPanel = f.up('form');
     var reader = new FileReader();
     reader.onload = function (e) {
         var b64 = e.target.result.split(',')[1];
@@ -460,12 +473,11 @@ Usp.waweb.uploadPiece = function (f, media) {
             jsonData: { fichierBase64: b64, mimeType: mime, nomFichier: file.name },
             success: function (resp) {
                 var r = Ext.decode(resp.responseText);
-                media.url = r.url; media.mime = mime; media.nom = file.name;
-                media.type = mime.indexOf('image/') === 0 ? 'image'
-                    : mime.indexOf('video/') === 0 ? 'video'
-                    : mime.indexOf('audio/') === 0 ? 'audio' : 'document';
-                if (info) { info.update('<span style="color:#2e7d32;font-size:11px">✔ ' +
-                    Ext.String.htmlEncode(file.name) + '</span>'); }
+                medias.push({ url: r.url, mime: mime, nom: file.name,
+                    type: mime.indexOf('image/') === 0 ? 'image'
+                        : mime.indexOf('video/') === 0 ? 'video'
+                        : mime.indexOf('audio/') === 0 ? 'audio' : 'document' });
+                Usp.waweb.majPjList(formPanel, medias);
             },
             failure: function () { Ext.Msg.alert('Erreur', 'Téléversement de la pièce jointe impossible.'); } });
     };
@@ -873,10 +885,19 @@ Usp.waweb.detailEnvoi = function (jobId) {
     Usp.ajax({ url: '/wa-bulk/' + jobId, method: 'GET', success: function (resp) {
         var j = Ext.decode(resp.responseText) || {};
         var variantes = [j.msg1, j.msg2, j.msg3, j.msg4, j.msg5].filter(function (m) { return m && m.trim(); });
+        var pj = '';
+        var lstMedias = [];
+        if (j.mediasJson) { try { lstMedias = Ext.decode(j.mediasJson) || []; } catch (e) {} }
+        if (lstMedias.length) {
+            pj = '<div>📎 ' + lstMedias.length + ' pièce(s) jointe(s) : ' +
+                lstMedias.map(function (m) { return Ext.String.htmlEncode(m.nom || m.type || ''); }).join(', ') + '</div>';
+        } else if (j.mediaUrl) {
+            pj = '<div>📎 Pièce jointe : ' + Ext.String.htmlEncode(j.mediaNom || j.mediaType || '') + '</div>';
+        }
         var contenu = '<b>' + Ext.String.htmlEncode(j.nom || ('Envoi #' + jobId)) + '</b> — statut : ' + (j.statut || '') +
             '<br/>Total : ' + j.total + ' · <span style="color:#2e7d32">Envoyés : ' + j.envoyes + '</span> · ' +
             '<span style="color:#c62828">Échoués : ' + j.echoues + '</span><hr/>' +
-            (j.mediaUrl ? '<div>📎 Pièce jointe : ' + Ext.String.htmlEncode(j.mediaNom || j.mediaType || '') + '</div>' : '') +
+            pj +
             '<div style="color:#555"><b>Variantes :</b></div>' +
             variantes.map(function (m) { return '<div style="margin:2px 0;padding:4px;background:#f4f4f4;border-radius:4px">' +
                 Ext.String.htmlEncode(m) + '</div>'; }).join('');

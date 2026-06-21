@@ -865,6 +865,7 @@ CREATE TABLE usp_wa_bulk_job (
     media_type VARCHAR(20),
     media_mime VARCHAR(100),
     media_nom VARCHAR(255),
+    medias_json TEXT,
     attente_min INT NOT NULL DEFAULT 4,
     attente_max INT NOT NULL DEFAULT 8,
     pause_apres INT NOT NULL DEFAULT 10,
