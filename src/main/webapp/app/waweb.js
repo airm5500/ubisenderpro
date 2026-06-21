@@ -76,9 +76,10 @@ Usp.waweb.sessionsPanel = function () {
                 var c = v === 'CONNECTE' ? '#2e7d32' : (v === 'QR' ? '#ef6c00' : '#999');
                 return '<span style="color:' + c + '">' + (v || '') + '</span>';
             } },
-            { text: 'Actions', width: 130, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Actions', width: 160, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
                   return ico('connect', 'Connecter (scanner le QR)', '🔗') +
+                         ico('warmup', 'Réchauffeur (warming)', '🔥') +
                          ico('logout', 'Déconnecter', '⏏️') +
                          ico('delete', 'Supprimer', '🗑️');
               } }
@@ -101,6 +102,8 @@ Usp.waweb.sessionsPanel = function () {
                 var act = el.getAttribute('data-act');
                 if (act === 'connect') {
                     Usp.waweb.connect(rec.get('id'), store);
+                } else if (act === 'warmup') {
+                    Usp.waweb.warmup(rec.get('id'), rec.get('libelle'));
                 } else if (act === 'logout') {
                     Usp.ajax({ url: '/wa-web/sessions/' + rec.get('id') + '/logout', method: 'POST',
                         success: function () { store.load(); } });
@@ -162,6 +165,40 @@ Usp.waweb.connect = function (id, store) {
     Usp.ajax({ url: '/wa-web/sessions/' + id + '/start', method: 'POST',
         success: function (resp) { render(Ext.decode(resp.responseText)); },
         failure: function () { zone.update('<div style="color:#a00">Service WhatsApp Web injoignable.</div>'); } });
+};
+
+/* ---------- Réchauffeur (warming) ---------- */
+Usp.waweb.warmup = function (id, libelle) {
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Réchauffeur — ' + (libelle || ('compte ' + id)), width: 480, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'displayfield', value: '<span style="color:#555">Envoie progressivement de petits messages ' +
+              'neutres vers vos numéros pour « chauffer » le compte (8h–20h) et réduire le risque de bannissement ' +
+              'avant les gros volumes.</span>' },
+            { xtype: 'checkbox', name: 'actif', boxLabel: 'Activer le réchauffeur' },
+            { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros (pool)', height: 100,
+              emptyText: 'Un numéro par ligne (vos propres numéros de préférence)' },
+            { xtype: 'fieldcontainer', fieldLabel: 'Volume/jour', layout: 'hbox', defaults: { width: 110, labelWidth: 55 }, items: [
+                { xtype: 'numberfield', name: 'parJourBase', fieldLabel: 'Base', value: 10, minValue: 1 },
+                { xtype: 'numberfield', name: 'incrementJour', fieldLabel: '+ /j', value: 10, minValue: 0 },
+                { xtype: 'numberfield', name: 'parJourMax', fieldLabel: 'Max', value: 60, minValue: 1 }
+            ] },
+            { xtype: 'displayfield', value: '<span style="color:#888;font-size:11px">Ex. 10 le 1er jour, +10/jour, plafonné à 60.</span>' }
+        ] }],
+        buttons: [{ text: 'Enregistrer', handler: function (b) {
+            var form = b.up('window').down('form').getForm();
+            var v = form.getValues();
+            v.actif = form.findField('actif').getValue();
+            Usp.ajax({ url: '/wa-web/sessions/' + id + '/warmup', method: 'PUT', jsonData: v,
+                success: function () { win.close(); Ext.Msg.alert('OK', 'Réchauffeur enregistré.'); },
+                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
+        } }]
+    });
+    win.show();
+    Usp.ajax({ url: '/wa-web/sessions/' + id + '/warmup', method: 'GET', success: function (resp) {
+        if (!resp.responseText) { return; }
+        try { win.down('form').getForm().setValues(Ext.decode(resp.responseText)); } catch (e) {}
+    } });
 };
 
 /* ---------- Envoi en masse ---------- */

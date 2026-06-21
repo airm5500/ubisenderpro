@@ -1,8 +1,10 @@
 package com.ubisenderpro.rest;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ubisenderpro.entity.WaWarmup;
 import com.ubisenderpro.entity.WaWebSession;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.service.WaWarmupService;
 import com.ubisenderpro.service.WaWebSessionService;
 
 import javax.ejb.EJB;
@@ -24,6 +26,8 @@ public class WaWebResource {
 
     @EJB
     private WaWebSessionService service;
+    @EJB
+    private WaWarmupService warmupService;
 
     @GET
     @Path("/sessions")
@@ -100,6 +104,20 @@ public class WaWebResource {
         String mime = body != null && body.get("mimeType") != null ? String.valueOf(body.get("mimeType")) : null;
         String nom = body != null && body.get("fileName") != null ? String.valueOf(body.get("fileName")) : null;
         return Response.ok(service.envoyerMedia(id, numero, type, url, caption, mime, nom)).build();
+    }
+
+    // ----- Réchauffeur (warming) -----
+    @GET
+    @Path("/sessions/{id}/warmup")
+    public Response warmup(@PathParam("id") Long id) {
+        WaWarmup w = warmupService.config(id);
+        return w == null ? Response.noContent().build() : Response.ok(w).build();
+    }
+
+    @PUT
+    @Path("/sessions/{id}/warmup")
+    public Response sauverWarmup(@PathParam("id") Long id, WaWarmup data) {
+        return Response.ok(warmupService.enregistrer(id, data)).build();
     }
 
     // ----- Extraction (Phase 4) -----

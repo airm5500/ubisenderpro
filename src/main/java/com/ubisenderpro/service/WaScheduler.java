@@ -23,6 +23,8 @@ public class WaScheduler {
     private WaBulkService bulkService;
     @EJB
     private WaBulkSenderAsync sender;
+    @EJB
+    private WaWarmupService warmupService;
 
     @Schedule(hour = "*", minute = "*", persistent = false)
     public void tick() {
@@ -32,5 +34,11 @@ public class WaScheduler {
                 sender.lancer(j.getId());
             }
         }
+    }
+
+    /** Réchauffeur : envoi progressif toutes les 3 minutes. */
+    @Schedule(hour = "*", minute = "*/3", persistent = false)
+    public void tickWarmup() {
+        warmupService.tick();
     }
 }
