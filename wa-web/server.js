@@ -31,6 +31,7 @@ const makeWASocket = baileys.default || baileys.makeWASocket;
 const useMultiFileAuthState = baileys.useMultiFileAuthState;
 const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
 const makeInMemoryStore = baileys.makeInMemoryStore; // peut être absent
+const makeCacheableSignalKeyStore = baileys.makeCacheableSignalKeyStore; // peut être absent
 const DisconnectReason = baileys.DisconnectReason || {};
 
 const __filename = fileURLToPath(import.meta.url);
@@ -142,6 +143,14 @@ async function startSession(id) {
   let version;
   try { ({ version } = await fetchLatestBaileysVersion()); } catch (e) { /* défaut interne */ }
 
+  // Cache en mémoire des clés Signal : évite que la session de chiffrement soit
+  // « manquée » puis reconstruite (pendingPreKey) à chaque envoi — cause du
+  // « En attente de ce message… » et de la distribution silencieuse.
+  const authKeys = (typeof makeCacheableSignalKeyStore === 'function')
+    ? makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+    : state.keys;
+  const auth = { creds: state.creds, keys: authKeys };
+
   // Cache des messages envoyés : indispensable pour répondre aux « retry receipts »
   // (sinon le destinataire reste bloqué sur « En attente de ce message… »).
   if (!s.sent) { s.sent = new Map(); }
@@ -157,7 +166,7 @@ async function startSession(id) {
 
   const sock = makeWASocket({
     version,
-    auth: state,
+    auth,
     printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
     browser: ['UbiSenderPro', 'Chrome', '1.0.0'],
