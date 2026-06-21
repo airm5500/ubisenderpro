@@ -42,6 +42,19 @@ public class ConversationService {
         parId(conversationId).ifPresent(c -> { c.setAgentId(agentId); em.merge(c); });
     }
 
+    /** Supprime une conversation et tout son contenu (messages + médias associés). */
+    public boolean supprimer(Long conversationId) {
+        Conversation c = em.find(Conversation.class, conversationId);
+        if (c == null) { return false; }
+        em.createQuery("DELETE FROM MessageMedia mm WHERE mm.messageId IN " +
+                "(SELECT m.id FROM Message m WHERE m.conversationId = :c)")
+                .setParameter("c", conversationId).executeUpdate();
+        em.createQuery("DELETE FROM Message m WHERE m.conversationId = :c")
+                .setParameter("c", conversationId).executeUpdate();
+        em.remove(c);
+        return true;
+    }
+
     public void changerStatut(Long conversationId, String statut) {
         parId(conversationId).ifPresent(c -> {
             c.setStatut(statut);

@@ -71,6 +71,9 @@ public class Campagne {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "cree_par")
+    private Long creePar;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -122,6 +125,8 @@ public class Campagne {
     public void setNbEchoues(int nbEchoues) { this.nbEchoues = nbEchoues; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getCreePar() { return creePar; }
+    public void setCreePar(Long creePar) { this.creePar = creePar; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

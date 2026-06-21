@@ -39,11 +39,14 @@ public class WaBulkService {
     @EJB
     private ParametreService parametreService;
 
-    public WaBulkJob creer(WaBulkRequest req) {
+    public WaBulkJob creer(WaBulkRequest req) { return creer(req, null); }
+
+    public WaBulkJob creer(WaBulkRequest req, Long creePar) {
         if (req.getSessionId() == null) throw new IllegalArgumentException("Session requise");
 
         WaBulkJob j = new WaBulkJob();
         j.setSessionId(req.getSessionId());
+        j.setCreePar(creePar);
         j.setNom(req.getNom());
         j.setMsg1(req.getMsg1()); j.setMsg2(req.getMsg2()); j.setMsg3(req.getMsg3());
         j.setMsg4(req.getMsg4()); j.setMsg5(req.getMsg5());

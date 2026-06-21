@@ -82,6 +82,9 @@ public class WaBulkJob {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "cree_par")
+    private Long creePar;
+
     /** Motif d'échec représentatif (rempli à la lecture de la liste ; non persisté). */
     @Transient
     private String derniereErreur;
@@ -91,6 +94,8 @@ public class WaBulkJob {
 
     public String getDerniereErreur() { return derniereErreur; }
     public void setDerniereErreur(String derniereErreur) { this.derniereErreur = derniereErreur; }
+    public Long getCreePar() { return creePar; }
+    public void setCreePar(Long creePar) { this.creePar = creePar; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

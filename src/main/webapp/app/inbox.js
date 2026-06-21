@@ -130,9 +130,11 @@ Usp.inbox.panel = function () {
                         var apercu = Ext.String.htmlEncode(rec.get('dernierMessage') || '');
                         var canal = rec.get('canal') === 'WEB'
                             ? '<span style="background:#e8f0fe;color:#1967d2;border-radius:3px;padding:0 4px;font-size:10px;margin-right:4px">Web</span>' : '';
+                        var del = '<span class="conv-del" title="Supprimer cette discussion" ' +
+                            'style="float:right;cursor:pointer;color:#c62828;margin-left:6px">🗑️</span>';
                         var badge = rec.get('nonLu') > 0
-                            ? '<span style="float:right;background:#25d366;color:#fff;border-radius:10px;padding:0 6px;font-size:11px">' + rec.get('nonLu') + '</span>' : '';
-                        return '<div>' + canal + '<b>' + titre + '</b>' + badge + '</div>' +
+                            ? '<span style="float:right;background:#25d366;color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-left:6px">' + rec.get('nonLu') + '</span>' : '';
+                        return '<div>' + canal + '<b>' + titre + '</b>' + del + badge + '</div>' +
                             '<div style="color:#888;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + apercu + '</div>';
                     }
                 }],
@@ -143,12 +145,41 @@ Usp.inbox.panel = function () {
                     '->',
                     { xtype: 'button', text: 'Rafraîchir', handler: function () { convStore.load(); } }
                 ],
-                listeners: { itemclick: function (g, rec) { loadConversation(rec); } }
+                listeners: {
+                    cellclick: function (g, td, ci, rec, tr, ri, e) {
+                        if (e.getTarget('.conv-del')) { Usp.inbox.supprimerConversation(rec, convStore); return false; }
+                        loadConversation(rec);
+                    }
+                }
             },
             discussion,
             contactPanel
         ]
     };
+};
+
+/* Supprime une discussion (et tout son contenu) après confirmation. */
+Usp.inbox.supprimerConversation = function (rec, convStore) {
+    var nom = rec.get('nomAffiche') || rec.get('numeroWhatsapp') || '';
+    Ext.Msg.show({
+        title: 'Supprimer la discussion',
+        msg: 'Supprimer définitivement la discussion avec <b>' + Ext.String.htmlEncode(nom) +
+             '</b> et tous ses messages ? Cette action est irréversible.',
+        width: 460, buttons: Ext.Msg.YESNO, icon: Ext.Msg.WARNING,
+        fn: function (btn) {
+            if (btn !== 'yes') { return; }
+            Usp.ajax({
+                url: '/conversations/' + rec.get('id'), method: 'DELETE',
+                success: function () {
+                    if (Usp.inbox.currentConv && Usp.inbox.currentConv.get('id') === rec.get('id')) {
+                        Usp.inbox.currentConv = null;
+                    }
+                    if (convStore) { convStore.load(); }
+                },
+                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); }
+            });
+        }
+    });
 };
 
 Usp.inbox.envoyer = function (field) {

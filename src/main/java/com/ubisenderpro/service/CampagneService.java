@@ -33,7 +33,14 @@ public class CampagneService {
     public Optional<Campagne> parId(Long id) { return Optional.ofNullable(em.find(Campagne.class, id)); }
 
     public Campagne creer(Campagne c) { em.persist(c); return c; }
-    public Campagne modifier(Campagne c) { return em.merge(c); }
+    public Campagne modifier(Campagne c) {
+        Campagne ex = em.find(Campagne.class, c.getId());
+        if (ex != null) {
+            c.setCreatedAt(ex.getCreatedAt());
+            if (c.getCreePar() == null) { c.setCreePar(ex.getCreePar()); }
+        }
+        return em.merge(c);
+    }
 
     /**
      * Construit la liste des destinataires depuis la liste statique et/ou le segment

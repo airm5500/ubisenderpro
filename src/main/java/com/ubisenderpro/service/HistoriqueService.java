@@ -110,14 +110,16 @@ public class HistoriqueService {
     private List<HistoriqueLigne> campagnes() {
         List<Object[]> rows = em.createQuery(
                 "SELECT cd.envoyeAt, cd.createdAt, cd.numeroWhatsapp, cd.nomContact, cmp.nom, " +
-                "cd.statut, cd.erreur, cd.id, cmp.id FROM CampagneDestinataire cd, Campagne cmp " +
+                "cd.statut, cd.erreur, cd.id, cmp.id, cmp.creePar FROM CampagneDestinataire cd, Campagne cmp " +
                 "WHERE cd.campagneId = cmp.id ORDER BY cd.createdAt DESC")
                 .setMaxResults(PAR_SOURCE).getResultList();
+        Map<Long, String> users = utilisateurs();
         List<HistoriqueLigne> out = new ArrayList<>();
         for (Object[] r : rows) {
             LocalDateTime date = r[0] != null ? (LocalDateTime) r[0] : (LocalDateTime) r[1];
+            String u = r[9] == null ? "" : users.getOrDefault((Long) r[9], "");
             out.add(new HistoriqueLigne("CAMPAGNE", "API", (Long) r[7], (Long) r[8], str(r[4], "Campagne"),
-                    str(r[2], ""), str(r[3], ""), "", null, str(r[5], ""), str(r[6], null), date));
+                    str(r[2], ""), str(r[3], ""), u, null, str(r[5], ""), str(r[6], null), date));
         }
         return out;
     }
@@ -125,14 +127,16 @@ public class HistoriqueService {
     @SuppressWarnings("unchecked")
     private List<HistoriqueLigne> envoisMasse() {
         List<Object[]> rows = em.createQuery(
-                "SELECT d.sentAt, d.numero, d.nom, j.nom, d.statut, d.erreur, d.id, j.id " +
+                "SELECT d.sentAt, d.numero, d.nom, j.nom, d.statut, d.erreur, d.id, j.id, j.creePar " +
                 "FROM WaBulkDestinataire d, WaBulkJob j WHERE d.jobId = j.id " +
                 "ORDER BY d.id DESC")
                 .setMaxResults(PAR_SOURCE).getResultList();
+        Map<Long, String> users = utilisateurs();
         List<HistoriqueLigne> out = new ArrayList<>();
         for (Object[] r : rows) {
+            String u = r[8] == null ? "" : users.getOrDefault((Long) r[8], "");
             out.add(new HistoriqueLigne("ENVOI_MASSE", "WEB", (Long) r[6], (Long) r[7], str(r[3], "Envoi de masse"),
-                    str(r[1], ""), str(r[2], ""), "", null, str(r[4], ""), str(r[5], null), (LocalDateTime) r[0]));
+                    str(r[1], ""), str(r[2], ""), u, null, str(r[4], ""), str(r[5], null), (LocalDateTime) r[0]));
         }
         return out;
     }

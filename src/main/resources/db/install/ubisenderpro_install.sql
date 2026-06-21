@@ -657,6 +657,7 @@ CREATE TABLE usp_campagne (
     nb_repondus INT NOT NULL DEFAULT 0,
     nb_echoues INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
+    cree_par BIGINT,
     updated_at DATETIME,
     PRIMARY KEY (id),
     KEY idx_usp_campagne_statut (statut),
@@ -860,6 +861,7 @@ CREATE TABLE usp_wa_bulk_job (
     envoyes INT NOT NULL DEFAULT 0,
     echoues INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
+    cree_par BIGINT,
     PRIMARY KEY (id),
     KEY idx_usp_bulk_session (session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
