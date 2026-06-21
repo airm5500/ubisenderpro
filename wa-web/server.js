@@ -83,6 +83,20 @@ function jidOf(numero) {
 }
 
 /**
+ * Extrait le numéro de téléphone d'une clé de message. WhatsApp peut adresser
+ * en @lid (numéro masqué) ; le vrai numéro (@s.whatsapp.net) est alors dans un
+ * champ alternatif (remoteJidAlt, senderPn, participant…).
+ */
+function phoneFromKey(k) {
+  if (!k) { return null; }
+  const cands = [k.remoteJid, k.remoteJidAlt, k.senderPn, k.participantPn, k.participant, k.participantAlt];
+  for (const c of cands) {
+    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) { return c.split('@')[0]; }
+  }
+  return null;
+}
+
+/**
  * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
  * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
  */
@@ -138,27 +152,24 @@ async function startSession(id) {
 
   // Messages entrants -> remontée vers UbiSenderPro (réponses des clients).
   sock.ev.on('messages.upsert', (ev) => {
-    // Diagnostic : tracer tout ce qui arrive (type, jids, fromMe).
-    try {
-      logger.info({
-        id, type: ev && ev.type,
-        msgs: (ev && ev.messages ? ev.messages : []).map(function (m) {
-          var k = m && m.key ? m.key : {};
-          return { jid: k.remoteJid, fromMe: !!k.fromMe, part: k.participant || null };
-        })
-      }, 'upsert reçu');
-    } catch (e) { /* ignore */ }
     if (!ev || ev.type !== 'notify' || !Array.isArray(ev.messages)) { return; }
     for (const m of ev.messages) {
       if (!m || !m.key || m.key.fromMe) { continue; }
-      const jid = m.key.remoteJid || '';
-      if (!jid.endsWith('@s.whatsapp.net')) { continue; } // ignore groupes/diffusions
+      const k = m.key;
+      const jid = k.remoteJid || '';
+      if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) { continue; } // ignore groupes/diffusions
+      const phone = phoneFromKey(k);
+      if (!phone) {
+        // Numéro introuvable (souvent @lid) : on logue la clé pour localiser le champ.
+        logger.warn({ id, key: k }, 'Entrant sans numéro résolu');
+        continue;
+      }
       const contenu = texteMessage(m);
       if (!contenu) { continue; }
-      logger.info({ id, from: jid.split('@')[0], type: contenu.type }, 'Message entrant');
+      logger.info({ id, from: phone, type: contenu.type }, 'Message entrant');
       postCallback('/message', {
-        sessionId: id, from: jid.split('@')[0], name: m.pushName || null,
-        type: contenu.type, text: contenu.text, id: m.key.id
+        sessionId: id, from: phone, name: m.pushName || null,
+        type: contenu.type, text: contenu.text, id: k.id
       });
     }
   });
