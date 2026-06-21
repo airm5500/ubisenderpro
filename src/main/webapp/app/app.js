@@ -394,12 +394,14 @@ Usp.showMain = function () {
                 }),
                 listeners: {
                     itemclick: function (v, rec) {
-                        // Pastille sur le menu actif.
-                        var root = v.getStore().getRootNode();
-                        root.eachChild(function (n) {
-                            if (!n.data.baseText) { n.data.baseText = n.get('text'); }
-                            n.set('text', n.data.baseText);
-                        });
+                        // Pastille sur le menu actif (rec.parentNode = racine, items en enfants directs).
+                        var root = rec.parentNode || rec.store.getRootNode();
+                        if (root) {
+                            root.eachChild(function (n) {
+                                if (!n.data.baseText) { n.data.baseText = n.get('text'); }
+                                n.set('text', n.data.baseText);
+                            });
+                        }
                         if (!rec.data.baseText) { rec.data.baseText = rec.get('text'); }
                         rec.set('text', rec.data.baseText + ' <span style="color:#25d366">●</span>');
 
