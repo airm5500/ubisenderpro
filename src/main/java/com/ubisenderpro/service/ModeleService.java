@@ -21,7 +21,12 @@ public class ModeleService {
     public Optional<ModeleMessage> parId(Long id) { return Optional.ofNullable(em.find(ModeleMessage.class, id)); }
 
     public ModeleMessage creer(ModeleMessage m) { em.persist(m); return m; }
-    public ModeleMessage modifier(ModeleMessage m) { return em.merge(m); }
+    public ModeleMessage modifier(ModeleMessage m) {
+        ModeleMessage ex = em.find(ModeleMessage.class, m.getId());
+        if (ex != null) { m.setCreatedAt(ex.getCreatedAt()); }
+        m.setUpdatedAt(java.time.LocalDateTime.now());
+        return em.merge(m);
+    }
     public void supprimer(Long id) { parId(id).ifPresent(em::remove); }
 
     /** Remplace les variables {{cle}} d'un corps de modèle par leurs valeurs. */
