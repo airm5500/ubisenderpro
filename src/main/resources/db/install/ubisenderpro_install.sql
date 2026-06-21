@@ -386,7 +386,6 @@ CREATE TABLE usp_article (
     quantite_ug INT,
     nom_promo VARCHAR(150),
     code_promo VARCHAR(50),
-    promotion_id BIGINT,
     date_debut_promotion DATETIME,
     date_fin_promotion DATETIME,
     stock_disponible DECIMAL(15,3) NOT NULL DEFAULT 0,
@@ -407,7 +406,6 @@ CREATE TABLE usp_article (
     KEY idx_usp_article_categorie (categorie_id),
     KEY idx_usp_article_marque (marque_id),
     KEY idx_usp_article_code_promo (code_promo),
-    KEY idx_usp_article_promotion (promotion_id),
     CONSTRAINT fk_usp_article_categorie FOREIGN KEY (categorie_id) REFERENCES usp_categorie_article(id),
     CONSTRAINT fk_usp_article_marque FOREIGN KEY (marque_id) REFERENCES usp_marque(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

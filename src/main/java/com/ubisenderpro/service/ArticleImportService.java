@@ -158,7 +158,7 @@ public class ArticleImportService {
         if (!req.isSimulation() && codePromo != null && !codePromo.isEmpty()) {
             com.ubisenderpro.entity.Promotion p = promotionService.resoudre(
                     codePromo, val(ligne, req, "nom_promo"), dDebut, dFin);
-            if (p != null) { a.setPromotionId(p.getId()); a.getPromotions().add(p); }
+            if (p != null) { a.getPromotions().add(p); }
         }
 
         String cat = val(ligne, req, "categorie");

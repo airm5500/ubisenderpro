@@ -58,10 +58,6 @@ public class Article {
     @Column(name = "code_promo", length = 50)
     private String codePromo;
 
-    /** Promotion associée (réf. usp_promotion) ; null = pas de promotion. (Hérité V22, conservé) */
-    @Column(name = "promotion_id")
-    private Long promotionId;
-
     /** Promotions associées (un article peut être dans plusieurs promotions). */
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "usp_article_promotion",
@@ -147,8 +143,6 @@ public class Article {
     public void setNomPromo(String nomPromo) { this.nomPromo = nomPromo; }
     public String getCodePromo() { return codePromo; }
     public void setCodePromo(String codePromo) { this.codePromo = codePromo; }
-    public Long getPromotionId() { return promotionId; }
-    public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
     public java.util.Set<Promotion> getPromotions() { return promotions; }
     public void setPromotions(java.util.Set<Promotion> promotions) { this.promotions = promotions; }
     public java.util.List<Long> getPromotionIds() { return promotionIds; }
