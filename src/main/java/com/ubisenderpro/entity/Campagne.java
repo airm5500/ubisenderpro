@@ -38,6 +38,9 @@ public class Campagne {
     @Column(name = "segment_id")
     private Long segmentId;
 
+    @Column(name = "segmentation_id")
+    private Long segmentationId;
+
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
@@ -97,6 +100,8 @@ public class Campagne {
     public void setListeId(Long listeId) { this.listeId = listeId; }
     public Long getSegmentId() { return segmentId; }
     public void setSegmentId(Long segmentId) { this.segmentId = segmentId; }
+    public Long getSegmentationId() { return segmentationId; }
+    public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
     public LocalDateTime getDateProgrammee() { return dateProgrammee; }

@@ -31,7 +31,12 @@ public class WhatsappService {
     public Optional<WhatsappAccount> compte(Long id) { return Optional.ofNullable(em.find(WhatsappAccount.class, id)); }
 
     public WhatsappAccount creerCompte(WhatsappAccount a) { em.persist(a); return a; }
-    public WhatsappAccount modifierCompte(WhatsappAccount a) { return em.merge(a); }
+    public WhatsappAccount modifierCompte(WhatsappAccount a) {
+        WhatsappAccount ex = em.find(WhatsappAccount.class, a.getId());
+        if (ex != null) { a.setCreatedAt(ex.getCreatedAt()); }
+        a.setUpdatedAt(LocalDateTime.now());
+        return em.merge(a);
+    }
 
     public Optional<WhatsappAccount> compteParPhoneNumberId(String phoneNumberId) {
         List<WhatsappAccount> l = em.createQuery(

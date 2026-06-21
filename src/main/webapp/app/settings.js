@@ -139,8 +139,10 @@ Usp.settings.templateForm = function (store, rec) {
                       html: '<span style="color:#888;font-size:11px">image / vidéo / document depuis votre ordinateur</span>' }
                   ] },
                 { xtype: 'component', itemId: 'mediaPreview', margin: '0 0 6 0', html: '' },
+                Usp.waweb.barreVariables('corps'),
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
-                  emptyText: 'Bonjour {{nom_contact}}, l\'article {{article}} est disponible à {{prix}} F.' },
+                  emptyText: 'Bonjour [NOM], bienvenue chez [SOCIETE].',
+                  listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
                 { xtype: 'textareafield', name: 'boutonsJson', fieldLabel: 'Boutons (JSON)', height: 50,
                   emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]' },
@@ -230,20 +232,45 @@ Usp.settings.generalPanel = function () {
             { xtype: 'displayfield',
               value: '<span style="color:#888">API : conforme, nécessite un compte Meta. ' +
                      'WEB : sans Meta (scan QR), à débit lent. Ce choix présélectionne le canal ' +
-                     'dans le composeur « Nouveau message ».</span>' }
+                     'dans le composeur « Nouveau message ».</span>' },
+            { xtype: 'textfield', name: 'prefixe', itemId: 'prefixeField', fieldLabel: 'Préfixe pays', width: 360,
+              value: '225', maskRe: /[0-9]/,
+              emptyText: 'Ex. 225 (Côte d\'Ivoire), 226, 33…' },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Pré-rempli automatiquement dans les champs « numéro » ' +
+                     'et ajouté aux numéros saisis en format local.</span>' },
+            { xtype: 'textfield', name: 'societe', itemId: 'societeField', fieldLabel: 'Société émettrice', width: 520,
+              emptyText: 'Nom de votre société (variable [SOCIETE] dans les messages)' }
         ],
         bbar: ['->', { text: 'Enregistrer', handler: function (b) {
-            var val = b.up('panel').down('#modeField').getValue();
-            Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'PUT', jsonData: { valeur: val },
-                success: function () { Usp.mode = val; Ext.Msg.alert('OK', 'Mode enregistré : ' + val + '.'); },
-                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
+            var p = b.up('panel');
+            var mode = p.down('#modeField').getValue();
+            var prefixe = (p.down('#prefixeField').getValue() || '').replace(/[^0-9]/g, '');
+            var societe = p.down('#societeField').getValue() || '';
+            var put = function (cle, valeur) {
+                return function (cb) {
+                    Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: valeur },
+                        success: cb, failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (' + cle + ').'); } });
+                };
+            };
+            put('whatsapp.mode_envoi', mode)(function () {
+                Usp.mode = mode;
+                put('whatsapp.prefixe_pays', prefixe)(function () {
+                    Usp.prefixe = prefixe;
+                    put('app.societe', societe)(function () { Ext.Msg.alert('OK', 'Paramètres enregistrés.'); });
+                });
+            });
         } }]
     });
     form.on('afterrender', function () {
-        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (resp) {
-            var v = (Ext.decode(resp.responseText) || {}).valeur;
-            form.down('#modeField').setValue(v || 'API');
-        } });
+        var charger = function (cle, itemId, defaut) {
+            Usp.ajax({ url: '/parametres/' + cle, method: 'GET', success: function (resp) {
+                form.down('#' + itemId).setValue((Ext.decode(resp.responseText) || {}).valeur || defaut);
+            } });
+        };
+        charger('whatsapp.mode_envoi', 'modeField', 'API');
+        charger('whatsapp.prefixe_pays', 'prefixeField', '225');
+        charger('app.societe', 'societeField', '');
     });
     return form;
 };

@@ -25,8 +25,9 @@ public class WaWebClient {
         public final boolean success;
         public final String id;
         public final String erreur;
-        public SendResult(boolean success, String id, String erreur) {
-            this.success = success; this.id = id; this.erreur = erreur;
+        public final String waNumber;
+        public SendResult(boolean success, String id, String erreur, String waNumber) {
+            this.success = success; this.id = id; this.erreur = erreur; this.waNumber = waNumber;
         }
     }
 
@@ -88,11 +89,11 @@ public class WaWebClient {
         try {
             JsonNode node = appel("POST", path, body);
             boolean ok = node != null && node.path("success").asBoolean(false);
-            if (ok) return new SendResult(true, node.path("id").asText(null), null);
+            if (ok) return new SendResult(true, node.path("id").asText(null), null, node.path("waNumber").asText(null));
             String err = node == null ? "Réponse vide" : node.path("erreur").asText("Echec d'envoi");
-            return new SendResult(false, null, err);
+            return new SendResult(false, null, err, null);
         } catch (Exception e) {
-            return new SendResult(false, null, e.getMessage());
+            return new SendResult(false, null, e.getMessage(), null);
         }
     }
 

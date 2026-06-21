@@ -50,6 +50,7 @@ public class CampagneService {
         List<ClientContact> contacts = new ArrayList<>();
         if (c.getListeId() != null) contacts.addAll(listeService.contacts(c.getListeId()));
         if (c.getSegmentId() != null) contacts.addAll(segmentService.evaluer(c.getSegmentId()));
+        if (c.getSegmentationId() != null) contacts.addAll(contactsParSegmentation(c.getSegmentationId()));
 
         java.util.Set<String> vus = new java.util.HashSet<>();
         int total = 0;
@@ -72,6 +73,15 @@ public class CampagneService {
         c.setNbDestinataires(total);
         em.merge(c);
         return total;
+    }
+
+    /** Contacts WhatsApp des clients d'une segmentation donnée. */
+    private List<ClientContact> contactsParSegmentation(Long segmentationId) {
+        return em.createQuery(
+                "SELECT ct FROM ClientContact ct, Client cl WHERE ct.clientId = cl.id " +
+                "AND cl.segmentationId = :seg AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
+                ClientContact.class)
+                .setParameter("seg", segmentationId).getResultList();
     }
 
     /**

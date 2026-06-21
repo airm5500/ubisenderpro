@@ -21,6 +21,9 @@ public class WaWebSessionService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @javax.ejb.EJB
+    private WaWebJournalService journal;
+
     private final WaWebClient client = new WaWebClient();
 
     public List<WaWebSession> lister() {
@@ -61,6 +64,12 @@ public class WaWebSessionService {
         return node;
     }
 
+    /** Met à jour le statut d'une session (appelé sur événement du service Node). */
+    public void enregistrerStatut(Long id, String statut) {
+        WaWebSession s = em.find(WaWebSession.class, id);
+        if (s != null) { s.setStatut(statut); s.setUpdatedAt(LocalDateTime.now()); em.merge(s); }
+    }
+
     public void deconnecter(Long id) {
         WaWebSession s = em.find(WaWebSession.class, id);
         if (s == null) return;
@@ -77,12 +86,24 @@ public class WaWebSessionService {
 
     // ----- Envoi unitaire (composeur dual-canal) -----
     public java.util.Map<String, Object> envoyerTexte(Long id, String numero, String texte) {
-        return resultat(client.sendText(nodeId(id), numero, texte));
+        WaWebClient.SendResult r = client.sendText(nodeId(id), numero, texte);
+        if (r.success) { journal.enregistrerSortant(id, numeroCanonique(r, numero), "TEXTE", texte, r.id); }
+        return resultat(r);
     }
 
     public java.util.Map<String, Object> envoyerMedia(Long id, String numero, String type, String mediaUrl,
                                                       String caption, String mime, String nom) {
-        return resultat(client.sendMedia(nodeId(id), numero, type, mediaUrl, caption, mime, nom));
+        WaWebClient.SendResult r = client.sendMedia(nodeId(id), numero, type, mediaUrl, caption, mime, nom);
+        if (r.success) {
+            String contenu = caption != null && !caption.isEmpty() ? caption : ("[" + (type == null ? "média" : type) + "]");
+            journal.enregistrerSortant(id, numeroCanonique(r, numero), type, contenu, r.id);
+        }
+        return resultat(r);
+    }
+
+    /** Numéro tel que WhatsApp le reconnaît (peut différer de la saisie), pour cohérence avec les entrants. */
+    private String numeroCanonique(WaWebClient.SendResult r, String saisi) {
+        return r.waNumber != null && !r.waNumber.isEmpty() ? r.waNumber : saisi;
     }
 
     private java.util.Map<String, Object> resultat(WaWebClient.SendResult r) {

@@ -38,7 +38,54 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const API_TOKEN = process.env.WA_WEB_TOKEN || '';
 const DATA_DIR = process.env.WA_WEB_DATA || path.join(__dirname, 'data');
+// Base UbiSenderPro pour renvoyer les messages entrants / l'état (ex. http://localhost:8080/ubisenderpro)
+const CALLBACK = (process.env.UBISENDER_CALLBACK || '').replace(/\/+$/, '');
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+// libsignal écrit directement sur la console des erreurs de déchiffrement intermittentes
+// (Bad MAC) non fatales : on filtre ces lignes connues pour garder une console lisible.
+(function () {
+  const bruit = function (args) {
+    const s = (args && args.length && args[0] != null) ? String(args[0]) : '';
+    return s.indexOf('Bad MAC') !== -1
+        || s.indexOf('Failed to decrypt message') !== -1
+        || s.indexOf('Closing open session') !== -1
+        || s.indexOf('Closing session:') !== -1
+        || s.indexOf('SessionEntry') !== -1;
+  };
+  const origErr = console.error.bind(console);
+  const origLog = console.log.bind(console);
+  console.error = function () { if (!bruit(arguments)) { origErr.apply(null, arguments); } };
+  console.log = function () { if (!bruit(arguments)) { origLog.apply(null, arguments); } };
+})();
+
+/** Notifie UbiSenderPro d'un événement (message entrant, statut). Best-effort. */
+async function postCallback(chemin, body) {
+  if (!CALLBACK) { logger.warn('UBISENDER_CALLBACK non défini : événement ' + chemin + ' ignoré'); return; }
+  try {
+    const resp = await fetch(CALLBACK + '/api/v1/webhooks/wa-web' + chemin, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Token': API_TOKEN },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      logger.warn('Callback ' + chemin + ' -> HTTP ' + resp.status + ' (' + (CALLBACK + '/api/v1/webhooks/wa-web' + chemin) + ')');
+    } else {
+      logger.info('Callback ' + chemin + ' OK');
+    }
+  } catch (e) { logger.warn('Callback ' + chemin + ' injoignable : ' + (e.message || e)); }
+}
+
+function texteMessage(m) {
+  var msg = m && m.message; if (!msg) { return null; }
+  if (msg.conversation) { return { type: 'TEXTE', text: msg.conversation }; }
+  if (msg.extendedTextMessage && msg.extendedTextMessage.text) { return { type: 'TEXTE', text: msg.extendedTextMessage.text }; }
+  if (msg.imageMessage) { return { type: 'IMAGE', text: msg.imageMessage.caption || '[image]' }; }
+  if (msg.videoMessage) { return { type: 'VIDEO', text: msg.videoMessage.caption || '[vidéo]' }; }
+  if (msg.documentMessage) { return { type: 'DOCUMENT', text: msg.documentMessage.fileName || '[document]' }; }
+  if (msg.audioMessage) { return { type: 'AUDIO', text: '[audio]' }; }
+  return { type: 'TEXTE', text: '[message]' };
+}
 
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
 
@@ -50,6 +97,20 @@ function sessionDir(id) { return path.join(DATA_DIR, 'session-' + id); }
 function jidOf(numero) {
   const clean = String(numero).replace(/[^0-9]/g, '');
   return clean + '@s.whatsapp.net';
+}
+
+/**
+ * Extrait le numéro de téléphone d'une clé de message. WhatsApp peut adresser
+ * en @lid (numéro masqué) ; le vrai numéro (@s.whatsapp.net) est alors dans un
+ * champ alternatif (remoteJidAlt, senderPn, participant…).
+ */
+function phoneFromKey(k) {
+  if (!k) { return null; }
+  const cands = [k.remoteJid, k.remoteJidAlt, k.senderPn, k.participantPn, k.participant, k.participantAlt];
+  for (const c of cands) {
+    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) { return c.split('@')[0]; }
+  }
+  return null;
 }
 
 /**
@@ -74,8 +135,8 @@ function publicState(s) {
 /** Démarre (ou relance) une session Baileys et câble les événements. */
 async function startSession(id) {
   let s = sessions.get(id);
-  if (s && s.starting) { return s; }
-  if (s && (s.status === 'CONNECTE' || s.status === 'QR')) { return s; }
+  // Évite d'ouvrir un 2e socket sur les mêmes clés (cause de « Bad MAC »).
+  if (s && (s.starting || (s.sock && s.status !== 'DECONNECTE'))) { return s; }
 
   s = s || {};
   s.starting = true;
@@ -106,6 +167,30 @@ async function startSession(id) {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // Messages entrants -> remontée vers UbiSenderPro (réponses des clients).
+  sock.ev.on('messages.upsert', (ev) => {
+    if (!ev || ev.type !== 'notify' || !Array.isArray(ev.messages)) { return; }
+    for (const m of ev.messages) {
+      if (!m || !m.key || m.key.fromMe) { continue; }
+      const k = m.key;
+      const jid = k.remoteJid || '';
+      if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) { continue; } // ignore groupes/diffusions
+      const phone = phoneFromKey(k);
+      if (!phone) {
+        // Numéro introuvable (souvent @lid) : on logue la clé pour localiser le champ.
+        logger.warn({ id, key: k }, 'Entrant sans numéro résolu');
+        continue;
+      }
+      const contenu = texteMessage(m);
+      if (!contenu) { continue; }
+      logger.info({ id, from: phone, type: contenu.type }, 'Message entrant');
+      postCallback('/message', {
+        sessionId: id, from: phone, name: m.pushName || null,
+        type: contenu.type, text: contenu.text, id: k.id
+      });
+    }
+  });
+
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
@@ -118,16 +203,19 @@ async function startSession(id) {
       s.qr = null;
       s.me = sock.user ? { id: sock.user.id, name: sock.user.name } : null;
       logger.info({ id, me: s.me }, 'Session connectée');
+      postCallback('/status', { sessionId: id, status: 'CONNECTE' });
     }
     if (connection === 'close') {
       const code = lastDisconnect && lastDisconnect.error
         && lastDisconnect.error.output && lastDisconnect.error.output.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
+      s.sock = null; // libère le socket fermé (sinon la garde anti-doublon bloque la reconnexion)
       s.status = loggedOut ? 'DECONNECTE' : 'CONNEXION';
       s.qr = null;
       logger.warn({ id, code, loggedOut }, 'Connexion fermée');
+      postCallback('/status', { sessionId: id, status: s.status });
       if (!loggedOut) {
-        setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 3000);
+        setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 2000);
       } else {
         try { fs.rmSync(sessionDir(id), { recursive: true, force: true }); } catch (e) { /* ignore */ }
         sessions.delete(id);
@@ -206,21 +294,23 @@ app.post('/sessions/:id/send', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
     const jid = await resolveJid(s.sock, req.body.to);
+    logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
-    res.json({ success: true, id: r && r.key ? r.key.id : null });
-  } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
+    res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
+  } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 
 app.post('/sessions/:id/send-media', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
     const jid = await resolveJid(s.sock, req.body.to);
+    logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi média');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
-    res.json({ success: true, id: r && r.key ? r.key.id : null });
-  } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
+    res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
+  } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 
 app.post('/sessions/:id/check-numbers', async (req, res) => {

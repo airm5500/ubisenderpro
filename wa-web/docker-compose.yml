@@ -13,6 +13,9 @@ services:
       - PORT=3000
       - WA_WEB_TOKEN=${WA_WEB_TOKEN:-changeme}
       - WA_WEB_DATA=/app/data
+      # Base UbiSenderPro pour recevoir messages entrants + état (réponses des clients).
+      # Ex. http://host.docker.internal:8080/ubisenderpro (Docker Desktop) ou l'URL du serveur.
+      - UBISENDER_CALLBACK=${UBISENDER_CALLBACK:-}
       - LOG_LEVEL=info
     volumes:
       - wa_web_data:/app/data
