@@ -279,4 +279,20 @@ app.get('/sessions/:id/groups/:jid/participants', async (req, res) => {
   } catch (e) { res.status(502).json({ erreur: String(e.message || e) }); }
 });
 
-app.listen(PORT, () => logger.info('UbiSenderPro WA-Web sur le port ' + PORT));
+/** Reconnecte automatiquement les sessions persistées au démarrage. */
+function restoreSessions() {
+  try {
+    for (const d of fs.readdirSync(DATA_DIR)) {
+      if (d.startsWith('session-')) {
+        const id = d.substring('session-'.length);
+        logger.info({ id }, 'Restauration de session');
+        startSession(id).catch((e) => logger.error(e));
+      }
+    }
+  } catch (e) { logger.warn(String(e.message || e)); }
+}
+
+app.listen(PORT, () => {
+  logger.info('UbiSenderPro WA-Web sur le port ' + PORT);
+  restoreSessions();
+});
