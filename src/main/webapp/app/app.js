@@ -327,9 +327,19 @@ Usp.dashboardChart = function () {
             markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur } };
     };
     return {
-        xtype: 'panel', title: 'Évolution sur 30 jours', anchor: '100%', height: 360,
+        xtype: 'panel', title: 'Évolution', anchor: '100%', height: 360,
         margin: '6 0 0 0', layout: 'fit', bodyPadding: 4,
         serieStore: serieStore,
+        tbar: ['Période :',
+            { xtype: 'combobox', width: 130, editable: false, queryMode: 'local',
+              value: 30, valueField: 'v', displayField: 'l',
+              store: Ext.create('Ext.data.Store', { fields: ['v', 'l'], data: [
+                  { v: 7, l: '7 jours' }, { v: 30, l: '30 jours' }, { v: 90, l: '90 jours' }] }),
+              listeners: { select: function (c) {
+                  serieStore.getProxy().extraParams = { jours: c.getValue() };
+                  serieStore.load();
+              } } }
+        ],
         items: [{
             xtype: 'chart', store: serieStore, animate: true, shadow: false, insetPadding: 24,
             legend: { position: 'top' },
