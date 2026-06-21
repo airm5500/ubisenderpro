@@ -135,7 +135,7 @@ Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
 
 Usp.catalogue.panel = function () {
     return {
-        xtype: 'tabpanel', title: 'Catalogue',
+        xtype: 'tabpanel', title: 'Catalogue', listeners: Usp.tabListeners,
         items: [
             Usp.catalogue.articlesPanel(),
             Usp.catalogue.simplePanel('Catégories', '/catalogue/categories',

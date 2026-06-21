@@ -17,6 +17,7 @@
  */
 'use strict';
 
+import './quiet.js'; // doit précéder l'import de Baileys (surcharge console)
 import express from 'express';
 import pino from 'pino';
 import QRCode from 'qrcode';
@@ -41,23 +42,6 @@ const DATA_DIR = process.env.WA_WEB_DATA || path.join(__dirname, 'data');
 // Base UbiSenderPro pour renvoyer les messages entrants / l'état (ex. http://localhost:8080/ubisenderpro)
 const CALLBACK = (process.env.UBISENDER_CALLBACK || '').replace(/\/+$/, '');
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-
-// libsignal écrit directement sur la console des erreurs de déchiffrement intermittentes
-// (Bad MAC) non fatales : on filtre ces lignes connues pour garder une console lisible.
-(function () {
-  const bruit = function (args) {
-    const s = (args && args.length && args[0] != null) ? String(args[0]) : '';
-    return s.indexOf('Bad MAC') !== -1
-        || s.indexOf('Failed to decrypt message') !== -1
-        || s.indexOf('Closing open session') !== -1
-        || s.indexOf('Closing session:') !== -1
-        || s.indexOf('SessionEntry') !== -1;
-  };
-  const origErr = console.error.bind(console);
-  const origLog = console.log.bind(console);
-  console.error = function () { if (!bruit(arguments)) { origErr.apply(null, arguments); } };
-  console.log = function () { if (!bruit(arguments)) { origLog.apply(null, arguments); } };
-})();
 
 /** Notifie UbiSenderPro d'un événement (message entrant, statut). Best-effort. */
 async function postCallback(chemin, body) {
@@ -117,6 +101,16 @@ function phoneFromKey(k) {
  * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
  * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
  */
+/** Mémorise un message envoyé (pour répondre aux retry receipts). Borne la taille. */
+function rememberSent(s, r) {
+  if (!s || !s.sent || !r || !r.key || !r.key.id || !r.message) { return; }
+  s.sent.set(r.key.id, r.message);
+  if (s.sent.size > 1000) {
+    const first = s.sent.keys().next().value;
+    s.sent.delete(first);
+  }
+}
+
 async function resolveJid(sock, numero) {
   const clean = String(numero).replace(/[^0-9]/g, '');
   if (clean.length < 6) { return null; }
@@ -148,12 +142,37 @@ async function startSession(id) {
   let version;
   try { ({ version } = await fetchLatestBaileysVersion()); } catch (e) { /* défaut interne */ }
 
+  // Cache des messages envoyés : indispensable pour répondre aux « retry receipts »
+  // (sinon le destinataire reste bloqué sur « En attente de ce message… »).
+  if (!s.sent) { s.sent = new Map(); }
+  if (!s.retryCache) {
+    s.retryCache = {
+      _m: new Map(),
+      get(k) { return this._m.get(k); },
+      set(k, v) { this._m.set(k, v); },
+      del(k) { this._m.delete(k); },
+      flushAll() { this._m.clear(); }
+    };
+  }
+
   const sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
-    browser: ['UbiSenderPro', 'Chrome', '1.0.0']
+    browser: ['UbiSenderPro', 'Chrome', '1.0.0'],
+    msgRetryCounterCache: s.retryCache,
+    // Permet à Baileys de ré-émettre un message qu'un destinataire n'a pas pu déchiffrer.
+    getMessage: async (key) => {
+      try {
+        if (key && key.id && s.sent.has(key.id)) { return s.sent.get(key.id); }
+        if (s.store && typeof s.store.loadMessage === 'function' && key) {
+          const m = await s.store.loadMessage(key.remoteJid, key.id);
+          if (m && m.message) { return m.message; }
+        }
+      } catch (e) { /* ignore */ }
+      return undefined;
+    }
   });
   s.sock = sock;
   s.starting = false;
@@ -297,6 +316,7 @@ app.post('/sessions/:id/send', async (req, res) => {
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
+    rememberSent(s, r);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -309,6 +329,7 @@ app.post('/sessions/:id/send-media', async (req, res) => {
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
+    rememberSent(s, r);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });

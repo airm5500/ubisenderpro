@@ -44,6 +44,10 @@ public class ModeleMessage {
     @Column(name = "nom_modele_whatsapp", length = 150)
     private String nomModeleWhatsapp;
 
+    /** Segmentation client à laquelle ce modèle est dédié (null = tous). */
+    @Column(name = "segmentation_id")
+    private Long segmentationId;
+
     @Column(name = "statut_approbation", nullable = false, length = 30)
     private String statutApprobation = "BROUILLON";
 
@@ -83,6 +87,8 @@ public class ModeleMessage {
     public void setBoutonsJson(String boutonsJson) { this.boutonsJson = boutonsJson; }
     public String getNomModeleWhatsapp() { return nomModeleWhatsapp; }
     public void setNomModeleWhatsapp(String nomModeleWhatsapp) { this.nomModeleWhatsapp = nomModeleWhatsapp; }
+    public Long getSegmentationId() { return segmentationId; }
+    public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
     public String getStatutApprobation() { return statutApprobation; }
     public void setStatutApprobation(String statutApprobation) { this.statutApprobation = statutApprobation; }
     public boolean isActif() { return actif; }

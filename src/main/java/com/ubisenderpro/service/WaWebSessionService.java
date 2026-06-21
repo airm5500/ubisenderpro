@@ -85,18 +85,18 @@ public class WaWebSessionService {
     }
 
     // ----- Envoi unitaire (composeur dual-canal) -----
-    public java.util.Map<String, Object> envoyerTexte(Long id, String numero, String texte) {
+    public java.util.Map<String, Object> envoyerTexte(Long id, String numero, String texte, Long expediteurId) {
         WaWebClient.SendResult r = client.sendText(nodeId(id), numero, texte);
-        if (r.success) { journal.enregistrerSortant(id, numeroCanonique(r, numero), "TEXTE", texte, r.id); }
+        if (r.success) { journal.enregistrerSortant(id, numeroCanonique(r, numero), "TEXTE", texte, r.id, expediteurId); }
         return resultat(r);
     }
 
     public java.util.Map<String, Object> envoyerMedia(Long id, String numero, String type, String mediaUrl,
-                                                      String caption, String mime, String nom) {
+                                                      String caption, String mime, String nom, Long expediteurId) {
         WaWebClient.SendResult r = client.sendMedia(nodeId(id), numero, type, mediaUrl, caption, mime, nom);
         if (r.success) {
             String contenu = caption != null && !caption.isEmpty() ? caption : ("[" + (type == null ? "média" : type) + "]");
-            journal.enregistrerSortant(id, numeroCanonique(r, numero), type, contenu, r.id);
+            journal.enregistrerSortant(id, numeroCanonique(r, numero), type, contenu, r.id, expediteurId);
         }
         return resultat(r);
     }

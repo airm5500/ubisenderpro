@@ -13,6 +13,17 @@ var Usp = {
     prefixe: '225' // préfixe pays par défaut — chargé à la connexion
 };
 
+/* Logo WhatsApp (SVG en data-URI) pour l'entrée de menu « WhatsApp Web ». */
+Usp.ICON_WA = '<img src="data:image/svg+xml,' +
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E" +
+    "%3Cpath fill='%2325d366' d='M16 0a16 16 0 0 0-13.7 24.2L0 32l8-2.1A16 16 0 1 0 16 0z'/%3E" +
+    "%3Cpath fill='%23fff' d='M12 8c-.3-.7-.6-.7-.9-.7h-.8c-.3 0-.7.1-1 .5-.4.4-1.3 1.3-1.3 " +
+    "3.1s1.4 3.6 1.5 3.9c.2.3 2.6 4.1 6.4 5.6 3.2 1.2 3.8 1 4.5.9.7-.1 2.2-.9 2.5-1.7.3-.9.3-1.6.2-1.7" +
+    "-.1-.2-.3-.2-.7-.4-.4-.2-2.2-1.1-2.5-1.2-.3-.1-.6-.2-.8.2-.2.3-.9 1.2-1.1 1.4-.2.2-.4.2-.7.1" +
+    "-.4-.2-1.6-.6-3-1.8-1.1-1-1.8-2.2-2.1-2.6-.2-.4 0-.6.2-.7.2-.2.4-.4.5-.6.2-.2.2-.3.4-.6.1-.2.1-.4 0-.6" +
+    "-.1-.2-.8-1.9-1-2.6z'/%3E%3C/svg%3E" +
+    '" style="width:15px;height:15px;vertical-align:middle"/>';
+
 /* Normalise un numéro : chiffres seuls ; préfixe pays ajouté si saisie locale. */
 Usp.normNumero = function (n) {
     var d = String(n || '').replace(/[^0-9]/g, '');
@@ -22,6 +33,18 @@ Usp.normNumero = function (n) {
         d = p + d.replace(/^0+/, '');
     }
     return d;
+};
+
+/* Applique une icône d'application personnalisée (favicon). Vide = garde l'icône par défaut. */
+Usp.appliquerFavicon = function (url) {
+    if (!url) { return; }
+    var lien = document.querySelector('link[rel="icon"]');
+    if (!lien) {
+        lien = document.createElement('link');
+        lien.rel = 'icon';
+        document.head.appendChild(lien);
+    }
+    lien.href = url;
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
@@ -79,7 +102,11 @@ Usp.showLogin = function () {
                                 Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
                                     success: function (r2) {
                                         Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
-                                        ouvrir();
+                                        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
+                                            success: function (r3) {
+                                                Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
+                                                ouvrir();
+                                            }, failure: ouvrir });
                                     }, failure: ouvrir });
                             },
                             failure: ouvrir });
@@ -121,7 +148,12 @@ Usp.clientsPanel = function () {
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 150 },
             { text: 'E-mail', dataIndex: 'emailPrincipal', width: 200 },
-            { text: 'Statut', dataIndex: 'statut', width: 90 }
+            { text: 'Statut', dataIndex: 'statut', width: 90 },
+            { text: 'Contacts', width: 100, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="cli-contacts" title="Voir / ajouter les contacts" ' +
+                      'style="cursor:pointer;color:#1976d2">👥 contacts</span>';
+              } }
         ],
         tbar: [
             { xtype: 'textfield', emptyText: 'Rechercher...', width: 220, listeners: {
@@ -131,12 +163,6 @@ Usp.clientsPanel = function () {
                 }, buffer: 400 } },
             '->',
             { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
-            { text: 'Contacts', tooltip: 'Voir / ajouter les contacts du client sélectionné',
-              handler: function (b) {
-                  var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                  if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un client.'); return; }
-                  Usp.contactsWindow(rec.get('id'), rec.get('nomCompte'));
-              } },
             { text: 'Importer Excel/CSV', handler: Usp.showImport }
         ],
         bbar: {
@@ -144,7 +170,12 @@ Usp.clientsPanel = function () {
             store: store,
             displayInfo: true
         },
-        listeners: { itemdblclick: function (g, rec) { Usp.clientForm(store, rec); } }
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.clientForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); }
+            }
+        }
     };
 };
 
@@ -283,54 +314,97 @@ Usp.showImport = function () {
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
     var panel = Ext.create('Ext.panel.Panel', {
-        title: 'Tableau de bord', autoScroll: true, bodyPadding: 16,
-        bodyStyle: 'background:#f4f6f8',
+        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18,
+        bodyStyle: 'background:#eef1f5',
         html: '<div style="color:#999">Chargement des indicateurs…</div>',
-        tbar: [{ text: 'Rafraîchir', handler: function () { charger(); } }]
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
     });
-    var LIBELLES = {
-        comptesClients: 'Comptes clients', contacts: 'Contacts',
-        contactsWhatsapp: 'Contacts WhatsApp', contactsSansWhatsapp: 'Sans WhatsApp',
-        contactsConsentement: 'Consentement', contactsDesabonnes: 'Désabonnés',
-        articles: 'Articles', articlesActifs: 'Articles actifs', articlesRupture: 'En rupture',
-        conversationsOuvertes: 'Conversations ouvertes', conversationsNonLues: 'Non lues',
-        campagnesEnCours: 'Campagnes en cours', campagnesTerminees: 'Campagnes terminées',
-        commandes: 'Commandes', opportunitesOuvertes: 'Opportunités ouvertes', imports: 'Imports'
-    };
-    function carte(lib, val) {
-        return '<div style="display:inline-block;width:180px;margin:6px;padding:14px;background:#fff;' +
-            'border:1px solid #e0e0e0;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)">' +
-            '<div style="font-size:24px;font-weight:bold;color:#1976d2">' + (val == null ? '–' : val) + '</div>' +
-            '<div style="font-size:12px;color:#666">' + lib + '</div></div>';
+    var SECTIONS = [
+        { titre: 'Clients & contacts', items: [
+            { k: 'comptesClients', lib: 'Comptes clients', icon: '🏢', couleur: '#1976d2', vue: 'clients' },
+            { k: 'contacts', lib: 'Contacts', icon: '👥', couleur: '#1976d2', vue: 'clients' },
+            { k: 'contactsWhatsapp', lib: 'Contacts WhatsApp', icon: '💬', couleur: '#25d366' },
+            { k: 'contactsSansWhatsapp', lib: 'Sans WhatsApp', icon: '🚫', couleur: '#9e9e9e' },
+            { k: 'contactsConsentement', lib: 'Consentement', icon: '✅', couleur: '#2e7d32' },
+            { k: 'contactsDesabonnes', lib: 'Désabonnés', icon: '⛔', couleur: '#c62828' }
+        ] },
+        { titre: 'Catalogue', items: [
+            { k: 'articles', lib: 'Articles', icon: '📦', couleur: '#6a1b9a', vue: 'catalogue' },
+            { k: 'articlesActifs', lib: 'Articles actifs', icon: '🟢', couleur: '#2e7d32' },
+            { k: 'articlesRupture', lib: 'En rupture', icon: '⚠️', couleur: '#ef6c00' }
+        ] },
+        { titre: 'Messagerie', items: [
+            { k: 'conversationsOuvertes', lib: 'Conversations ouvertes', icon: '💬', couleur: '#1976d2', vue: 'inbox' },
+            { k: 'conversationsNonLues', lib: 'Non lues', icon: '🔔', couleur: '#ef6c00', vue: 'inbox' },
+            { k: 'messagesEnvoyes', lib: 'Messages envoyés', icon: '📤', couleur: '#1976d2', vue: 'historique' },
+            { k: 'sessionsWebConnectees', lib: 'Sessions Web connectées', icon: '🔗', couleur: '#25d366', vue: 'waweb' }
+        ] },
+        { titre: 'Campagnes & envois', items: [
+            { k: 'campagnesEnCours', lib: 'Campagnes en cours', icon: '🚀', couleur: '#1976d2', vue: 'campaigns' },
+            { k: 'campagnesTerminees', lib: 'Campagnes terminées', icon: '🏁', couleur: '#2e7d32', vue: 'campaigns' },
+            { k: 'envoisMasse', lib: 'Envois de masse', icon: '📨', couleur: '#6a1b9a', vue: 'historique' },
+            { k: 'modeles', lib: 'Modèles actifs', icon: '📝', couleur: '#455a64', vue: 'settings' }
+        ] },
+        { titre: 'Commercial', items: [
+            { k: 'commandes', lib: 'Commandes', icon: '🛒', couleur: '#6a1b9a' },
+            { k: 'opportunitesOuvertes', lib: 'Opportunités ouvertes', icon: '🎯', couleur: '#ef6c00', vue: 'crm' },
+            { k: 'imports', lib: 'Imports', icon: '📥', couleur: '#455a64' }
+        ] }
+    ];
+    function carte(it, val) {
+        var nav = it.vue ? ' data-vue="' + it.vue + '" style="cursor:pointer;' : ' style="';
+        return '<div class="usp-card"' + nav +
+            'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:92px;margin:8px;' +
+            'padding:14px 16px;background:#fff;border-radius:10px;border-left:5px solid ' + it.couleur + ';' +
+            'box-shadow:0 1px 4px rgba(0,0,0,.08)">' +
+            '<div style="position:absolute;top:12px;right:14px;font-size:22px;opacity:.85">' + it.icon + '</div>' +
+            '<div style="font-size:30px;font-weight:bold;color:' + it.couleur + ';line-height:1.1">' +
+            (val == null ? '–' : val) + '</div>' +
+            '<div style="font-size:12px;color:#5a6573;margin-top:6px">' + it.lib + '</div></div>';
+    }
+    function rendre(d) {
+        var html = '';
+        SECTIONS.forEach(function (sec) {
+            html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
+                'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
+            html += '<div style="margin-bottom:14px">';
+            sec.items.forEach(function (it) { html += carte(it, d[it.k]); });
+            html += '</div>';
+        });
+        panel.update(html);
     }
     function charger() {
         Usp.ajax({
             url: '/dashboard', method: 'GET',
-            success: function (resp) {
-                var d = Ext.decode(resp.responseText) || {};
-                var html = '';
-                Ext.Object.each(LIBELLES, function (k, lib) { html += carte(lib, d[k]); });
-                panel.update(html);
-            },
+            success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
             failure: function () { panel.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
         });
     }
     panel.on('afterrender', charger);
+    // Clic sur une carte « navigable » : ouvre la vue correspondante.
+    panel.on('render', function () {
+        panel.getEl().on('click', function (e, t) {
+            var card = Ext.fly(t).up('.usp-card');
+            if (!card) { return; }
+            var vue = card.getAttribute('data-vue');
+            if (vue && Usp.ouvrirVue) { Usp.ouvrirVue(vue); }
+        });
+    });
     return panel;
 };
 
 /* ---------- Menu filtré par rôle ---------- */
 Usp.MENU = [
-    { text: 'Tableau de bord',     view: 'dashboard',  roles: null },
-    { text: 'Discussions',         view: 'inbox',      roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
-    { text: 'Comptes clients',     view: 'clients',    roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
-    { text: 'Catalogue',           view: 'catalogue',  roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
-    { text: 'Campagnes',           view: 'campaigns',  roles: ['ADMIN', 'MARKETING'] },
-    { text: 'WhatsApp Web',        view: 'waweb',      roles: ['ADMIN', 'MARKETING'] },
-    { text: 'CRM / Opportunités',  view: 'crm',        roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
-    { text: 'Importations',        view: 'import',     roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
-    { text: 'Paramètres',          view: 'settings',   roles: ['ADMIN'] },
-    { text: 'Utilisateurs',        view: 'users',      roles: ['ADMIN'] }
+    { text: 'Tableau de bord',     view: 'dashboard',  icon: '📊', roles: null },
+    { text: 'Discussions',         view: 'inbox',      icon: '💬', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
+    { text: 'Comptes clients',     view: 'clients',    icon: '🏢', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
+    { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
+    { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
+    { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
+    { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
+    { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
+    { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
+    { text: 'Utilisateurs',        view: 'users',      icon: '👤', roles: ['ADMIN'] }
 ];
 
 Usp.canSee = function (roles) {
@@ -340,13 +414,51 @@ Usp.canSee = function (roles) {
     return roles.some(function (r) { return mine.indexOf(r) !== -1; });
 };
 
+/* Pastille sur l'onglet actif d'un tabpanel. */
+Usp.tabPastille = function (tp, active) {
+    if (!tp || !tp.items) { return; }
+    tp.items.each(function (t) {
+        if (t.baseTitle === undefined) { t.baseTitle = t.title; }
+        t.setTitle(t.baseTitle + (t === active ? ' <span style="color:#25d366">●</span>' : ''));
+    });
+};
+Usp.tabListeners = {
+    afterrender: function (tp) { Usp.tabPastille(tp, tp.getActiveTab()); },
+    tabchange: function (tp, nc) { Usp.tabPastille(tp, nc); }
+};
+
 Usp.menuChildren = function () {
     return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
-        .map(function (m) { return { text: m.text, leaf: true, view: m.view }; });
+        .map(function (m) {
+            var pre = m.iconHtml ? m.iconHtml + ' ' : (m.icon ? m.icon + '  ' : '');
+            var t = pre + m.text;
+            return { text: t, baseText: t, leaf: true, view: m.view };
+        });
+};
+
+/* Charge la vue correspondante dans la zone centrale (menu + cartes du tableau de bord). */
+Usp.ouvrirVue = function (vue) {
+    switch (vue) {
+        case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
+        case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
+        case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
+        case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
+        case 'historique': Usp.loadCenter(Usp.history.panel()); break;
+        case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
+        case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
+        case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
+        case 'users': Usp.loadCenter(Usp.users.panel()); break;
+        case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
+        case 'import': Usp.showImport(); break;
+        default: Usp.loadCenter(Usp.dashboardPanel());
+    }
 };
 
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
+    // Boutons des boîtes de dialogue en français (Oui / Non).
+    Ext.MessageBox.buttonText.yes = 'Oui';
+    Ext.MessageBox.buttonText.no = 'Non';
     Ext.create('Ext.container.Viewport', {
         layout: 'border',
         items: [
@@ -358,7 +470,15 @@ Usp.showMain = function () {
                     { xtype: 'tbtext', text: '<b>UbiSenderPro</b>' },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
-                    { text: 'Déconnexion', handler: function () {
+                    { tooltip: 'Déconnexion', cls: 'usp-logout',
+                      text: '<img src="data:image/svg+xml,' +
+                          "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
+                          "stroke='%23c62828' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E" +
+                          "%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E" +
+                          "%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cline x1='21' y1='12' x2='9' y2='12'/%3E" +
+                          "%3C/svg%3E" +
+                          '" style="width:18px;height:18px;vertical-align:middle"/>',
+                      handler: function () {
                         Usp.ajax({ url: '/auth/logout', method: 'POST' });
                         location.reload();
                     } }
@@ -370,27 +490,26 @@ Usp.showMain = function () {
                 width: 220,
                 collapsible: true,
                 xtype: 'treepanel',
+                cls: 'usp-menu',
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
-                    fields: ['text', 'view', 'leaf'],
+                    fields: ['text', 'baseText', 'view', 'leaf'],
                     root: { expanded: true, children: Usp.menuChildren() }
                 }),
                 listeners: {
                     itemclick: function (v, rec) {
-                        var vue = rec.get('view') || (rec.raw && rec.raw.view);
-                        switch (vue) {
-                            case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
-                            case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
-                            case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
-                            case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
-                            case 'crm': Usp.loadCenter(Usp.crm.tabs()); break;
-                            case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
-                            case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
-                            case 'users': Usp.loadCenter(Usp.users.panel()); break;
-                            case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
-                            case 'import': Usp.showImport(); break;
-                            default: Usp.loadCenter(Usp.dashboardPanel());
+                        // Pastille sur le menu actif (rec.parentNode = racine, items en enfants directs).
+                        var root = rec.parentNode || rec.store.getRootNode();
+                        if (root) {
+                            root.eachChild(function (n) {
+                                if (!n.data.baseText) { n.data.baseText = n.get('text'); }
+                                n.set('text', n.data.baseText);
+                            });
                         }
+                        if (!rec.data.baseText) { rec.data.baseText = rec.get('text'); }
+                        rec.set('text', rec.data.baseText + ' <span style="color:#25d366">●</span>');
+
+                        Usp.ouvrirVue(rec.get('view') || (rec.raw && rec.raw.view));
                     }
                 }
             },

@@ -37,8 +37,12 @@ public class DashboardResource {
         d.put("articlesRupture", compter("usp_article WHERE stock_disponible <= seuil_alerte"));
         d.put("conversationsOuvertes", compter("usp_conversation WHERE statut = 'OUVERTE'"));
         d.put("conversationsNonLues", compter("usp_conversation WHERE non_lu > 0"));
+        d.put("messagesEnvoyes", compter("usp_message WHERE direction = 'SORTANT' AND note_interne = 0"));
+        d.put("sessionsWebConnectees", compter("usp_wa_web_session WHERE statut = 'CONNECTE'"));
         d.put("campagnesEnCours", compter("usp_campagne WHERE statut = 'EN_COURS'"));
         d.put("campagnesTerminees", compter("usp_campagne WHERE statut = 'TERMINEE'"));
+        d.put("envoisMasse", compter("usp_wa_bulk_job"));
+        d.put("modeles", compter("usp_modele_message WHERE actif = 1"));
         d.put("commandes", compter("usp_commande"));
         d.put("opportunitesOuvertes", compter("usp_opportunite WHERE statut NOT IN ('PERDU','CLIENT_FIDELISE')"));
         d.put("imports", compter("usp_import"));

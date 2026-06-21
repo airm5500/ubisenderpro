@@ -1,12 +1,16 @@
 package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.Campagne;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.CampagneSenderAsync;
 import com.ubisenderpro.service.CampagneService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
@@ -22,6 +26,8 @@ public class CampagneResource {
     private CampagneService campagneService;
     @EJB
     private CampagneSenderAsync campagneSenderAsync;
+    @Inject
+    private SessionStore sessionStore;
 
     @GET
     public List<Campagne> lister() { return campagneService.lister(); }
@@ -35,8 +41,15 @@ public class CampagneResource {
 
     @POST
     @Secured(roles = {"ADMIN", "MARKETING"})
-    public Response creer(Campagne c) {
+    public Response creer(Campagne c, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        c.setCreePar(utilisateurId(authHeader));
         return Response.status(Response.Status.CREATED).entity(campagneService.creer(c)).build();
+    }
+
+    private Long utilisateurId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        return u == null ? null : u.getId();
     }
 
     @PUT

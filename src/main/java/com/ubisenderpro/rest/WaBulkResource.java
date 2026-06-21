@@ -2,11 +2,15 @@ package com.ubisenderpro.rest;
 
 import com.ubisenderpro.dto.WaBulkRequest;
 import com.ubisenderpro.entity.WaBulkJob;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.WaBulkService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.HashMap;
@@ -24,6 +28,8 @@ public class WaBulkResource {
 
     @EJB
     private WaBulkService service;
+    @Inject
+    private SessionStore sessionStore;
 
     @GET
     public List<WaBulkJob> lister() { return service.lister(); }
@@ -41,11 +47,40 @@ public class WaBulkResource {
         return service.destinataires(id);
     }
 
+    /** Analyse un fichier CSV/Excel de destinataires sans rien enregistrer (envoi ponctuel). */
     @POST
-    public Response creer(WaBulkRequest req) {
+    @Path("/preparer-fichier")
+    public Response preparerFichier(Map<String, Object> body) {
         try {
-            WaBulkJob j = service.creer(req);
+            String b64 = body == null ? null : (String) body.get("fichierBase64");
+            String nom = body == null ? null : (String) body.get("nomFichier");
+            return Response.ok(service.preparerFichier(b64, nom)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
+        }
+    }
+
+    @POST
+    public Response creer(WaBulkRequest req, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        try {
+            WaBulkJob j = service.creer(req, utilisateurId(authHeader));
             return Response.status(Response.Status.CREATED).entity(j).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
+        }
+    }
+
+    private Long utilisateurId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        return u == null ? null : u.getId();
+    }
+
+    @POST
+    @Path("/{id}/relancer")
+    public Response relancerEchecs(@PathParam("id") Long id) {
+        try {
+            return Response.ok(service.relancerEchecs(id)).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
         }

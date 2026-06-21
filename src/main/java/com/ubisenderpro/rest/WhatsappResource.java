@@ -3,11 +3,15 @@ package com.ubisenderpro.rest;
 import com.ubisenderpro.dto.MediaUploadRequest;
 import com.ubisenderpro.entity.Message;
 import com.ubisenderpro.entity.WhatsappAccount;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.WhatsappService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.HashMap;
@@ -22,6 +26,9 @@ public class WhatsappResource {
 
     @EJB
     private WhatsappService whatsappService;
+
+    @Inject
+    private SessionStore sessionStore;
 
     @GET
     @Path("/accounts")
@@ -45,34 +52,43 @@ public class WhatsappResource {
     @POST
     @Path("/messages/text")
     @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
-    public Response envoyerTexte(Map<String, Object> body) {
+    public Response envoyerTexte(Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         Long accountId = Long.valueOf(String.valueOf(body.get("accountId")));
         String numero = String.valueOf(body.get("numero"));
         String texte = String.valueOf(body.get("texte"));
-        Message m = whatsappService.envoyerTexte(accountId, numero, texte, null);
+        Message m = whatsappService.envoyerTexte(accountId, numero, texte, utilisateurId(authHeader));
         return Response.ok(m).build();
     }
 
     @POST
     @Path("/messages/media")
     @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
-    public Response envoyerMedia(Map<String, Object> body) {
+    public Response envoyerMedia(Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         Long accountId = Long.valueOf(String.valueOf(body.get("accountId")));
         String numero = String.valueOf(body.get("numero"));
         String type = String.valueOf(body.getOrDefault("type", "image"));
         String legende = body.get("legende") == null ? null : String.valueOf(body.get("legende"));
+        Long expediteurId = utilisateurId(authHeader);
         Object mediaId = body.get("mediaId");
         Message m;
         if (mediaId != null && !String.valueOf(mediaId).isEmpty()) {
             String mimeType = body.get("mimeType") == null ? null : String.valueOf(body.get("mimeType"));
             String nomFichier = body.get("nomFichier") == null ? null : String.valueOf(body.get("nomFichier"));
             m = whatsappService.envoyerMediaParId(accountId, numero, type, String.valueOf(mediaId),
-                    legende, mimeType, nomFichier, null);
+                    legende, mimeType, nomFichier, expediteurId);
         } else {
             String url = String.valueOf(body.get("url"));
-            m = whatsappService.envoyerMedia(accountId, numero, type, url, legende, null);
+            m = whatsappService.envoyerMedia(accountId, numero, type, url, legende, expediteurId);
         }
         return Response.ok(m).build();
+    }
+
+    private Long utilisateurId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        return u == null ? null : u.getId();
     }
 
     /**

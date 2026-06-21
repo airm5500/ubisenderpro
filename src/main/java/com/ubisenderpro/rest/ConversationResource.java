@@ -43,6 +43,15 @@ public class ConversationResource {
         return conversationService.messages(id);
     }
 
+    @DELETE
+    @Path("/{id}")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "MARKETING"})
+    public Response supprimer(@PathParam("id") Long id) {
+        return conversationService.supprimer(id)
+                ? Response.noContent().build()
+                : Response.status(Response.Status.NOT_FOUND).build();
+    }
+
     @POST
     @Path("/{id}/assign")
     public Response affecter(@PathParam("id") Long id, Map<String, Object> body) {

@@ -4,6 +4,7 @@
     <meta charset="UTF-8"/>
     <title>UbiSenderPro</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2325d366'/%3E%3Ctext x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='white'%3EU%3C/text%3E%3C/svg%3E"/>
 
     <!--
         ExtJS 4.2 : copiez le dossier "ext" de Prestige
@@ -12,6 +13,25 @@
     -->
     <link rel="stylesheet" href="ext/packages/ext-theme-neptune/build/resources/ext-theme-neptune-all.css"/>
     <script src="ext/ext-all.js"></script>
+
+    <style>
+        /* Masque les icônes « page » par défaut des nœuds de l'arbre de menu
+           (on n'utilise que nos emojis dans le libellé). Supprime aussi le
+           cadre d'image cassée affiché par certains navigateurs. */
+        .usp-menu .x-tree-icon { display: none !important; }
+
+        /* Animation au survol des cartes du tableau de bord. */
+        .usp-card {
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .usp-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0,0,0,.16) !important;
+        }
+
+        /* Bouton de déconnexion : icône rouge seule. */
+        .usp-logout { padding: 0 6px !important; }
+    </style>
 
     <script src="app/app.js"></script>
     <script src="app/importer.js"></script>
@@ -22,6 +42,7 @@
     <script src="app/settings.js"></script>
     <script src="app/users.js"></script>
     <script src="app/waweb.js"></script>
+    <script src="app/history.js"></script>
 </head>
 <body>
     <!-- Diagnostic : message lisible si le SDK Ext JS n'est pas trouvé (au lieu d'une page blanche). -->

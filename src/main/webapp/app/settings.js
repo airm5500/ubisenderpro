@@ -92,7 +92,7 @@ Usp.settings.templatesPanel = function () {
     var store = Usp.settings.jsonStore('/templates',
         ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
          'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
-         'statutApprobation', 'actif']);
+         'segmentationId', 'statutApprobation', 'actif']);
 
     return {
         xtype: 'grid', title: 'Modèles de messages', store: store,
@@ -113,9 +113,9 @@ Usp.settings.templatesPanel = function () {
 Usp.settings.templateForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le modèle' : 'Nouveau modèle',
-        width: 560, modal: true, bodyPadding: 12,
+        width: 680, height: 600, modal: true, layout: 'fit',
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' },
             items: [
                 { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
                 { xtype: 'combobox', name: 'typeModele', fieldLabel: 'Type', value: 'marketing',
@@ -124,12 +124,31 @@ Usp.settings.templateForm = function (store, rec) {
                           'produit_disponible', 'fidelite'], queryMode: 'local' },
                 { xtype: 'textfield', name: 'langue', fieldLabel: 'Langue', value: 'fr' },
                 { xtype: 'textfield', name: 'categorie', fieldLabel: 'Catégorie' },
-                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête (texte)' },
+                { xtype: 'combobox', name: 'segmentationId', itemId: 'segmentationCombo',
+                  fieldLabel: 'Segmentation dédiée', emptyText: 'Tous les clients (aucune segmentation)',
+                  store: Usp.settings.jsonStore('/segmentations', ['id', 'libelle']),
+                  valueField: 'id', displayField: 'libelle', queryMode: 'local',
+                  editable: false, allowBlank: true, triggers: {
+                      clear: { cls: 'x-form-clear-trigger',
+                          handler: function (c) { c.clearValue(); } }
+                  } },
+                { xtype: 'displayfield',
+                  value: '<span style="color:#888">Segmentation pour laquelle ce modèle est conçu ' +
+                         '(facultatif). Utilisez le bouton ✖ pour retirer la segmentation.</span>' },
+                { xtype: 'displayfield',
+                  value: '<b>En-tête</b> : ligne mise en avant en haut du message. ' +
+                         'Soit un <i>texte</i> court, soit un <i>média</i> (image / vidéo / document) — pas les deux.' },
+                { xtype: 'textfield', name: 'enteteTexte', fieldLabel: 'En-tête (texte)',
+                  emptyText: 'Titre court affiché en gras en haut',
+                  listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'combobox', name: 'enteteMediaType', fieldLabel: 'En-tête (média)', value: 'AUCUN',
                   store: [['AUCUN', 'Aucun'], ['IMAGE', 'Image'], ['VIDEO', 'Vidéo'], ['DOCUMENT', 'Document']],
                   queryMode: 'local', editable: false },
                 { xtype: 'textfield', name: 'enteteMediaUrl', fieldLabel: 'URL du média',
                   emptyText: 'https://… ou importez un fichier ci-dessous' },
+                { xtype: 'displayfield',
+                  value: '<span style="color:#888">« URL du média » : adresse du fichier d\'en-tête. ' +
+                         'Renseignez-la manuellement ou importez un fichier (l\'URL se remplit toute seule).</span>' },
                 { xtype: 'fieldcontainer', fieldLabel: 'Importer un fichier', layout: 'hbox',
                   items: [
                     { xtype: 'filefield', name: 'mediaFichier', buttonOnly: true, hideLabel: true,
@@ -143,9 +162,11 @@ Usp.settings.templateForm = function (store, rec) {
                 { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps', height: 100, allowBlank: false,
                   emptyText: 'Bonjour [NOM], bienvenue chez [SOCIETE].',
                   listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
-                { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page' },
+                { xtype: 'textfield', name: 'piedDePage', fieldLabel: 'Pied de page',
+                  listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textareafield', name: 'boutonsJson', fieldLabel: 'Boutons (JSON)', height: 50,
-                  emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]' },
+                  emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]',
+                  listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom du modèle Meta',
                   emptyText: 'Nom approuvé côté Meta (pour les campagnes)' },
                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',
@@ -240,13 +261,41 @@ Usp.settings.generalPanel = function () {
               value: '<span style="color:#888">Pré-rempli automatiquement dans les champs « numéro » ' +
                      'et ajouté aux numéros saisis en format local.</span>' },
             { xtype: 'textfield', name: 'societe', itemId: 'societeField', fieldLabel: 'Société émettrice', width: 520,
-              emptyText: 'Nom de votre société (variable [SOCIETE] dans les messages)' }
+              emptyText: 'Nom de votre société (variable [SOCIETE] dans les messages)' },
+            { xtype: 'textfield', name: 'societeTel', itemId: 'societeTelField',
+              fieldLabel: 'Téléphone(s) société', width: 520,
+              emptyText: 'Si plusieurs numéros, séparés par ; (variable [TEL_SOCIETE])' },
+            { xtype: 'textfield', name: 'site', itemId: 'siteField',
+              fieldLabel: 'Lien du site société', width: 520,
+              emptyText: 'https://… (variable [SITE])' },
+            { xtype: 'textfield', name: 'lienCommande', itemId: 'lienCommandeField',
+              fieldLabel: 'Lien de commande', width: 520,
+              emptyText: 'https://… (variable [LIEN_COMMANDE])' },
+            { xtype: 'fieldcontainer', fieldLabel: 'Icône de l\'application', layout: 'hbox', items: [
+                { xtype: 'hiddenfield', itemId: 'faviconField' },
+                { xtype: 'component', itemId: 'faviconApercu', margin: '0 8 0 0',
+                  html: '<span style="color:#888;font-size:11px">icône par défaut</span>' },
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Choisir une image…',
+                  listeners: { change: function (f) { Usp.settings.uploadFavicon(f); } } },
+                { xtype: 'button', text: 'Réinitialiser', margin: '0 0 0 6', handler: function (b) {
+                    var p = b.up('panel');
+                    p.down('#faviconField').setValue('');
+                    p.down('#faviconApercu').update('<span style="color:#888;font-size:11px">icône par défaut</span>');
+                } }
+            ] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Image affichée dans l\'onglet du navigateur ' +
+                     '(PNG/SVG conseillé). Vide = icône verte par défaut. Appliquée après enregistrement.</span>' }
         ],
         bbar: ['->', { text: 'Enregistrer', handler: function (b) {
             var p = b.up('panel');
             var mode = p.down('#modeField').getValue();
             var prefixe = (p.down('#prefixeField').getValue() || '').replace(/[^0-9]/g, '');
             var societe = p.down('#societeField').getValue() || '';
+            var societeTel = p.down('#societeTelField').getValue() || '';
+            var site = p.down('#siteField').getValue() || '';
+            var lienCommande = p.down('#lienCommandeField').getValue() || '';
+            var favicon = p.down('#faviconField').getValue() || '';
             var put = function (cle, valeur) {
                 return function (cb) {
                     Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: valeur },
@@ -257,7 +306,18 @@ Usp.settings.generalPanel = function () {
                 Usp.mode = mode;
                 put('whatsapp.prefixe_pays', prefixe)(function () {
                     Usp.prefixe = prefixe;
-                    put('app.societe', societe)(function () { Ext.Msg.alert('OK', 'Paramètres enregistrés.'); });
+                    put('app.societe', societe)(function () {
+                    put('app.societe_tel', societeTel)(function () {
+                        put('app.site', site)(function () {
+                            put('app.lien_commande', lienCommande)(function () {
+                            put('app.favicon', favicon)(function () {
+                                Usp.appliquerFavicon(favicon);
+                                Ext.Msg.alert('OK', 'Paramètres enregistrés.');
+                            });
+                            });
+                        });
+                    });
+                });
                 });
             });
         } }]
@@ -271,13 +331,47 @@ Usp.settings.generalPanel = function () {
         charger('whatsapp.mode_envoi', 'modeField', 'API');
         charger('whatsapp.prefixe_pays', 'prefixeField', '225');
         charger('app.societe', 'societeField', '');
+        charger('app.societe_tel', 'societeTelField', '');
+        charger('app.site', 'siteField', '');
+        charger('app.lien_commande', 'lienCommandeField', '');
+        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET', success: function (resp) {
+            var url = (Ext.decode(resp.responseText) || {}).valeur || '';
+            form.down('#faviconField').setValue(url);
+            if (url) {
+                form.down('#faviconApercu').update('<img src="' + url +
+                    '" style="height:24px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            }
+        } });
     });
     return form;
 };
 
+/* Téléverse l'icône d'application choisie et l'affiche en aperçu. */
+Usp.settings.uploadFavicon = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var panel = f.up('panel');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/media/upload', method: 'POST',
+            jsonData: { fichierBase64: b64, mimeType: file.type || 'image/png', nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText);
+                panel.down('#faviconField').setValue(r.url);
+                panel.down('#faviconApercu').update('<img src="' + r.url +
+                    '" style="height:24px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Téléversement de l\'icône impossible.'); }
+        });
+    };
+    reader.readAsDataURL(file);
+};
+
 Usp.settings.tabs = function () {
     return {
-        xtype: 'tabpanel', title: 'Paramètres',
+        xtype: 'tabpanel', title: 'Paramètres', listeners: Usp.tabListeners,
         items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
     };
 };
