@@ -67,7 +67,7 @@ Usp.users.gridPanel = function () {
         tbar: [
             { text: 'Nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
             { text: 'Rafraîchir', handler: function () { store.load(); } }
-        ],
+        ].concat(Usp.export.boutons('Utilisateurs')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.usr-edit')) { Usp.users.form(store, rec); return; }
@@ -203,7 +203,8 @@ Usp.users.connexionsPanel = function () {
                       'style="cursor:pointer;font-size:15px">🔍</span>';
               } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }],
+        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+            .concat(Usp.export.boutons('Historique des connexions')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.con-det')) { Usp.users.activiteSession(rec); }
@@ -271,5 +272,6 @@ Usp.users.journalPanel = function () {
             { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 }
         ],
         tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+            .concat(Usp.export.boutons('Journal d\'actions'))
     };
 };
