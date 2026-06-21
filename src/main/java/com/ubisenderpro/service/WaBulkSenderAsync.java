@@ -35,6 +35,13 @@ public class WaBulkSenderAsync {
         WaBulkJob job = em.find(WaBulkJob.class, jobId);
         if (job == null) return;
 
+        // Hors plage horaire autorisée : on remet en PLANIFIEE, le planificateur relancera.
+        if (!WaBulkService.dansFenetre(job)) {
+            tx.marquerStatut(jobId, "PLANIFIEE");
+            LOG.info("Envoi en masse " + jobId + " hors plage horaire : reporté.");
+            return;
+        }
+
         tx.marquerStatut(jobId, "EN_COURS");
         List<Long> ids = tx.idsEnAttente(jobId);
         LOG.info("Envoi en masse " + jobId + " : " + ids.size() + " destinataires.");
@@ -44,6 +51,12 @@ public class WaBulkSenderAsync {
             String statut = tx.statutJob(jobId);
             if ("SUSPENDUE".equals(statut) || "ANNULEE".equals(statut)) {
                 LOG.info("Envoi en masse " + jobId + " interrompu (" + statut + ").");
+                return;
+            }
+            // Plage horaire fermée en cours de route : on met en pause (reprise auto par le planificateur).
+            if (!WaBulkService.dansFenetre(job)) {
+                tx.marquerStatut(jobId, "PLANIFIEE");
+                LOG.info("Envoi en masse " + jobId + " : plage horaire fermée, mise en pause.");
                 return;
             }
             try {

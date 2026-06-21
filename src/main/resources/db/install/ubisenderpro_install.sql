@@ -848,6 +848,9 @@ CREATE TABLE usp_wa_bulk_job (
     pause_min INT NOT NULL DEFAULT 10,
     pause_max INT NOT NULL DEFAULT 20,
     statut VARCHAR(20) NOT NULL DEFAULT 'BROUILLON',
+    date_programmee DATETIME,
+    heure_debut INT NOT NULL DEFAULT 0,
+    heure_fin INT NOT NULL DEFAULT 0,
     total INT NOT NULL DEFAULT 0,
     envoyes INT NOT NULL DEFAULT 0,
     echoues INT NOT NULL DEFAULT 0,
@@ -867,6 +870,23 @@ CREATE TABLE usp_wa_bulk_destinataire (
     PRIMARY KEY (id),
     KEY idx_usp_bulk_dest_job (job_id),
     CONSTRAINT fk_usp_bulk_dest_job FOREIGN KEY (job_id) REFERENCES usp_wa_bulk_job(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE usp_wa_warmup (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_id BIGINT NOT NULL,
+    actif BOOLEAN NOT NULL DEFAULT FALSE,
+    numeros TEXT,
+    par_jour_base INT NOT NULL DEFAULT 10,
+    par_jour_max INT NOT NULL DEFAULT 60,
+    increment_jour INT NOT NULL DEFAULT 10,
+    jour_courant INT NOT NULL DEFAULT 1,
+    envoyes_jour INT NOT NULL DEFAULT 0,
+    date_jour DATE,
+    dernier_envoi DATETIME,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_usp_warmup_session (session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Automatisations d'exemple (section 22)
