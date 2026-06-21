@@ -106,6 +106,7 @@ Usp.inbox.panel = function () {
         msgStore.getProxy().url = Usp.apiBase + '/conversations/' + rec.get('id') + '/messages';
         msgStore.load();
         Usp.ajax({ url: '/conversations/' + rec.get('id') + '/read', method: 'POST' });
+        if (rec.get('nonLu')) { rec.set('nonLu', 0); } // retire le badge tout de suite
         contactPanel.update(
             '<b>' + Ext.String.htmlEncode(rec.get('nomAffiche') || rec.get('numeroWhatsapp')) + '</b><hr/>' +
             '<div><b>Numéro WhatsApp :</b><br/>' + Ext.String.htmlEncode(rec.get('numeroWhatsapp') || '') + '</div><br/>' +

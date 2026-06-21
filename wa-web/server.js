@@ -42,6 +42,23 @@ const DATA_DIR = process.env.WA_WEB_DATA || path.join(__dirname, 'data');
 const CALLBACK = (process.env.UBISENDER_CALLBACK || '').replace(/\/+$/, '');
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
+// libsignal écrit directement sur la console des erreurs de déchiffrement intermittentes
+// (Bad MAC) non fatales : on filtre ces lignes connues pour garder une console lisible.
+(function () {
+  const bruit = function (args) {
+    const s = (args && args.length && args[0] != null) ? String(args[0]) : '';
+    return s.indexOf('Bad MAC') !== -1
+        || s.indexOf('Failed to decrypt message') !== -1
+        || s.indexOf('Closing open session') !== -1
+        || s.indexOf('Closing session:') !== -1
+        || s.indexOf('SessionEntry') !== -1;
+  };
+  const origErr = console.error.bind(console);
+  const origLog = console.log.bind(console);
+  console.error = function () { if (!bruit(arguments)) { origErr.apply(null, arguments); } };
+  console.log = function () { if (!bruit(arguments)) { origLog.apply(null, arguments); } };
+})();
+
 /** Notifie UbiSenderPro d'un événement (message entrant, statut). Best-effort. */
 async function postCallback(chemin, body) {
   if (!CALLBACK) { logger.warn('UBISENDER_CALLBACK non défini : événement ' + chemin + ' ignoré'); return; }
