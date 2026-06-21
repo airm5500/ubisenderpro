@@ -17,18 +17,23 @@
  */
 'use strict';
 
-const express = require('express');
-const pino = require('pino');
-const QRCode = require('qrcode');
-const path = require('path');
-const fs = require('fs');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  makeInMemoryStore,
-  DisconnectReason
-} = require('@whiskeysockets/baileys');
+import express from 'express';
+import pino from 'pino';
+import QRCode from 'qrcode';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import * as baileys from '@whiskeysockets/baileys';
+
+// Destructuration tolérante (l'API Baileys évolue selon les versions).
+const makeWASocket = baileys.default || baileys.makeWASocket;
+const useMultiFileAuthState = baileys.useMultiFileAuthState;
+const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
+const makeInMemoryStore = baileys.makeInMemoryStore; // peut être absent
+const DisconnectReason = baileys.DisconnectReason || {};
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const API_TOKEN = process.env.WA_WEB_TOKEN || '';
@@ -79,8 +84,11 @@ async function startSession(id) {
   s.starting = false;
 
   // Store en mémoire : capture contacts/chats/groupes pour l'extraction.
-  if (!s.store) { s.store = makeInMemoryStore({ logger: pino({ level: 'silent' }) }); }
-  try { s.store.bind(sock.ev); } catch (e) { /* ignore */ }
+  if (!s.store && typeof makeInMemoryStore === 'function') {
+    try { s.store = makeInMemoryStore({ logger: pino({ level: 'silent' }) }); }
+    catch (e) { s.store = null; }
+  }
+  if (s.store) { try { s.store.bind(sock.ev); } catch (e) { /* ignore */ } }
 
   sock.ev.on('creds.update', saveCreds);
 

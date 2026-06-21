@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Service compagnon WhatsApp Web (Baileys) pour UbiSenderPro - canal non officiel : connexion par QR, envoi texte/média, filtre de numéros.",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
