@@ -23,6 +23,10 @@ public class WaBulkRequest {
     private Integer pauseMin;
     private Integer pauseMax;
     private String destinatairesTexte;
+    private Boolean planifier;
+    private String dateProgrammee; // "yyyy-MM-dd HH:mm" ou ISO
+    private Integer heureDebut;
+    private Integer heureFin;
 
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
@@ -58,4 +62,12 @@ public class WaBulkRequest {
     public void setPauseMax(Integer pauseMax) { this.pauseMax = pauseMax; }
     public String getDestinatairesTexte() { return destinatairesTexte; }
     public void setDestinatairesTexte(String destinatairesTexte) { this.destinatairesTexte = destinatairesTexte; }
+    public Boolean getPlanifier() { return planifier; }
+    public void setPlanifier(Boolean planifier) { this.planifier = planifier; }
+    public String getDateProgrammee() { return dateProgrammee; }
+    public void setDateProgrammee(String dateProgrammee) { this.dateProgrammee = dateProgrammee; }
+    public Integer getHeureDebut() { return heureDebut; }
+    public void setHeureDebut(Integer heureDebut) { this.heureDebut = heureDebut; }
+    public Integer getHeureFin() { return heureFin; }
+    public void setHeureFin(Integer heureFin) { this.heureFin = heureFin; }
 }

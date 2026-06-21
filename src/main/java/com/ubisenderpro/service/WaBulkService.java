@@ -41,6 +41,12 @@ public class WaBulkService {
         if (req.getPauseApres() != null) j.setPauseApres(req.getPauseApres());
         if (req.getPauseMin() != null) j.setPauseMin(req.getPauseMin());
         if (req.getPauseMax() != null) j.setPauseMax(req.getPauseMax());
+        if (req.getHeureDebut() != null) j.setHeureDebut(req.getHeureDebut());
+        if (req.getHeureFin() != null) j.setHeureFin(req.getHeureFin());
+        if (Boolean.TRUE.equals(req.getPlanifier())) {
+            j.setDateProgrammee(parseDate(req.getDateProgrammee()));
+            j.setStatut("PLANIFIEE");
+        }
 
         if (vide(j.getMsg1()) && vide(j.getMsg2()) && vide(j.getMsg3())
                 && vide(j.getMsg4()) && vide(j.getMsg5()) && vide(j.getMediaUrl())) {
@@ -86,6 +92,37 @@ public class WaBulkService {
         return em.createQuery(
                 "SELECT d FROM WaBulkDestinataire d WHERE d.jobId = :j ORDER BY d.id", WaBulkDestinataire.class)
                 .setParameter("j", jobId).getResultList();
+    }
+
+    /** Travaux planifiés dont l'heure de démarrage est atteinte (pour le planificateur). */
+    public List<WaBulkJob> planifiesDus() {
+        return em.createQuery(
+                "SELECT j FROM WaBulkJob j WHERE j.statut = 'PLANIFIEE' " +
+                "AND (j.dateProgrammee IS NULL OR j.dateProgrammee <= :now)", WaBulkJob.class)
+                .setParameter("now", java.time.LocalDateTime.now()).getResultList();
+    }
+
+    /** La plage horaire autorisée du travail est-elle ouverte maintenant ? */
+    public static boolean dansFenetre(WaBulkJob j) {
+        int d = j.getHeureDebut(), f = j.getHeureFin();
+        if (d == f) { return true; } // pas de restriction
+        int h = java.time.LocalTime.now().getHour();
+        return d < f ? (h >= d && h < f) : (h >= d || h < f); // fenêtre traversant minuit
+    }
+
+    private java.time.LocalDateTime parseDate(String s) {
+        if (s == null || s.trim().isEmpty()) { return java.time.LocalDateTime.now(); }
+        String v = s.trim().replace('T', ' ');
+        try {
+            if (v.length() <= 16) { // yyyy-MM-dd HH:mm
+                return java.time.LocalDateTime.parse(v,
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            }
+            return java.time.LocalDateTime.parse(v.substring(0, 19),
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (Exception e) {
+            return java.time.LocalDateTime.now();
+        }
     }
 
     private boolean vide(String s) { return s == null || s.trim().isEmpty(); }

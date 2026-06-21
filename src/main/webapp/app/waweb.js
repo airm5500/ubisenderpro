@@ -243,6 +243,22 @@ Usp.waweb.bulkPanel = function () {
                 { xtype: 'numberfield', name: 'pauseMin', fieldLabel: 'msgs:', value: 10, minValue: 0, labelWidth: 40 },
                 { xtype: 'numberfield', name: 'pauseMax', fieldLabel: 'à', value: 20, minValue: 0, labelWidth: 20 }
             ] },
+            { xtype: 'fieldcontainer', fieldLabel: 'Envoi', layout: 'hbox', items: [
+                { xtype: 'radiogroup', columns: 2, width: 230, items: [
+                    { boxLabel: 'Immédiat', name: 'envoiMode', inputValue: 'now', checked: true },
+                    { boxLabel: 'Planifié', name: 'envoiMode', inputValue: 'plan' }
+                ] },
+                { xtype: 'datefield', name: 'dateProg', format: 'Y-m-d', submitFormat: 'Y-m-d',
+                  emptyText: 'Date', width: 120, margin: '0 0 0 8' },
+                { xtype: 'timefield', name: 'heureProg', format: 'H:i', submitFormat: 'H:i',
+                  emptyText: 'Heure', width: 90, margin: '0 0 0 6', increment: 15 }
+            ] },
+            { xtype: 'fieldcontainer', fieldLabel: 'Plage horaire', layout: 'hbox',
+              defaults: { width: 80, labelWidth: 24 }, items: [
+                { xtype: 'numberfield', name: 'heureDebut', fieldLabel: 'de', minValue: 0, maxValue: 23, value: 0 },
+                { xtype: 'numberfield', name: 'heureFin', fieldLabel: 'à', minValue: 0, maxValue: 23, value: 0 },
+                { xtype: 'displayfield', value: 'h (0 / 0 = sans restriction)', width: 180 }
+            ] },
             { xtype: 'fieldcontainer', fieldLabel: 'Destinataires', layout: 'hbox', items: [
                 { xtype: 'button', text: 'Choisir des clients…', handler: function (b) {
                     Usp.waweb.choisirClients(b.up('form')); } },
@@ -253,20 +269,33 @@ Usp.waweb.bulkPanel = function () {
               emptyText: 'Une ligne par contact : numero;nom\nEx. 2250700000000;Awa' }
         ],
         bbar: ['->',
-            { text: 'Créer et lancer', formBind: true, handler: function (b) {
+            { text: 'Créer / lancer', formBind: true, handler: function (b) {
                 var f = b.up('form').getForm();
                 if (!f.isValid()) { return; }
                 var v = f.getValues();
                 v.mediaUrl = media.url; v.mediaType = media.type; v.mediaMime = media.mime; v.mediaNom = media.nom;
+                var planifie = v.envoiMode === 'plan';
+                v.planifier = planifie;
+                if (planifie) {
+                    if (!v.dateProg) { Ext.Msg.alert('Info', 'Choisissez une date de programmation.'); return; }
+                    v.dateProgrammee = v.dateProg + ' ' + (v.heureProg || '09:00');
+                }
                 Usp.ajax({ url: '/wa-bulk', method: 'POST', jsonData: v,
                     success: function (resp) {
                         var job = Ext.decode(resp.responseText);
-                        Usp.ajax({ url: '/wa-bulk/' + job.id + '/launch', method: 'POST',
-                            success: function () {
-                                Ext.Msg.alert('Lancé', 'Envoi en masse démarré (' + job.total + ' destinataires).');
-                                if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); }
-                            },
-                            failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Lancement impossible.')); } });
+                        var fini = function () { if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); } };
+                        if (planifie) {
+                            Ext.Msg.alert('Planifié', 'Envoi planifié (' + job.total + ' destinataires) pour le ' +
+                                v.dateProgrammee + '.');
+                            fini();
+                        } else {
+                            Usp.ajax({ url: '/wa-bulk/' + job.id + '/launch', method: 'POST',
+                                success: function () {
+                                    Ext.Msg.alert('Lancé', 'Envoi démarré (' + job.total + ' destinataires).');
+                                    fini();
+                                },
+                                failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Lancement impossible.')); } });
+                        }
                     },
                     failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Création impossible.')); } });
             } }

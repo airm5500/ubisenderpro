@@ -58,9 +58,19 @@ public class WaBulkJob {
     @Column(name = "pause_max", nullable = false)
     private int pauseMax = 20;
 
-    /** BROUILLON | EN_COURS | TERMINEE | SUSPENDUE */
+    /** BROUILLON | PLANIFIEE | EN_COURS | TERMINEE | SUSPENDUE */
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
+
+    /** Date/heure de démarrage planifié (null = immédiat). */
+    @Column(name = "date_programmee")
+    private java.time.LocalDateTime dateProgrammee;
+
+    /** Plage horaire autorisée [heureDebut, heureFin[ ; 0/0 = pas de restriction. */
+    @Column(name = "heure_debut", nullable = false)
+    private int heureDebut = 0;
+    @Column(name = "heure_fin", nullable = false)
+    private int heureFin = 0;
 
     @Column(name = "total", nullable = false)
     private int total = 0;
@@ -111,6 +121,12 @@ public class WaBulkJob {
     public void setPauseMax(int pauseMax) { this.pauseMax = pauseMax; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
+    public java.time.LocalDateTime getDateProgrammee() { return dateProgrammee; }
+    public void setDateProgrammee(java.time.LocalDateTime dateProgrammee) { this.dateProgrammee = dateProgrammee; }
+    public int getHeureDebut() { return heureDebut; }
+    public void setHeureDebut(int heureDebut) { this.heureDebut = heureDebut; }
+    public int getHeureFin() { return heureFin; }
+    public void setHeureFin(int heureFin) { this.heureFin = heureFin; }
     public int getTotal() { return total; }
     public void setTotal(int total) { this.total = total; }
     public int getEnvoyes() { return envoyes; }
