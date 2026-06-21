@@ -67,14 +67,23 @@ Deux variables, par **variable d'environnement OS** *ou* **propriété JVM** :
 
 **Option A — propriétés JVM (recommandé sur Payara)** :
 
+> ⚠️ `asadmin create-jvm-options` utilise le `:` comme séparateur : il faut
+> **échapper les deux-points de l'URL** avec `\:`.
+
 ```bash
-asadmin create-jvm-options "-DWA_WEB_URL=http://localhost:3000"
+asadmin create-jvm-options "-DWA_WEB_URL=http\://localhost\:3000"
 asadmin create-jvm-options "-DWA_WEB_TOKEN=un-secret-partage"
 asadmin restart-domain
+# Vérifier :
+asadmin list-jvm-options | grep WA_WEB
 ```
 
-**Option B — variables d'environnement OS** : les exporter avant de démarrer
-Payara (ou dans l'unité systemd du service).
+**Option B — variables d'environnement OS (sans échappement)** : `WaWebConfig`
+lit d'abord la variable d'environnement, puis la propriété JVM.
+
+- Linux/systemd : exporter `WA_WEB_URL` / `WA_WEB_TOKEN` avant de démarrer Payara.
+- Windows : `setx WA_WEB_URL "http://localhost:3000" /M` puis
+  `setx WA_WEB_TOKEN "un-secret-partage" /M`, et **redémarrer le service Payara**.
 
 > Si Payara et le service Node sont sur des machines/containers différents,
 > remplacer `localhost` par l'hôte joignable (et ouvrir le port 3000 en réseau privé).
