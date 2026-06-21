@@ -438,6 +438,7 @@ CREATE TABLE usp_whatsapp_account (
     verify_token VARCHAR(150),
     api_version VARCHAR(20) NOT NULL DEFAULT 'v19.0',
     actif BOOLEAN NOT NULL DEFAULT TRUE,
+    mode_test BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL,
     updated_at DATETIME,
     PRIMARY KEY (id),

@@ -18,7 +18,7 @@ Usp.settings.jsonStore = function (url, fields) {
 Usp.settings.accountsPanel = function () {
     var store = Usp.settings.jsonStore('/whatsapp/accounts',
         ['id', 'libelle', 'phoneNumberId', 'businessAccountId', 'numeroAffiche',
-         'accessToken', 'verifyToken', 'apiVersion', 'actif']);
+         'accessToken', 'verifyToken', 'apiVersion', 'actif', 'modeTest']);
 
     return {
         xtype: 'grid', title: 'Comptes WhatsApp', store: store,
@@ -27,7 +27,9 @@ Usp.settings.accountsPanel = function () {
             { text: 'Phone Number ID', dataIndex: 'phoneNumberId', width: 160 },
             { text: 'Numéro affiché', dataIndex: 'numeroAffiche', width: 150 },
             { text: 'API', dataIndex: 'apiVersion', width: 70 },
-            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+            { text: 'Actif', dataIndex: 'actif', width: 60, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+            { text: 'Mode test', dataIndex: 'modeTest', width: 80,
+              renderer: function (v) { return v ? '🧪 Oui' : 'Non'; } }
         ],
         tbar: [
             { text: 'Nouveau compte', handler: function () { Usp.settings.accountForm(store, null); } },
@@ -59,7 +61,9 @@ Usp.settings.accountForm = function (store, rec) {
                 { xtype: 'textareafield', name: 'accessToken', fieldLabel: 'Access token', height: 60 },
                 { xtype: 'textfield', name: 'verifyToken', fieldLabel: 'Verify token (webhook)' },
                 { xtype: 'textfield', name: 'apiVersion', fieldLabel: 'Version API', value: 'v19.0' },
-                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: true }
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: true },
+                { xtype: 'checkbox', name: 'modeTest', fieldLabel: 'Mode test',
+                  boxLabel: 'Simuler les envois (aucun appel à Meta) — pour tester sans token' }
             ]
         }],
         buttons: [{
@@ -69,6 +73,7 @@ Usp.settings.accountForm = function (store, rec) {
                 if (!form.isValid()) { return; }
                 var data = form.getValues();
                 data.actif = form.findField('actif').getValue();
+                data.modeTest = form.findField('modeTest').getValue();
                 Usp.ajax({
                     url: rec ? '/whatsapp/accounts/' + rec.get('id') : '/whatsapp/accounts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,

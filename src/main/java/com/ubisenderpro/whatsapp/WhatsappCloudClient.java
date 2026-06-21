@@ -96,6 +96,9 @@ public class WhatsappCloudClient {
      * pour l'envoi de messages média sans hébergement public.
      */
     public UploadResult uploadMedia(byte[] contenu, String mimeType, String nomFichier) {
+        if (account.isModeTest()) {
+            return new UploadResult(true, "SIMULATED-MEDIA-" + UUID.randomUUID(), null);
+        }
         HttpURLConnection conn = null;
         try {
             String endpoint = String.format("https://graph.facebook.com/%s/%s/media",
@@ -232,6 +235,10 @@ public class WhatsappCloudClient {
     }
 
     private SendResult envoyer(Map<String, Object> body) {
+        if (account.isModeTest()) {
+            // Mode test : aucun appel à Meta, on simule un envoi réussi.
+            return new SendResult(true, "SIMULATED-" + UUID.randomUUID(), null);
+        }
         HttpURLConnection conn = null;
         try {
             String endpoint = String.format("https://graph.facebook.com/%s/%s/messages",
