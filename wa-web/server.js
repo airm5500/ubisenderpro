@@ -255,21 +255,23 @@ app.post('/sessions/:id/send', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
     const jid = await resolveJid(s.sock, req.body.to);
+    logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
     res.json({ success: true, id: r && r.key ? r.key.id : null });
-  } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
+  } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 
 app.post('/sessions/:id/send-media', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
     const jid = await resolveJid(s.sock, req.body.to);
+    logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi média');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
     res.json({ success: true, id: r && r.key ? r.key.id : null });
-  } catch (e) { res.status(502).json({ success: false, erreur: String(e.message || e) }); }
+  } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 
 app.post('/sessions/:id/check-numbers', async (req, res) => {
