@@ -72,6 +72,13 @@ public class ArticleResource {
         return Response.noContent().build();
     }
 
+    /** Articles concernés par un code promo (aperçu avant mise à jour). */
+    @GET
+    @Path("/promo")
+    public java.util.List<Article> articlesPromo(@QueryParam("code") String code) {
+        return articleService.parCodePromo(code);
+    }
+
     /** Mise à jour sélective des dates d'une promotion (tous les articles du code promo). */
     @POST
     @Path("/promo")

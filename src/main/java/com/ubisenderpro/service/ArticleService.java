@@ -48,6 +48,13 @@ public class ArticleService {
         return l.isEmpty() ? Optional.empty() : Optional.of(l.get(0));
     }
 
+    /** Articles portant un code promo donné (aperçu avant mise à jour). */
+    public List<Article> parCodePromo(String codePromo) {
+        if (codePromo == null || codePromo.trim().isEmpty()) { return new ArrayList<>(); }
+        return em.createQuery("SELECT a FROM Article a WHERE a.codePromo = :c ORDER BY a.designation", Article.class)
+                .setParameter("c", codePromo.trim()).getResultList();
+    }
+
     /**
      * Mise à jour sélective des dates d'une promotion : applique les dates à tous
      * les articles portant ce code promo. @return le nombre d'articles mis à jour.

@@ -122,21 +122,52 @@ Usp.catalogue.importArticles = function (store) {
 
 /* Mise à jour sélective des dates d'une promotion (tous les articles du code promo). */
 Usp.catalogue.majPromo = function (store) {
+    var fmtDate = function (v) { return v ? String(v).substring(0, 10) : ''; };
+    var apercu = Ext.create('Ext.data.Store', {
+        fields: ['pscode', 'designation', 'dateDebutPromotion', 'dateFinPromotion'] });
+
+    var charger = function (win) {
+        var code = win.down('[name=codePromo]').getValue();
+        if (!code) { apercu.removeAll(); return; }
+        Usp.ajax({ url: '/articles/promo?code=' + encodeURIComponent(code), method: 'GET',
+            success: function (resp) {
+                apercu.loadData(Ext.decode(resp.responseText) || []);
+                win.down('#promoCount').update(apercu.getCount() + ' article(s) concerné(s)');
+            },
+            failure: function () { apercu.removeAll(); } });
+    };
+
     var win = Ext.create('Ext.window.Window', {
-        title: 'Mettre à jour une promotion', width: 420, modal: true, bodyPadding: 12,
-        items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
-            items: [
+        title: 'Mettre à jour une promotion', width: 620, height: 460, modal: true, layout: 'border',
+        items: [
+            { region: 'north', xtype: 'form', border: false, bodyPadding: 12, defaults: { anchor: '100%' },
+              items: [
                 { xtype: 'displayfield',
                   value: 'Applique les dates à <b>tous les articles</b> portant ce code promo.' },
-                { xtype: 'textfield', name: 'codePromo', fieldLabel: 'Code promo', allowBlank: false,
-                  emptyText: 'ex. 6553' },
-                { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y',
-                  submitFormat: 'Y-m-d', editable: false },
-                { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y',
-                  submitFormat: 'Y-m-d', editable: false }
-            ]
-        }],
+                { xtype: 'fieldcontainer', layout: 'hbox', items: [
+                    { xtype: 'textfield', name: 'codePromo', fieldLabel: 'Code promo', allowBlank: false,
+                      emptyText: 'ex. 6553', width: 280, labelWidth: 90,
+                      listeners: { change: { buffer: 400, fn: function (f) { charger(f.up('window')); } } } },
+                    { xtype: 'button', text: 'Aperçu', margin: '0 0 0 8',
+                      handler: function (b) { charger(b.up('window')); } }
+                ] },
+                { xtype: 'fieldcontainer', layout: 'hbox', items: [
+                    { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y',
+                      submitFormat: 'Y-m-d', editable: false, width: 230, labelWidth: 90 },
+                    { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y',
+                      submitFormat: 'Y-m-d', editable: false, width: 210, labelWidth: 80, margin: '0 0 0 8' }
+                ] }
+              ] },
+            { region: 'center', xtype: 'grid', store: apercu, title: 'Articles concernés',
+              columns: [
+                { text: 'PS Code', dataIndex: 'pscode', width: 100 },
+                { text: 'Désignation', dataIndex: 'designation', flex: 1 },
+                { text: 'Début actuel', dataIndex: 'dateDebutPromotion', width: 100, renderer: fmtDate },
+                { text: 'Fin actuelle', dataIndex: 'dateFinPromotion', width: 100, renderer: fmtDate }
+              ],
+              tbar: [{ xtype: 'tbtext', itemId: 'promoCount', text: 'Saisissez un code promo' }]
+            }
+        ],
         buttons: [{
             text: 'Valider', formBind: true, handler: function (b) {
                 var f = b.up('window').down('form').getForm();
