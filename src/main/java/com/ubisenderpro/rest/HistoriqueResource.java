@@ -28,7 +28,9 @@ public class HistoriqueResource {
     public List<HistoriqueLigne> lister(@QueryParam("canal") String canal,
                                         @QueryParam("type") String type,
                                         @QueryParam("q") String q,
+                                        @QueryParam("dateDebut") String dateDebut,
+                                        @QueryParam("dateFin") String dateFin,
                                         @QueryParam("limit") Integer limit) {
-        return service.lister(canal, type, q, limit == null ? 200 : limit);
+        return service.lister(canal, type, q, dateDebut, dateFin, limit == null ? 200 : limit);
     }
 }

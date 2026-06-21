@@ -3,12 +3,16 @@ package com.ubisenderpro.rest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ubisenderpro.entity.WaWarmup;
 import com.ubisenderpro.entity.WaWebSession;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.WaWarmupService;
 import com.ubisenderpro.service.WaWebSessionService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.ArrayList;
@@ -28,6 +32,8 @@ public class WaWebResource {
     private WaWebSessionService service;
     @EJB
     private WaWarmupService warmupService;
+    @Inject
+    private SessionStore sessionStore;
 
     @GET
     @Path("/sessions")
@@ -88,22 +94,31 @@ public class WaWebResource {
     // ----- Envoi unitaire (composeur dual-canal) -----
     @POST
     @Path("/sessions/{id}/send")
-    public Response envoyerTexte(@PathParam("id") Long id, Map<String, Object> body) {
+    public Response envoyerTexte(@PathParam("id") Long id, Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         String numero = body == null ? null : String.valueOf(body.get("numero"));
         String texte = body == null ? "" : String.valueOf(body.getOrDefault("texte", ""));
-        return Response.ok(service.envoyerTexte(id, numero, texte)).build();
+        return Response.ok(service.envoyerTexte(id, numero, texte, utilisateurId(authHeader))).build();
     }
 
     @POST
     @Path("/sessions/{id}/send-media")
-    public Response envoyerMedia(@PathParam("id") Long id, Map<String, Object> body) {
+    public Response envoyerMedia(@PathParam("id") Long id, Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         String numero = body == null ? null : String.valueOf(body.get("numero"));
         String type = body != null && body.get("type") != null ? String.valueOf(body.get("type")) : "image";
         String url = body != null && body.get("mediaUrl") != null ? String.valueOf(body.get("mediaUrl")) : null;
         String caption = body != null && body.get("caption") != null ? String.valueOf(body.get("caption")) : null;
         String mime = body != null && body.get("mimeType") != null ? String.valueOf(body.get("mimeType")) : null;
         String nom = body != null && body.get("fileName") != null ? String.valueOf(body.get("fileName")) : null;
-        return Response.ok(service.envoyerMedia(id, numero, type, url, caption, mime, nom)).build();
+        return Response.ok(service.envoyerMedia(id, numero, type, url, caption, mime, nom,
+                utilisateurId(authHeader))).build();
+    }
+
+    private Long utilisateurId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        return u == null ? null : u.getId();
     }
 
     // ----- Réchauffeur (warming) -----

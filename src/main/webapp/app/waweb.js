@@ -303,9 +303,16 @@ Usp.waweb.bulkPanel = function () {
             { xtype: 'fieldcontainer', fieldLabel: 'Destinataires', layout: 'hbox', items: [
                 { xtype: 'button', text: 'Choisir des clients…', handler: function (b) {
                     Usp.waweb.choisirClients(b.up('form')); } },
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true, margin: '0 0 0 6',
+                  buttonText: 'Importer un fichier (.csv/.xlsx)…',
+                  listeners: { change: function (f) { Usp.waweb.importerFichierBulk(f); } } },
                 { xtype: 'component', itemId: 'destCount', margin: '5 0 0 10',
                   html: '<span style="color:#888;font-size:11px">ou saisie manuelle ci-dessous</span>' }
             ] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888;font-size:11px">Fichier ponctuel (non enregistré), structure ' +
+                     '<b>numero;nomclient</b> — ex. <code>2250707075510;konate mariam</code>. ' +
+                     'Les numéros sont vérifiés ; les lignes non conformes sont proposées à la correction.</span>' },
             { xtype: 'textareafield', name: 'destinatairesTexte', height: 110,
               emptyText: 'Une ligne par contact : numero;nom\nEx. 2250700000000;Awa' }
         ],
@@ -326,12 +333,18 @@ Usp.waweb.bulkPanel = function () {
                 var fini = function (msgTitre, msgTexte) {
                     formPanel.setLoading(false);
                     if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); }
-                    Ext.Msg.confirm(msgTitre, msgTexte + '<br/><br/>Réinitialiser la vue ?', function (btn) {
-                        if (btn === 'yes') {
-                            f.reset();
-                            media.url = null; media.type = null; media.mime = null; media.nom = null;
-                            var pj = formPanel.down('#pjInfo');
-                            if (pj) { pj.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                    Ext.Msg.show({
+                        title: msgTitre,
+                        msg: msgTexte + ' &nbsp; Réinitialiser la vue ?',
+                        width: 560, minWidth: 560,
+                        buttons: Ext.Msg.YESNO, icon: Ext.Msg.QUESTION,
+                        fn: function (btn) {
+                            if (btn === 'yes') {
+                                f.reset();
+                                media.url = null; media.type = null; media.mime = null; media.nom = null;
+                                var pj = formPanel.down('#pjInfo');
+                                if (pj) { pj.update('<span style="color:#888;font-size:11px">optionnel (image/vidéo/document)</span>'); }
+                            }
                         }
                     });
                 };
@@ -356,16 +369,32 @@ Usp.waweb.bulkPanel = function () {
 /* ---------- Historique des envois ---------- */
 Usp.waweb.historyPanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom', 'statut', 'total', 'envoyes', 'echoues'],
+        fields: ['id', 'nom', 'statut', 'total', 'envoyes', 'echoues', 'derniereErreur', 'createdAt'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/wa-bulk',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
     });
     Usp.waweb._jobStore = store;
+    var dateFiltre = { d: null, f: null };
+    var appliquerFiltre = function () {
+        store.clearFilter(true);
+        if (dateFiltre.d || dateFiltre.f) {
+            store.filterBy(function (rec) {
+                var c = rec.get('createdAt');
+                if (!c) { return false; }
+                var dt = new Date(String(c).substring(0, 10) + 'T00:00:00');
+                if (dateFiltre.d && dt < dateFiltre.d) { return false; }
+                if (dateFiltre.f && dt > dateFiltre.f) { return false; }
+                return true;
+            });
+        }
+    };
     return {
-        xtype: 'grid', title: 'Historique des envois', store: store,
+        xtype: 'grid', title: 'Historique des envois Web', store: store,
         columns: [
             { text: '#', dataIndex: 'id', width: 50 },
+            { text: 'Date', dataIndex: 'createdAt', width: 120, renderer: function (v) {
+                return v ? Ext.String.htmlEncode(String(v).replace('T', ' ').substring(0, 16)) : ''; } },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Statut', dataIndex: 'statut', width: 110 },
             { text: 'Total', dataIndex: 'total', width: 70 },
@@ -373,10 +402,14 @@ Usp.waweb.historyPanel = function () {
                 return '<span style="color:#2e7d32;font-weight:bold">' + (v || 0) + '</span>'; } },
             { text: 'Échoués', dataIndex: 'echoues', width: 90, renderer: function (v) {
                 return v ? '<span style="color:#c62828;font-weight:bold">' + v + '</span>' : '0'; } },
-            { text: 'Détail', width: 80, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Motif d\'échec', dataIndex: 'derniereErreur', width: 200, renderer: function (v, m) {
+                if (!v) { return ''; }
+                m.tdAttr = 'data-qtip="' + Ext.String.htmlEncode(v).replace(/"/g, '&quot;') + '"';
+                return '<span style="color:#c62828">' + Ext.String.htmlEncode(v) + '</span>'; } },
+            { text: 'Détail', width: 70, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
-                  return '<span class="wa-det" title="Voir le détail (contenu + statuts)" ' +
-                      'style="cursor:pointer;font-size:16px">🔍</span>';
+                  return '<span class="wa-det" data-qtip="Voir le détail (contenu + statuts par destinataire)" ' +
+                      'title="Voir le détail (contenu + statuts)" style="cursor:pointer;font-size:16px">🔍</span>';
               } },
             { text: 'Renvoi échecs', width: 110, sortable: false, menuDisabled: true, dataIndex: 'echoues',
               renderer: function (v) {
@@ -384,7 +417,21 @@ Usp.waweb.historyPanel = function () {
                       'style="cursor:pointer;color:#c62828">🔄 ' + v + '</span>' : '';
               } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }],
+        tbar: [
+            { xtype: 'datefield', itemId: 'hDateDebut', emptyText: 'Du', width: 110, format: 'd/m/Y',
+              editable: false, listeners: { select: function (f) {
+                  dateFiltre.d = Ext.Date.clearTime(f.getValue()); appliquerFiltre(); } } },
+            { xtype: 'datefield', itemId: 'hDateFin', emptyText: 'Au', width: 110, format: 'd/m/Y',
+              editable: false, listeners: { select: function (f) {
+                  var d = f.getValue(); d.setHours(23, 59, 59, 999); dateFiltre.f = d; appliquerFiltre(); } } },
+            { text: 'Réinitialiser', handler: function (b) {
+                var tb = b.up('toolbar');
+                tb.down('#hDateDebut').setValue(''); tb.down('#hDateFin').setValue('');
+                dateFiltre.d = null; dateFiltre.f = null; appliquerFiltre();
+            } },
+            '->',
+            { text: 'Rafraîchir', handler: function () { store.load(); } }
+        ],
         listeners: {
             cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
                 if (e.getTarget('.wa-relancer')) { Usp.waweb.relancerEchecs(rec.get('id'), store); return; }
@@ -655,6 +702,117 @@ Usp.waweb.choisirClients = function (formPanel) {
 };
 
 /* Détail d'un envoi : contenu + statut par destinataire (réussi/échoué). */
+/* Ajoute des lignes « numero;nom » à la zone des destinataires de l'envoi de masse. */
+Usp.waweb._ajouterDestinataires = function (lignes) {
+    var ta = Ext.ComponentQuery.query('textareafield[name=destinatairesTexte]')[0];
+    if (!ta) { return; }
+    var courant = (ta.getValue() || '').replace(/\s+$/, '');
+    var ajout = lignes.join('\n');
+    ta.setValue(courant ? courant + '\n' + ajout : ajout);
+    var dc = Ext.ComponentQuery.query('#destCount')[0];
+    if (dc) {
+        dc.update('<span style="color:#2e7d32;font-size:11px">✔ ' + lignes.length +
+            ' destinataire(s) ajouté(s)</span>');
+    }
+};
+
+/* Vérifie côté client un numéro (mêmes règles que le serveur). @return motif ou null si conforme. */
+Usp.waweb._motifNumero = function (numero) {
+    var brut = String(numero || '').replace(/[^0-9]/g, '');
+    if (!brut) { return 'Numéro manquant'; }
+    var norm = Usp.normNumero(numero);
+    if (norm.length < 8) { return 'Numéro trop court'; }
+    if (norm.length > 15) { return 'Numéro trop long'; }
+    return null;
+};
+
+/* Importe un fichier CSV/Excel ponctuel : ajoute les conformes, réconcilie les autres. */
+Usp.waweb.importerFichierBulk = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/wa-bulk/preparer-fichier', method: 'POST',
+            jsonData: { fichierBase64: b64, nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                var valides = r.valides || [], invalides = r.invalides || [];
+                if (valides.length) {
+                    Usp.waweb._ajouterDestinataires(valides.map(function (v) {
+                        return v.numero + ';' + (v.nom || ''); }));
+                }
+                if (invalides.length) {
+                    Usp.waweb.reconciliation(invalides);
+                } else {
+                    Ext.Msg.alert('Import', valides.length + ' destinataire(s) conforme(s) ajouté(s). ' +
+                        'Aucune ligne à corriger.');
+                }
+            },
+            failure: function (resp) {
+                Ext.Msg.alert('Erreur', Usp.waweb.err(resp, 'Lecture du fichier impossible.'));
+            }
+        });
+    };
+    reader.readAsDataURL(file);
+};
+
+/* Vue de réconciliation : corriger les lignes non conformes puis réintégrer celles qui le deviennent. */
+Usp.waweb.reconciliation = function (invalides) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['numero', 'nom', 'raison'],
+        data: invalides
+    });
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Destinataires non reconnus (' + invalides.length + ')',
+        width: 620, height: 420, modal: true, layout: 'fit', bodyPadding: 0,
+        items: [{
+            xtype: 'grid', store: store,
+            plugins: [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })],
+            tbar: [{ xtype: 'tbtext', text: 'Corrigez les numéros (double-clic), puis réintégrez les conformes :' }],
+            columns: [
+                { text: 'Numéro', dataIndex: 'numero', width: 180, editor: { xtype: 'textfield' } },
+                { text: 'Nom', dataIndex: 'nom', flex: 1, editor: { xtype: 'textfield' } },
+                { text: 'Motif', dataIndex: 'raison', width: 160, renderer: function (v) {
+                    return '<span style="color:#c62828">' + Ext.String.htmlEncode(v || '') + '</span>'; } }
+            ]
+        }],
+        buttons: [
+            { text: 'Exporter (CSV)', handler: function () {
+                var lignes = ['numero;nom;motif'];
+                store.each(function (rec) {
+                    lignes.push((rec.get('numero') || '') + ';' + (rec.get('nom') || '') + ';' + (rec.get('raison') || ''));
+                });
+                var uri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lignes.join('\n'));
+                var a = document.createElement('a');
+                a.href = uri; a.download = 'destinataires_non_reconnus.csv';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            } },
+            '->',
+            { text: 'Réintégrer les conformes', handler: function () {
+                var ok = [], aRetirer = [];
+                store.each(function (rec) {
+                    var motif = Usp.waweb._motifNumero(rec.get('numero'));
+                    if (motif) { rec.set('raison', motif); }
+                    else { ok.push(Usp.normNumero(rec.get('numero')) + ';' + (rec.get('nom') || '')); aRetirer.push(rec); }
+                });
+                if (ok.length) { Usp.waweb._ajouterDestinataires(ok); }
+                Ext.Array.each(aRetirer, function (rec) { store.remove(rec); });
+                if (store.getCount() === 0) {
+                    Ext.Msg.alert('Réconciliation', ok.length + ' destinataire(s) réintégré(s). Tout est conforme.');
+                    win.close();
+                } else {
+                    Ext.Msg.alert('Réconciliation', ok.length + ' réintégré(s). ' +
+                        store.getCount() + ' ligne(s) restent non conformes.');
+                }
+            } },
+            { text: 'Fermer', handler: function () { win.close(); } }
+        ]
+    });
+    win.show();
+};
+
 Usp.waweb.detailEnvoi = function (jobId) {
     var dStore = Ext.create('Ext.data.Store', {
         fields: ['numero', 'nom', 'statut', 'erreur'],

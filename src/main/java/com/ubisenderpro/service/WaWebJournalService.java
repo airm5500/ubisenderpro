@@ -45,7 +45,8 @@ public class WaWebJournalService {
     }
 
     /** Enregistre un message sortant WEB dans la conversation. */
-    public void enregistrerSortant(Long sessionId, String numero, String type, String contenu, String waMessageId) {
+    public void enregistrerSortant(Long sessionId, String numero, String type, String contenu,
+                                   String waMessageId, Long expediteurId) {
         Conversation conv = conversation(sessionId, numero, null);
         Message m = new Message();
         m.setConversationId(conv.getId());
@@ -54,6 +55,7 @@ public class WaWebJournalService {
         m.setContenu(contenu);
         m.setStatut("ENVOYE");
         m.setWaMessageId(waMessageId);
+        m.setExpediteurId(expediteurId);
         em.persist(m);
         conv.setDernierMessage(contenu);
         conv.setDateDernierMessage(LocalDateTime.now());

@@ -27,12 +27,15 @@ public class HistoriqueService {
     private static final int PAR_SOURCE = 500;
 
     /**
-     * @param canal filtre canal (API/WEB) ou null/"" pour tous
-     * @param type  filtre type (DISCUSSION/CAMPAGNE/ENVOI_MASSE) ou null/"" pour tous
-     * @param q     recherche libre (numéro, nom, libellé) ou null/"" pour tout
-     * @param limit nombre maximal de lignes renvoyées (défaut 200)
+     * @param canal      filtre canal (API/WEB) ou null/"" pour tous
+     * @param type       filtre type (DISCUSSION/CAMPAGNE/ENVOI_MASSE) ou null/"" pour tous
+     * @param q          recherche libre (numéro, nom, libellé) ou null/"" pour tout
+     * @param dateDebut  date min (yyyy-MM-dd) incluse ou null/"" pour aucune borne
+     * @param dateFin    date max (yyyy-MM-dd) incluse ou null/"" pour aucune borne
+     * @param limit      nombre maximal de lignes renvoyées (défaut 200)
      */
-    public List<HistoriqueLigne> lister(String canal, String type, String q, int limit) {
+    public List<HistoriqueLigne> lister(String canal, String type, String q,
+                                        String dateDebut, String dateFin, int limit) {
         List<HistoriqueLigne> lignes = new ArrayList<>();
         boolean tousTypes = vide(type);
 
@@ -42,11 +45,15 @@ public class HistoriqueService {
 
         String canalF = vide(canal) ? null : canal.trim().toUpperCase();
         String recherche = vide(q) ? null : q.trim().toLowerCase();
+        LocalDateTime debut = jour(dateDebut, false);
+        LocalDateTime fin = jour(dateFin, true);
 
         List<HistoriqueLigne> filtrees = new ArrayList<>();
         for (HistoriqueLigne l : lignes) {
             if (canalF != null && !canalF.equals(l.getCanal())) { continue; }
             if (recherche != null && !correspond(l, recherche)) { continue; }
+            if (debut != null && (l.getDate() == null || l.getDate().isBefore(debut))) { continue; }
+            if (fin != null && (l.getDate() == null || l.getDate().isAfter(fin))) { continue; }
             filtrees.add(l);
         }
 
@@ -55,6 +62,15 @@ public class HistoriqueService {
 
         int max = limit <= 0 ? 200 : limit;
         return filtrees.size() > max ? filtrees.subList(0, max) : filtrees;
+    }
+
+    /** Convertit "yyyy-MM-dd" en début (00:00) ou fin (23:59:59) de journée ; null si vide/invalide. */
+    private static LocalDateTime jour(String s, boolean finJournee) {
+        if (vide(s)) { return null; }
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(s.trim().substring(0, 10));
+            return finJournee ? d.atTime(23, 59, 59) : d.atStartOfDay();
+        } catch (Exception e) { return null; }
     }
 
     private boolean correspond(HistoriqueLigne l, String r) {

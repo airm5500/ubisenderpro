@@ -41,6 +41,19 @@ public class WaBulkResource {
         return service.destinataires(id);
     }
 
+    /** Analyse un fichier CSV/Excel de destinataires sans rien enregistrer (envoi ponctuel). */
+    @POST
+    @Path("/preparer-fichier")
+    public Response preparerFichier(Map<String, Object> body) {
+        try {
+            String b64 = body == null ? null : (String) body.get("fichierBase64");
+            String nom = body == null ? null : (String) body.get("nomFichier");
+            return Response.ok(service.preparerFichier(b64, nom)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
+        }
+    }
+
     @POST
     public Response creer(WaBulkRequest req) {
         try {

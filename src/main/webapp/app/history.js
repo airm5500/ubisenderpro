@@ -55,7 +55,13 @@ Usp.history.panel = function () {
         var canal = tb.down('#fCanal').getValue() || '';
         var type = tb.down('#fType').getValue() || '';
         var q = tb.down('#fRecherche').getValue() || '';
-        store.getProxy().extraParams = { limit: 300, canal: canal, type: type, q: q };
+        var dd = tb.down('#fDateDebut').getValue();
+        var df = tb.down('#fDateFin').getValue();
+        store.getProxy().extraParams = {
+            limit: 300, canal: canal, type: type, q: q,
+            dateDebut: dd ? Ext.Date.format(dd, 'Y-m-d') : '',
+            dateFin: df ? Ext.Date.format(df, 'Y-m-d') : ''
+        };
         store.load();
     };
 
@@ -99,14 +105,22 @@ Usp.history.panel = function () {
               store: [['', 'Tous'], ['DISCUSSION', 'Discussion'],
                       ['CAMPAGNE', 'Campagne'], ['ENVOI_MASSE', 'Envoi de masse']],
               listeners: { select: function (c) { recharger(c.up('grid')); } } },
-            { xtype: 'textfield', itemId: 'fRecherche', emptyText: 'Numéro, nom, contenu…', width: 220,
+            { xtype: 'datefield', itemId: 'fDateDebut', emptyText: 'Du', width: 110,
+              format: 'd/m/Y', editable: false,
+              listeners: { select: function (f) { recharger(f.up('grid')); } } },
+            { xtype: 'datefield', itemId: 'fDateFin', emptyText: 'Au', width: 110,
+              format: 'd/m/Y', editable: false,
+              listeners: { select: function (f) { recharger(f.up('grid')); } } },
+            { xtype: 'textfield', itemId: 'fRecherche', emptyText: 'Numéro, nom, contenu…', width: 200,
               listeners: { specialkey: function (f, e) {
                   if (e.getKey() === e.ENTER) { recharger(f.up('grid')); } } } },
             { text: 'Filtrer', handler: function (b) { recharger(b.up('grid')); } },
             { text: 'Réinitialiser', handler: function (b) {
                 var g = b.up('grid'), tb = g.down('toolbar');
                 tb.down('#fCanal').setValue(''); tb.down('#fType').setValue('');
-                tb.down('#fRecherche').setValue(''); recharger(g);
+                tb.down('#fRecherche').setValue('');
+                tb.down('#fDateDebut').setValue(''); tb.down('#fDateFin').setValue('');
+                recharger(g);
             } },
             '->',
             { text: 'Rafraîchir', handler: function (b) { recharger(b.up('grid')); } }

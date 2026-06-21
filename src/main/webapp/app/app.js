@@ -456,6 +456,9 @@ Usp.ouvrirVue = function (vue) {
 
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
+    // Boutons des boîtes de dialogue en français (Oui / Non).
+    Ext.MessageBox.buttonText.yes = 'Oui';
+    Ext.MessageBox.buttonText.no = 'Non';
     Ext.create('Ext.container.Viewport', {
         layout: 'border',
         items: [
@@ -467,7 +470,15 @@ Usp.showMain = function () {
                     { xtype: 'tbtext', text: '<b>UbiSenderPro</b>' },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
-                    { text: 'Déconnexion', cls: 'usp-logout', handler: function () {
+                    { tooltip: 'Déconnexion', cls: 'usp-logout',
+                      text: '<img src="data:image/svg+xml,' +
+                          "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
+                          "stroke='%23c62828' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E" +
+                          "%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E" +
+                          "%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cline x1='21' y1='12' x2='9' y2='12'/%3E" +
+                          "%3C/svg%3E" +
+                          '" style="width:18px;height:18px;vertical-align:middle"/>',
+                      handler: function () {
                         Usp.ajax({ url: '/auth/logout', method: 'POST' });
                         location.reload();
                     } }
