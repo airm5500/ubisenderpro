@@ -258,7 +258,7 @@ app.post('/sessions/:id/send', async (req, res) => {
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
-    res.json({ success: true, id: r && r.key ? r.key.id : null });
+    res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 
@@ -270,7 +270,7 @@ app.post('/sessions/:id/send-media', async (req, res) => {
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
-    res.json({ success: true, id: r && r.key ? r.key.id : null });
+    res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
 

@@ -87,7 +87,7 @@ public class WaWebSessionService {
     // ----- Envoi unitaire (composeur dual-canal) -----
     public java.util.Map<String, Object> envoyerTexte(Long id, String numero, String texte) {
         WaWebClient.SendResult r = client.sendText(nodeId(id), numero, texte);
-        if (r.success) { journal.enregistrerSortant(id, numero, "TEXTE", texte, r.id); }
+        if (r.success) { journal.enregistrerSortant(id, numeroCanonique(r, numero), "TEXTE", texte, r.id); }
         return resultat(r);
     }
 
@@ -96,9 +96,14 @@ public class WaWebSessionService {
         WaWebClient.SendResult r = client.sendMedia(nodeId(id), numero, type, mediaUrl, caption, mime, nom);
         if (r.success) {
             String contenu = caption != null && !caption.isEmpty() ? caption : ("[" + (type == null ? "média" : type) + "]");
-            journal.enregistrerSortant(id, numero, type, contenu, r.id);
+            journal.enregistrerSortant(id, numeroCanonique(r, numero), type, contenu, r.id);
         }
         return resultat(r);
+    }
+
+    /** Numéro tel que WhatsApp le reconnaît (peut différer de la saisie), pour cohérence avec les entrants. */
+    private String numeroCanonique(WaWebClient.SendResult r, String saisi) {
+        return r.waNumber != null && !r.waNumber.isEmpty() ? r.waNumber : saisi;
     }
 
     private java.util.Map<String, Object> resultat(WaWebClient.SendResult r) {
