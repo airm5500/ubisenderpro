@@ -3,11 +3,13 @@ package com.ubisenderpro.rest;
 import com.ubisenderpro.dto.PageResult;
 import com.ubisenderpro.entity.Client;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.service.AuditService;
 import com.ubisenderpro.service.ClientService;
 import com.ubisenderpro.service.ContactService;
 
 import javax.ejb.EJB;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Optional;
@@ -22,6 +24,8 @@ public class ClientResource {
     private ClientService clientService;
     @EJB
     private ContactService contactService;
+    @EJB
+    private AuditService auditService;
 
     @GET
     public PageResult<Client> lister(@QueryParam("q") String recherche,
@@ -51,26 +55,33 @@ public class ClientResource {
 
     @POST
     @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
-    public Response creer(Client client) {
-        return Response.status(Response.Status.CREATED).entity(clientService.creer(client)).build();
+    public Response creer(Client client, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        Client c = clientService.creer(client);
+        auditService.tracer(auth, "CREATION", "Client", c.getId(), c.getNomCompte());
+        return Response.status(Response.Status.CREATED).entity(c).build();
     }
 
     @PUT
     @Path("/{id}")
     @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
-    public Response modifier(@PathParam("id") Long id, Client client) {
+    public Response modifier(@PathParam("id") Long id, Client client,
+                             @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         if (!clientService.parId(id).isPresent()) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         client.setId(id);
-        return Response.ok(clientService.modifier(client)).build();
+        Client c = clientService.modifier(client);
+        auditService.tracer(auth, "MODIFICATION", "Client", id, c.getNomCompte());
+        return Response.ok(c).build();
     }
 
     @DELETE
     @Path("/{id}")
     @Secured(roles = {"ADMIN"})
-    public Response supprimer(@PathParam("id") Long id) {
+    public Response supprimer(@PathParam("id") Long id,
+                              @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         clientService.supprimer(id);
+        auditService.tracer(auth, "SUPPRESSION", "Client", id, null);
         return Response.noContent().build();
     }
 }

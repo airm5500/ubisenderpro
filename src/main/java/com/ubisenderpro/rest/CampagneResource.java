@@ -26,6 +26,8 @@ public class CampagneResource {
     private CampagneService campagneService;
     @EJB
     private CampagneSenderAsync campagneSenderAsync;
+    @EJB
+    private com.ubisenderpro.service.AuditService auditService;
     @Inject
     private SessionStore sessionStore;
 
@@ -43,7 +45,9 @@ public class CampagneResource {
     @Secured(roles = {"ADMIN", "MARKETING"})
     public Response creer(Campagne c, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         c.setCreePar(utilisateurId(authHeader));
-        return Response.status(Response.Status.CREATED).entity(campagneService.creer(c)).build();
+        Campagne cree = campagneService.creer(c);
+        auditService.tracer(authHeader, "CREATION", "Campagne", cree.getId(), cree.getNom());
+        return Response.status(Response.Status.CREATED).entity(cree).build();
     }
 
     private Long utilisateurId(String authHeader) {
@@ -75,9 +79,10 @@ public class CampagneResource {
     @POST
     @Path("/{id}/launch")
     @Secured(roles = {"ADMIN", "MARKETING"})
-    public Response lancer(@PathParam("id") Long id) {
+    public Response lancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         campagneService.verifierLancable(id);
         campagneSenderAsync.lancer(id);
+        auditService.tracer(authHeader, "LANCEMENT", "Campagne", id, null);
         return Response.status(Response.Status.ACCEPTED)
                 .entity(Map.of("statut", "EN_COURS", "message", "Campagne lancée en arrière-plan")).build();
     }

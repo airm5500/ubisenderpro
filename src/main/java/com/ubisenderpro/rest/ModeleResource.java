@@ -2,10 +2,12 @@ package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.service.AuditService;
 import com.ubisenderpro.service.ModeleService;
 
 import javax.ejb.EJB;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
@@ -18,6 +20,8 @@ public class ModeleResource {
 
     @EJB
     private ModeleService modeleService;
+    @EJB
+    private AuditService auditService;
 
     @GET
     public List<ModeleMessage> lister() { return modeleService.lister(); }
@@ -31,23 +35,30 @@ public class ModeleResource {
 
     @POST
     @Secured(roles = {"ADMIN", "MARKETING"})
-    public Response creer(ModeleMessage m) {
-        return Response.status(Response.Status.CREATED).entity(modeleService.creer(m)).build();
+    public Response creer(ModeleMessage m, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        ModeleMessage cree = modeleService.creer(m);
+        auditService.tracer(auth, "CREATION", "Modele", cree.getId(), cree.getNom());
+        return Response.status(Response.Status.CREATED).entity(cree).build();
     }
 
     @PUT
     @Path("/{id}")
     @Secured(roles = {"ADMIN", "MARKETING"})
-    public Response modifier(@PathParam("id") Long id, ModeleMessage m) {
+    public Response modifier(@PathParam("id") Long id, ModeleMessage m,
+                             @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         m.setId(id);
-        return Response.ok(modeleService.modifier(m)).build();
+        ModeleMessage mod = modeleService.modifier(m);
+        auditService.tracer(auth, "MODIFICATION", "Modele", id, mod.getNom());
+        return Response.ok(mod).build();
     }
 
     @DELETE
     @Path("/{id}")
     @Secured(roles = {"ADMIN", "MARKETING"})
-    public Response supprimer(@PathParam("id") Long id) {
+    public Response supprimer(@PathParam("id") Long id,
+                              @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         modeleService.supprimer(id);
+        auditService.tracer(auth, "SUPPRESSION", "Modele", id, null);
         return Response.noContent().build();
     }
 }

@@ -28,6 +28,8 @@ public class WaBulkResource {
 
     @EJB
     private WaBulkService service;
+    @EJB
+    private com.ubisenderpro.service.AuditService auditService;
     @Inject
     private SessionStore sessionStore;
 
@@ -64,6 +66,7 @@ public class WaBulkResource {
     public Response creer(WaBulkRequest req, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         try {
             WaBulkJob j = service.creer(req, utilisateurId(authHeader));
+            auditService.tracer(authHeader, "CREATION", "EnvoiMasse", j.getId(), j.getNom());
             return Response.status(Response.Status.CREATED).entity(j).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
@@ -88,9 +91,11 @@ public class WaBulkResource {
 
     @POST
     @Path("/{id}/launch")
-    public Response lancer(@PathParam("id") Long id) {
+    public Response lancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         try {
-            return Response.ok(service.lancer(id)).build();
+            WaBulkJob j = service.lancer(id);
+            auditService.tracer(authHeader, "LANCEMENT", "EnvoiMasse", id, null);
+            return Response.ok(j).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity(erreur(e.getMessage())).build();
         }
