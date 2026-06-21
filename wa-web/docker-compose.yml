@@ -1,0 +1,21 @@
+# Service compagnon WhatsApp Web pour UbiSenderPro.
+# Lancer : WA_WEB_TOKEN=monsecret docker compose up -d
+# Le backend Java (Payara) appelle ce service via WA_WEB_URL (ex. http://localhost:3000)
+# en envoyant l'en-tête X-Api-Token: ${WA_WEB_TOKEN}.
+services:
+  wa-web:
+    build: .
+    container_name: ubisender-wa-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - WA_WEB_TOKEN=${WA_WEB_TOKEN:-changeme}
+      - WA_WEB_DATA=/app/data
+      - LOG_LEVEL=info
+    volumes:
+      - wa_web_data:/app/data
+
+volumes:
+  wa_web_data:
