@@ -456,14 +456,35 @@ Usp.segmentationsManager = function () {
             listeners: {
                 cellclick: function (g, td, ci, rec, tr, ri, e) {
                     if (e.getTarget('.seg-del')) {
+                        // Désactive une segmentation utilisée par des clients (au lieu de la supprimer).
+                        var desactiver = function () {
+                            var data = rec.getData();
+                            data.actif = false;
+                            Usp.ajax({ url: '/segmentations/' + rec.get('id'), method: 'PUT', jsonData: data,
+                                success: function () { store.load(); },
+                                failure: function (resp) {
+                                    var m = 'Désactivation impossible.';
+                                    try { m = Ext.decode(resp.responseText).erreur || m; } catch (ex) {}
+                                    Ext.Msg.alert('Erreur', m);
+                                } });
+                        };
                         Ext.Msg.confirm('Supprimer', 'Supprimer la segmentation « ' + Ext.String.htmlEncode(rec.get('libelle')) + ' » ?',
                             function (btn) { if (btn === 'yes') {
                                 Usp.ajax({ url: '/segmentations/' + rec.get('id'), method: 'DELETE',
                                     success: function () { store.load(); },
                                     failure: function (resp) {
+                                        // Suppression refusée (clients rattachés) -> proposer la désactivation.
                                         var msg = 'Suppression impossible.';
                                         try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (ex) {}
-                                        Ext.Msg.alert('Erreur', msg);
+                                        Ext.Msg.show({
+                                            title: 'Suppression impossible',
+                                            msg: msg + '<br/><br/>Voulez-vous plutôt la <b>désactiver</b> ? '
+                                                + 'Elle ne sera plus proposée pour de nouveaux clients, sans toucher aux clients existants.',
+                                            buttons: Ext.Msg.YESNO,
+                                            buttonText: { yes: 'Désactiver', no: 'Annuler' },
+                                            icon: Ext.Msg.QUESTION,
+                                            fn: function (b) { if (b === 'yes') { desactiver(); } }
+                                        });
                                     } });
                             } });
                         return;
