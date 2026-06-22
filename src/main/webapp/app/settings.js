@@ -116,7 +116,8 @@ Usp.settings.templatesPanel = function () {
 Usp.settings.templateForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le modèle' : 'Nouveau modèle',
-        width: 680, height: 600, modal: true, layout: 'fit',
+        width: 820, height: 700, maxHeight: Ext.getBody().getViewSize().height - 40,
+        maximizable: true, modal: true, layout: 'fit',
         items: [{
             xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' },
             items: [

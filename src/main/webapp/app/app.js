@@ -1095,6 +1095,49 @@ Ext.apply(Ext.form.field.VTypes, {
     numwaMask: /[0-9]/
 });
 
+/* ------------------------------------------------------------------
+ * Améliorations globales des fenêtres de création / modification :
+ *  #2 bouton « Annuler » auto-ajouté à côté d'« Enregistrer/Valider/Créer »
+ *  #1 bouton « agrandir » (maximize) sur ces mêmes fenêtres
+ *  #3 focus automatique sur le premier champ de saisie à l'ouverture
+ * ------------------------------------------------------------------ */
+Ext.override(Ext.window.Window, {
+    initComponent: function () {
+        var b = this.buttons;
+        if (Ext.isArray(b)) {
+            var aEnregistrer = false, aAnnuler = false;
+            Ext.each(b, function (it) {
+                var t = (it && it.text) ? String(it.text) : '';
+                if (t.indexOf('Enregistrer') >= 0 || t.indexOf('Valider') >= 0 || t.indexOf('Créer') >= 0) { aEnregistrer = true; }
+                if (t.indexOf('Annuler') >= 0 || t.indexOf('Fermer') >= 0) { aAnnuler = true; }
+            });
+            if (aEnregistrer) {
+                if (!aAnnuler) {
+                    b.push({ text: 'Annuler', tooltip: 'Fermer sans enregistrer',
+                        handler: function (btn) { var w = btn.up('window'); if (w) { w.close(); } } });
+                }
+                if (this.maximizable === undefined) { this.maximizable = true; }
+            }
+        }
+        this.callParent(arguments);
+    },
+    afterShow: function () {
+        this.callParent(arguments);
+        var w = this;
+        Ext.defer(function () {
+            if (w.isDestroyed) { return; }
+            var champs = w.query ? w.query('field') : [];
+            for (var i = 0; i < champs.length; i++) {
+                var f = champs[i], xt = f.getXType && f.getXType();
+                if (xt === 'displayfield' || xt === 'hiddenfield' || xt === 'hidden') { continue; }
+                if (f.isDisabled && f.isDisabled()) { continue; }
+                if (!f.rendered || f.hidden) { continue; }
+                if (f.focus) { f.focus(false); break; }
+            }
+        }, 60);
+    }
+});
+
 Ext.onReady(function () {
     Ext.QuickTips.init();
     Usp.showLogin();
