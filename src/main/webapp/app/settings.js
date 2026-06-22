@@ -21,7 +21,7 @@ Usp.settings.accountsPanel = function () {
          'accessToken', 'verifyToken', 'apiVersion', 'actif', 'modeTest']);
 
     return {
-        xtype: 'grid', title: 'Comptes WhatsApp', store: store,
+        xtype: 'grid', title: '📱 Comptes WhatsApp', store: store,
         columns: [
             { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
             { text: 'Phone Number ID', dataIndex: 'phoneNumberId', width: 160 },
@@ -32,7 +32,7 @@ Usp.settings.accountsPanel = function () {
               renderer: function (v) { return v ? '🧪 Oui' : 'Non'; } }
         ],
         tbar: [
-            { text: 'Nouveau compte', handler: function () { Usp.settings.accountForm(store, null); } },
+            { text: '➕ Nouveau compte', tooltip: 'Configurer un nouveau compte WhatsApp', handler: function () { Usp.settings.accountForm(store, null); } },
             { text: 'Webhook', tooltip: 'Rappel de l\'URL de webhook', handler: function () {
                 var base = window.location.origin + window.location.pathname.replace(/\/$/, '');
                 Ext.Msg.alert('URL de webhook Meta',
@@ -49,9 +49,9 @@ Usp.settings.accountsPanel = function () {
 Usp.settings.accountForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le compte WhatsApp' : 'Nouveau compte WhatsApp',
-        width: 540, modal: true, bodyPadding: 12,
+        width: 680, modal: true, bodyPadding: 12,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 170 },
             items: [
                 { xtype: 'displayfield', value: 'Identifiants issus de Meta for Developers (produit WhatsApp).' },
                 { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false },
@@ -77,7 +77,10 @@ Usp.settings.accountForm = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/whatsapp/accounts/' + rec.get('id') : '/whatsapp/accounts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Compte WhatsApp « ' + (data.libelle || '') + ' »', !!rec);
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
                 });
             }
@@ -95,7 +98,7 @@ Usp.settings.templatesPanel = function () {
          'segmentationId', 'statutApprobation', 'actif']);
 
     return {
-        xtype: 'grid', title: 'Modèles de messages', store: store,
+        xtype: 'grid', title: '📝 Modèles de messages', store: store,
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Type', dataIndex: 'typeModele', width: 120 },
@@ -104,7 +107,7 @@ Usp.settings.templatesPanel = function () {
             { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 }
         ],
         tbar: [
-            { text: 'Nouveau modèle', handler: function () { Usp.settings.templateForm(store, null); } }
+            { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } }
         ],
         listeners: { itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); } }
     };
@@ -113,7 +116,8 @@ Usp.settings.templatesPanel = function () {
 Usp.settings.templateForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le modèle' : 'Nouveau modèle',
-        width: 680, height: 600, modal: true, layout: 'fit',
+        width: 1180, height: 840, maxHeight: Ext.getBody().getViewSize().height - 20,
+        maximizable: true, modal: true, layout: 'fit',
         items: [{
             xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' },
             items: [
@@ -181,10 +185,14 @@ Usp.settings.templateForm = function (store, rec) {
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
+                var vals = form.getValues();
                 Usp.ajax({
                     url: rec ? '/templates/' + rec.get('id') : '/templates',
-                    method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
-                    success: function () { win.close(); store.load(); },
+                    method: rec ? 'PUT' : 'POST', jsonData: vals,
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Modèle « ' + (vals.nom || '') + ' »', !!rec);
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
                 });
             }
@@ -242,7 +250,7 @@ Usp.settings.previewMedia = function (form, url, type) {
 /* ---------- Général : mode de fonctionnement ---------- */
 Usp.settings.generalPanel = function () {
     var form = Ext.create('Ext.form.Panel', {
-        title: 'Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
+        title: '⚙️ Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
         items: [
             { xtype: 'displayfield',
               value: '<b>Mode de fonctionnement</b> : choisissez le canal d\'envoi par défaut.' },
@@ -313,7 +321,7 @@ Usp.settings.generalPanel = function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.favicon', favicon)(function () {
                                 Usp.appliquerFavicon(favicon);
-                                Ext.Msg.alert('OK', 'Paramètres enregistrés.');
+                                Usp.toast('Paramètres enregistrés avec succès.');
                             });
                             });
                         });

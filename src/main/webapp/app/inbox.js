@@ -60,17 +60,17 @@ Usp.inbox.panel = function () {
         bodyStyle: 'background:#efeae2',
         html: '<div style="padding:20px;color:#999">Sélectionnez une conversation</div>',
         tbar: [
-            { text: 'Affecter', handler: function () { Usp.inbox.action('assign'); } },
-            { text: 'Clôturer', handler: function () { Usp.inbox.action('close'); } },
-            { text: 'Rouvrir', handler: function () { Usp.inbox.action('reopen'); } }
+            { text: '👤 Affecter', tooltip: 'Affecter cette discussion à un agent', handler: function () { Usp.inbox.action('assign'); } },
+            { text: '✅ Clôturer', tooltip: 'Marquer la discussion comme traitée (fermée)', handler: function () { Usp.inbox.action('close'); } },
+            { text: '↩️ Rouvrir', tooltip: 'Rouvrir une discussion clôturée', handler: function () { Usp.inbox.action('reopen'); } }
         ],
         bbar: [
             { xtype: 'textfield', itemId: 'msgInput', flex: 1, emptyText: 'Écrire un message...',
               listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { Usp.inbox.envoyer(f); } } } },
-            { xtype: 'button', text: 'Envoyer', handler: function (b) { Usp.inbox.envoyer(b.up('toolbar').down('#msgInput')); } },
-            { xtype: 'button', text: 'Lien', tooltip: 'Envoyer un média par URL publique', handler: function () { Usp.inbox.media(); } },
-            { xtype: 'button', text: 'Joindre', tooltip: 'Téléverser et envoyer un fichier', handler: function () { Usp.inbox.joindre(); } },
-            { xtype: 'button', text: 'Note', tooltip: 'Note interne', handler: function (b) { Usp.inbox.note(b.up('toolbar').down('#msgInput')); } }
+            { xtype: 'button', text: '📨 Envoyer', tooltip: 'Envoyer le message saisi', handler: function (b) { Usp.inbox.envoyer(b.up('toolbar').down('#msgInput')); } },
+            { xtype: 'button', text: '🔗 Lien', tooltip: 'Envoyer un média par URL publique', handler: function () { Usp.inbox.media(); } },
+            { xtype: 'button', text: '📎 Joindre', tooltip: 'Téléverser et envoyer un fichier', handler: function () { Usp.inbox.joindre(); } },
+            { xtype: 'button', text: '🗒️ Note', tooltip: 'Ajouter une note interne (non envoyée au client)', handler: function (b) { Usp.inbox.note(b.up('toolbar').down('#msgInput')); } }
         ]
     });
 
@@ -139,9 +139,9 @@ Usp.inbox.panel = function () {
                     }
                 }],
                 tbar: [
-                    { xtype: 'button', text: 'Nouveau', tooltip: 'Composer un message (texte/image) hors modèle', handler: function () { Usp.inbox.nouveauMessage(); } },
-                    { xtype: 'button', text: 'Toutes', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
-                    { xtype: 'button', text: 'Non lues', handler: function () { convStore.getProxy().extraParams = { statut: 'OUVERTE' }; convStore.load(); } },
+                    { xtype: 'button', text: '➕ Nouveau', tooltip: 'Créer un nouveau chat (message texte/image hors modèle)', handler: function () { Usp.inbox.nouveauMessage(); } },
+                    { xtype: 'button', text: '📋 Toutes', tooltip: 'Afficher toutes les discussions', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
+                    { xtype: 'button', text: '🔔 Non lues', tooltip: 'N\'afficher que les discussions ayant des messages non lus', handler: function () { convStore.getProxy().extraParams = { nonLu: true }; convStore.load(); } },
                     '->',
                     { xtype: 'button', text: 'Rafraîchir', handler: function () { convStore.load(); } }
                 ],
@@ -552,11 +552,29 @@ Usp.inbox.action = function (action) {
     var conv = Usp.inbox.currentConv;
     if (!conv) { return; }
     if (action === 'assign') {
-        Ext.Msg.prompt('Affecter', 'ID de l\'agent :', function (btn, val) {
-            if (btn === 'ok') {
-                Usp.ajax({ url: '/conversations/' + conv.get('id') + '/assign', method: 'POST', jsonData: { agentId: val } });
-            }
+        var store = Ext.create('Ext.data.Store', {
+            fields: ['id', 'nomComplet'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/users/affectables',
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
         });
+        var win = Ext.create('Ext.window.Window', {
+            title: 'Affecter la discussion', width: 360, modal: true, bodyPadding: 14, layout: 'fit',
+            items: [{ xtype: 'combobox', itemId: 'agentCombo', fieldLabel: 'Agent', labelWidth: 60,
+                emptyText: 'Choisir un agent…', store: store, queryMode: 'local', editable: false,
+                valueField: 'id', displayField: 'nomComplet' }],
+            buttons: [
+                { text: 'Affecter', handler: function (b) {
+                    var v = b.up('window').down('#agentCombo').getValue();
+                    if (!v) { Ext.Msg.alert('Affecter', 'Veuillez choisir un agent.'); return; }
+                    Usp.ajax({ url: '/conversations/' + conv.get('id') + '/assign', method: 'POST',
+                        jsonData: { agentId: v },
+                        success: function () { win.close(); Usp.toast('Discussion affectée avec succès.'); },
+                        failure: function () { Ext.Msg.alert('Erreur', 'Affectation impossible.'); } });
+                } },
+                { text: 'Annuler', handler: function (b) { b.up('window').close(); } }
+            ]
+        });
+        win.show();
         return;
     }
     Usp.ajax({ url: '/conversations/' + conv.get('id') + '/' + action, method: 'POST' });

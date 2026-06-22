@@ -33,6 +33,17 @@
         /* Bouton de déconnexion : icône rouge seule. */
         .usp-logout { padding: 0 6px !important; }
 
+        /* Avatar rond de l'utilisateur dans le header (#3). */
+        .usp-avatar {
+            display: inline-block; width: 30px; height: 30px; border-radius: 50%;
+            overflow: hidden; vertical-align: middle;
+            border: 2px solid rgba(255,255,255,.75);
+            background: rgba(255,255,255,.22);
+            box-shadow: 0 1px 3px rgba(0,0,0,.2);
+        }
+        .usp-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .usp-avatar--empty { background: rgba(255,255,255,.25); }
+
         /* ===== Palette ubipharm (teal) — à valider ===== */
         .usp-header, .usp-header.x-toolbar-default {
             background: #0a8f86 !important;

@@ -17,10 +17,11 @@ public class ConversationService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
-    public PageResult<Conversation> lister(String statut, Long agentId, int offset, int limit) {
+    public PageResult<Conversation> lister(String statut, Long agentId, Boolean nonLu, int offset, int limit) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         if (statut != null && !statut.isEmpty()) where.append(" AND c.statut = :statut");
         if (agentId != null) where.append(" AND c.agentId = :agent");
+        if (Boolean.TRUE.equals(nonLu)) where.append(" AND c.nonLu > 0");
 
         var q = em.createQuery("SELECT c FROM Conversation c" + where +
                 " ORDER BY c.dateDernierMessage DESC", Conversation.class);

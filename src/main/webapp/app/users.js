@@ -42,7 +42,7 @@ Usp.users.gridPanel = function () {
     });
 
     return {
-        xtype: 'grid', title: 'Utilisateurs', store: store,
+        xtype: 'grid', title: '👤 Utilisateurs', store: store,
         columns: [
             { text: '', dataIndex: 'avatar', width: 44, align: 'center', sortable: false, menuDisabled: true,
               renderer: function (v) { return '<span style="font-size:16px">' + (v || '👤') + '</span>'; } },
@@ -65,8 +65,8 @@ Usp.users.gridPanel = function () {
               } }
         ],
         tbar: [
-            { text: 'Nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
-            { text: 'Rafraîchir', handler: function () { store.load(); } }
+            { text: '➕ Nouvel utilisateur', tooltip: 'Créer un nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
+            { text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Utilisateurs')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -112,24 +112,38 @@ Usp.users.form = function (store, rec) {
     });
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur',
-        width: 540, maxHeight: 560, modal: true, bodyPadding: 12, autoScroll: true,
+        width: 660, maxHeight: 580, modal: true, bodyPadding: 12, autoScroll: true,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, layout: { type: 'hbox', align: 'stretch' },
             items: [
-                { xtype: 'textfield', name: 'login', fieldLabel: 'Login', allowBlank: false, disabled: !!rec },
-                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
-                { xtype: 'combobox', name: 'avatar', fieldLabel: 'Icône', value: '👤', editable: false,
-                  queryMode: 'local', valueField: 'v', displayField: 'v',
-                  store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
-                  listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
-                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
-                { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
-                  emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
-                { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
-                    { xtype: 'displayfield',
-                      value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
-                    { xtype: 'checkboxgroup', columns: 2, items: roleItems }
-                ] }
+                // Colonne gauche : champs du compte utilisateur.
+                { xtype: 'container', flex: 1, layout: 'anchor', defaults: { anchor: '100%' }, items: [
+                    { xtype: 'textfield', name: 'login', fieldLabel: 'Login', allowBlank: false, disabled: !!rec },
+                    { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
+                    { xtype: 'combobox', name: 'avatar', fieldLabel: 'Icône', value: '👤', editable: false,
+                      queryMode: 'local', valueField: 'v', displayField: 'v',
+                      store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
+                      listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
+                    { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                    { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
+                      emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
+                    { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
+                        { xtype: 'displayfield',
+                          value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
+                        { xtype: 'checkboxgroup', columns: 2, items: roleItems }
+                    ] }
+                ] },
+                // Colonne droite : photo de profil (cadre + Parcourir).
+                { xtype: 'container', width: 168, margin: '0 0 0 16',
+                  layout: { type: 'vbox', align: 'center' }, items: [
+                    { xtype: 'component', itemId: 'photoPreview', html: Usp.users.photoImgHtml(null) },
+                    { xtype: 'filefield', itemId: 'photoFile', buttonOnly: true, hideLabel: true,
+                      buttonText: 'Parcourir…', margin: '10 0 0 0', width: 150,
+                      listeners: { change: function (f) { Usp.users.chargerPhoto(f); } } },
+                    { xtype: 'button', itemId: 'photoClear', text: 'Retirer la photo', margin: '6 0 0 0',
+                      handler: function (b) { Usp.users.definirPhoto(b.up('window'), ''); } },
+                    { xtype: 'hidden', name: 'photo', itemId: 'photoField' }
+                  ] }
             ]
         }],
         buttons: [{
@@ -146,6 +160,7 @@ Usp.users.form = function (store, rec) {
                     login: form.findField('login').getValue(),
                     nomComplet: form.findField('nomComplet').getValue(),
                     avatar: form.findField('avatar').getValue(),
+                    photo: form.findField('photo').getValue(),
                     email: form.findField('email').getValue(),
                     motDePasse: form.findField('motDePasse').getValue(),
                     roles: roles
@@ -153,7 +168,10 @@ Usp.users.form = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/users/' + rec.get('id') : '/users',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Utilisateur « ' + (data.nomComplet || data.login) + ' »', !!rec);
+                    },
                     failure: function (resp) {
                         var msg = 'Enregistrement impossible.';
                         try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
@@ -177,7 +195,87 @@ Usp.users.form = function (store, rec) {
             var cb = form.findField('role_' + code);
             if (cb) { cb.setValue(true); }
         });
+        // Charge la photo existante dans le cadre (hors des listes, à la demande).
+        Usp.ajax({ url: '/users/' + rec.get('id') + '/photo', method: 'GET',
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText || '{}');
+                Usp.users.definirPhoto(win, r.photo || '');
+            } });
     }
+};
+
+/* Rendu du cadre photo (image ou placeholder « Aucune photo »). */
+Usp.users.photoImgHtml = function (dataUri) {
+    if (dataUri) {
+        return '<div style="width:150px;height:150px;border-radius:14px;overflow:hidden;' +
+            'border:1px solid #ccc;background:#f5f5f5">' +
+            '<img src="' + dataUri + '" style="width:100%;height:100%;object-fit:cover"/></div>';
+    }
+    return '<div style="width:150px;height:150px;border-radius:14px;border:1px dashed #bbb;' +
+        'background:#fafafa;display:flex;align-items:center;justify-content:center;' +
+        'color:#aaa;font-size:13px;text-align:center">Aucune<br/>photo</div>';
+};
+
+/* Met à jour le cadre + le champ caché photo de la fenêtre utilisateur. */
+Usp.users.definirPhoto = function (win, dataUri) {
+    var prev = win.down('#photoPreview');
+    var field = win.down('#photoField');
+    if (field) { field.setValue(dataUri || ''); }
+    if (prev) { prev.update(Usp.users.photoImgHtml(dataUri || null)); }
+};
+
+/* Lit le fichier image choisi (max 2 Mo) et l'affiche dans le cadre. */
+Usp.users.chargerPhoto = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    if (!/^image\//.test(file.type)) {
+        Ext.Msg.alert('Photo', 'Veuillez choisir un fichier image.');
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        Ext.Msg.alert('Photo', 'Image trop lourde (maximum 2 Mo).');
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) { Usp.users.definirPhoto(f.up('window'), e.target.result); };
+    reader.readAsDataURL(file);
+};
+
+/* Barre de filtres réutilisable (#1) : utilisateur + période (+ action).
+   Pose les extraParams du store et recharge. */
+Usp.users.filtreItems = function (store, withAction) {
+    var appliquer = function (tb) {
+        var p = { limit: 300 };
+        var login = tb.down('#fLogin').getValue();
+        var d1 = tb.down('#fDtStart').getValue();
+        var d2 = tb.down('#fDtEnd').getValue();
+        if (login) { p.login = login; }
+        if (d1) { p.dtStart = Ext.Date.format(d1, 'Y-m-d'); }
+        if (d2) { p.dtEnd = Ext.Date.format(d2, 'Y-m-d'); }
+        if (withAction) { var a = tb.down('#fAction').getValue(); if (a) { p.action = a; } }
+        store.getProxy().extraParams = p;
+        store.load();
+    };
+    var surEntree = function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } };
+    var items = [
+        { xtype: 'textfield', itemId: 'fLogin', emptyText: 'Utilisateur (login)', width: 150,
+          listeners: { specialkey: surEntree } },
+        { xtype: 'datefield', itemId: 'fDtStart', emptyText: 'Du…', format: 'd/m/Y', width: 105, editable: false },
+        { xtype: 'datefield', itemId: 'fDtEnd', emptyText: 'Au…', format: 'd/m/Y', width: 105, editable: false }
+    ];
+    if (withAction) {
+        items.push({ xtype: 'textfield', itemId: 'fAction', emptyText: 'Action (ex. CREATION)', width: 150,
+            listeners: { specialkey: surEntree } });
+    }
+    items.push({ text: '🔎 Filtrer', tooltip: 'Appliquer les filtres', handler: function (b) { appliquer(b.up('toolbar')); } });
+    items.push({ text: '♻️ Réinitialiser', tooltip: 'Effacer les filtres', handler: function (b) {
+        var tb = b.up('toolbar');
+        tb.down('#fLogin').setValue(''); tb.down('#fDtStart').setValue(''); tb.down('#fDtEnd').setValue('');
+        if (withAction) { tb.down('#fAction').setValue(''); }
+        store.getProxy().extraParams = { limit: 300 }; store.load();
+    } });
+    items.push('-');
+    return items;
 };
 
 /* ---------- Historique des connexions ---------- */
@@ -190,7 +288,7 @@ Usp.users.connexionsPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: 'Historique des connexions', store: store,
+        xtype: 'grid', title: '🔑 Historique des connexions', store: store,
         columns: [
             { text: 'Utilisateur', dataIndex: 'login', width: 140 },
             { text: 'Connexion', dataIndex: 'connexionAt', width: 140, renderer: Usp.users.fmtDate },
@@ -206,7 +304,8 @@ Usp.users.connexionsPanel = function () {
                       'style="cursor:pointer;font-size:15px">🔍</span>';
               } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+        tbar: Usp.users.filtreItems(store, false)
+            .concat([{ text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Historique des connexions')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -256,14 +355,14 @@ Usp.users.activiteSession = function (rec) {
 /* ---------- Journal d'actions ---------- */
 Usp.users.journalPanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['login', 'action', 'entite', 'entiteId', 'details', 'adresseIp', 'createdAt'],
+        fields: ['login', 'action', 'entite', 'entiteId', 'details', 'adresseIp', 'poste', 'createdAt'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/users/journal',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
             extraParams: { limit: 300 } },
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: 'Journal d\'actions', store: store,
+        xtype: 'grid', title: '📜 Journal d\'actions', store: store,
         columns: [
             { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: Usp.users.fmtDate },
             { text: 'Utilisateur', dataIndex: 'login', width: 130 },
@@ -272,9 +371,11 @@ Usp.users.journalPanel = function () {
             { text: 'Réf.', dataIndex: 'entiteId', width: 60 },
             { text: 'Détails', dataIndex: 'details', flex: 1, renderer: function (v) {
                 return v ? Ext.String.htmlEncode(v) : ''; } },
-            { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 }
+            { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 },
+            { text: 'Poste', dataIndex: 'poste', width: 150, renderer: function (v) { return v || ''; } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+        tbar: Usp.users.filtreItems(store, true)
+            .concat([{ text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Journal d\'actions'))
     };
 };

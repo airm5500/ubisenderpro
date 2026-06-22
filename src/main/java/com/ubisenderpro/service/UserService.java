@@ -52,6 +52,18 @@ public class UserService {
 
     public Optional<Utilisateur> parId(Long id) { return Optional.ofNullable(em.find(Utilisateur.class, id)); }
 
+    /** Liste légère des utilisateurs actifs (id + nom) pour l'affectation de discussions (#5). */
+    public List<Map<String, Object>> listerAffectables() {
+        return em.createQuery("SELECT u FROM Utilisateur u WHERE u.actif = true ORDER BY u.nomComplet", Utilisateur.class)
+                .getResultList().stream()
+                .map(u -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", u.getId());
+                    m.put("nomComplet", u.getNomComplet());
+                    return m;
+                }).collect(Collectors.toList());
+    }
+
     public boolean loginExiste(String login, Long exclureId) {
         List<Utilisateur> l = em.createQuery(
                 "SELECT u FROM Utilisateur u WHERE u.login = :l", Utilisateur.class)
@@ -64,6 +76,7 @@ public class UserService {
         u.setLogin(req.getLogin());
         u.setNomComplet(req.getNomComplet());
         u.setAvatar(req.getAvatar());
+        u.setPhoto(req.getPhoto());
         u.setEmail(req.getEmail());
         u.setActif(req.getActif() == null || req.getActif());
         String mdp = (req.getMotDePasse() == null || req.getMotDePasse().isEmpty())
@@ -79,6 +92,8 @@ public class UserService {
         if (u == null) return null;
         if (req.getNomComplet() != null) u.setNomComplet(req.getNomComplet());
         if (req.getAvatar() != null) u.setAvatar(req.getAvatar());
+        // Photo : "" efface, valeur = remplace, null = inchangée.
+        if (req.getPhoto() != null) u.setPhoto(req.getPhoto().isEmpty() ? null : req.getPhoto());
         if (req.getEmail() != null) u.setEmail(req.getEmail());
         if (req.getActif() != null) u.setActif(req.getActif());
         if (req.getMotDePasse() != null && !req.getMotDePasse().isEmpty()) {

@@ -1,12 +1,16 @@
 package com.ubisenderpro.service;
 
 import com.ubisenderpro.entity.JournalAction;
+import com.ubisenderpro.security.RequestContext;
 
 import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
 import javax.ejb.TransactionAttributeType;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.persistence.TypedQuery;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,15 +32,31 @@ public class JournalService {
         ja.setEntite(entite);
         ja.setEntiteId(entiteId);
         ja.setDetails(details);
-        ja.setAdresseIp(ip);
+        // IP fournie par l'appelant sinon celle de la requête courante ; poste = reverse-DNS (#11).
+        ja.setAdresseIp((ip != null && !ip.isEmpty()) ? ip : RequestContext.ip());
+        ja.setPoste(RequestContext.poste());
         em.persist(ja);
     }
 
     /** Journal d'actions le plus récent (hors navigation, gardée pour le détail de session). */
     public List<JournalAction> lister(int limit) {
-        return em.createQuery("SELECT j FROM JournalAction j WHERE j.action <> 'NAVIGATION' " +
-                "ORDER BY j.createdAt DESC", JournalAction.class)
-                .setMaxResults(limit <= 0 ? 200 : limit).getResultList();
+        return lister(null, null, null, null, limit);
+    }
+
+    /**
+     * Journal d'actions filtré (#1) : par utilisateur, type d'action et période.
+     */
+    public List<JournalAction> lister(String login, String action, LocalDateTime debut, LocalDateTime fin, int limit) {
+        StringBuilder q = new StringBuilder("SELECT j FROM JournalAction j WHERE j.action <> 'NAVIGATION'");
+        List<Object[]> params = new ArrayList<>();
+        if (login != null && !login.isEmpty()) { q.append(" AND j.login = :l"); params.add(new Object[]{"l", login}); }
+        if (action != null && !action.isEmpty()) { q.append(" AND j.action = :a"); params.add(new Object[]{"a", action}); }
+        if (debut != null) { q.append(" AND j.createdAt >= :d"); params.add(new Object[]{"d", debut}); }
+        if (fin != null) { q.append(" AND j.createdAt <= :f"); params.add(new Object[]{"f", fin}); }
+        q.append(" ORDER BY j.createdAt DESC");
+        TypedQuery<JournalAction> query = em.createQuery(q.toString(), JournalAction.class);
+        for (Object[] p : params) { query.setParameter((String) p[0], p[1]); }
+        return query.setMaxResults(limit <= 0 ? 200 : limit).getResultList();
     }
 
     /** Activité (menus parcourus + actions) d'un utilisateur sur une fenêtre de temps (session). */

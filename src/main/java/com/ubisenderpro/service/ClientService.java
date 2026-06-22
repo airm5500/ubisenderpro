@@ -18,8 +18,8 @@ public class ClientService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
-    public PageResult<Client> rechercher(String recherche, String agence, String region,
-                                         Long segmentationId, int offset, int limit) {
+    public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
+                                         Long segmentationId, Boolean actif, int offset, int limit) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object[]> params = new ArrayList<>();
         if (recherche != null && !recherche.isEmpty()) {
@@ -34,9 +34,17 @@ public class ClientService {
             where.append(" AND c.region = :region");
             params.add(new Object[]{"region", region});
         }
+        if (commune != null && !commune.isEmpty()) {
+            where.append(" AND c.commune = :commune");
+            params.add(new Object[]{"commune", commune});
+        }
         if (segmentationId != null) {
             where.append(" AND c.segmentationId = :seg");
             params.add(new Object[]{"seg", segmentationId});
+        }
+        if (actif != null) {
+            where.append(" AND c.actif = :actif");
+            params.add(new Object[]{"actif", actif});
         }
 
         TypedQuery<Client> q = em.createQuery(
@@ -102,5 +110,29 @@ public class ClientService {
 
     public void supprimer(Long id) {
         parId(id).ifPresent(em::remove);
+    }
+
+    /** Active/désactive un compte client (#10). Le statut suit l'état actif. */
+    public Client definirActif(Long id, boolean actif) {
+        Client c = em.find(Client.class, id);
+        if (c == null) { return null; }
+        c.setActif(actif);
+        c.setStatut(actif ? "ACTIF" : "INACTIF");
+        c.setUpdatedAt(LocalDateTime.now());
+        return em.merge(c);
+    }
+
+    /** Valeurs distinctes pour les filtres de tri (agences, régions, communes). */
+    public java.util.Map<String, List<String>> facettes() {
+        java.util.Map<String, List<String>> m = new java.util.LinkedHashMap<>();
+        m.put("agences", distinct("agence"));
+        m.put("regions", distinct("region"));
+        m.put("communes", distinct("commune"));
+        return m;
+    }
+
+    private List<String> distinct(String champ) {
+        return em.createQuery("SELECT DISTINCT c." + champ + " FROM Client c WHERE c." + champ +
+                " IS NOT NULL AND c." + champ + " <> '' ORDER BY c." + champ, String.class).getResultList();
     }
 }

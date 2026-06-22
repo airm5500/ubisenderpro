@@ -103,7 +103,7 @@ Usp.crm.oppForm = function (reload) {
         buttons: [{ text: 'Créer', handler: function (b) {
             var v = b.up('window').down('form').getForm().getValues();
             Usp.ajax({ url: '/opportunities', method: 'POST', jsonData: v,
-                success: function () { win.close(); reload(); },
+                success: function () { win.close(); reload(); Usp.toastEnregistre('Opportunité', false); },
                 failure: function () { Ext.Msg.alert('Erreur', 'Création impossible.'); } });
         } }]
     });

@@ -535,7 +535,7 @@ Usp.waweb.exportNumbers = function (lignes) {
 Usp.waweb.filterPanel = function () {
     var resStore = Ext.create('Ext.data.Store', { fields: ['numero', 'format', 'exists'] });
     return {
-        xtype: 'panel', title: 'Vérification de numéros', layout: 'border',
+        xtype: 'panel', title: '🔢 Vérification de numéros', layout: 'border',
         items: [
             { region: 'west', width: 340, xtype: 'form', bodyPadding: 10, border: false,
               defaults: { anchor: '100%' },

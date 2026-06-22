@@ -31,10 +31,19 @@ public class ClientResource {
     public PageResult<Client> lister(@QueryParam("q") String recherche,
                                      @QueryParam("agence") String agence,
                                      @QueryParam("region") String region,
+                                     @QueryParam("commune") String commune,
                                      @QueryParam("segmentationId") Long segmentationId,
+                                     @QueryParam("actif") Boolean actif,
                                      @QueryParam("start") @DefaultValue("0") int start,
                                      @QueryParam("limit") @DefaultValue("25") int limit) {
-        return clientService.rechercher(recherche, agence, region, segmentationId, start, limit);
+        return clientService.rechercher(recherche, agence, region, commune, segmentationId, actif, start, limit);
+    }
+
+    /** Valeurs distinctes pour alimenter les filtres (agences/régions/communes). */
+    @GET
+    @Path("/facettes")
+    public java.util.Map<String, java.util.List<String>> facettes() {
+        return clientService.facettes();
     }
 
     @GET
@@ -83,5 +92,25 @@ public class ClientResource {
         clientService.supprimer(id);
         auditService.tracer(auth, "SUPPRESSION", "Client", id, null);
         return Response.noContent().build();
+    }
+
+    @POST
+    @Path("/{id}/activate")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    public Response activer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        Client c = clientService.definirActif(id, true);
+        if (c == null) { return Response.status(Response.Status.NOT_FOUND).build(); }
+        auditService.tracer(auth, "ACTIVATION", "Client", id, c.getNomCompte());
+        return Response.ok(c).build();
+    }
+
+    @POST
+    @Path("/{id}/deactivate")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    public Response desactiver(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        Client c = clientService.definirActif(id, false);
+        if (c == null) { return Response.status(Response.Status.NOT_FOUND).build(); }
+        auditService.tracer(auth, "DESACTIVATION", "Client", id, c.getNomCompte());
+        return Response.ok(c).build();
     }
 }

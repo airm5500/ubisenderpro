@@ -41,6 +41,14 @@ public class UserResource {
         return userService.listerRoles();
     }
 
+    /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — au-delà des seuls admins. */
+    @GET
+    @Path("/affectables")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
+    public List<Map<String, Object>> affectables() {
+        return userService.listerAffectables();
+    }
+
     @POST
     public Response creer(UserRequest req) {
         if (req.getLogin() == null || req.getLogin().isEmpty()) {
@@ -59,6 +67,15 @@ public class UserResource {
     public Response modifier(@PathParam("id") Long id, UserRequest req) {
         Map<String, Object> u = userService.modifier(id, req);
         return u == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(u).build();
+    }
+
+    /** Photo de profil d'un utilisateur (chargée à la demande, hors des listes). */
+    @GET
+    @Path("/{id}/photo")
+    public Response photo(@PathParam("id") Long id) {
+        return userService.parId(id)
+                .map(u -> Response.ok(Map.of("photo", u.getPhoto() == null ? "" : u.getPhoto())).build())
+                .orElse(Response.status(Response.Status.NOT_FOUND).build());
     }
 
     @POST
@@ -86,14 +103,31 @@ public class UserResource {
 
     @GET
     @Path("/connexions")
-    public List<com.ubisenderpro.entity.ConnexionLog> connexions(@QueryParam("limit") Integer limit) {
-        return connexionLogService.lister(limit == null ? 200 : limit);
+    public List<com.ubisenderpro.entity.ConnexionLog> connexions(@QueryParam("limit") Integer limit,
+                                                                 @QueryParam("login") String login,
+                                                                 @QueryParam("dtStart") String dtStart,
+                                                                 @QueryParam("dtEnd") String dtEnd) {
+        return connexionLogService.lister(login, debutJour(dtStart), finJour(dtEnd), limit == null ? 200 : limit);
     }
 
     @GET
     @Path("/journal")
-    public List<com.ubisenderpro.entity.JournalAction> journal(@QueryParam("limit") Integer limit) {
-        return journalService.lister(limit == null ? 200 : limit);
+    public List<com.ubisenderpro.entity.JournalAction> journal(@QueryParam("limit") Integer limit,
+                                                               @QueryParam("login") String login,
+                                                               @QueryParam("action") String action,
+                                                               @QueryParam("dtStart") String dtStart,
+                                                               @QueryParam("dtEnd") String dtEnd) {
+        return journalService.lister(login, action, debutJour(dtStart), finJour(dtEnd), limit == null ? 200 : limit);
+    }
+
+    /** Début de journée (00:00) à partir d'une date ISO yyyy-MM-dd, ou null. */
+    private java.time.LocalDateTime debutJour(String d) {
+        return (d == null || d.isEmpty()) ? null : java.time.LocalDate.parse(d).atStartOfDay();
+    }
+
+    /** Fin de journée (23:59:59) à partir d'une date ISO yyyy-MM-dd, ou null. */
+    private java.time.LocalDateTime finJour(String d) {
+        return (d == null || d.isEmpty()) ? null : java.time.LocalDate.parse(d).atTime(23, 59, 59);
     }
 
     /** Activité d'une session : menus parcourus + actions d'un utilisateur sur une fenêtre. */

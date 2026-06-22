@@ -53,6 +53,42 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Notification éphémère (toast) en bas à droite — confirmation d'action (#8).
+   type : 'success' (vert, défaut) | 'error' (rouge) | 'info' (bleu). */
+Usp.toast = function (message, type) {
+    var couleurs = { success: '#2e7d32', error: '#c62828', info: '#1976d2' };
+    var icones = { success: '✓', error: '⚠', info: 'ℹ' };
+    var bg = couleurs[type] || couleurs.success;
+    var ic = icones[type] || icones.success;
+    var el = Ext.DomHelper.append(Ext.getBody(), {
+        tag: 'div', cls: 'usp-toast',
+        html: '<span style="font-weight:bold;margin-right:8px">' + ic + '</span>' + Ext.String.htmlEncode(message || ''),
+        style: 'position:fixed;z-index:99999;right:18px;bottom:18px;max-width:340px;background:' + bg +
+            ';color:#fff;padding:12px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);' +
+            'font-family:sans-serif;font-size:13px;opacity:0;transition:opacity .25s ease,transform .25s ease;' +
+            'transform:translateY(12px)'
+    }, true);
+    el.dom.offsetWidth; // force le reflow avant la transition
+    el.setStyle({ opacity: 1, transform: 'translateY(0)' });
+    Ext.defer(function () {
+        el.setStyle({ opacity: 0, transform: 'translateY(12px)' });
+        Ext.defer(function () { el.remove(); }, 300);
+    }, 2800);
+};
+
+/* Message standard « X créé/modifié avec succès » selon le contexte (#8). */
+Usp.toastEnregistre = function (libelle, modification) {
+    Usp.toast(libelle + (modification ? ' modifié avec succès.' : ' créé avec succès.'));
+};
+
+/* Avatar rond du header (#3) : photo de l'utilisateur, ou cadre rond vide. */
+Usp.avatarRond = function (photo) {
+    if (photo) {
+        return '<span class="usp-avatar"><img src="' + photo + '" alt=""/></span>';
+    }
+    return '<span class="usp-avatar usp-avatar--empty" title="Aucune photo"></span>';
+};
+
 /* Animation « lettre par lettre » (vague pl-letter-wave) — partagée entre le
    login plein écran et le branding du header. Reprise fidèlement de prestige. */
 Usp.hasClass = function (t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; };
@@ -183,8 +219,8 @@ Usp.export.boutons = function (titre) {
         });
     };
     return [
-        { text: 'Export CSV', tooltip: 'Exporter en CSV (Excel)', handler: function (b) { faire(b, 'csv'); } },
-        { text: 'Export PDF', tooltip: 'Exporter en PDF (impression)', handler: function (b) { faire(b, 'pdf'); } }
+        { text: '📊 Export CSV', tooltip: 'Exporter « ' + titre + ' » au format CSV (ouvrable dans Excel)', handler: function (b) { faire(b, 'csv'); } },
+        { text: '🖨️ Export PDF', tooltip: 'Exporter / imprimer « ' + titre + ' » au format PDF', handler: function (b) { faire(b, 'pdf'); } }
     ];
 };
 
@@ -209,7 +245,7 @@ Usp.showLogin = function () {
         '          <div class="pl-pharmacy-card" id="pl-title">',
         '            <span class="pl-pharmacy-card__header">',
         '              <span class="pl-pharmacy-card__icon" aria-hidden="true">📤</span>',
-        '              <span class="pl-pharmacy-card__label">Plateforme d\'envoi</span>',
+        '              <span class="pl-pharmacy-card__label">Marketing Digital</span>',
         '            </span>',
         '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
         '          </div>',
@@ -322,28 +358,54 @@ Usp.showLogin = function () {
 };
 
 /* ---------- Store des comptes clients ---------- */
-Usp.createClientStore = function () {
-    return Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'emailPrincipal', 'statut'],
+Usp._clientStores = [];
+
+Usp.createClientStore = function (actif) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'commune',
+                 'emailPrincipal', 'statut', 'segmentationId', 'actif'],
         pageSize: 25,
         proxy: {
             type: 'ajax',
             url: Usp.apiBase + '/clients',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
-            reader: { type: 'json', root: 'data', totalProperty: 'total' }
+            reader: { type: 'json', root: 'data', totalProperty: 'total' },
+            extraParams: { actif: actif }
         },
         autoLoad: true
     });
+    Usp._clientStores.push(store);
+    return store;
+};
+
+/* Recharge les deux grilles (actifs + désactivés) après activation/désactivation. */
+Usp.reloadClients = function () {
+    Usp._clientStores.forEach(function (s) { s.loadPage(1); });
+};
+
+/* Combos de filtre alimentés par /clients/facettes (agences, communes). */
+Usp.clientFacettes = function (combos) {
+    Usp.ajax({ url: '/clients/facettes', method: 'GET', success: function (resp) {
+        var d = Ext.decode(resp.responseText) || {};
+        var remplir = function (cb, arr) {
+            if (cb) { cb.getStore().loadData((arr || []).map(function (v) { return { v: v }; })); }
+        };
+        remplir(combos.agence, d.agences);
+        remplir(combos.commune, d.communes);
+    } });
 };
 
 /* ---------- Comptes clients : 2 onglets (liste + vérification de numéros) ---------- */
 Usp.clientsPanel = function () {
+    Usp._clientStores = [];
     return {
         xtype: 'tabpanel',
         title: 'Comptes clients',
         listeners: Usp.tabListeners,
         items: [
-            Usp.clientsGrid(),
+            Usp.clientsGrid(true),
+            // Onglet des comptes désactivés (#10) : réactivation possible d'ici.
+            Usp.clientsGrid(false),
             // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
             // numéros vit désormais à côté de la liste des comptes clients.
             Usp.waweb.filterPanel()
@@ -351,49 +413,115 @@ Usp.clientsPanel = function () {
     };
 };
 
-/* Onglet « Liste des comptes » : la grille des comptes clients (existant intact). */
-Usp.clientsGrid = function () {
-    var store = Usp.createClientStore();
+/* Grille des comptes clients (#10). actif=true : onglet principal (actifs) ;
+   actif=false : onglet des comptes désactivés. Tri par segmentation/agence/commune. */
+Usp.clientsGrid = function (actif) {
+    var store = Usp.createClientStore(actif);
+
+    var comboSeg = { xtype: 'combobox', itemId: 'fSeg', emptyText: 'Segmentation', width: 150,
+        queryMode: 'local', editable: false, valueField: 'id', displayField: 'libelle',
+        store: Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) };
+    var comboAgence = { xtype: 'combobox', itemId: 'fAgence', emptyText: 'Agence', width: 130,
+        queryMode: 'local', valueField: 'v', displayField: 'v',
+        store: Ext.create('Ext.data.Store', { fields: ['v'] }) };
+    var comboCommune = { xtype: 'combobox', itemId: 'fCommune', emptyText: 'Commune', width: 130,
+        queryMode: 'local', valueField: 'v', displayField: 'v',
+        store: Ext.create('Ext.data.Store', { fields: ['v'] }) };
+
+    var appliquer = function (tb) {
+        var p = { actif: actif };
+        var q = tb.down('#fQ').getValue();
+        var seg = tb.down('#fSeg').getValue();
+        var ag = tb.down('#fAgence').getValue();
+        var com = tb.down('#fCommune').getValue();
+        if (q) { p.q = q; }
+        if (seg) { p.segmentationId = seg; }
+        if (ag) { p.agence = ag; }
+        if (com) { p.commune = com; }
+        store.getProxy().extraParams = p;
+        store.loadPage(1);
+    };
+
+    var actionCol = actif
+        ? { text: 'Actions', width: 120, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+            renderer: function () {
+                return '<span class="cli-edit" title="Modifier ce compte" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                    '<span class="cli-off" title="Désactiver ce compte" style="cursor:pointer;margin:0 4px;color:#c62828">⛔</span>';
+            } }
+        : { text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+            renderer: function () {
+                return '<span class="cli-on" title="Réactiver ce compte" style="cursor:pointer;color:#2e7d32">✅ Activer</span>';
+            } };
+
+    var tbar = [
+        { xtype: 'textfield', itemId: 'fQ', emptyText: 'Rechercher...', width: 180,
+          listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
+        comboSeg, comboAgence, comboCommune,
+        { text: '🔎 Filtrer', tooltip: 'Appliquer les filtres sélectionnés', handler: function (b) { appliquer(b.up('toolbar')); } },
+        { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
+            var tb = b.up('toolbar');
+            tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
+            tb.down('#fAgence').setValue(null); tb.down('#fCommune').setValue(null);
+            store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
+        } }
+    ];
+    if (actif) {
+        tbar.push('->',
+            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } },
+            { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
+            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport });
+    }
+
     return {
         xtype: 'grid',
-        title: 'Liste des comptes',
+        title: actif ? '🏢 Liste des comptes' : '🚫 Clients désactivés',
         store: store,
         columns: [
             { text: 'N° client', dataIndex: 'numeroClient', width: 110 },
             { text: 'Nom du compte', dataIndex: 'nomCompte', flex: 1 },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
-            { text: 'Région', dataIndex: 'region', width: 150 },
-            { text: 'E-mail', dataIndex: 'emailPrincipal', width: 200 },
-            { text: 'Statut', dataIndex: 'statut', width: 90 },
+            { text: 'Commune', dataIndex: 'commune', width: 120 },
+            { text: 'Région', dataIndex: 'region', width: 140 },
+            { text: 'E-mail', dataIndex: 'emailPrincipal', width: 180 },
+            { text: 'Statut', dataIndex: 'statut', width: 80 },
             { text: 'Contacts', width: 100, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
                   return '<span class="cli-contacts" title="Voir / ajouter les contacts" ' +
                       'style="cursor:pointer;color:#1976d2">👥 contacts</span>';
-              } }
+              } },
+            actionCol
         ],
-        tbar: [
-            { xtype: 'textfield', emptyText: 'Rechercher...', width: 220, listeners: {
-                change: function (f, val) {
-                    store.getProxy().extraParams = { q: val };
-                    store.loadPage(1);
-                }, buffer: 400 } },
-            '->',
-            { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
-            { text: 'Gérer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            { text: 'Importer Excel/CSV', handler: Usp.showImport }
-        ].concat(Usp.export.boutons('Comptes clients')),
-        bbar: {
-            xtype: 'pagingtoolbar',
-            store: store,
-            displayInfo: true
-        },
+        tbar: tbar.concat(Usp.export.boutons(actif ? 'Comptes clients' : 'Clients désactivés')),
+        bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
-            itemdblclick: function (g, rec) { Usp.clientForm(store, rec); },
+            afterrender: function () { Usp.clientFacettes({ agence: comboAgence, commune: comboCommune }); },
+            itemdblclick: function (g, rec) { if (actif) { Usp.clientForm(store, rec); } },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
-                if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); }
+                if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); return; }
+                if (e.getTarget('.cli-edit')) { Usp.clientForm(store, rec); return; }
+                if (e.getTarget('.cli-off')) { Usp.clientActif(rec, false); return; }
+                if (e.getTarget('.cli-on')) { Usp.clientActif(rec, true); return; }
             }
         }
     };
+};
+
+/* Active/désactive un compte client puis rafraîchit les deux onglets (#10). */
+Usp.clientActif = function (rec, actif) {
+    var nom = rec.get('nomCompte');
+    var faire = function () {
+        Usp.ajax({ url: '/clients/' + rec.get('id') + (actif ? '/activate' : '/deactivate'), method: 'POST',
+            success: function () {
+                Usp.reloadClients();
+                Usp.toast('Compte « ' + nom + ' » ' + (actif ? 'réactivé' : 'désactivé') + ' avec succès.');
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+    };
+    if (actif) { faire(); return; }
+    Ext.Msg.confirm('Désactiver', 'Désactiver le compte « ' + Ext.String.htmlEncode(nom) +
+        ' » ? Il passera dans l\'onglet « Clients désactivés ».', function (b) { if (b === 'yes') { faire(); } });
 };
 
 /* ---------- Gestion des segmentations (CRUD) ---------- */
@@ -534,10 +662,14 @@ Usp.clientForm = function (store, rec) {
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
+                var vals = form.getValues();
                 Usp.ajax({
                     url: rec ? '/clients/' + rec.get('id') : '/clients',
-                    method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
-                    success: function () { win.close(); store.load(); },
+                    method: rec ? 'PUT' : 'POST', jsonData: vals,
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Client « ' + (vals.nomCompte || vals.numeroClient || '') + ' »', !!rec);
+                    },
                     failure: function (resp) {
                         // Message clair renvoyé par le serveur + surlignage du champ fautif (#3/#6).
                         var msg = 'Enregistrement impossible.', champ = null;
@@ -892,7 +1024,9 @@ Usp.showMain = function () {
                           if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
                       } } },
                     '->',
-                    { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
+                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
+                      html: Usp.avatarRond(Usp.user && Usp.user.photo) },
+                    { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',
                       text: '<img src="data:image/svg+xml,' +
                           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
@@ -959,6 +1093,49 @@ Ext.apply(Ext.form.field.VTypes, {
     numwa: function (v) { return /^[0-9]{6,15}$/.test(v); },
     numwaText: 'Numéro international en chiffres uniquement, ex. 2250102030405',
     numwaMask: /[0-9]/
+});
+
+/* ------------------------------------------------------------------
+ * Améliorations globales des fenêtres de création / modification :
+ *  #2 bouton « Annuler » auto-ajouté à côté d'« Enregistrer/Valider/Créer »
+ *  #1 bouton « agrandir » (maximize) sur ces mêmes fenêtres
+ *  #3 focus automatique sur le premier champ de saisie à l'ouverture
+ * ------------------------------------------------------------------ */
+Ext.override(Ext.window.Window, {
+    initComponent: function () {
+        var b = this.buttons;
+        if (Ext.isArray(b)) {
+            var aEnregistrer = false, aAnnuler = false;
+            Ext.each(b, function (it) {
+                var t = (it && it.text) ? String(it.text) : '';
+                if (t.indexOf('Enregistrer') >= 0 || t.indexOf('Valider') >= 0 || t.indexOf('Créer') >= 0) { aEnregistrer = true; }
+                if (t.indexOf('Annuler') >= 0 || t.indexOf('Fermer') >= 0) { aAnnuler = true; }
+            });
+            if (aEnregistrer) {
+                if (!aAnnuler) {
+                    b.push({ text: 'Annuler', tooltip: 'Fermer sans enregistrer',
+                        handler: function (btn) { var w = btn.up('window'); if (w) { w.close(); } } });
+                }
+                if (this.maximizable === undefined) { this.maximizable = true; }
+            }
+        }
+        this.callParent(arguments);
+    },
+    afterShow: function () {
+        this.callParent(arguments);
+        var w = this;
+        Ext.defer(function () {
+            if (w.isDestroyed) { return; }
+            var champs = w.query ? w.query('field') : [];
+            for (var i = 0; i < champs.length; i++) {
+                var f = champs[i], xt = f.getXType && f.getXType();
+                if (xt === 'displayfield' || xt === 'hiddenfield' || xt === 'hidden') { continue; }
+                if (f.isDisabled && f.isDisabled()) { continue; }
+                if (!f.rendered || f.hidden) { continue; }
+                if (f.focus) { f.focus(false); break; }
+            }
+        }, 60);
+    }
 });
 
 Ext.onReady(function () {

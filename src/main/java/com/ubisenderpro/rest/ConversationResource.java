@@ -25,9 +25,10 @@ public class ConversationResource {
     @GET
     public PageResult<Conversation> lister(@QueryParam("statut") String statut,
                                            @QueryParam("agentId") Long agentId,
+                                           @QueryParam("nonLu") Boolean nonLu,
                                            @QueryParam("start") @DefaultValue("0") int start,
                                            @QueryParam("limit") @DefaultValue("25") int limit) {
-        return conversationService.lister(statut, agentId, start, limit);
+        return conversationService.lister(statut, agentId, nonLu, start, limit);
     }
 
     @GET
