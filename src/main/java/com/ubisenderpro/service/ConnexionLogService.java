@@ -88,7 +88,20 @@ public class ConnexionLogService {
     }
 
     public List<ConnexionLog> lister(int limit) {
-        return em.createQuery("SELECT c FROM ConnexionLog c ORDER BY c.connexionAt DESC", ConnexionLog.class)
-                .setMaxResults(limit <= 0 ? 200 : limit).getResultList();
+        return lister(null, null, null, limit);
+    }
+
+    /** Historique des connexions filtré (#1) : par utilisateur et période. */
+    public List<ConnexionLog> lister(String login, LocalDateTime debut, LocalDateTime fin, int limit) {
+        StringBuilder q = new StringBuilder("SELECT c FROM ConnexionLog c WHERE 1=1");
+        if (login != null && !login.isEmpty()) { q.append(" AND c.login = :l"); }
+        if (debut != null) { q.append(" AND c.connexionAt >= :d"); }
+        if (fin != null) { q.append(" AND c.connexionAt <= :f"); }
+        q.append(" ORDER BY c.connexionAt DESC");
+        javax.persistence.TypedQuery<ConnexionLog> query = em.createQuery(q.toString(), ConnexionLog.class);
+        if (login != null && !login.isEmpty()) { query.setParameter("l", login); }
+        if (debut != null) { query.setParameter("d", debut); }
+        if (fin != null) { query.setParameter("f", fin); }
+        return query.setMaxResults(limit <= 0 ? 200 : limit).getResultList();
     }
 }

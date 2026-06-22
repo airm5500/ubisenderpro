@@ -241,6 +241,43 @@ Usp.users.chargerPhoto = function (f) {
     reader.readAsDataURL(file);
 };
 
+/* Barre de filtres réutilisable (#1) : utilisateur + période (+ action).
+   Pose les extraParams du store et recharge. */
+Usp.users.filtreItems = function (store, withAction) {
+    var appliquer = function (tb) {
+        var p = { limit: 300 };
+        var login = tb.down('#fLogin').getValue();
+        var d1 = tb.down('#fDtStart').getValue();
+        var d2 = tb.down('#fDtEnd').getValue();
+        if (login) { p.login = login; }
+        if (d1) { p.dtStart = Ext.Date.format(d1, 'Y-m-d'); }
+        if (d2) { p.dtEnd = Ext.Date.format(d2, 'Y-m-d'); }
+        if (withAction) { var a = tb.down('#fAction').getValue(); if (a) { p.action = a; } }
+        store.getProxy().extraParams = p;
+        store.load();
+    };
+    var surEntree = function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } };
+    var items = [
+        { xtype: 'textfield', itemId: 'fLogin', emptyText: 'Utilisateur (login)', width: 150,
+          listeners: { specialkey: surEntree } },
+        { xtype: 'datefield', itemId: 'fDtStart', emptyText: 'Du…', format: 'd/m/Y', width: 105, editable: false },
+        { xtype: 'datefield', itemId: 'fDtEnd', emptyText: 'Au…', format: 'd/m/Y', width: 105, editable: false }
+    ];
+    if (withAction) {
+        items.push({ xtype: 'textfield', itemId: 'fAction', emptyText: 'Action (ex. CREATION)', width: 150,
+            listeners: { specialkey: surEntree } });
+    }
+    items.push({ text: 'Filtrer', iconCls: '', handler: function (b) { appliquer(b.up('toolbar')); } });
+    items.push({ text: 'Réinitialiser', handler: function (b) {
+        var tb = b.up('toolbar');
+        tb.down('#fLogin').setValue(''); tb.down('#fDtStart').setValue(''); tb.down('#fDtEnd').setValue('');
+        if (withAction) { tb.down('#fAction').setValue(''); }
+        store.getProxy().extraParams = { limit: 300 }; store.load();
+    } });
+    items.push('-');
+    return items;
+};
+
 /* ---------- Historique des connexions ---------- */
 Usp.users.connexionsPanel = function () {
     var store = Ext.create('Ext.data.Store', {
@@ -267,7 +304,8 @@ Usp.users.connexionsPanel = function () {
                       'style="cursor:pointer;font-size:15px">🔍</span>';
               } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+        tbar: Usp.users.filtreItems(store, false)
+            .concat([{ text: 'Rafraîchir', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Historique des connexions')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -317,7 +355,7 @@ Usp.users.activiteSession = function (rec) {
 /* ---------- Journal d'actions ---------- */
 Usp.users.journalPanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['login', 'action', 'entite', 'entiteId', 'details', 'adresseIp', 'createdAt'],
+        fields: ['login', 'action', 'entite', 'entiteId', 'details', 'adresseIp', 'poste', 'createdAt'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/users/journal',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' },
             extraParams: { limit: 300 } },
@@ -333,9 +371,11 @@ Usp.users.journalPanel = function () {
             { text: 'Réf.', dataIndex: 'entiteId', width: 60 },
             { text: 'Détails', dataIndex: 'details', flex: 1, renderer: function (v) {
                 return v ? Ext.String.htmlEncode(v) : ''; } },
-            { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 }
+            { text: 'Adresse IP', dataIndex: 'adresseIp', width: 120 },
+            { text: 'Poste', dataIndex: 'poste', width: 150, renderer: function (v) { return v || ''; } }
         ],
-        tbar: [{ text: 'Rafraîchir', handler: function () { store.load(); } }]
+        tbar: Usp.users.filtreItems(store, true)
+            .concat([{ text: 'Rafraîchir', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Journal d\'actions'))
     };
 };

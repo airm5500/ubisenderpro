@@ -2,9 +2,12 @@ package com.ubisenderpro.security;
 
 import javax.annotation.Priority;
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Priorities;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
@@ -17,14 +20,18 @@ import java.util.Arrays;
 /**
  * Valide le jeton de session porté par l'en-tête Authorization: Bearer <token>
  * et applique les restrictions de rôle déclarées via @Secured.
+ * Capture aussi l'IP et le nom de poste de l'appelant (RequestContext) pour la
+ * journalisation, et nettoie ce contexte en fin de requête.
  */
 @Secured
 @Provider
 @Priority(Priorities.AUTHENTICATION)
-public class AuthenticationFilter implements ContainerRequestFilter {
+public class AuthenticationFilter implements ContainerRequestFilter, ContainerResponseFilter {
 
     @Context
     private ResourceInfo resourceInfo;
+    @Context
+    private HttpServletRequest servletRequest;
 
     @Inject
     private SessionStore sessionStore;
@@ -50,7 +57,28 @@ public class AuthenticationFilter implements ContainerRequestFilter {
             return;
         }
 
+        capturerContexte();
         requestContext.setSecurityContext(new UserSecurityContext(user));
+    }
+
+    /** Renseigne RequestContext (IP réelle + nom de poste) pour la journalisation. */
+    private void capturerContexte() {
+        if (servletRequest == null) { return; }
+        String ip = servletRequest.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty()) {
+            int virgule = ip.indexOf(',');
+            ip = (virgule > 0 ? ip.substring(0, virgule) : ip).trim();
+        } else {
+            ip = servletRequest.getRemoteAddr();
+        }
+        String poste = servletRequest.getRemoteHost();
+        if (poste != null && poste.equals(servletRequest.getRemoteAddr())) { poste = null; }
+        RequestContext.definir(ip, poste);
+    }
+
+    @Override
+    public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
+        RequestContext.effacer();
     }
 
     private String[] requiredRoles() {

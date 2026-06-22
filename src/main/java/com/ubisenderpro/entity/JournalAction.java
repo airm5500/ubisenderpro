@@ -32,6 +32,9 @@ public class JournalAction {
     @Column(name = "adresse_ip", length = 60)
     private String adresseIp;
 
+    @Column(name = "poste", length = 255)
+    private String poste;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -56,6 +59,8 @@ public class JournalAction {
     public void setDetails(String details) { this.details = details; }
     public String getAdresseIp() { return adresseIp; }
     public void setAdresseIp(String adresseIp) { this.adresseIp = adresseIp; }
+    public String getPoste() { return poste; }
+    public void setPoste(String poste) { this.poste = poste; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
