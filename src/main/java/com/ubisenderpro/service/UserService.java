@@ -52,6 +52,15 @@ public class UserService {
 
     public Optional<Utilisateur> parId(Long id) { return Optional.ofNullable(em.find(Utilisateur.class, id)); }
 
+    /** E-mails des superviseurs et administrateurs actifs (notifications d'escalade). */
+    public List<String> listerEmailsSuperviseurs() {
+        return em.createQuery(
+                "SELECT DISTINCT u.email FROM Utilisateur u JOIN u.roles r " +
+                "WHERE u.actif = true AND r.code IN ('SUPERVISEUR','ADMIN') " +
+                "AND u.email IS NOT NULL AND u.email <> ''", String.class)
+                .getResultList();
+    }
+
     /** Liste légère des utilisateurs actifs (id + nom) pour l'affectation de discussions (#5). */
     public List<Map<String, Object>> listerAffectables() {
         return em.createQuery("SELECT u FROM Utilisateur u WHERE u.actif = true ORDER BY u.nomComplet", Utilisateur.class)

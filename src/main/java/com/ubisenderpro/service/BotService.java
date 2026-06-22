@@ -35,6 +35,16 @@ public class BotService {
     @EJB private WhatsappService whatsappService;
     @EJB private WaWebSessionService waWebSessionService;
     @EJB private JournalService journalService;
+    @EJB private MailService mailService;
+    @EJB private UserService userService;
+
+    private static final String[] INTENT_ADRESSE = {
+        "adresse", "ou etes vous", "ou etes-vous", "ou se trouve", "ou vous trouvez",
+        "localisation", "situe", "situee", "comment vous trouver", "itineraire", "ou se situe"
+    };
+    private static final String[] INTENT_HORAIRES = {
+        "horaire", "horaires", "ouvert", "ouverture", "fermeture", "ferme", "heure", "heures", "jours d ouverture"
+    };
 
     private static final String[] INTENT_CATALOGUE = {
         "prix", "combien", "coute", "cout", "tarif", "promo", "promotion",
@@ -60,21 +70,33 @@ public class BotService {
                 return;
             }
 
-            // 2) Base de connaissance (FAQ).
+            // 2) Infos « pratiques » paramétrables : adresse, horaires.
+            String adresse = parametre("bot.adresse", "");
+            if (!adresse.isEmpty() && contientUnMotTableau(norm, INTENT_ADRESSE)) {
+                repondre(conv, "📍 " + adresse, "ADRESSE");
+                return;
+            }
+            String horaires = parametre("bot.horaires", "");
+            if (!horaires.isEmpty() && contientUnMotTableau(norm, INTENT_HORAIRES)) {
+                repondre(conv, "🕒 " + horaires, "HORAIRES");
+                return;
+            }
+
+            // 3) Base de connaissance (FAQ).
             String reponseFaq = chercherFaq(norm);
             if (reponseFaq != null) {
                 repondre(conv, reponseFaq, "FAQ");
                 return;
             }
 
-            // 3) Unités gratuites (UG) : « combien commander pour avoir des unités
+            // 4) Unités gratuites (UG) : « combien commander pour avoir des unités
             //    gratuites », ou question sur un produit en offre UG.
             if (intentionUG(norm)) {
                 repondre(conv, chercherUG(norm), "UG");
                 return;
             }
 
-            // 4) Catalogue / promotions (si l'intention est détectée).
+            // 5) Catalogue / promotions (si l'intention est détectée).
             if (contientUnMotTableau(norm, INTENT_CATALOGUE)) {
                 String reponseCat = chercherCatalogue(norm);
                 if (reponseCat != null) {
@@ -83,7 +105,7 @@ public class BotService {
                 }
             }
 
-            // 5) Rien trouvé -> on passe la main à un humain.
+            // 6) Rien trouvé -> on passe la main à un humain.
             escalader(conv, "aucune règle ne correspond");
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Bot KO sur la conversation " + conversationId, e);
@@ -217,6 +239,28 @@ public class BotService {
         envoyer(conv, transfert);
         journalService.tracer(null, "BOT", "BOT_ESCALADE", "Conversation", conv.getId(),
                 "Passage à un humain (" + raison + ")", null);
+        notifierSuperviseurs(conv, raison);
+    }
+
+    /** Notifie les superviseurs par e-mail de l'escalade (si activé et SMTP configuré). */
+    private void notifierSuperviseurs(Conversation conv, String raison) {
+        try {
+            if (!"true".equalsIgnoreCase(parametre("bot.email_escalade", "false"))) { return; }
+            List<String> emails = userService.listerEmailsSuperviseurs();
+            if (emails.isEmpty()) { return; }
+            String nom = conv.getNomAffiche() != null ? conv.getNomAffiche() : conv.getNumeroWhatsapp();
+            String sujet = "🙋 Escalade bot — " + nom;
+            String corps = "Le bot a passé la main à un humain.\n\n"
+                    + "Contact : " + nom + "\n"
+                    + "Numéro : " + conv.getNumeroWhatsapp() + "\n"
+                    + "Canal : " + (conv.getCanal() != null ? conv.getCanal() : "API") + "\n"
+                    + "Raison : " + raison + "\n"
+                    + "Dernier message : " + (conv.getDernierMessage() != null ? conv.getDernierMessage() : "") + "\n\n"
+                    + "Ouvrez UbiSenderPro > Discussions pour reprendre cette conversation.";
+            mailService.envoyer(emails, sujet, corps);
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Notification e-mail d'escalade KO (conversation " + conv.getId() + ")", e);
+        }
     }
 
     private void envoyer(Conversation conv, String message) {

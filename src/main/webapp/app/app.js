@@ -53,6 +53,27 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Bip d'alerte (Web Audio) — utilisé à l'arrivée d'une escalade du bot. */
+Usp.beep = function () {
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) { return; }
+        if (!Usp._audioCtx) { Usp._audioCtx = new AC(); }
+        var ctx = Usp._audioCtx;
+        var jouer = function (freq, debut, duree) {
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = freq;
+            o.connect(g); g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.001, ctx.currentTime + debut);
+            g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + debut + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + debut + duree);
+            o.start(ctx.currentTime + debut); o.stop(ctx.currentTime + debut + duree);
+        };
+        jouer(880, 0, 0.18);
+        jouer(1175, 0.2, 0.22); // deux notes : « ding-dong »
+    } catch (e) { /* audio indisponible : on ignore */ }
+};
+
 /* Notification éphémère (toast) en bas à droite — confirmation d'action (#8).
    type : 'success' (vert, défaut) | 'error' (rouge) | 'info' (bleu). */
 Usp.toast = function (message, type) {
@@ -1118,6 +1139,7 @@ Usp.escalades = {
                     var data = r.data || [];
                     var nom = data.length ? (data[0].nomAffiche || data[0].numeroWhatsapp || '') : '';
                     Usp.toast('🙋 Le bot a passé la main' + (nom ? ' : ' + nom : '') + ' — discussion à reprendre.', 'info');
+                    Usp.beep();
                 }
                 self._dernierTotal = total;
                 self._init = true;

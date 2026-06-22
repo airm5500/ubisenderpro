@@ -400,28 +400,54 @@ Usp.settings.botPanel = function () {
                 setter((Ext.decode(r.responseText) || {}).valeur);
             } });
         };
-        lire('bot.actif', function (v) { p.down('#botActif').setValue(v === 'true' || v === true); });
-        lire('bot.message_transfert', function (v) { p.down('#botTransfert').setValue(v || ''); });
-        lire('bot.mots_cles_humain', function (v) { p.down('#botHumain').setValue(v || ''); });
-        lire('bot.mots_cles_escalade', function (v) { p.down('#botEscalade').setValue(v || ''); });
+        var txt = function (id) { return function (v) { p.down('#' + id).setValue(v || ''); }; };
+        var bool = function (id) { return function (v) { p.down('#' + id).setValue(v === 'true' || v === true); }; };
+        lire('bot.actif', bool('botActif'));
+        lire('bot.message_transfert', txt('botTransfert'));
+        lire('bot.mots_cles_humain', txt('botHumain'));
+        lire('bot.mots_cles_escalade', txt('botEscalade'));
+        lire('bot.adresse', txt('botAdresse'));
+        lire('bot.horaires', txt('botHoraires'));
+        lire('bot.email_escalade', bool('botEmail'));
+        lire('mail.smtp.host', txt('smtpHost'));
+        lire('mail.smtp.port', txt('smtpPort'));
+        lire('mail.smtp.user', txt('smtpUser'));
+        lire('mail.smtp.password', txt('smtpPass'));
+        lire('mail.smtp.from', txt('smtpFrom'));
+        lire('mail.smtp.tls', bool('smtpTls'));
     };
 
     var enregistrerParams = function (p) {
-        var put = function (cle, valeur, cb) {
-            Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: String(valeur) },
-                success: cb, failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (' + cle + ').'); } });
-        };
+        // Enregistre une liste [clé, valeur] en série, puis affiche une confirmation.
         var actif = p.down('#botActif').getValue();
-        put('bot.actif', actif ? 'true' : 'false', function () {
-            Usp.botActif = actif;
-            put('bot.message_transfert', p.down('#botTransfert').getValue(), function () {
-                put('bot.mots_cles_humain', p.down('#botHumain').getValue(), function () {
-                    put('bot.mots_cles_escalade', p.down('#botEscalade').getValue(), function () {
-                        Usp.toast('Réglages du bot enregistrés' + (actif ? ' — bot activé.' : ' — bot désactivé.'));
-                    });
-                });
-            });
-        });
+        var paires = [
+            ['bot.actif', actif ? 'true' : 'false'],
+            ['bot.message_transfert', p.down('#botTransfert').getValue()],
+            ['bot.mots_cles_humain', p.down('#botHumain').getValue()],
+            ['bot.mots_cles_escalade', p.down('#botEscalade').getValue()],
+            ['bot.adresse', p.down('#botAdresse').getValue()],
+            ['bot.horaires', p.down('#botHoraires').getValue()],
+            ['bot.email_escalade', p.down('#botEmail').getValue() ? 'true' : 'false'],
+            ['mail.smtp.host', p.down('#smtpHost').getValue()],
+            ['mail.smtp.port', p.down('#smtpPort').getValue()],
+            ['mail.smtp.user', p.down('#smtpUser').getValue()],
+            ['mail.smtp.password', p.down('#smtpPass').getValue()],
+            ['mail.smtp.from', p.down('#smtpFrom').getValue()],
+            ['mail.smtp.tls', p.down('#smtpTls').getValue() ? 'true' : 'false']
+        ];
+        var i = 0;
+        var suivant = function () {
+            if (i >= paires.length) {
+                Usp.botActif = actif;
+                Usp.toast('Réglages du bot enregistrés' + (actif ? ' — bot activé.' : ' — bot désactivé.'));
+                return;
+            }
+            var c = paires[i++];
+            Usp.ajax({ url: '/parametres/' + c[0], method: 'PUT', jsonData: { valeur: String(c[1] == null ? '' : c[1]) },
+                success: suivant,
+                failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (' + c[0] + ').'); } });
+        };
+        suivant();
     };
 
     return {
@@ -440,10 +466,28 @@ Usp.settings.botPanel = function () {
                 { xtype: 'textfield', itemId: 'botHumain', fieldLabel: 'Mots-clés « parler à un humain »',
                   emptyText: 'conseiller, agent, humain…' },
                 { xtype: 'textfield', itemId: 'botEscalade', fieldLabel: 'Mots-clés sensibles (escalade)',
-                  emptyText: 'réclamation, remboursement, litige…' },
-                { xtype: 'button', text: '💾 Enregistrer les réglages', margin: '8 0 0 0',
-                  handler: function (b) { enregistrerParams(b.up('panel')); } }
+                  emptyText: 'réclamation, remboursement, litige…' }
             ] },
+            { xtype: 'fieldset', title: 'Informations communiquées par le bot', defaults: { anchor: '100%', labelWidth: 230 }, items: [
+                { xtype: 'textarea', itemId: 'botAdresse', fieldLabel: 'Adresse', height: 50,
+                  emptyText: 'Ex. Rue du Commerce, Plateau, Abidjan' },
+                { xtype: 'textarea', itemId: 'botHoraires', fieldLabel: 'Horaires', height: 50,
+                  emptyText: 'Ex. Du lundi au samedi, de 8h à 19h.' }
+            ] },
+            { xtype: 'fieldset', title: 'Notification e-mail des superviseurs (escalade)', defaults: { anchor: '100%', labelWidth: 230 }, items: [
+                { xtype: 'checkbox', itemId: 'botEmail', fieldLabel: 'Notifier par e-mail',
+                  boxLabel: 'Envoyer un e-mail aux superviseurs/admins à chaque escalade' },
+                { xtype: 'displayfield', value: '<span style="color:#888">Renseignez le serveur SMTP ci-dessous. ' +
+                  'Les e-mails partent aux utilisateurs actifs ayant le rôle Superviseur ou Administrateur.</span>' },
+                { xtype: 'textfield', itemId: 'smtpHost', fieldLabel: 'Serveur SMTP', emptyText: 'smtp.gmail.com' },
+                { xtype: 'textfield', itemId: 'smtpPort', fieldLabel: 'Port', emptyText: '587', width: 360 },
+                { xtype: 'textfield', itemId: 'smtpUser', fieldLabel: 'Utilisateur SMTP' },
+                { xtype: 'textfield', itemId: 'smtpPass', fieldLabel: 'Mot de passe SMTP', inputType: 'password' },
+                { xtype: 'textfield', itemId: 'smtpFrom', fieldLabel: 'Adresse expéditeur', vtype: 'email' },
+                { xtype: 'checkbox', itemId: 'smtpTls', fieldLabel: 'STARTTLS', boxLabel: 'Connexion chiffrée (recommandé)' }
+            ] },
+            { xtype: 'button', text: '💾 Enregistrer les réglages', margin: '0 0 10 0',
+              handler: function (b) { enregistrerParams(b.up('panel')); } },
             { xtype: 'grid', title: 'Base de connaissance (FAQ)', height: 320, anchor: '100%', store: faqStore,
               columns: [
                 { text: 'Déclencheurs (mots-clés)', dataIndex: 'declencheurs', flex: 1,
