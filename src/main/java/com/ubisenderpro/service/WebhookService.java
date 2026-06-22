@@ -33,6 +33,8 @@ public class WebhookService {
     private WhatsappService whatsappService;
     @EJB
     private ContactService contactService;
+    @EJB
+    private BotService botService;
 
     public void traiter(String payload) {
         WebhookEvent event = new WebhookEvent();
@@ -93,6 +95,11 @@ public class WebhookService {
             em.merge(conv);
 
             appliquerAutomatisations(conv, texte);
+
+            // Réponse automatique du bot (sauf désabonnement STOP).
+            if (texte != null && !texte.trim().equalsIgnoreCase("STOP")) {
+                botService.traiterEntrant(conv.getId(), texte);
+            }
         }
     }
 

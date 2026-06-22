@@ -63,9 +63,9 @@ public class WaWebJournalService {
     }
 
     /** Enregistre un message entrant WEB et incrémente le compteur non lu. */
-    public void enregistrerEntrant(Long sessionId, String numero, String nomAffiche,
+    public Conversation enregistrerEntrant(Long sessionId, String numero, String nomAffiche,
                                    String type, String contenu, String waMessageId) {
-        if (dejaRecu(waMessageId)) { return; } // évite les doublons (ré-émission Baileys)
+        if (dejaRecu(waMessageId)) { return null; } // évite les doublons (ré-émission Baileys)
         Conversation conv = conversation(sessionId, numero, nomAffiche);
         Message m = new Message();
         m.setConversationId(conv.getId());
@@ -78,8 +78,10 @@ public class WaWebJournalService {
         conv.setDernierMessage(contenu);
         conv.setDateDernierMessage(LocalDateTime.now());
         conv.setNonLu(conv.getNonLu() + 1);
-        if (!"OUVERTE".equals(conv.getStatut())) { conv.setStatut("OUVERTE"); }
+        // Une discussion clôturée se rouvre ; l'état « à reprendre » est préservé.
+        if ("CLOTUREE".equals(conv.getStatut())) { conv.setStatut("OUVERTE"); }
         em.merge(conv);
+        return conv;
     }
 
     /** Un message avec cet identifiant WhatsApp a-t-il déjà été enregistré ? */

@@ -43,6 +43,15 @@ public class ConversationService {
         parId(conversationId).ifPresent(c -> { c.setAgentId(agentId); em.merge(c); });
     }
 
+    /** Active/désactive le bot sur une conversation ; le réactiver la repasse à OUVERTE. */
+    public void definirBot(Long conversationId, boolean actif) {
+        parId(conversationId).ifPresent(c -> {
+            c.setBotActif(actif);
+            if (actif && "A_REPRENDRE".equals(c.getStatut())) { c.setStatut("OUVERTE"); }
+            em.merge(c);
+        });
+    }
+
     /** Supprime une conversation et tout son contenu (messages + médias associés). */
     public boolean supprimer(Long conversationId) {
         Conversation c = em.find(Conversation.class, conversationId);

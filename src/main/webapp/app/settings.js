@@ -381,6 +381,133 @@ Usp.settings.uploadFavicon = function (f) {
 Usp.settings.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'Paramètres', listeners: Usp.tabListeners,
-        items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(), Usp.settings.templatesPanel()]
+        items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(),
+                Usp.settings.templatesPanel(), Usp.settings.botPanel()]
     };
+};
+
+/* ---------- Assistant (Bot) : réglages + base de connaissance (FAQ) ---------- */
+Usp.settings.botPanel = function () {
+    var faqStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'declencheurs', 'reponse', 'ordre', 'actif'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/bot/faq',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+
+    var chargerParams = function (p) {
+        var lire = function (cle, setter) {
+            Usp.ajax({ url: '/parametres/' + cle, method: 'GET', success: function (r) {
+                setter((Ext.decode(r.responseText) || {}).valeur);
+            } });
+        };
+        lire('bot.actif', function (v) { p.down('#botActif').setValue(v === 'true' || v === true); });
+        lire('bot.message_transfert', function (v) { p.down('#botTransfert').setValue(v || ''); });
+        lire('bot.mots_cles_humain', function (v) { p.down('#botHumain').setValue(v || ''); });
+        lire('bot.mots_cles_escalade', function (v) { p.down('#botEscalade').setValue(v || ''); });
+    };
+
+    var enregistrerParams = function (p) {
+        var put = function (cle, valeur, cb) {
+            Usp.ajax({ url: '/parametres/' + cle, method: 'PUT', jsonData: { valeur: String(valeur) },
+                success: cb, failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible (' + cle + ').'); } });
+        };
+        var actif = p.down('#botActif').getValue();
+        put('bot.actif', actif ? 'true' : 'false', function () {
+            Usp.botActif = actif;
+            put('bot.message_transfert', p.down('#botTransfert').getValue(), function () {
+                put('bot.mots_cles_humain', p.down('#botHumain').getValue(), function () {
+                    put('bot.mots_cles_escalade', p.down('#botEscalade').getValue(), function () {
+                        Usp.toast('Réglages du bot enregistrés' + (actif ? ' — bot activé.' : ' — bot désactivé.'));
+                    });
+                });
+            });
+        });
+    };
+
+    return {
+        xtype: 'panel', title: '🤖 Assistant (Bot)', autoScroll: true, bodyPadding: 14, layout: 'anchor',
+        listeners: { afterrender: function (p) { chargerParams(p); } },
+        items: [
+            { xtype: 'component', html: '<div style="color:#555;margin-bottom:8px">' +
+                'Le bot répond automatiquement aux messages entrants (WhatsApp API et WhatsApp Web) ' +
+                'à partir de la base de connaissance ci-dessous et du catalogue/promotions. ' +
+                'Quand il ne sait pas répondre, ou sur un mot-clé sensible, il <b>passe la main à un humain</b> ' +
+                '(la discussion bascule en « À reprendre »). <b>Désactivé par défaut.</b></div>' },
+            { xtype: 'fieldset', title: 'Réglages', defaults: { anchor: '100%', labelWidth: 230 }, items: [
+                { xtype: 'checkbox', itemId: 'botActif', fieldLabel: 'Activer le bot',
+                  boxLabel: 'Réponses automatiques activées' },
+                { xtype: 'textfield', itemId: 'botTransfert', fieldLabel: 'Message de transfert vers un humain' },
+                { xtype: 'textfield', itemId: 'botHumain', fieldLabel: 'Mots-clés « parler à un humain »',
+                  emptyText: 'conseiller, agent, humain…' },
+                { xtype: 'textfield', itemId: 'botEscalade', fieldLabel: 'Mots-clés sensibles (escalade)',
+                  emptyText: 'réclamation, remboursement, litige…' },
+                { xtype: 'button', text: '💾 Enregistrer les réglages', margin: '8 0 0 0',
+                  handler: function (b) { enregistrerParams(b.up('panel')); } }
+            ] },
+            { xtype: 'grid', title: 'Base de connaissance (FAQ)', height: 320, anchor: '100%', store: faqStore,
+              columns: [
+                { text: 'Déclencheurs (mots-clés)', dataIndex: 'declencheurs', flex: 1,
+                  renderer: function (v) { return Ext.String.htmlEncode(v || ''); } },
+                { text: 'Réponse', dataIndex: 'reponse', flex: 2,
+                  renderer: function (v) { return Ext.String.htmlEncode(v || ''); } },
+                { text: 'Ordre', dataIndex: 'ordre', width: 60 },
+                { text: 'Active', dataIndex: 'actif', width: 70, align: 'center',
+                  renderer: function (v) { return v ? '✅' : '—'; } },
+                { text: 'Suppr.', width: 60, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+                  renderer: function () { return '<span class="faq-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
+              ],
+              tbar: [
+                { text: '➕ Nouvelle entrée', tooltip: 'Ajouter une question/réponse', handler: function () { Usp.settings.faqForm(faqStore, null); } },
+                { text: '🔄 Rafraîchir', handler: function () { faqStore.load(); } }
+              ],
+              listeners: {
+                itemdblclick: function (g, rec) { Usp.settings.faqForm(faqStore, rec); },
+                cellclick: function (g, td, ci, rec, tr, ri, e) {
+                    if (e.getTarget('.faq-del')) {
+                        Ext.Msg.confirm('Supprimer', 'Supprimer cette entrée de la FAQ ?', function (btn) {
+                            if (btn === 'yes') {
+                                Usp.ajax({ url: '/bot/faq/' + rec.get('id'), method: 'DELETE',
+                                    success: function () { faqStore.load(); Usp.toast('Entrée supprimée.'); } });
+                            }
+                        });
+                    }
+                }
+              }
+            }
+        ]
+    };
+};
+
+/* Formulaire de création/modification d'une entrée FAQ du bot. */
+Usp.settings.faqForm = function (store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier l\'entrée FAQ' : 'Nouvelle entrée FAQ',
+        width: 560, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'textfield', name: 'declencheurs', fieldLabel: 'Déclencheurs', allowBlank: false,
+              emptyText: 'Mots-clés séparés par des virgules : horaire, ouvert, heure' },
+            { xtype: 'displayfield', value: '<span style="color:#888">Si le message du client contient l\'un de ces ' +
+              'mots-clés, le bot envoie la réponse ci-dessous.</span>' },
+            { xtype: 'textareafield', name: 'reponse', fieldLabel: 'Réponse', allowBlank: false, height: 110 },
+            { xtype: 'numberfield', name: 'ordre', fieldLabel: 'Ordre', value: 0, minValue: 0 },
+            { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
+        ] }],
+        buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+            var form = b.up('window').down('form').getForm();
+            if (!form.isValid()) { return; }
+            var data = form.getValues();
+            data.actif = form.findField('actif').getValue();
+            data.ordre = form.findField('ordre').getValue() || 0;
+            Usp.ajax({ url: rec ? '/bot/faq/' + rec.get('id') : '/bot/faq',
+                method: rec ? 'PUT' : 'POST', jsonData: data,
+                success: function () { win.close(); store.load(); Usp.toastEnregistre('Entrée FAQ', !!rec); },
+                failure: function (resp) {
+                    var msg = 'Enregistrement impossible.';
+                    try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                    Ext.Msg.alert('Erreur', msg);
+                } });
+        } }]
+    });
+    win.show();
+    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
 };
