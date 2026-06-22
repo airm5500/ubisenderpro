@@ -49,9 +49,9 @@ Usp.settings.accountsPanel = function () {
 Usp.settings.accountForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le compte WhatsApp' : 'Nouveau compte WhatsApp',
-        width: 540, modal: true, bodyPadding: 12,
+        width: 680, modal: true, bodyPadding: 12,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 170 },
             items: [
                 { xtype: 'displayfield', value: 'Identifiants issus de Meta for Developers (produit WhatsApp).' },
                 { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false },
@@ -116,7 +116,7 @@ Usp.settings.templatesPanel = function () {
 Usp.settings.templateForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le modèle' : 'Nouveau modèle',
-        width: 820, height: 700, maxHeight: Ext.getBody().getViewSize().height - 40,
+        width: 1180, height: 840, maxHeight: Ext.getBody().getViewSize().height - 20,
         maximizable: true, modal: true, layout: 'fit',
         items: [{
             xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' },
