@@ -67,7 +67,14 @@ public class BotService {
                 return;
             }
 
-            // 3) Catalogue / promotions (si l'intention est détectée).
+            // 3) Unités gratuites (UG) : « combien commander pour avoir des unités
+            //    gratuites », ou question sur un produit en offre UG.
+            if (intentionUG(norm)) {
+                repondre(conv, chercherUG(norm), "UG");
+                return;
+            }
+
+            // 4) Catalogue / promotions (si l'intention est détectée).
             if (contientUnMotTableau(norm, INTENT_CATALOGUE)) {
                 String reponseCat = chercherCatalogue(norm);
                 if (reponseCat != null) {
@@ -76,7 +83,7 @@ public class BotService {
                 }
             }
 
-            // 4) Rien trouvé -> on passe la main à un humain.
+            // 5) Rien trouvé -> on passe la main à un humain.
             escalader(conv, "aucune règle ne correspond");
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Bot KO sur la conversation " + conversationId, e);
@@ -124,14 +131,73 @@ public class BotService {
         if (a.getPrixPromotionnel() != null && a.getPrixPromotionnel().signum() > 0) {
             sb.append(" — en promotion à ").append(montant(a.getPrixPromotionnel())).append(" FCFA 🎉");
         }
+        if (aDesUG(a)) {
+            sb.append("\n").append(offreUG(a));
+        }
         if (a.getStockDisponible() != null) {
             sb.append(a.getStockDisponible().signum() > 0 ? "\n✅ Disponible." : "\n⚠️ Actuellement en rupture.");
         }
         return sb.toString();
     }
 
+    /** Vrai si l'article a une offre d'unités gratuites (commandez X, recevez Y). */
+    private boolean aDesUG(Article a) {
+        return a.getQuantiteUg() != null && a.getQuantiteUg() > 0
+                && a.getQuantiteCommandee() != null && a.getQuantiteCommandee() > 0;
+    }
+
+    private String offreUG(Article a) {
+        return "🎁 Offre : commandez " + a.getQuantiteCommandee()
+                + ", recevez " + a.getQuantiteUg() + " gratuite(s) !";
+    }
+
     private String montant(BigDecimal v) {
         return v.stripTrailingZeros().toPlainString();
+    }
+
+    /** Détecte une question relative aux unités gratuites (UG / gratuit / offert / bonus). */
+    private boolean intentionUG(String norm) {
+        String[] mots = { "unite gratuite", "unites gratuites", "gratuit", "gratuite", "gratuites",
+                "offert", "offerte", "offerts", "bonus" };
+        if (contientUnMotTableau(norm, mots)) { return true; }
+        for (String t : norm.split("\\s+")) { if (t.equals("ug")) { return true; } }
+        return false;
+    }
+
+    /**
+     * Réponse aux questions sur les unités gratuites : détail pour un produit cité,
+     * sinon liste des offres UG en cours.
+     */
+    private String chercherUG(String norm) {
+        // Produit précis cité dans le message et bénéficiant d'une offre UG ?
+        for (String token : norm.split("\\s+")) {
+            if (token.length() < 4) { continue; }
+            List<Article> arts = em.createQuery(
+                    "SELECT a FROM Article a WHERE a.actif = true AND a.quantiteUg > 0 AND a.quantiteCommandee > 0 " +
+                    "AND (LOWER(a.designation) LIKE :t OR LOWER(a.pscode) = :p) ORDER BY a.designation",
+                    Article.class)
+                    .setParameter("t", "%" + token + "%")
+                    .setParameter("p", token)
+                    .setMaxResults(1).getResultList();
+            if (!arts.isEmpty()) { return ligneArticle(arts.get(0)); }
+        }
+        // Sinon, liste générale des offres avec unités gratuites.
+        List<Article> offres = em.createQuery(
+                "SELECT a FROM Article a WHERE a.actif = true AND a.quantiteUg > 0 AND a.quantiteCommandee > 0 " +
+                "ORDER BY a.designation", Article.class)
+                .setMaxResults(8).getResultList();
+        if (offres.isEmpty()) {
+            return "Aucune offre d'unités gratuites n'est active pour le moment. "
+                    + "Souhaitez-vous des informations sur un autre produit ?";
+        }
+        StringBuilder sb = new StringBuilder("🎁 Nos offres avec unités gratuites :");
+        for (Article a : offres) {
+            sb.append("\n• ").append(a.getDesignation())
+              .append(" : commandez ").append(a.getQuantiteCommandee())
+              .append(", recevez ").append(a.getQuantiteUg()).append(" gratuite(s)");
+        }
+        sb.append("\n\nIndiquez-moi le nom d'un produit pour plus de détails.");
+        return sb.toString();
     }
 
     /** Envoie une réponse automatique sur le canal de la conversation et la journalise. */
