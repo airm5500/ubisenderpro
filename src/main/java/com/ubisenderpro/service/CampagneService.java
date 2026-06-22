@@ -98,11 +98,44 @@ public class CampagneService {
     public void verifierLancable(Long campagneId) {
         Campagne c = em.find(Campagne.class, campagneId);
         if (c == null) throw new IllegalArgumentException("Campagne introuvable");
-        if (c.getWhatsappAccountId() == null) throw new IllegalArgumentException("Compte WhatsApp non défini");
         if (c.getModeleId() == null) throw new IllegalArgumentException("Modèle de message non défini");
+        if ("WEB".equalsIgnoreCase(c.getCanal())) {
+            if (c.getWaWebSessionId() == null || c.getWaWebSessionId().isEmpty())
+                throw new IllegalArgumentException("Session WhatsApp Web non définie");
+        } else if (c.getWhatsappAccountId() == null) {
+            throw new IllegalArgumentException("Compte WhatsApp non défini");
+        }
     }
 
     public void changerStatut(Long campagneId, String statut) {
         parId(campagneId).ifPresent(c -> { c.setStatut(statut); em.merge(c); });
+    }
+
+    /** Liste des destinataires d'une campagne (détails : numéro, nom, statut, erreur). */
+    public List<CampagneDestinataire> destinataires(Long campagneId) {
+        return em.createQuery(
+                "SELECT d FROM CampagneDestinataire d WHERE d.campagneId = :c ORDER BY d.id",
+                CampagneDestinataire.class).setParameter("c", campagneId).getResultList();
+    }
+
+    /**
+     * Réinitialise les destinataires en échec d'une campagne pour permettre une
+     * relance : ECHOUE -> EN_ATTENTE (l'historique des tentatives est conservé).
+     * Décrémente d'autant le compteur d'échecs de la campagne.
+     * @return le nombre de destinataires remis en file d'attente.
+     */
+    public int reinitialiserEchecs(Long campagneId) {
+        int reinities = em.createQuery(
+                "UPDATE CampagneDestinataire d SET d.statut = 'EN_ATTENTE' " +
+                "WHERE d.campagneId = :c AND d.statut = 'ECHOUE'")
+                .setParameter("c", campagneId).executeUpdate();
+        if (reinities > 0) {
+            Campagne c = em.find(Campagne.class, campagneId);
+            if (c != null) {
+                c.setNbEchoues(Math.max(0, c.getNbEchoues() - reinities));
+                em.merge(c);
+            }
+        }
+        return reinities;
     }
 }

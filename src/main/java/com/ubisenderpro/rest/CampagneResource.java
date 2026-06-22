@@ -72,6 +72,33 @@ public class CampagneResource {
         return Response.ok(Map.of("nbDestinataires", total)).build();
     }
 
+    /** Détails d'une campagne : liste des destinataires avec leur statut d'envoi. */
+    @GET
+    @Path("/{id}/recipients")
+    public List<com.ubisenderpro.entity.CampagneDestinataire> destinataires(@PathParam("id") Long id) {
+        return campagneService.destinataires(id);
+    }
+
+    /**
+     * Relance les envois en échec d'une campagne : les destinataires ECHOUE
+     * repassent EN_ATTENTE (l'historique des tentatives est conservé) et la
+     * campagne est relancée en arrière-plan.
+     */
+    @POST
+    @Path("/{id}/relancer")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response relancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        int reinities = campagneService.reinitialiserEchecs(id);
+        if (reinities == 0) {
+            return Response.ok(Map.of("relances", 0, "message", "Aucun envoi en échec à relancer")).build();
+        }
+        campagneService.verifierLancable(id);
+        campagneSenderAsync.lancer(id);
+        auditService.tracer(authHeader, "RELANCE", "Campagne", id, reinities + " envoi(s) en échec relancé(s)");
+        return Response.status(Response.Status.ACCEPTED)
+                .entity(Map.of("relances", reinities, "statut", "EN_COURS")).build();
+    }
+
     /**
      * Lance la campagne en arrière-plan : répond 202 immédiatement, l'envoi
      * progresse de façon asynchrone (statut EN_COURS -> TERMINEE).

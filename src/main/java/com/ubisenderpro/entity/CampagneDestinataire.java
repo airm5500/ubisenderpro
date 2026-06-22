@@ -26,6 +26,10 @@ public class CampagneDestinataire {
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "EN_ATTENTE";
 
+    /** Nombre de tentatives d'envoi (incrémenté à chaque envoi/relance). */
+    @Column(name = "tentatives", nullable = false)
+    private int tentatives = 0;
+
     @Column(name = "wa_message_id", length = 150)
     private String waMessageId;
 
@@ -59,6 +63,8 @@ public class CampagneDestinataire {
     public void setNomContact(String nomContact) { this.nomContact = nomContact; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
+    public int getTentatives() { return tentatives; }
+    public void setTentatives(int tentatives) { this.tentatives = tentatives; }
     public String getWaMessageId() { return waMessageId; }
     public void setWaMessageId(String waMessageId) { this.waMessageId = waMessageId; }
     public String getErreur() { return erreur; }

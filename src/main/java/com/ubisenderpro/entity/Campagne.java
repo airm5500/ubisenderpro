@@ -44,6 +44,14 @@ public class Campagne {
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
+    /** Canal d'envoi : 'API' (Cloud API officielle) ou 'WEB' (WhatsApp Web). */
+    @Column(name = "canal", nullable = false, length = 10)
+    private String canal = "API";
+
+    /** Session WhatsApp Web utilisée lorsque {@link #canal} = 'WEB'. */
+    @Column(name = "wa_web_session_id", length = 80)
+    private String waWebSessionId;
+
     @Column(name = "date_programmee")
     private LocalDateTime dateProgrammee;
 
@@ -107,6 +115,10 @@ public class Campagne {
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
+    public String getCanal() { return canal; }
+    public void setCanal(String canal) { this.canal = canal; }
+    public String getWaWebSessionId() { return waWebSessionId; }
+    public void setWaWebSessionId(String waWebSessionId) { this.waWebSessionId = waWebSessionId; }
     public LocalDateTime getDateProgrammee() { return dateProgrammee; }
     public void setDateProgrammee(LocalDateTime dateProgrammee) { this.dateProgrammee = dateProgrammee; }
     public String getFuseauHoraire() { return fuseauHoraire; }
