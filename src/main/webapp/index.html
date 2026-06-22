@@ -50,8 +50,9 @@
             50%  { transform: translate(3px, -3px) rotate(-8deg); }
             100% { transform: translate(0, 0) rotate(0deg); }
         }
-        .usp-brand-text { animation: usp-fade 3s ease-in-out infinite; }
-        @keyframes usp-fade { 0%, 100% { opacity: 1; } 50% { opacity: .78; } }
+        /* Le branding du header utilise l'animation « vague » lettre par lettre
+           (classe .pl-animated-text--brand, cf. app/login.css) appliquée au
+           rendu — plus besoin du pulse d'opacité usp-fade. */
 
         /* En-têtes de panneaux / grilles aux couleurs ubipharm */
         .x-panel-header-default {

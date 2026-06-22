@@ -53,6 +53,31 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Animation « lettre par lettre » (vague pl-letter-wave) — partagée entre le
+   login plein écran et le branding du header. Reprise fidèlement de prestige. */
+Usp.hasClass = function (t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; };
+Usp.renderAnimatedLetters = function (target, text, modifier) {
+    var safeText = text || '', tokens = safeText.split(/(\s+)/), letterIndex = 0;
+    target.innerHTML = '';
+    if (modifier && !Usp.hasClass(target, modifier)) {
+        target.className = (target.className + ' ' + modifier).replace(/\s+/g, ' ');
+    }
+    for (var i = 0; i < tokens.length; i += 1) {
+        if (/^\s+$/.test(tokens[i])) { target.appendChild(document.createTextNode(' ')); continue; }
+        var word = document.createElement('span');
+        word.className = 'pl-animated-word';
+        for (var j = 0; j < tokens[i].length; j += 1) {
+            var letter = document.createElement('span');
+            letter.className = 'pl-animated-letter';
+            letter.style.cssText = '--letter-index:' + letterIndex + ';';
+            letter.textContent = tokens[i].charAt(j);
+            word.appendChild(letter);
+            letterIndex += 1;
+        }
+        target.appendChild(word);
+    }
+};
+
 /* ---------- Appels REST avec jeton de session ---------- */
 Usp.ajax = function (options) {
     options.url = Usp.apiBase + options.url;
@@ -186,7 +211,7 @@ Usp.showLogin = function () {
         '              <span class="pl-pharmacy-card__icon" aria-hidden="true">📤</span>',
         '              <span class="pl-pharmacy-card__label">Plateforme d\'envoi</span>',
         '            </span>',
-        '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Messagerie WhatsApp &amp; SMS</strong>',
+        '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
         '          </div>',
         '          <div class="pl-version-badge">UbiSenderPro · v1.0</div>',
         '        </div>',
@@ -231,33 +256,11 @@ Usp.showLogin = function () {
     wrap.innerHTML = html;
     document.body.appendChild(wrap);
 
-    // Animation lettre par lettre (repris fidèlement de prestige).
-    function hasClass(t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; }
-    function renderAnimatedLetters(target, text, modifier) {
-        var safeText = text || '', tokens = safeText.split(/(\s+)/), letterIndex = 0;
-        target.innerHTML = '';
-        if (modifier && !hasClass(target, modifier)) {
-            target.className = (target.className + ' ' + modifier).replace(/\s+/g, ' ');
-        }
-        for (var i = 0; i < tokens.length; i += 1) {
-            if (/^\s+$/.test(tokens[i])) { target.appendChild(document.createTextNode(' ')); continue; }
-            var word = document.createElement('span');
-            word.className = 'pl-animated-word';
-            for (var j = 0; j < tokens[i].length; j += 1) {
-                var letter = document.createElement('span');
-                letter.className = 'pl-animated-letter';
-                letter.style.cssText = '--letter-index:' + letterIndex + ';';
-                letter.textContent = tokens[i].charAt(j);
-                word.appendChild(letter);
-                letterIndex += 1;
-            }
-            target.appendChild(word);
-        }
-    }
+    // Animation lettre par lettre (repris fidèlement de prestige, helper partagé Usp.renderAnimatedLetters).
     var brand = wrap.querySelector('.pl-brand__text');
-    if (brand) { renderAnimatedLetters(brand, brand.textContent, 'pl-animated-text--brand'); }
+    if (brand) { Usp.renderAnimatedLetters(brand, brand.textContent, 'pl-animated-text--brand'); }
     var pharma = wrap.querySelector('#pl-pharma-name');
-    if (pharma) { renderAnimatedLetters(pharma, pharma.textContent, 'pl-animated-text--pharmacy'); }
+    if (pharma) { Usp.renderAnimatedLetters(pharma, pharma.textContent, 'pl-animated-text--pharmacy'); }
 
     var loader = wrap.querySelector('#loader');
     var errBox = wrap.querySelector('#pl-error');
@@ -836,7 +839,12 @@ Usp.showMain = function () {
                 items: [
                     { xtype: 'tbtext', cls: 'usp-brand', text:
                         '<span class="usp-logo">' + Usp.LOGO + '</span>' +
-                        '<span class="usp-brand-text">UbiSenderPro</span>' },
+                        '<span class="usp-brand-text pl-animated-text--brand">UbiSenderPro</span>',
+                      listeners: { afterrender: function (c) {
+                          // Même animation « vague » que l'accroche du login, appliquée au branding du header.
+                          var el = c.getEl().dom.querySelector('.usp-brand-text');
+                          if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
+                      } } },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',
