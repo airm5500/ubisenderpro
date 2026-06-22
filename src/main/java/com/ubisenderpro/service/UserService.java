@@ -64,6 +64,7 @@ public class UserService {
         u.setLogin(req.getLogin());
         u.setNomComplet(req.getNomComplet());
         u.setAvatar(req.getAvatar());
+        u.setPhoto(req.getPhoto());
         u.setEmail(req.getEmail());
         u.setActif(req.getActif() == null || req.getActif());
         String mdp = (req.getMotDePasse() == null || req.getMotDePasse().isEmpty())
@@ -79,6 +80,8 @@ public class UserService {
         if (u == null) return null;
         if (req.getNomComplet() != null) u.setNomComplet(req.getNomComplet());
         if (req.getAvatar() != null) u.setAvatar(req.getAvatar());
+        // Photo : "" efface, valeur = remplace, null = inchangée.
+        if (req.getPhoto() != null) u.setPhoto(req.getPhoto().isEmpty() ? null : req.getPhoto());
         if (req.getEmail() != null) u.setEmail(req.getEmail());
         if (req.getActif() != null) u.setActif(req.getActif());
         if (req.getMotDePasse() != null && !req.getMotDePasse().isEmpty()) {

@@ -27,7 +27,7 @@ Usp.campaign.show = function (store) {
 
     var step1 = {
         title: '1. Informations', bodyPadding: 12, border: false,
-        defaults: { anchor: '100%' },
+        defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
             { xtype: 'textfield', name: 'objectif', fieldLabel: 'Objectif' },
@@ -53,7 +53,7 @@ Usp.campaign.show = function (store) {
 
     var step2 = {
         title: '2. Destinataires', bodyPadding: 12, border: false,
-        defaults: { anchor: '100%' },
+        defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'displayfield', value: 'Ciblez par segmentation client, et/ou liste statique, et/ou segment dynamique.' },
             Usp.campaign.combo('/segmentations', '', 'id', 'libelle',
@@ -76,7 +76,7 @@ Usp.campaign.show = function (store) {
 
     var step4 = {
         title: '4. Programmation', bodyPadding: 12, border: false,
-        defaults: { anchor: '100%' },
+        defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'radiogroup', fieldLabel: 'Envoi', columns: 1, items: [
                 { boxLabel: 'Immédiat', name: 'prog', inputValue: 'now', checked: true },
@@ -93,7 +93,7 @@ Usp.campaign.show = function (store) {
     };
 
     var wizard = Ext.create('Ext.window.Window', {
-        title: 'Nouvelle campagne', width: 560, height: 440, modal: true, layout: 'fit',
+        title: 'Nouvelle campagne', width: 720, height: 480, modal: true, layout: 'fit',
         items: [{
             xtype: 'form', itemId: 'wizForm', layout: 'card', activeItem: 0, border: false,
             items: [step1, step2, step3, step4, step5]

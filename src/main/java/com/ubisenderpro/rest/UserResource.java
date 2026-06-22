@@ -61,6 +61,15 @@ public class UserResource {
         return u == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(u).build();
     }
 
+    /** Photo de profil d'un utilisateur (chargée à la demande, hors des listes). */
+    @GET
+    @Path("/{id}/photo")
+    public Response photo(@PathParam("id") Long id) {
+        return userService.parId(id)
+                .map(u -> Response.ok(Map.of("photo", u.getPhoto() == null ? "" : u.getPhoto())).build())
+                .orElse(Response.status(Response.Status.NOT_FOUND).build());
+    }
+
     @POST
     @Path("/{id}/activate")
     public Response activer(@PathParam("id") Long id) {

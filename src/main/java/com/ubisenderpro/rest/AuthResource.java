@@ -8,6 +8,8 @@ import com.ubisenderpro.service.AuthService;
 import com.ubisenderpro.service.ConnexionLogService;
 import com.ubisenderpro.service.GeoIpService;
 import com.ubisenderpro.service.JournalService;
+import com.ubisenderpro.service.UserService;
+import com.ubisenderpro.entity.Utilisateur;
 
 import javax.ejb.EJB;
 import javax.inject.Inject;
@@ -34,6 +36,8 @@ public class AuthResource {
     private ConnexionLogService connexionLogService;
     @EJB
     private GeoIpService geoIpService;
+    @EJB
+    private UserService userService;
     @Inject
     private SessionStore sessionStore;
 
@@ -120,6 +124,8 @@ public class AuthResource {
         info.put("login", u.getLogin());
         info.put("nomComplet", u.getNomComplet());
         info.put("roles", u.getRoles());
+        // Photo de profil pour l'avatar rond du header (#3) ; null si non chargée.
+        info.put("photo", userService.parId(u.getId()).map(Utilisateur::getPhoto).orElse(null));
         return info;
     }
 

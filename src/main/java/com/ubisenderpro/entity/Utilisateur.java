@@ -22,6 +22,11 @@ public class Utilisateur {
     @Column(name = "avatar", length = 16)
     private String avatar;
 
+    /** Photo de profil (data URI base64). Chargée à la demande, pas dans les listes. */
+    @Lob
+    @Column(name = "photo", columnDefinition = "LONGTEXT")
+    private String photo;
+
     @Column(name = "email", length = 150)
     private String email;
 
@@ -59,6 +64,8 @@ public class Utilisateur {
     public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }
+    public String getPhoto() { return photo; }
+    public void setPhoto(String photo) { this.photo = photo; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     public String getMotDePasseHash() { return motDePasseHash; }

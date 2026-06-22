@@ -11,6 +11,7 @@ public class UserRequest {
     private String login;
     private String nomComplet;
     private String avatar;
+    private String photo;
     private String email;
     private String motDePasse;
     private Boolean actif;
@@ -22,6 +23,8 @@ public class UserRequest {
     public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }
+    public String getPhoto() { return photo; }
+    public void setPhoto(String photo) { this.photo = photo; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     public String getMotDePasse() { return motDePasse; }

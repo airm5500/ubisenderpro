@@ -53,6 +53,14 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Avatar rond du header (#3) : photo de l'utilisateur, ou cadre rond vide. */
+Usp.avatarRond = function (photo) {
+    if (photo) {
+        return '<span class="usp-avatar"><img src="' + photo + '" alt=""/></span>';
+    }
+    return '<span class="usp-avatar usp-avatar--empty" title="Aucune photo"></span>';
+};
+
 /* Animation « lettre par lettre » (vague pl-letter-wave) — partagée entre le
    login plein écran et le branding du header. Reprise fidèlement de prestige. */
 Usp.hasClass = function (t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; };
@@ -209,7 +217,7 @@ Usp.showLogin = function () {
         '          <div class="pl-pharmacy-card" id="pl-title">',
         '            <span class="pl-pharmacy-card__header">',
         '              <span class="pl-pharmacy-card__icon" aria-hidden="true">📤</span>',
-        '              <span class="pl-pharmacy-card__label">Plateforme d\'envoi</span>',
+        '              <span class="pl-pharmacy-card__label">Marketing Digital</span>',
         '            </span>',
         '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
         '          </div>',
@@ -892,6 +900,8 @@ Usp.showMain = function () {
                           if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
                       } } },
                     '->',
+                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
+                      html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',
                       text: '<img src="data:image/svg+xml,' +

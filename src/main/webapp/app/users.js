@@ -112,24 +112,38 @@ Usp.users.form = function (store, rec) {
     });
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur',
-        width: 540, maxHeight: 560, modal: true, bodyPadding: 12, autoScroll: true,
+        width: 660, maxHeight: 580, modal: true, bodyPadding: 12, autoScroll: true,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, layout: { type: 'hbox', align: 'stretch' },
             items: [
-                { xtype: 'textfield', name: 'login', fieldLabel: 'Login', allowBlank: false, disabled: !!rec },
-                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
-                { xtype: 'combobox', name: 'avatar', fieldLabel: 'Icône', value: '👤', editable: false,
-                  queryMode: 'local', valueField: 'v', displayField: 'v',
-                  store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
-                  listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
-                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
-                { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
-                  emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
-                { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
-                    { xtype: 'displayfield',
-                      value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
-                    { xtype: 'checkboxgroup', columns: 2, items: roleItems }
-                ] }
+                // Colonne gauche : champs du compte utilisateur.
+                { xtype: 'container', flex: 1, layout: 'anchor', defaults: { anchor: '100%' }, items: [
+                    { xtype: 'textfield', name: 'login', fieldLabel: 'Login', allowBlank: false, disabled: !!rec },
+                    { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
+                    { xtype: 'combobox', name: 'avatar', fieldLabel: 'Icône', value: '👤', editable: false,
+                      queryMode: 'local', valueField: 'v', displayField: 'v',
+                      store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
+                      listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
+                    { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                    { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
+                      emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
+                    { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
+                        { xtype: 'displayfield',
+                          value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
+                        { xtype: 'checkboxgroup', columns: 2, items: roleItems }
+                    ] }
+                ] },
+                // Colonne droite : photo de profil (cadre + Parcourir).
+                { xtype: 'container', width: 168, margin: '0 0 0 16',
+                  layout: { type: 'vbox', align: 'center' }, items: [
+                    { xtype: 'component', itemId: 'photoPreview', html: Usp.users.photoImgHtml(null) },
+                    { xtype: 'filefield', itemId: 'photoFile', buttonOnly: true, hideLabel: true,
+                      buttonText: 'Parcourir…', margin: '10 0 0 0', width: 150,
+                      listeners: { change: function (f) { Usp.users.chargerPhoto(f); } } },
+                    { xtype: 'button', itemId: 'photoClear', text: 'Retirer la photo', margin: '6 0 0 0',
+                      handler: function (b) { Usp.users.definirPhoto(b.up('window'), ''); } },
+                    { xtype: 'hidden', name: 'photo', itemId: 'photoField' }
+                  ] }
             ]
         }],
         buttons: [{
@@ -146,6 +160,7 @@ Usp.users.form = function (store, rec) {
                     login: form.findField('login').getValue(),
                     nomComplet: form.findField('nomComplet').getValue(),
                     avatar: form.findField('avatar').getValue(),
+                    photo: form.findField('photo').getValue(),
                     email: form.findField('email').getValue(),
                     motDePasse: form.findField('motDePasse').getValue(),
                     roles: roles
@@ -177,7 +192,50 @@ Usp.users.form = function (store, rec) {
             var cb = form.findField('role_' + code);
             if (cb) { cb.setValue(true); }
         });
+        // Charge la photo existante dans le cadre (hors des listes, à la demande).
+        Usp.ajax({ url: '/users/' + rec.get('id') + '/photo', method: 'GET',
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText || '{}');
+                Usp.users.definirPhoto(win, r.photo || '');
+            } });
     }
+};
+
+/* Rendu du cadre photo (image ou placeholder « Aucune photo »). */
+Usp.users.photoImgHtml = function (dataUri) {
+    if (dataUri) {
+        return '<div style="width:150px;height:150px;border-radius:14px;overflow:hidden;' +
+            'border:1px solid #ccc;background:#f5f5f5">' +
+            '<img src="' + dataUri + '" style="width:100%;height:100%;object-fit:cover"/></div>';
+    }
+    return '<div style="width:150px;height:150px;border-radius:14px;border:1px dashed #bbb;' +
+        'background:#fafafa;display:flex;align-items:center;justify-content:center;' +
+        'color:#aaa;font-size:13px;text-align:center">Aucune<br/>photo</div>';
+};
+
+/* Met à jour le cadre + le champ caché photo de la fenêtre utilisateur. */
+Usp.users.definirPhoto = function (win, dataUri) {
+    var prev = win.down('#photoPreview');
+    var field = win.down('#photoField');
+    if (field) { field.setValue(dataUri || ''); }
+    if (prev) { prev.update(Usp.users.photoImgHtml(dataUri || null)); }
+};
+
+/* Lit le fichier image choisi (max 2 Mo) et l'affiche dans le cadre. */
+Usp.users.chargerPhoto = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    if (!/^image\//.test(file.type)) {
+        Ext.Msg.alert('Photo', 'Veuillez choisir un fichier image.');
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        Ext.Msg.alert('Photo', 'Image trop lourde (maximum 2 Mo).');
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) { Usp.users.definirPhoto(f.up('window'), e.target.result); };
+    reader.readAsDataURL(file);
 };
 
 /* ---------- Historique des connexions ---------- */
