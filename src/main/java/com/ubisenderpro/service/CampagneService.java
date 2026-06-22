@@ -32,7 +32,23 @@ public class CampagneService {
 
     public Optional<Campagne> parId(Long id) { return Optional.ofNullable(em.find(Campagne.class, id)); }
 
-    public Campagne creer(Campagne c) { em.persist(c); return c; }
+    public Campagne creer(Campagne c) {
+        valider(c);
+        em.persist(c);
+        return c;
+    }
+
+    /** Contrôle des champs obligatoires de la campagne, messages clairs (#6). */
+    private void valider(Campagne c) {
+        if (c.getNom() == null || c.getNom().trim().isEmpty()) {
+            throw new ValidationException("nom", "Le nom de la campagne est obligatoire.");
+        }
+        if (c.getCanal() == null || c.getCanal().trim().isEmpty()) {
+            c.setCanal("API");
+        } else if (!"API".equalsIgnoreCase(c.getCanal()) && !"WEB".equalsIgnoreCase(c.getCanal())) {
+            throw new ValidationException("canal", "Canal d'envoi invalide : choisissez « API » ou « WEB ».");
+        }
+    }
     public Campagne modifier(Campagne c) {
         Campagne ex = em.find(Campagne.class, c.getId());
         if (ex != null) {

@@ -67,13 +67,37 @@ public class ClientService {
     }
 
     public Client creer(Client client) {
+        valider(client, true);
         em.persist(client);
         return client;
     }
 
     public Client modifier(Client client) {
+        valider(client, false);
         client.setUpdatedAt(LocalDateTime.now());
         return em.merge(client);
+    }
+
+    /** Contrôle des champs obligatoires/format du compte client, messages clairs (#6). */
+    private void valider(Client c, boolean creation) {
+        if (c.getNumeroClient() == null || c.getNumeroClient().trim().isEmpty()) {
+            throw new ValidationException("numeroClient", "Le numéro client est obligatoire.");
+        }
+        if (c.getNomCompte() == null || c.getNomCompte().trim().isEmpty()) {
+            throw new ValidationException("nomCompte", "Le nom du compte est obligatoire.");
+        }
+        String email = c.getEmailPrincipal();
+        if (email != null && !email.trim().isEmpty()
+                && !email.trim().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw new ValidationException("emailPrincipal",
+                    "L'adresse e-mail « " + email.trim() + " » n'est pas valide.");
+        }
+        // Unicité du numéro client (clé fonctionnelle).
+        Optional<Client> existant = parNumero(c.getNumeroClient().trim());
+        if (existant.isPresent() && (creation || !existant.get().getId().equals(c.getId()))) {
+            throw new ValidationException("numeroClient",
+                    "Le numéro client « " + c.getNumeroClient().trim() + " » est déjà utilisé par un autre compte.");
+        }
     }
 
     public void supprimer(Long id) {

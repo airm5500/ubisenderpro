@@ -539,7 +539,17 @@ Usp.clientForm = function (store, rec) {
                     method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
                     success: function () { win.close(); store.load(); },
                     failure: function (resp) {
-                        Ext.Msg.alert('Erreur', 'Enregistrement impossible (numéro client en doublon ?).');
+                        // Message clair renvoyé par le serveur + surlignage du champ fautif (#3/#6).
+                        var msg = 'Enregistrement impossible.', champ = null;
+                        try {
+                            var r = Ext.decode(resp.responseText);
+                            msg = r.erreur || msg; champ = r.champ || null;
+                        } catch (e) {}
+                        if (champ) {
+                            var f = form.findField(champ);
+                            if (f) { f.markInvalid(msg); f.focus(true, 50); }
+                        }
+                        Ext.Msg.alert('Saisie à corriger', msg);
                     }
                 });
             }
