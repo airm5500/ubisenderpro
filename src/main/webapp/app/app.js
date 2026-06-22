@@ -1024,6 +1024,10 @@ Usp.showMain = function () {
                           if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
                       } } },
                     '->',
+                    { xtype: 'button', itemId: 'uspEscaladeBadge', hidden: true, cls: 'usp-escalade-badge',
+                      margin: '0 10 0 0',
+                      tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
+                      handler: function () { Usp.escalades.ouvrir(); } },
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
@@ -1080,6 +1084,63 @@ Usp.showMain = function () {
             }
         ]
     });
+    // Surveillance des escalades du bot (notification aux agents).
+    Usp.escalades.demarrer();
+};
+
+/* ------------------------------------------------------------------
+ * Notification d'escalade du bot : badge header + toast lorsqu'une
+ * discussion passe en « À reprendre » (le bot a passé la main).
+ * ------------------------------------------------------------------ */
+Usp.escalades = {
+    _task: null,
+    _dernierTotal: 0,
+    _init: false,
+    demarrer: function () {
+        if (this._task) { return; }
+        if (!Usp.canSee(['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'])) { return; }
+        var self = this;
+        this._task = Ext.TaskManager.start({ interval: 20000, run: function () { self.verifier(); } });
+        this.verifier();
+    },
+    arreter: function () {
+        if (this._task) { Ext.TaskManager.stop(this._task); this._task = null; }
+    },
+    verifier: function () {
+        if (!Usp.token) { return; }
+        var self = this;
+        Usp.ajax({ url: '/conversations?statut=A_REPRENDRE&limit=5', method: 'GET',
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                var total = r.total || 0;
+                self.majBadge(total);
+                if (self._init && total > self._dernierTotal) {
+                    var data = r.data || [];
+                    var nom = data.length ? (data[0].nomAffiche || data[0].numeroWhatsapp || '') : '';
+                    Usp.toast('🙋 Le bot a passé la main' + (nom ? ' : ' + nom : '') + ' — discussion à reprendre.', 'info');
+                }
+                self._dernierTotal = total;
+                self._init = true;
+            }
+        });
+    },
+    majBadge: function (total) {
+        var b = Ext.ComponentQuery.query('#uspEscaladeBadge')[0];
+        if (!b) { return; }
+        if (total > 0) { b.setText('🙋 ' + total + ' à reprendre'); b.show(); }
+        else { b.hide(); }
+    },
+    ouvrir: function () {
+        Usp.ouvrirVue('inbox');
+        // Filtre la liste sur les discussions à reprendre.
+        Ext.defer(function () {
+            var grid = Ext.ComponentQuery.query('#convGrid')[0];
+            if (grid && grid.getStore()) {
+                grid.getStore().getProxy().extraParams = { statut: 'A_REPRENDRE' };
+                grid.getStore().load();
+            }
+        }, 300);
+    }
 };
 
 Usp.loadCenter = function (cmp) {
