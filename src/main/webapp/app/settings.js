@@ -77,7 +77,10 @@ Usp.settings.accountForm = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/whatsapp/accounts/' + rec.get('id') : '/whatsapp/accounts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Compte WhatsApp « ' + (data.libelle || '') + ' »', !!rec);
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
                 });
             }
@@ -181,10 +184,14 @@ Usp.settings.templateForm = function (store, rec) {
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
+                var vals = form.getValues();
                 Usp.ajax({
                     url: rec ? '/templates/' + rec.get('id') : '/templates',
-                    method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
-                    success: function () { win.close(); store.load(); },
+                    method: rec ? 'PUT' : 'POST', jsonData: vals,
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Modèle « ' + (vals.nom || '') + ' »', !!rec);
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
                 });
             }
@@ -313,7 +320,7 @@ Usp.settings.generalPanel = function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.favicon', favicon)(function () {
                                 Usp.appliquerFavicon(favicon);
-                                Ext.Msg.alert('OK', 'Paramètres enregistrés.');
+                                Usp.toast('Paramètres enregistrés avec succès.');
                             });
                             });
                         });

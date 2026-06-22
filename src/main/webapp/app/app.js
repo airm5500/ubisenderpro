@@ -53,6 +53,34 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Notification éphémère (toast) en bas à droite — confirmation d'action (#8).
+   type : 'success' (vert, défaut) | 'error' (rouge) | 'info' (bleu). */
+Usp.toast = function (message, type) {
+    var couleurs = { success: '#2e7d32', error: '#c62828', info: '#1976d2' };
+    var icones = { success: '✓', error: '⚠', info: 'ℹ' };
+    var bg = couleurs[type] || couleurs.success;
+    var ic = icones[type] || icones.success;
+    var el = Ext.DomHelper.append(Ext.getBody(), {
+        tag: 'div', cls: 'usp-toast',
+        html: '<span style="font-weight:bold;margin-right:8px">' + ic + '</span>' + Ext.String.htmlEncode(message || ''),
+        style: 'position:fixed;z-index:99999;right:18px;bottom:18px;max-width:340px;background:' + bg +
+            ';color:#fff;padding:12px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);' +
+            'font-family:sans-serif;font-size:13px;opacity:0;transition:opacity .25s ease,transform .25s ease;' +
+            'transform:translateY(12px)'
+    }, true);
+    el.dom.offsetWidth; // force le reflow avant la transition
+    el.setStyle({ opacity: 1, transform: 'translateY(0)' });
+    Ext.defer(function () {
+        el.setStyle({ opacity: 0, transform: 'translateY(12px)' });
+        Ext.defer(function () { el.remove(); }, 300);
+    }, 2800);
+};
+
+/* Message standard « X créé/modifié avec succès » selon le contexte (#8). */
+Usp.toastEnregistre = function (libelle, modification) {
+    Usp.toast(libelle + (modification ? ' modifié avec succès.' : ' créé avec succès.'));
+};
+
 /* Avatar rond du header (#3) : photo de l'utilisateur, ou cadre rond vide. */
 Usp.avatarRond = function (photo) {
     if (photo) {
@@ -902,7 +930,7 @@ Usp.showMain = function () {
                     '->',
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
-                    { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
+                    { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',
                       text: '<img src="data:image/svg+xml,' +
                           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +

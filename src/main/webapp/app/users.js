@@ -168,7 +168,10 @@ Usp.users.form = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/users/' + rec.get('id') : '/users',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Utilisateur « ' + (data.nomComplet || data.login) + ' »', !!rec);
+                    },
                     failure: function (resp) {
                         var msg = 'Enregistrement impossible.';
                         try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}

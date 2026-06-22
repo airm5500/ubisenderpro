@@ -141,7 +141,7 @@ Usp.inbox.panel = function () {
                 tbar: [
                     { xtype: 'button', text: 'Nouveau', tooltip: 'Composer un message (texte/image) hors modèle', handler: function () { Usp.inbox.nouveauMessage(); } },
                     { xtype: 'button', text: 'Toutes', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
-                    { xtype: 'button', text: 'Non lues', handler: function () { convStore.getProxy().extraParams = { statut: 'OUVERTE' }; convStore.load(); } },
+                    { xtype: 'button', text: 'Non lues', tooltip: 'N\'afficher que les discussions ayant des messages non lus', handler: function () { convStore.getProxy().extraParams = { nonLu: true }; convStore.load(); } },
                     '->',
                     { xtype: 'button', text: 'Rafraîchir', handler: function () { convStore.load(); } }
                 ],

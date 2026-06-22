@@ -120,7 +120,10 @@ Usp.catalogue.articleForm = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/articles/' + rec.get('id') : '/articles',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Article « ' + (data.designation || data.pscode || '') + ' »', !!rec);
+                    },
                     failure: function (resp) {
                         var msg = 'Enregistrement impossible.';
                         try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
@@ -290,7 +293,10 @@ Usp.catalogue.promotionForm = function (store, rec) {
                 Usp.ajax({
                     url: rec ? '/promotions/' + rec.get('id') : '/promotions',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toastEnregistre('Promotion « ' + (data.nom || data.code || '') + ' »', !!rec);
+                    },
                     failure: function (resp) {
                         var msg = 'Enregistrement impossible.';
                         try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
@@ -320,7 +326,10 @@ Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
                     var form = b.up('window').down('form').getForm();
                     if (!form.isValid()) { return; }
                     Usp.ajax({ url: url, method: 'POST', jsonData: form.getValues(),
-                        success: function () { win.close(); store.load(); },
+                        success: function () {
+                            win.close(); store.load();
+                            Usp.toastEnregistre(titre, false);
+                        },
                         failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
                 } }]
             });
