@@ -74,7 +74,8 @@ Usp.catalogue.articleForm = function (store, rec) {
                 { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false },
                 { xtype: 'textfield', name: 'cip', fieldLabel: 'CIP' },
                 { xtype: 'textfield', name: 'codeBarres', fieldLabel: 'Code-barres' },
-                { xtype: 'numberfield', name: 'prixVente', fieldLabel: 'Prix de vente', allowBlank: false, minValue: 0 },
+                { xtype: 'numberfield', name: 'prixVente', fieldLabel: 'Prix de vente', allowBlank: false,
+                  minValue: 0.01, minText: 'Le prix de vente doit être strictement supérieur à 0.' },
                 { xtype: 'numberfield', name: 'prixVentePublic', fieldLabel: 'Prix de vente public', minValue: 0 },
                 { xtype: 'numberfield', name: 'prixPromotionnel', fieldLabel: 'Prix promotionnel', minValue: 0 },
                 { xtype: 'fieldcontainer', fieldLabel: 'Quantités', layout: 'hbox', defaults: { labelWidth: 70, width: 150 }, items: [

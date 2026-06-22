@@ -71,18 +71,36 @@ public class ArticleService {
     }
 
     public Article creer(Article a) {
-        if (a.getPscode() == null || a.getPscode().trim().isEmpty()) {
-            throw new IllegalArgumentException("Le PS Code est obligatoire");
-        }
-        if (a.getDesignation() == null || a.getDesignation().trim().isEmpty()) {
-            throw new IllegalArgumentException("La désignation est obligatoire");
-        }
-        if (parCode(a.getPscode()).isPresent()) {
-            throw new IllegalArgumentException("Un article avec le PS Code « " + a.getPscode() + " » existe déjà");
-        }
+        valider(a, true);
         appliquerPromotions(a);
         em.persist(a);
         return a;
+    }
+
+    /**
+     * Contrôle des champs obligatoires/cohérence d'un article, messages clairs (#6).
+     * Le prix est contrôlé non négatif côté service (sûr pour l'import en masse) ;
+     * le formulaire de saisie impose en plus un prix strictement positif.
+     */
+    private void valider(Article a, boolean creation) {
+        if (a.getPscode() == null || a.getPscode().trim().isEmpty()) {
+            throw new ValidationException("pscode", "Le PS Code est obligatoire.");
+        }
+        if (a.getDesignation() == null || a.getDesignation().trim().isEmpty()) {
+            throw new ValidationException("designation", "La désignation est obligatoire.");
+        }
+        if (a.getPrixVente() == null || a.getPrixVente().signum() < 0) {
+            throw new ValidationException("prixVente", "Le prix de vente doit être un montant positif.");
+        }
+        if (a.getPrixPromotionnel() != null && a.getPrixPromotionnel().signum() < 0) {
+            throw new ValidationException("prixPromotionnel", "Le prix promotionnel ne peut pas être négatif.");
+        }
+        // Unicité du PS Code (clé fonctionnelle).
+        Optional<Article> existant = parCode(a.getPscode().trim());
+        if (existant.isPresent() && (creation || !existant.get().getId().equals(a.getId()))) {
+            throw new ValidationException("pscode",
+                    "Un article avec le PS Code « " + a.getPscode().trim() + " » existe déjà.");
+        }
     }
 
     /** Résout les promotions depuis promotionIds (écriture). Null = ne pas toucher aux associations. */
@@ -97,6 +115,7 @@ public class ArticleService {
     }
 
     public Article modifier(Article a) {
+        valider(a, false);
         appliquerPromotions(a);
         a.setUpdatedAt(LocalDateTime.now());
         return em.merge(a);
