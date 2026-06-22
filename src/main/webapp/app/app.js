@@ -336,12 +336,27 @@ Usp.createClientStore = function () {
     });
 };
 
-/* ---------- Grille des comptes clients ---------- */
+/* ---------- Comptes clients : 2 onglets (liste + vérification de numéros) ---------- */
 Usp.clientsPanel = function () {
+    return {
+        xtype: 'tabpanel',
+        title: 'Comptes clients',
+        listeners: Usp.tabListeners,
+        items: [
+            Usp.clientsGrid(),
+            // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
+            // numéros vit désormais à côté de la liste des comptes clients.
+            Usp.waweb.filterPanel()
+        ]
+    };
+};
+
+/* Onglet « Liste des comptes » : la grille des comptes clients (existant intact). */
+Usp.clientsGrid = function () {
     var store = Usp.createClientStore();
     return {
         xtype: 'grid',
-        title: 'Comptes clients',
+        title: 'Liste des comptes',
         store: store,
         columns: [
             { text: 'N° client', dataIndex: 'numeroClient', width: 110 },

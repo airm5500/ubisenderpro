@@ -925,7 +925,8 @@ Usp.waweb.detailEnvoi = function (jobId) {
 Usp.waweb.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'WhatsApp Web', listeners: Usp.tabListeners,
+        // « Vérification de numéros » (filterPanel) déplacé vers Comptes clients (#4).
         items: [Usp.waweb.sessionsPanel(), Usp.waweb.bulkPanel(), Usp.waweb.historyPanel(),
-                Usp.waweb.filterPanel(), Usp.waweb.extractPanel()]
+                Usp.waweb.extractPanel()]
     };
 };
