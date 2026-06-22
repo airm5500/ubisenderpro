@@ -47,6 +47,12 @@ Usp.appliquerFavicon = function (url) {
     lien.href = url;
 };
 
+/* Logo UbiSenderPro (avion en papier, SVG blanc) pour l'entête. */
+Usp.LOGO = '<img src="data:image/svg+xml,' +
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E" +
+    "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
+    '" style="width:20px;height:20px;vertical-align:middle"/>';
+
 /* ---------- Appels REST avec jeton de session ---------- */
 Usp.ajax = function (options) {
     options.url = Usp.apiBase + options.url;
@@ -260,6 +266,7 @@ Usp.clientsPanel = function () {
                 }, buffer: 400 } },
             '->',
             { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
+            { text: 'Gérer les segmentations', handler: function () { Usp.segmentationsManager(); } },
             { text: 'Importer Excel/CSV', handler: Usp.showImport }
         ].concat(Usp.export.boutons('Comptes clients')),
         bbar: {
@@ -274,6 +281,85 @@ Usp.clientsPanel = function () {
             }
         }
     };
+};
+
+/* ---------- Gestion des segmentations (CRUD) ---------- */
+Usp.segmentationsManager = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle', 'description', 'ordreAffichage', 'actif'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var form = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: rec ? 'Modifier la segmentation' : 'Nouvelle segmentation',
+            width: 420, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false },
+                { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false },
+                { xtype: 'textfield', name: 'description', fieldLabel: 'Description' },
+                { xtype: 'numberfield', name: 'ordreAffichage', fieldLabel: 'Ordre d\'affichage', value: 0, minValue: 0 },
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
+            ] }],
+            buttons: [{ text: 'Enregistrer', handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) {
+                    var m = f.getFields().findBy(function (x) { return !x.isValid(); });
+                    if (m) { m.focus(true, 50); Ext.Msg.alert('Champ obligatoire', 'Renseignez : <b>' + (m.fieldLabel || m.getName()) + '</b>.'); }
+                    return;
+                }
+                var data = f.getValues();
+                data.actif = f.findField('actif').getValue();
+                Usp.ajax({ url: rec ? '/segmentations/' + rec.get('id') : '/segmentations',
+                    method: rec ? 'PUT' : 'POST', jsonData: data,
+                    success: function () { win.close(); store.load(); },
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    } });
+            } }]
+        });
+        win.show();
+        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    };
+    Ext.create('Ext.window.Window', {
+        title: 'Segmentations clients', width: 640, height: 440, modal: true, layout: 'fit',
+        items: [{
+            xtype: 'grid', store: store,
+            columns: [
+                { text: 'Code', dataIndex: 'code', width: 120 },
+                { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+                { text: 'Description', dataIndex: 'description', flex: 1 },
+                { text: 'Ordre', dataIndex: 'ordreAffichage', width: 70 },
+                { text: 'Active', dataIndex: 'actif', width: 70, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+                { text: 'Suppr.', width: 60, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+                  renderer: function () { return '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
+            ],
+            tbar: [
+                { text: 'Nouvelle segmentation', handler: function () { form(null); } },
+                { text: 'Rafraîchir', handler: function () { store.load(); } }
+            ],
+            listeners: {
+                cellclick: function (g, td, ci, rec, tr, ri, e) {
+                    if (e.getTarget('.seg-del')) {
+                        Ext.Msg.confirm('Supprimer', 'Supprimer la segmentation « ' + Ext.String.htmlEncode(rec.get('libelle')) + ' » ?',
+                            function (btn) { if (btn === 'yes') {
+                                Usp.ajax({ url: '/segmentations/' + rec.get('id'), method: 'DELETE',
+                                    success: function () { store.load(); },
+                                    failure: function (resp) {
+                                        var msg = 'Suppression impossible.';
+                                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (ex) {}
+                                        Ext.Msg.alert('Erreur', msg);
+                                    } });
+                            } });
+                        return;
+                    }
+                },
+                itemdblclick: function (g, rec) { form(rec); }
+            }
+        }]
+    }).show();
 };
 
 /* ---------- Formulaire client ---------- */
@@ -479,7 +565,7 @@ Usp.dashboardPanel = function () {
     var panel = Ext.create('Ext.panel.Panel', {
         title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
         bodyStyle: 'background:#eef1f5', items: items,
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
+        tools: [{ type: 'refresh', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }]
     });
     var SECTIONS = [
         { titre: 'Clients & contacts', items: [
@@ -638,15 +724,24 @@ Usp.showMain = function () {
     // Boutons des boîtes de dialogue en français (Oui / Non).
     Ext.MessageBox.buttonText.yes = 'Oui';
     Ext.MessageBox.buttonText.no = 'Non';
+    // Battement de cœur : maintient la session « active » tant que la page est ouverte.
+    if (!Usp._heartbeat) {
+        Usp._heartbeat = Ext.TaskManager.start({ interval: 60000, run: function () {
+            if (Usp.token) { Usp.ajax({ url: '/auth/me', method: 'GET' }); }
+        } });
+    }
     Ext.create('Ext.container.Viewport', {
         layout: 'border',
         items: [
             {
                 region: 'north',
                 xtype: 'toolbar',
-                height: 40,
+                cls: 'usp-header',
+                height: 44,
                 items: [
-                    { xtype: 'tbtext', text: '<b>UbiSenderPro</b>' },
+                    { xtype: 'tbtext', cls: 'usp-brand', text:
+                        '<span class="usp-logo">' + Usp.LOGO + '</span>' +
+                        '<span class="usp-brand-text">UbiSenderPro</span>' },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',
