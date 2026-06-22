@@ -165,62 +165,157 @@ Usp.export.boutons = function (titre) {
 
 /* ---------- Fenêtre de connexion ---------- */
 Usp.showLogin = function () {
-    Ext.create('Ext.window.Window', {
-        title: 'UbiSenderPro - Connexion',
-        width: 360,
-        modal: true,
-        closable: false,
-        bodyPadding: 15,
-        items: [{
-            xtype: 'form',
-            border: false,
-            defaults: { anchor: '100%', labelWidth: 90 },
-            items: [
-                { xtype: 'textfield', name: 'login', fieldLabel: 'Identifiant', allowBlank: false, value: 'admin' },
-                { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password', allowBlank: false }
-            ]
-        }],
-        buttons: [{
-            text: 'Se connecter',
-            formBind: true,
-            handler: function (btn) {
-                var win = btn.up('window');
-                var form = win.down('form').getForm();
-                if (!form.isValid()) { return; }
-                var v = form.getValues();
-                Usp.ajax({
-                    url: '/auth/login',
-                    method: 'POST',
-                    jsonData: v,
-                    success: function (resp) {
-                        var data = Ext.decode(resp.responseText);
-                        Usp.token = data.token;
-                        Usp.user = data.user;
-                        win.close();
-                        // Charge les paramètres globaux (mode + préfixe) puis ouvre l'application.
-                        var ouvrir = function () { Usp.showMain(); };
-                        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
-                            success: function (r) {
-                                Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
-                                Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
-                                    success: function (r2) {
-                                        Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
-                                        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
-                                            success: function (r3) {
-                                                Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
-                                                ouvrir();
-                                            }, failure: ouvrir });
-                                    }, failure: ouvrir });
-                            },
-                            failure: ouvrir });
-                    },
-                    failure: function () {
-                        Ext.Msg.alert('Erreur', 'Identifiants invalides.');
-                    }
-                });
+    // Réplique du login « prestige » (design plein écran, classes .pl-*),
+    // branchée sur le REST /auth/login de la SPA UbiSenderPro.
+    var html = [
+        '<main class="pl-center">',
+        '  <section class="pl-card" role="dialog" aria-labelledby="pl-title">',
+        '    <span class="pl-glow pl-glow--primary" aria-hidden="true"></span>',
+        '    <span class="pl-glow pl-glow--secondary" aria-hidden="true"></span>',
+        '    <div class="pl-grid">',
+        '      <aside class="pl-hero" aria-labelledby="pl-title">',
+        '        <div class="pl-brand-row">',
+        '          <div class="pl-brand">',
+        '            <span class="pl-brand__mark" aria-hidden="true">✈</span>',
+        '            <span class="pl-brand__text pl-animated-text--brand">UbiSenderPro</span>',
+        '          </div>',
+        '        </div>',
+        '        <div class="pl-pharmacy-stack">',
+        '          <div class="pl-pharmacy-card" id="pl-title">',
+        '            <span class="pl-pharmacy-card__header">',
+        '              <span class="pl-pharmacy-card__icon" aria-hidden="true">📤</span>',
+        '              <span class="pl-pharmacy-card__label">Plateforme d\'envoi</span>',
+        '            </span>',
+        '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Messagerie WhatsApp &amp; SMS</strong>',
+        '          </div>',
+        '          <div class="pl-version-badge">UbiSenderPro · v1.0</div>',
+        '        </div>',
+        '      </aside>',
+        '      <div class="pl-login-panel">',
+        '        <div class="pl-panel-header">',
+        '          <h2>Connexion</h2>',
+        '          <p>Renseignez vos identifiants pour continuer.</p>',
+        '        </div>',
+        '        <div class="pl-col pl-col--form">',
+        '          <label class="pl-label" for="str_login">Identifiant</label>',
+        '          <div class="pl-input">',
+        '            <span class="pl-input__icon" aria-hidden="true">👤</span>',
+        '            <input id="str_login" name="str_login" type="text" autocomplete="username" autofocus placeholder="Votre identifiant"/>',
+        '          </div>',
+        '          <label class="pl-label" for="str_password">Mot de passe</label>',
+        '          <div class="pl-input">',
+        '            <span class="pl-input__icon" aria-hidden="true">🔒</span>',
+        '            <input id="str_password" name="str_password" type="password" autocomplete="current-password" placeholder="Votre mot de passe"/>',
+        '          </div>',
+        '          <button type="button" id="login" name="login" class="pl-btn">',
+        '            <span>Se connecter</span>',
+        '            <span class="pl-btn__arrow" aria-hidden="true">→</span>',
+        '          </button>',
+        '          <div id="pl-error" style="display:none;margin-top:16px;color:#b91c1c;font-weight:800;text-align:center"></div>',
+        '          <span class="pl-loader" id="loader" role="status" aria-live="polite" aria-label="Connexion en cours" style="display:none;">',
+        '            <span class="pl-loader__card">',
+        '              <span class="pl-loader__ring" aria-hidden="true"><span class="pl-loader__ring-core"></span></span>',
+        '              <span class="pl-loader__text">Connexion en cours…</span>',
+        '            </span>',
+        '          </span>',
+        '        </div>',
+        '      </div>',
+        '    </div>',
+        '  </section>',
+        '</main>'
+    ].join('');
+
+    var wrap = document.createElement('div');
+    wrap.id = 'pl-login-root';
+    wrap.className = 'pl-body';
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap);
+
+    // Animation lettre par lettre (repris fidèlement de prestige).
+    function hasClass(t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; }
+    function renderAnimatedLetters(target, text, modifier) {
+        var safeText = text || '', tokens = safeText.split(/(\s+)/), letterIndex = 0;
+        target.innerHTML = '';
+        if (modifier && !hasClass(target, modifier)) {
+            target.className = (target.className + ' ' + modifier).replace(/\s+/g, ' ');
+        }
+        for (var i = 0; i < tokens.length; i += 1) {
+            if (/^\s+$/.test(tokens[i])) { target.appendChild(document.createTextNode(' ')); continue; }
+            var word = document.createElement('span');
+            word.className = 'pl-animated-word';
+            for (var j = 0; j < tokens[i].length; j += 1) {
+                var letter = document.createElement('span');
+                letter.className = 'pl-animated-letter';
+                letter.style.cssText = '--letter-index:' + letterIndex + ';';
+                letter.textContent = tokens[i].charAt(j);
+                word.appendChild(letter);
+                letterIndex += 1;
             }
-        }]
-    }).show();
+            target.appendChild(word);
+        }
+    }
+    var brand = wrap.querySelector('.pl-brand__text');
+    if (brand) { renderAnimatedLetters(brand, brand.textContent, 'pl-animated-text--brand'); }
+    var pharma = wrap.querySelector('#pl-pharma-name');
+    if (pharma) { renderAnimatedLetters(pharma, pharma.textContent, 'pl-animated-text--pharmacy'); }
+
+    var loader = wrap.querySelector('#loader');
+    var errBox = wrap.querySelector('#pl-error');
+    var loginInput = wrap.querySelector('#str_login');
+    var pwdInput = wrap.querySelector('#str_password');
+
+    function soumettre() {
+        var login = (loginInput.value || '').trim();
+        var motDePasse = pwdInput.value || '';
+        if (!login || !motDePasse) {
+            errBox.textContent = 'Veuillez saisir votre identifiant et votre mot de passe.';
+            errBox.style.display = 'block';
+            return;
+        }
+        errBox.style.display = 'none';
+        loader.style.display = '';   // réaffiche le loader (CSS : grid)
+        Usp.ajax({
+            url: '/auth/login',
+            method: 'POST',
+            jsonData: { login: login, motDePasse: motDePasse },
+            success: function (resp) {
+                var data = Ext.decode(resp.responseText);
+                Usp.token = data.token;
+                Usp.user = data.user;
+                var ouvrir = function () {
+                    if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
+                    Usp.showMain();
+                };
+                // Charge les paramètres globaux (mode + préfixe + favicon) puis ouvre l'application.
+                Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
+                    success: function (r) {
+                        Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
+                        Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
+                            success: function (r2) {
+                                Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
+                                Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
+                                    success: function (r3) {
+                                        Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
+                                        ouvrir();
+                                    }, failure: ouvrir });
+                            }, failure: ouvrir });
+                    }, failure: ouvrir });
+            },
+            failure: function () {
+                loader.style.display = 'none';
+                errBox.textContent = 'Identifiants invalides.';
+                errBox.style.display = 'block';
+            }
+        });
+    }
+
+    wrap.querySelector('#login').addEventListener('click', soumettre);
+    [loginInput, pwdInput].forEach(function (inp) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.keyCode === 13) { soumettre(); }
+        });
+    });
+    loginInput.focus();
 };
 
 /* ---------- Store des comptes clients ---------- */
