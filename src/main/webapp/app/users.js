@@ -42,7 +42,7 @@ Usp.users.gridPanel = function () {
     });
 
     return {
-        xtype: 'grid', title: 'Utilisateurs', store: store,
+        xtype: 'grid', title: '👤 Utilisateurs', store: store,
         columns: [
             { text: '', dataIndex: 'avatar', width: 44, align: 'center', sortable: false, menuDisabled: true,
               renderer: function (v) { return '<span style="font-size:16px">' + (v || '👤') + '</span>'; } },
@@ -65,8 +65,8 @@ Usp.users.gridPanel = function () {
               } }
         ],
         tbar: [
-            { text: 'Nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
-            { text: 'Rafraîchir', handler: function () { store.load(); } }
+            { text: '➕ Nouvel utilisateur', tooltip: 'Créer un nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
+            { text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Utilisateurs')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -267,8 +267,8 @@ Usp.users.filtreItems = function (store, withAction) {
         items.push({ xtype: 'textfield', itemId: 'fAction', emptyText: 'Action (ex. CREATION)', width: 150,
             listeners: { specialkey: surEntree } });
     }
-    items.push({ text: 'Filtrer', iconCls: '', handler: function (b) { appliquer(b.up('toolbar')); } });
-    items.push({ text: 'Réinitialiser', handler: function (b) {
+    items.push({ text: '🔎 Filtrer', tooltip: 'Appliquer les filtres', handler: function (b) { appliquer(b.up('toolbar')); } });
+    items.push({ text: '♻️ Réinitialiser', tooltip: 'Effacer les filtres', handler: function (b) {
         var tb = b.up('toolbar');
         tb.down('#fLogin').setValue(''); tb.down('#fDtStart').setValue(''); tb.down('#fDtEnd').setValue('');
         if (withAction) { tb.down('#fAction').setValue(''); }
@@ -288,7 +288,7 @@ Usp.users.connexionsPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: 'Historique des connexions', store: store,
+        xtype: 'grid', title: '🔑 Historique des connexions', store: store,
         columns: [
             { text: 'Utilisateur', dataIndex: 'login', width: 140 },
             { text: 'Connexion', dataIndex: 'connexionAt', width: 140, renderer: Usp.users.fmtDate },
@@ -305,7 +305,7 @@ Usp.users.connexionsPanel = function () {
               } }
         ],
         tbar: Usp.users.filtreItems(store, false)
-            .concat([{ text: 'Rafraîchir', handler: function () { store.load(); } }])
+            .concat([{ text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Historique des connexions')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -362,7 +362,7 @@ Usp.users.journalPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: 'Journal d\'actions', store: store,
+        xtype: 'grid', title: '📜 Journal d\'actions', store: store,
         columns: [
             { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: Usp.users.fmtDate },
             { text: 'Utilisateur', dataIndex: 'login', width: 130 },
@@ -375,7 +375,7 @@ Usp.users.journalPanel = function () {
             { text: 'Poste', dataIndex: 'poste', width: 150, renderer: function (v) { return v || ''; } }
         ],
         tbar: Usp.users.filtreItems(store, true)
-            .concat([{ text: 'Rafraîchir', handler: function () { store.load(); } }])
+            .concat([{ text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }])
             .concat(Usp.export.boutons('Journal d\'actions'))
     };
 };

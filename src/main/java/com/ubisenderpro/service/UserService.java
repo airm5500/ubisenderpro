@@ -52,6 +52,18 @@ public class UserService {
 
     public Optional<Utilisateur> parId(Long id) { return Optional.ofNullable(em.find(Utilisateur.class, id)); }
 
+    /** Liste légère des utilisateurs actifs (id + nom) pour l'affectation de discussions (#5). */
+    public List<Map<String, Object>> listerAffectables() {
+        return em.createQuery("SELECT u FROM Utilisateur u WHERE u.actif = true ORDER BY u.nomComplet", Utilisateur.class)
+                .getResultList().stream()
+                .map(u -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", u.getId());
+                    m.put("nomComplet", u.getNomComplet());
+                    return m;
+                }).collect(Collectors.toList());
+    }
+
     public boolean loginExiste(String login, Long exclureId) {
         List<Utilisateur> l = em.createQuery(
                 "SELECT u FROM Utilisateur u WHERE u.login = :l", Utilisateur.class)

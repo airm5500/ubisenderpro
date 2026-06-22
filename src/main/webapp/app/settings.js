@@ -21,7 +21,7 @@ Usp.settings.accountsPanel = function () {
          'accessToken', 'verifyToken', 'apiVersion', 'actif', 'modeTest']);
 
     return {
-        xtype: 'grid', title: 'Comptes WhatsApp', store: store,
+        xtype: 'grid', title: '📱 Comptes WhatsApp', store: store,
         columns: [
             { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
             { text: 'Phone Number ID', dataIndex: 'phoneNumberId', width: 160 },
@@ -32,7 +32,7 @@ Usp.settings.accountsPanel = function () {
               renderer: function (v) { return v ? '🧪 Oui' : 'Non'; } }
         ],
         tbar: [
-            { text: 'Nouveau compte', handler: function () { Usp.settings.accountForm(store, null); } },
+            { text: '➕ Nouveau compte', tooltip: 'Configurer un nouveau compte WhatsApp', handler: function () { Usp.settings.accountForm(store, null); } },
             { text: 'Webhook', tooltip: 'Rappel de l\'URL de webhook', handler: function () {
                 var base = window.location.origin + window.location.pathname.replace(/\/$/, '');
                 Ext.Msg.alert('URL de webhook Meta',
@@ -98,7 +98,7 @@ Usp.settings.templatesPanel = function () {
          'segmentationId', 'statutApprobation', 'actif']);
 
     return {
-        xtype: 'grid', title: 'Modèles de messages', store: store,
+        xtype: 'grid', title: '📝 Modèles de messages', store: store,
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Type', dataIndex: 'typeModele', width: 120 },
@@ -107,7 +107,7 @@ Usp.settings.templatesPanel = function () {
             { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 }
         ],
         tbar: [
-            { text: 'Nouveau modèle', handler: function () { Usp.settings.templateForm(store, null); } }
+            { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } }
         ],
         listeners: { itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); } }
     };
@@ -249,7 +249,7 @@ Usp.settings.previewMedia = function (form, url, type) {
 /* ---------- Général : mode de fonctionnement ---------- */
 Usp.settings.generalPanel = function () {
     var form = Ext.create('Ext.form.Panel', {
-        title: 'Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
+        title: '⚙️ Général', bodyPadding: 14, border: false, defaults: { anchor: '100%', labelWidth: 220 },
         items: [
             { xtype: 'displayfield',
               value: '<b>Mode de fonctionnement</b> : choisissez le canal d\'envoi par défaut.' },

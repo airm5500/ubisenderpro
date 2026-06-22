@@ -219,8 +219,8 @@ Usp.export.boutons = function (titre) {
         });
     };
     return [
-        { text: 'Export CSV', tooltip: 'Exporter en CSV (Excel)', handler: function (b) { faire(b, 'csv'); } },
-        { text: 'Export PDF', tooltip: 'Exporter en PDF (impression)', handler: function (b) { faire(b, 'pdf'); } }
+        { text: '📊 Export CSV', tooltip: 'Exporter « ' + titre + ' » au format CSV (ouvrable dans Excel)', handler: function (b) { faire(b, 'csv'); } },
+        { text: '🖨️ Export PDF', tooltip: 'Exporter / imprimer « ' + titre + ' » au format PDF', handler: function (b) { faire(b, 'pdf'); } }
     ];
 };
 
@@ -459,8 +459,8 @@ Usp.clientsGrid = function (actif) {
         { xtype: 'textfield', itemId: 'fQ', emptyText: 'Rechercher...', width: 180,
           listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
         comboSeg, comboAgence, comboCommune,
-        { text: 'Filtrer', handler: function (b) { appliquer(b.up('toolbar')); } },
-        { text: 'Réinitialiser', handler: function (b) {
+        { text: '🔎 Filtrer', tooltip: 'Appliquer les filtres sélectionnés', handler: function (b) { appliquer(b.up('toolbar')); } },
+        { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
             var tb = b.up('toolbar');
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
             tb.down('#fAgence').setValue(null); tb.down('#fCommune').setValue(null);
@@ -469,14 +469,14 @@ Usp.clientsGrid = function (actif) {
     ];
     if (actif) {
         tbar.push('->',
-            { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
-            { text: 'Gérer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            { text: 'Importer Excel/CSV', handler: Usp.showImport });
+            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } },
+            { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
+            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport });
     }
 
     return {
         xtype: 'grid',
-        title: actif ? 'Liste des comptes' : 'Clients désactivés',
+        title: actif ? '🏢 Liste des comptes' : '🚫 Clients désactivés',
         store: store,
         columns: [
             { text: 'N° client', dataIndex: 'numeroClient', width: 110 },

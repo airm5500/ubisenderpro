@@ -41,6 +41,14 @@ public class UserResource {
         return userService.listerRoles();
     }
 
+    /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — au-delà des seuls admins. */
+    @GET
+    @Path("/affectables")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
+    public List<Map<String, Object>> affectables() {
+        return userService.listerAffectables();
+    }
+
     @POST
     public Response creer(UserRequest req) {
         if (req.getLogin() == null || req.getLogin().isEmpty()) {

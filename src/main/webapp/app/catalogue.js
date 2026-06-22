@@ -31,7 +31,7 @@ Usp.catalogue.articlesPanel = function () {
     var prix = function (v) { return v ? Ext.util.Format.number(v, '0,000') + ' F' : ''; };
 
     return {
-        xtype: 'grid', title: 'Articles', store: store,
+        xtype: 'grid', title: '📦 Articles', store: store,
         columns: [
             { text: 'PS Code', dataIndex: 'pscode', width: 100 },
             { text: 'Désignation', dataIndex: 'designation', flex: 1 },
@@ -49,14 +49,14 @@ Usp.catalogue.articlesPanel = function () {
             { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
                 change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
             '->',
-            { text: 'Nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } },
+            { text: '➕ Nouvel article', tooltip: 'Créer un nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } },
             { text: 'Ajuster stock', handler: function (b) {
                 var rec = b.up('grid').getSelectionModel().getSelection()[0];
                 if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un article.'); return; }
                 Usp.catalogue.stockForm(store, rec);
             } },
             { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } },
-            { text: 'Importer', handler: function () { Usp.catalogue.importArticles(store); } }
+            { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } }
         ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: { itemdblclick: function (g, rec) { Usp.catalogue.articleForm(store, rec); } }
@@ -245,7 +245,7 @@ Usp.catalogue.promotionsPanel = function () {
     });
     var fdate = function (v) { return v ? String(v).substring(0, 10) : ''; };
     return {
-        xtype: 'grid', title: 'Promotions', store: store,
+        xtype: 'grid', title: '🏷️ Promotions', store: store,
         columns: [
             { text: 'Code', dataIndex: 'code', width: 110 },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
@@ -255,7 +255,7 @@ Usp.catalogue.promotionsPanel = function () {
               renderer: function (v) { return v ? 'Oui' : 'Non'; } }
         ],
         tbar: [
-            { text: 'Nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } },
+            { text: '➕ Nouvelle promotion', tooltip: 'Créer une nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } },
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Promotions')),
         listeners: { itemdblclick: function (g, rec) { Usp.catalogue.promotionForm(store, rec); } }
@@ -318,7 +318,7 @@ Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
         columns: fields.filter(function (f) { return f !== 'id'; }).map(function (f) {
             return { text: f, dataIndex: f, flex: 1 };
         }),
-        tbar: [{ text: 'Nouveau', handler: function () {
+        tbar: [{ text: '➕ Nouveau', tooltip: 'Ajouter une entrée', handler: function () {
             var win = Ext.create('Ext.window.Window', {
                 title: titre, width: 420, modal: true, bodyPadding: 12,
                 items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: formFields }],
@@ -343,12 +343,12 @@ Usp.catalogue.panel = function () {
         xtype: 'tabpanel', title: 'Catalogue', listeners: Usp.tabListeners,
         items: [
             Usp.catalogue.articlesPanel(),
-            Usp.catalogue.simplePanel('Catégories', '/catalogue/categories',
+            Usp.catalogue.simplePanel('🗂️ Catégories', '/catalogue/categories',
                 ['id', 'code', 'libelle', 'description'],
                 [{ xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false },
                  { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false },
                  { xtype: 'textfield', name: 'description', fieldLabel: 'Description' }]),
-            Usp.catalogue.simplePanel('Marques', '/catalogue/marques',
+            Usp.catalogue.simplePanel('™️ Marques', '/catalogue/marques',
                 ['id', 'code', 'nom', 'description'],
                 [{ xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false },
                  { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },

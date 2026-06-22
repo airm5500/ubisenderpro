@@ -255,7 +255,7 @@ Usp.campaign.listPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: 'Campagnes', store: store,
+        xtype: 'grid', title: '🚀 Campagnes', store: store,
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Canal', dataIndex: 'canal', width: 70, renderer: function (v) {
@@ -282,7 +282,7 @@ Usp.campaign.listPanel = function () {
               } }
         ],
         tbar: [
-            { text: 'Nouvelle campagne', handler: function () { Usp.campaign.show(store); } },
+            { text: '➕ Nouvelle campagne', tooltip: 'Créer et lancer une nouvelle campagne', handler: function () { Usp.campaign.show(store); } },
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Campagnes')),
         listeners: {
