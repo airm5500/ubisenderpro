@@ -49,4 +49,12 @@ public class SessionStore {
             sessions.remove(token);
         }
     }
+
+    /** Secondes d'inactivité d'une session (sans la rafraîchir) ; -1 si absente/inconnue. */
+    public long inactifDepuisSecondes(String token) {
+        if (token == null) { return -1; }
+        Session s = sessions.get(token);
+        if (s == null) { return -1; }
+        return Duration.between(s.lastAccess, Instant.now()).getSeconds();
+    }
 }

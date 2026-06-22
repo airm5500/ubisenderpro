@@ -41,7 +41,11 @@ public class ArticleResource {
     @POST
     @Secured(roles = {"ADMIN", "CATALOGUE"})
     public Response creer(Article a) {
-        return Response.status(Response.Status.CREATED).entity(articleService.creer(a)).build();
+        try {
+            return Response.status(Response.Status.CREATED).entity(articleService.creer(a)).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", e.getMessage())).build();
+        }
     }
 
     @PUT

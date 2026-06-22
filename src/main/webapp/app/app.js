@@ -47,6 +47,37 @@ Usp.appliquerFavicon = function (url) {
     lien.href = url;
 };
 
+/* Logo UbiSenderPro (avion en papier, SVG blanc) pour l'entête. */
+Usp.LOGO = '<img src="data:image/svg+xml,' +
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E" +
+    "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
+    '" style="width:20px;height:20px;vertical-align:middle"/>';
+
+/* Animation « lettre par lettre » (vague pl-letter-wave) — partagée entre le
+   login plein écran et le branding du header. Reprise fidèlement de prestige. */
+Usp.hasClass = function (t, c) { return (' ' + t.className + ' ').indexOf(' ' + c + ' ') > -1; };
+Usp.renderAnimatedLetters = function (target, text, modifier) {
+    var safeText = text || '', tokens = safeText.split(/(\s+)/), letterIndex = 0;
+    target.innerHTML = '';
+    if (modifier && !Usp.hasClass(target, modifier)) {
+        target.className = (target.className + ' ' + modifier).replace(/\s+/g, ' ');
+    }
+    for (var i = 0; i < tokens.length; i += 1) {
+        if (/^\s+$/.test(tokens[i])) { target.appendChild(document.createTextNode(' ')); continue; }
+        var word = document.createElement('span');
+        word.className = 'pl-animated-word';
+        for (var j = 0; j < tokens[i].length; j += 1) {
+            var letter = document.createElement('span');
+            letter.className = 'pl-animated-letter';
+            letter.style.cssText = '--letter-index:' + letterIndex + ';';
+            letter.textContent = tokens[i].charAt(j);
+            word.appendChild(letter);
+            letterIndex += 1;
+        }
+        target.appendChild(word);
+    }
+};
+
 /* ---------- Appels REST avec jeton de session ---------- */
 Usp.ajax = function (options) {
     options.url = Usp.apiBase + options.url;
@@ -77,6 +108,11 @@ Usp.export.valeur = function (rec, d) {
     if (v === null || v === undefined) { return ''; }
     if (v === true) { return 'Oui'; }
     if (v === false) { return 'Non'; }
+    if (Ext.isArray(v)) {
+        return v.map(function (x) {
+            return (x && (x.nom || x.code || x.libelle)) || x;
+        }).join(' / ');
+    }
     v = String(v);
     if (v.length >= 16 && v.charAt(10) === 'T') { v = v.replace('T', ' ').substring(0, 16); } // dates ISO
     return v;
@@ -154,62 +190,135 @@ Usp.export.boutons = function (titre) {
 
 /* ---------- Fenêtre de connexion ---------- */
 Usp.showLogin = function () {
-    Ext.create('Ext.window.Window', {
-        title: 'UbiSenderPro - Connexion',
-        width: 360,
-        modal: true,
-        closable: false,
-        bodyPadding: 15,
-        items: [{
-            xtype: 'form',
-            border: false,
-            defaults: { anchor: '100%', labelWidth: 90 },
-            items: [
-                { xtype: 'textfield', name: 'login', fieldLabel: 'Identifiant', allowBlank: false, value: 'admin' },
-                { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password', allowBlank: false }
-            ]
-        }],
-        buttons: [{
-            text: 'Se connecter',
-            formBind: true,
-            handler: function (btn) {
-                var win = btn.up('window');
-                var form = win.down('form').getForm();
-                if (!form.isValid()) { return; }
-                var v = form.getValues();
-                Usp.ajax({
-                    url: '/auth/login',
-                    method: 'POST',
-                    jsonData: v,
-                    success: function (resp) {
-                        var data = Ext.decode(resp.responseText);
-                        Usp.token = data.token;
-                        Usp.user = data.user;
-                        win.close();
-                        // Charge les paramètres globaux (mode + préfixe) puis ouvre l'application.
-                        var ouvrir = function () { Usp.showMain(); };
-                        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
-                            success: function (r) {
-                                Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
-                                Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
-                                    success: function (r2) {
-                                        Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
-                                        Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
-                                            success: function (r3) {
-                                                Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
-                                                ouvrir();
-                                            }, failure: ouvrir });
+    // Réplique du login « prestige » (design plein écran, classes .pl-*),
+    // branchée sur le REST /auth/login de la SPA UbiSenderPro.
+    var html = [
+        '<main class="pl-center">',
+        '  <section class="pl-card" role="dialog" aria-labelledby="pl-title">',
+        '    <span class="pl-glow pl-glow--primary" aria-hidden="true"></span>',
+        '    <span class="pl-glow pl-glow--secondary" aria-hidden="true"></span>',
+        '    <div class="pl-grid">',
+        '      <aside class="pl-hero" aria-labelledby="pl-title">',
+        '        <div class="pl-brand-row">',
+        '          <div class="pl-brand">',
+        '            <span class="pl-brand__mark" aria-hidden="true">✈</span>',
+        '            <span class="pl-brand__text pl-animated-text--brand">UbiSenderPro</span>',
+        '          </div>',
+        '        </div>',
+        '        <div class="pl-pharmacy-stack">',
+        '          <div class="pl-pharmacy-card" id="pl-title">',
+        '            <span class="pl-pharmacy-card__header">',
+        '              <span class="pl-pharmacy-card__icon" aria-hidden="true">📤</span>',
+        '              <span class="pl-pharmacy-card__label">Plateforme d\'envoi</span>',
+        '            </span>',
+        '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
+        '          </div>',
+        '          <div class="pl-version-badge">UbiSenderPro · v1.0</div>',
+        '        </div>',
+        '      </aside>',
+        '      <div class="pl-login-panel">',
+        '        <div class="pl-panel-header">',
+        '          <h2>Connexion</h2>',
+        '          <p>Renseignez vos identifiants pour continuer.</p>',
+        '        </div>',
+        '        <div class="pl-col pl-col--form">',
+        '          <label class="pl-label" for="str_login">Identifiant</label>',
+        '          <div class="pl-input">',
+        '            <span class="pl-input__icon" aria-hidden="true">👤</span>',
+        '            <input id="str_login" name="str_login" type="text" autocomplete="username" autofocus placeholder="Votre identifiant"/>',
+        '          </div>',
+        '          <label class="pl-label" for="str_password">Mot de passe</label>',
+        '          <div class="pl-input">',
+        '            <span class="pl-input__icon" aria-hidden="true">🔒</span>',
+        '            <input id="str_password" name="str_password" type="password" autocomplete="current-password" placeholder="Votre mot de passe"/>',
+        '          </div>',
+        '          <button type="button" id="login" name="login" class="pl-btn">',
+        '            <span>Se connecter</span>',
+        '            <span class="pl-btn__arrow" aria-hidden="true">→</span>',
+        '          </button>',
+        '          <div id="pl-error" style="display:none;margin-top:16px;color:#b91c1c;font-weight:800;text-align:center"></div>',
+        '          <span class="pl-loader" id="loader" role="status" aria-live="polite" aria-label="Connexion en cours" style="display:none;">',
+        '            <span class="pl-loader__card">',
+        '              <span class="pl-loader__ring" aria-hidden="true"><span class="pl-loader__ring-core"></span></span>',
+        '              <span class="pl-loader__text">Connexion en cours…</span>',
+        '            </span>',
+        '          </span>',
+        '        </div>',
+        '      </div>',
+        '    </div>',
+        '  </section>',
+        '</main>'
+    ].join('');
+
+    var wrap = document.createElement('div');
+    wrap.id = 'pl-login-root';
+    wrap.className = 'pl-body';
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap);
+
+    // Animation lettre par lettre (repris fidèlement de prestige, helper partagé Usp.renderAnimatedLetters).
+    var brand = wrap.querySelector('.pl-brand__text');
+    if (brand) { Usp.renderAnimatedLetters(brand, brand.textContent, 'pl-animated-text--brand'); }
+    var pharma = wrap.querySelector('#pl-pharma-name');
+    if (pharma) { Usp.renderAnimatedLetters(pharma, pharma.textContent, 'pl-animated-text--pharmacy'); }
+
+    var loader = wrap.querySelector('#loader');
+    var errBox = wrap.querySelector('#pl-error');
+    var loginInput = wrap.querySelector('#str_login');
+    var pwdInput = wrap.querySelector('#str_password');
+
+    function soumettre() {
+        var login = (loginInput.value || '').trim();
+        var motDePasse = pwdInput.value || '';
+        if (!login || !motDePasse) {
+            errBox.textContent = 'Veuillez saisir votre identifiant et votre mot de passe.';
+            errBox.style.display = 'block';
+            return;
+        }
+        errBox.style.display = 'none';
+        loader.style.display = '';   // réaffiche le loader (CSS : grid)
+        Usp.ajax({
+            url: '/auth/login',
+            method: 'POST',
+            jsonData: { login: login, motDePasse: motDePasse },
+            success: function (resp) {
+                var data = Ext.decode(resp.responseText);
+                Usp.token = data.token;
+                Usp.user = data.user;
+                var ouvrir = function () {
+                    if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
+                    Usp.showMain();
+                };
+                // Charge les paramètres globaux (mode + préfixe + favicon) puis ouvre l'application.
+                Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
+                    success: function (r) {
+                        Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
+                        Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
+                            success: function (r2) {
+                                Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
+                                Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
+                                    success: function (r3) {
+                                        Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
+                                        ouvrir();
                                     }, failure: ouvrir });
-                            },
-                            failure: ouvrir });
-                    },
-                    failure: function () {
-                        Ext.Msg.alert('Erreur', 'Identifiants invalides.');
-                    }
-                });
+                            }, failure: ouvrir });
+                    }, failure: ouvrir });
+            },
+            failure: function () {
+                loader.style.display = 'none';
+                errBox.textContent = 'Identifiants invalides.';
+                errBox.style.display = 'block';
             }
-        }]
-    }).show();
+        });
+    }
+
+    wrap.querySelector('#login').addEventListener('click', soumettre);
+    [loginInput, pwdInput].forEach(function (inp) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.keyCode === 13) { soumettre(); }
+        });
+    });
+    loginInput.focus();
 };
 
 /* ---------- Store des comptes clients ---------- */
@@ -227,12 +336,27 @@ Usp.createClientStore = function () {
     });
 };
 
-/* ---------- Grille des comptes clients ---------- */
+/* ---------- Comptes clients : 2 onglets (liste + vérification de numéros) ---------- */
 Usp.clientsPanel = function () {
+    return {
+        xtype: 'tabpanel',
+        title: 'Comptes clients',
+        listeners: Usp.tabListeners,
+        items: [
+            Usp.clientsGrid(),
+            // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
+            // numéros vit désormais à côté de la liste des comptes clients.
+            Usp.waweb.filterPanel()
+        ]
+    };
+};
+
+/* Onglet « Liste des comptes » : la grille des comptes clients (existant intact). */
+Usp.clientsGrid = function () {
     var store = Usp.createClientStore();
     return {
         xtype: 'grid',
-        title: 'Comptes clients',
+        title: 'Liste des comptes',
         store: store,
         columns: [
             { text: 'N° client', dataIndex: 'numeroClient', width: 110 },
@@ -255,6 +379,7 @@ Usp.clientsPanel = function () {
                 }, buffer: 400 } },
             '->',
             { text: 'Nouveau client', handler: function () { Usp.clientForm(store, null); } },
+            { text: 'Gérer les segmentations', handler: function () { Usp.segmentationsManager(); } },
             { text: 'Importer Excel/CSV', handler: Usp.showImport }
         ].concat(Usp.export.boutons('Comptes clients')),
         bbar: {
@@ -269,6 +394,106 @@ Usp.clientsPanel = function () {
             }
         }
     };
+};
+
+/* ---------- Gestion des segmentations (CRUD) ---------- */
+Usp.segmentationsManager = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle', 'description', 'ordreAffichage', 'actif'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var form = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: rec ? 'Modifier la segmentation' : 'Nouvelle segmentation',
+            width: 420, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false },
+                { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false },
+                { xtype: 'textfield', name: 'description', fieldLabel: 'Description' },
+                { xtype: 'numberfield', name: 'ordreAffichage', fieldLabel: 'Ordre d\'affichage', value: 0, minValue: 0 },
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
+            ] }],
+            buttons: [{ text: 'Enregistrer', handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) {
+                    var m = f.getFields().findBy(function (x) { return !x.isValid(); });
+                    if (m) { m.focus(true, 50); Ext.Msg.alert('Champ obligatoire', 'Renseignez : <b>' + (m.fieldLabel || m.getName()) + '</b>.'); }
+                    return;
+                }
+                var data = f.getValues();
+                data.actif = f.findField('actif').getValue();
+                Usp.ajax({ url: rec ? '/segmentations/' + rec.get('id') : '/segmentations',
+                    method: rec ? 'PUT' : 'POST', jsonData: data,
+                    success: function () { win.close(); store.load(); },
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    } });
+            } }]
+        });
+        win.show();
+        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    };
+    Ext.create('Ext.window.Window', {
+        title: 'Segmentations clients', width: 640, height: 440, modal: true, layout: 'fit',
+        items: [{
+            xtype: 'grid', store: store,
+            columns: [
+                { text: 'Code', dataIndex: 'code', width: 120 },
+                { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+                { text: 'Description', dataIndex: 'description', flex: 1 },
+                { text: 'Ordre', dataIndex: 'ordreAffichage', width: 70 },
+                { text: 'Active', dataIndex: 'actif', width: 70, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+                { text: 'Suppr.', width: 60, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+                  renderer: function () { return '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
+            ],
+            tbar: [
+                { text: 'Nouvelle segmentation', handler: function () { form(null); } },
+                { text: 'Rafraîchir', handler: function () { store.load(); } }
+            ],
+            listeners: {
+                cellclick: function (g, td, ci, rec, tr, ri, e) {
+                    if (e.getTarget('.seg-del')) {
+                        // Désactive une segmentation utilisée par des clients (au lieu de la supprimer).
+                        var desactiver = function () {
+                            var data = rec.getData();
+                            data.actif = false;
+                            Usp.ajax({ url: '/segmentations/' + rec.get('id'), method: 'PUT', jsonData: data,
+                                success: function () { store.load(); },
+                                failure: function (resp) {
+                                    var m = 'Désactivation impossible.';
+                                    try { m = Ext.decode(resp.responseText).erreur || m; } catch (ex) {}
+                                    Ext.Msg.alert('Erreur', m);
+                                } });
+                        };
+                        Ext.Msg.confirm('Supprimer', 'Supprimer la segmentation « ' + Ext.String.htmlEncode(rec.get('libelle')) + ' » ?',
+                            function (btn) { if (btn === 'yes') {
+                                Usp.ajax({ url: '/segmentations/' + rec.get('id'), method: 'DELETE',
+                                    success: function () { store.load(); },
+                                    failure: function (resp) {
+                                        // Suppression refusée (clients rattachés) -> proposer la désactivation.
+                                        var msg = 'Suppression impossible.';
+                                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (ex) {}
+                                        Ext.Msg.show({
+                                            title: 'Suppression impossible',
+                                            msg: msg + '<br/><br/>Voulez-vous plutôt la <b>désactiver</b> ? '
+                                                + 'Elle ne sera plus proposée pour de nouveaux clients, sans toucher aux clients existants.',
+                                            buttons: Ext.Msg.YESNO,
+                                            buttonText: { yes: 'Désactiver', no: 'Annuler' },
+                                            icon: Ext.Msg.QUESTION,
+                                            fn: function (b) { if (b === 'yes') { desactiver(); } }
+                                        });
+                                    } });
+                            } });
+                        return;
+                    }
+                },
+                itemdblclick: function (g, rec) { form(rec); }
+            }
+        }]
+    }).show();
 };
 
 /* ---------- Formulaire client ---------- */
@@ -314,7 +539,17 @@ Usp.clientForm = function (store, rec) {
                     method: rec ? 'PUT' : 'POST', jsonData: form.getValues(),
                     success: function () { win.close(); store.load(); },
                     failure: function (resp) {
-                        Ext.Msg.alert('Erreur', 'Enregistrement impossible (numéro client en doublon ?).');
+                        // Message clair renvoyé par le serveur + surlignage du champ fautif (#3/#6).
+                        var msg = 'Enregistrement impossible.', champ = null;
+                        try {
+                            var r = Ext.decode(resp.responseText);
+                            msg = r.erreur || msg; champ = r.champ || null;
+                        } catch (e) {}
+                        if (champ) {
+                            var f = form.findField(champ);
+                            if (f) { f.markInvalid(msg); f.focus(true, 50); }
+                        }
+                        Ext.Msg.alert('Saisie à corriger', msg);
                     }
                 });
             }
@@ -474,7 +709,7 @@ Usp.dashboardPanel = function () {
     var panel = Ext.create('Ext.panel.Panel', {
         title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
         bodyStyle: 'background:#eef1f5', items: items,
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { charger(); } }]
+        tools: [{ type: 'refresh', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }]
     });
     var SECTIONS = [
         { titre: 'Clients & contacts', items: [
@@ -563,6 +798,7 @@ Usp.MENU = [
     { text: 'Discussions',         view: 'inbox',      icon: '💬', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Comptes clients',     view: 'clients',    icon: '🏢', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
     { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
+    { text: 'Promotions',          view: 'promotions', icon: '🏷️', roles: ['ADMIN', 'CATALOGUE'] },
     { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
     { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
@@ -613,6 +849,7 @@ Usp.ouvrirVue = function (vue) {
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
+        case 'promotions': Usp.loadCenter(Usp.catalogue.promotionsPanel()); break;
         case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
         case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
         case 'historique': Usp.loadCenter(Usp.history.panel()); break;
@@ -631,15 +868,29 @@ Usp.showMain = function () {
     // Boutons des boîtes de dialogue en français (Oui / Non).
     Ext.MessageBox.buttonText.yes = 'Oui';
     Ext.MessageBox.buttonText.no = 'Non';
+    // Battement de cœur : maintient la session « active » tant que la page est ouverte.
+    if (!Usp._heartbeat) {
+        Usp._heartbeat = Ext.TaskManager.start({ interval: 60000, run: function () {
+            if (Usp.token) { Usp.ajax({ url: '/auth/me', method: 'GET' }); }
+        } });
+    }
     Ext.create('Ext.container.Viewport', {
         layout: 'border',
         items: [
             {
                 region: 'north',
                 xtype: 'toolbar',
-                height: 40,
+                cls: 'usp-header',
+                height: 44,
                 items: [
-                    { xtype: 'tbtext', text: '<b>UbiSenderPro</b>' },
+                    { xtype: 'tbtext', cls: 'usp-brand', text:
+                        '<span class="usp-logo">' + Usp.LOGO + '</span>' +
+                        '<span class="usp-brand-text pl-animated-text--brand">UbiSenderPro</span>',
+                      listeners: { afterrender: function (c) {
+                          // Même animation « vague » que l'accroche du login, appliquée au branding du header.
+                          var el = c.getEl().dom.querySelector('.usp-brand-text');
+                          if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
+                      } } },
                     '->',
                     { xtype: 'tbtext', text: Usp.user ? Usp.user.nomComplet : '' },
                     { tooltip: 'Déconnexion', cls: 'usp-logout',

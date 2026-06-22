@@ -255,7 +255,8 @@ Usp.settings.generalPanel = function () {
                      'WEB : sans Meta (scan QR), à débit lent. Ce choix présélectionne le canal ' +
                      'dans le composeur « Nouveau message ».</span>' },
             { xtype: 'textfield', name: 'prefixe', itemId: 'prefixeField', fieldLabel: 'Préfixe pays', width: 360,
-              value: '225', maskRe: /[0-9]/,
+              value: '225', maskRe: /[0-9]/, allowBlank: false, maxLength: 4, enforceMaxLength: true,
+              regex: /^[0-9]{1,4}$/, regexText: 'Le préfixe pays doit contenir de 1 à 4 chiffres (ex. 225).',
               emptyText: 'Ex. 225 (Côte d\'Ivoire), 226, 33…' },
             { xtype: 'displayfield',
               value: '<span style="color:#888">Pré-rempli automatiquement dans les champs « numéro » ' +

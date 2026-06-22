@@ -12,6 +12,7 @@
         On réutilise le thème Neptune déjà compilé dans ce SDK.
     -->
     <link rel="stylesheet" href="ext/packages/ext-theme-neptune/build/resources/ext-theme-neptune-all.css"/>
+    <link rel="stylesheet" href="app/login.css"/>
     <script src="ext/ext-all.js"></script>
 
     <style>
@@ -31,6 +32,37 @@
 
         /* Bouton de déconnexion : icône rouge seule. */
         .usp-logout { padding: 0 6px !important; }
+
+        /* ===== Palette ubipharm (teal) — à valider ===== */
+        .usp-header, .usp-header.x-toolbar-default {
+            background: #0a8f86 !important;
+            background-image: linear-gradient(180deg, #12a99e 0%, #0a8f86 100%) !important;
+            border-bottom: 2px solid #086d66 !important;
+        }
+        .usp-header .x-toolbar-text { color: #ffffff !important; }
+        .usp-brand-text {
+            color: #fff; font-weight: bold; font-size: 15px; margin-left: 6px;
+            letter-spacing: .3px; display: inline-block;
+        }
+        .usp-logo { display: inline-block; animation: usp-fly 2.4s ease-in-out infinite; }
+        @keyframes usp-fly {
+            0%   { transform: translate(0, 0) rotate(0deg); }
+            50%  { transform: translate(3px, -3px) rotate(-8deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        /* Le branding du header utilise l'animation « vague » lettre par lettre
+           (classe .pl-animated-text--brand, cf. app/login.css) appliquée au
+           rendu — plus besoin du pulse d'opacité usp-fade. */
+
+        /* En-têtes de panneaux / grilles aux couleurs ubipharm */
+        .x-panel-header-default {
+            background: #0a8f86 !important;
+            background-image: none !important;
+            border-color: #086d66 !important;
+        }
+        .x-panel-header-text-default, .x-panel-header-default .x-panel-header-text { color: #ffffff !important; }
+        /* Onglet actif aux couleurs ubipharm */
+        .x-tab-active .x-tab-inner { color: #0a8f86 !important; font-weight: bold; }
     </style>
 
     <script src="app/app.js"></script>

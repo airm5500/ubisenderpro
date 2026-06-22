@@ -49,13 +49,18 @@ public class GeoIpService {
         } catch (Exception ignore) { /* non bloquant */ }
     }
 
-    /** Résolution inverse de l'IP en nom de poste (best-effort). */
+    /** Résolution inverse de l'IP en nom de poste (best-effort, noms d'infra ignorés). */
     private String resoudrePoste(String ip) {
         if (ip == null || ip.isEmpty()) { return null; }
         try {
             java.net.InetAddress addr = java.net.InetAddress.getByName(ip);
             String host = addr.getCanonicalHostName();
-            if (host != null && !host.isEmpty() && !host.equals(ip)) { return host; }
+            if (host == null || host.isEmpty() || host.equals(ip)) { return null; }
+            String h = host.toLowerCase();
+            // Noms techniques (conteneur/réseau) non pertinents -> on n'affiche rien.
+            if (h.contains("docker") || h.contains("kubernetes") || h.contains("internal")
+                    || h.equals("localhost") || h.endsWith(".local")) { return null; }
+            return host;
         } catch (Exception ignore) { /* pas de DNS inverse */ }
         return null;
     }

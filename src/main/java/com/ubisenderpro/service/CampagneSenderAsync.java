@@ -36,9 +36,13 @@ public class CampagneSenderAsync {
     public void lancer(Long campagneId) {
         Campagne c = em.find(Campagne.class, campagneId);
         if (c == null) return;
-        if (c.getWhatsappAccountId() == null || c.getModeleId() == null) {
+        boolean web = "WEB".equalsIgnoreCase(c.getCanal());
+        if (c.getModeleId() == null
+                || (web && (c.getWaWebSessionId() == null || c.getWaWebSessionId().isEmpty()))
+                || (!web && c.getWhatsappAccountId() == null)) {
             tx.marquerStatut(campagneId, "ECHOUEE");
-            LOG.warning("Campagne " + campagneId + " : compte WhatsApp ou modèle manquant.");
+            LOG.warning("Campagne " + campagneId + " : "
+                    + (web ? "session WhatsApp Web" : "compte WhatsApp") + " ou modèle manquant.");
             return;
         }
 

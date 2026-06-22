@@ -40,6 +40,8 @@ public class ArticleImportService {
     private CatalogueService catalogueService;
     @EJB
     private ImportMappingService importMappingService;
+    @EJB
+    private PromotionService promotionService;
 
     public ImportReport importer(ImportClientRequest req, Long utilisateurId) {
         long debut = System.currentTimeMillis();
@@ -150,6 +152,14 @@ public class ArticleImportService {
         java.time.LocalDateTime dFin = composerDate(val(ligne, req, "promo_annee"),
                 val(ligne, req, "promo_mois_fin"), val(ligne, req, "promo_jour_fin"), true);
         if (dFin != null) a.setDateFinPromotion(dFin);
+
+        // Promotion réutilisable : résolue/créée par code, associée au produit.
+        String codePromo = val(ligne, req, "code_promo");
+        if (!req.isSimulation() && codePromo != null && !codePromo.isEmpty()) {
+            com.ubisenderpro.entity.Promotion p = promotionService.resoudre(
+                    codePromo, val(ligne, req, "nom_promo"), dDebut, dFin);
+            if (p != null) { a.getPromotions().add(p); }
+        }
 
         String cat = val(ligne, req, "categorie");
         if (cat != null && !cat.isEmpty()) {
