@@ -389,10 +389,11 @@ Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.sp-edit')) { ouvrir(rec); }
                 else if (e.getTarget('.sp-del')) {
-                    Ext.Msg.confirm('Supprimer', 'Supprimer cette entrée ?', function (btn) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer cette entrée ? Les articles éventuellement liés ' +
+                        'seront réaffectés à « Standard ».', function (btn) {
                         if (btn !== 'yes') { return; }
                         Usp.ajax({ url: url + '/' + rec.get('id'), method: 'DELETE',
-                            success: function () { store.load(); Usp.toast('Entrée supprimée avec succès.'); },
+                            success: function () { store.load(); Usp.toast('Entrée supprimée (articles réaffectés à « Standard »).'); },
                             failure: function (resp) {
                                 var m = 'Suppression impossible.';
                                 try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}

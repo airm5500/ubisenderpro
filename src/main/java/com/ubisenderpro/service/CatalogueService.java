@@ -47,28 +47,60 @@ public class CatalogueService {
         return em.merge(ex);
     }
 
-    /** Supprime une catégorie inutilisée (refus clair si des articles y sont rattachés). */
+    /** Supprime une catégorie ; les articles liés sont réaffectés à la catégorie « Standard ». */
     public void supprimerCategorie(Long id) {
-        Long n = em.createQuery("SELECT COUNT(a) FROM Article a WHERE a.categorieId = :id", Long.class)
-                .setParameter("id", id).getSingleResult();
-        if (n > 0) {
-            throw new ValidationException("categorie",
-                    n + " article(s) utilisent cette catégorie : suppression impossible.");
-        }
         CategorieArticle c = em.find(CategorieArticle.class, id);
-        if (c != null) { em.remove(c); }
+        if (c == null) { return; }
+        CategorieArticle defaut = categorieStandard();
+        if (defaut.getId().equals(id)) {
+            throw new ValidationException("categorie", "La catégorie « Standard » ne peut pas être supprimée.");
+        }
+        em.createQuery("UPDATE Article a SET a.categorieId = :def WHERE a.categorieId = :id")
+                .setParameter("def", defaut.getId()).setParameter("id", id).executeUpdate();
+        em.remove(c);
     }
 
-    /** Supprime une marque inutilisée (refus clair si des articles y sont rattachés). */
+    /** Supprime une marque ; les articles liés sont réaffectés à la marque « Standard ». */
     public void supprimerMarque(Long id) {
-        Long n = em.createQuery("SELECT COUNT(a) FROM Article a WHERE a.marqueId = :id", Long.class)
-                .setParameter("id", id).getSingleResult();
-        if (n > 0) {
-            throw new ValidationException("marque",
-                    n + " article(s) utilisent cette marque : suppression impossible.");
-        }
         Marque m = em.find(Marque.class, id);
-        if (m != null) { em.remove(m); }
+        if (m == null) { return; }
+        Marque defaut = marqueStandard();
+        if (defaut.getId().equals(id)) {
+            throw new ValidationException("marque", "La marque « Standard » ne peut pas être supprimée.");
+        }
+        em.createQuery("UPDATE Article a SET a.marqueId = :def WHERE a.marqueId = :id")
+                .setParameter("def", defaut.getId()).setParameter("id", id).executeUpdate();
+        em.remove(m);
+    }
+
+    /** Catégorie « Standard » d'affectation par défaut (créée si absente). */
+    public CategorieArticle categorieStandard() {
+        List<CategorieArticle> l = em.createQuery(
+                "SELECT c FROM CategorieArticle c WHERE c.code = :code", CategorieArticle.class)
+                .setParameter("code", "STANDARD").setMaxResults(1).getResultList();
+        if (!l.isEmpty()) { return l.get(0); }
+        CategorieArticle c = new CategorieArticle();
+        c.setCode("STANDARD");
+        c.setLibelle("Standard");
+        c.setActif(true);
+        em.persist(c);
+        em.flush();
+        return c;
+    }
+
+    /** Marque « Standard » d'affectation par défaut (créée si absente). */
+    public Marque marqueStandard() {
+        List<Marque> l = em.createQuery(
+                "SELECT m FROM Marque m WHERE m.code = :code", Marque.class)
+                .setParameter("code", "STANDARD").setMaxResults(1).getResultList();
+        if (!l.isEmpty()) { return l.get(0); }
+        Marque m = new Marque();
+        m.setCode("STANDARD");
+        m.setNom("Standard");
+        m.setActif(true);
+        em.persist(m);
+        em.flush();
+        return m;
     }
 
     public Optional<CategorieArticle> resoudreCategorie(String libelle, boolean creer) {
