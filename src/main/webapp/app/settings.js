@@ -107,7 +107,20 @@ Usp.settings.templatesPanel = function () {
             { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 }
         ],
         tbar: [
-            { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } }
+            { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } },
+            { text: '📤 Exporter .docx', tooltip: 'Exporter le modèle sélectionné au format Word', handler: function (b) {
+                var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                if (!rec) { Ext.Msg.alert('Export', 'Sélectionnez d\'abord un modèle dans la liste.'); return; }
+                Usp.ajax({ url: '/templates/' + rec.get('id') + '/docx', method: 'GET',
+                    success: function (resp) {
+                        var r = Ext.decode(resp.responseText) || {};
+                        Usp.telechargerBase64(r.nomFichier, r.base64, r.mime);
+                        Usp.toast('Modèle exporté : ' + r.nomFichier);
+                    },
+                    failure: function () { Ext.Msg.alert('Erreur', 'Export impossible.'); } });
+            } },
+            { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer .docx',
+              listeners: { change: function (f) { Usp.settings.importerModeleDocx(f, store); } } }
         ],
         listeners: { itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); } }
     };
@@ -384,6 +397,31 @@ Usp.settings.tabs = function () {
         items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(),
                 Usp.settings.templatesPanel(), Usp.settings.botPanel()]
     };
+};
+
+/* Importe un modèle depuis un fichier .docx exporté (lecture base64 -> POST). */
+Usp.settings.importerModeleDocx = function (f, store) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    if (!/\.docx$/i.test(file.name)) {
+        Ext.Msg.alert('Import', 'Veuillez choisir un fichier .docx exporté depuis UbiSenderPro.');
+        f.reset();
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = (e.target.result || '').split(',')[1];
+        Usp.ajax({ url: '/templates/import-docx', method: 'POST',
+            jsonData: { fichierBase64: b64, nomFichier: file.name },
+            success: function () { store.load(); Usp.toast('Modèle importé avec succès.'); f.reset(); },
+            failure: function (resp) {
+                var m = 'Import impossible.';
+                try { m = Ext.decode(resp.responseText).erreur || m; } catch (ex) {}
+                Ext.Msg.alert('Erreur', m);
+                f.reset();
+            } });
+    };
+    reader.readAsDataURL(file);
 };
 
 /* ---------- Assistant (Bot) : réglages + base de connaissance (FAQ) ---------- */

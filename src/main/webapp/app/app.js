@@ -53,6 +53,18 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Déclenche le téléchargement d'un contenu base64 (ex. .docx exporté). */
+Usp.telechargerBase64 = function (nomFichier, base64, mime) {
+    var bin = atob(base64), len = bin.length, arr = new Uint8Array(len);
+    for (var i = 0; i < len; i++) { arr[i] = bin.charCodeAt(i); }
+    var blob = new Blob([arr], { type: mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = nomFichier || 'fichier';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+};
+
 /* Bip d'alerte (Web Audio) — utilisé à l'arrivée d'une escalade du bot. */
 Usp.beep = function () {
     try {
