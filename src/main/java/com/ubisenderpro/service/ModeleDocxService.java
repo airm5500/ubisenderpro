@@ -148,7 +148,28 @@ public class ModeleDocxService {
         appliquer(champs, L_BOUTONS, m::setBoutonsJson);
         appliquer(champs, L_META, m::setNomModeleWhatsapp);
         appliquer(champs, L_APPRO, m::setStatutApprobation);
+        // Segmentation : « Toutes les segmentations » -> aucune ; sinon on fait
+        // correspondre le libellé (ou le code) saisi à une segmentation existante.
+        if (champs.containsKey("Segmentation")) {
+            String segLib = champs.get("Segmentation").trim();
+            if (segLib.isEmpty() || segLib.equalsIgnoreCase("Toutes les segmentations")) {
+                m.setSegmentationId(null);
+            } else {
+                Long id = resoudreSegmentation(segLib);
+                if (id != null) { m.setSegmentationId(id); } // introuvable -> on conserve la valeur d'origine
+            }
+        }
         if (corpsTrouve) { m.setCorps(corps.toString()); }
+    }
+
+    /** Retrouve l'identifiant d'une segmentation par libellé ou code (insensible à la casse). */
+    private Long resoudreSegmentation(String libelleOuCode) {
+        java.util.List<SegmentationClient> l = em.createQuery(
+                "SELECT s FROM SegmentationClient s WHERE LOWER(s.libelle) = :v OR LOWER(s.code) = :v",
+                SegmentationClient.class)
+                .setParameter("v", libelleOuCode.toLowerCase())
+                .setMaxResults(1).getResultList();
+        return l.isEmpty() ? null : l.get(0).getId();
     }
 
     private void appliquer(Map<String, String> champs, String label, java.util.function.Consumer<String> setter) {
