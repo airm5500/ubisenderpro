@@ -190,9 +190,9 @@ Usp.catalogue.majPromo = function (store) {
                 ] },
                 { xtype: 'fieldcontainer', layout: 'hbox', items: [
                     { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y',
-                      submitFormat: 'Y-m-d', editable: false, width: 230, labelWidth: 90 },
+                      submitFormat: 'Y-m-d\\TH:i:s', editable: false, width: 230, labelWidth: 90 },
                     { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y',
-                      submitFormat: 'Y-m-d', editable: false, width: 210, labelWidth: 80, margin: '0 0 0 8' }
+                      submitFormat: 'Y-m-d\\TH:i:s', editable: false, width: 210, labelWidth: 80, margin: '0 0 0 8' }
                 ] }
               ] },
             { region: 'center', xtype: 'grid', store: apercu, title: 'Articles concernés',
@@ -272,8 +272,8 @@ Usp.catalogue.promotionForm = function (store, rec) {
                 { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, emptyText: 'ex. 6553' },
                 { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
                 { xtype: 'textfield', name: 'description', fieldLabel: 'Description' },
-                { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false },
-                { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false },
+                { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false },
+                { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false },
                 { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
             ]
         }],
