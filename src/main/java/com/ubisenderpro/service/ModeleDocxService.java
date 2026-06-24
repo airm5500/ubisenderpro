@@ -32,6 +32,22 @@ public class ModeleDocxService {
     public static final String MIME =
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+    private static final String CORPS_DEBUT = "----- CORPS DU MESSAGE (début) -----";
+    private static final String CORPS_FIN = "----- CORPS DU MESSAGE (fin) -----";
+
+    // Étiquettes lisibles <-> champs (pour reprendre les retouches manuelles à l'import).
+    private static final String L_NOM = "Nom";
+    private static final String L_TYPE = "Type";
+    private static final String L_LANGUE = "Langue";
+    private static final String L_CATEGORIE = "Catégorie";
+    private static final String L_ENT_TXT = "En-tête (texte)";
+    private static final String L_ENT_MTYPE = "En-tête média (type)";
+    private static final String L_ENT_MURL = "En-tête média (URL)";
+    private static final String L_PIED = "Pied de page";
+    private static final String L_BOUTONS = "Boutons (JSON)";
+    private static final String L_META = "Nom du modèle Meta";
+    private static final String L_APPRO = "Approbation";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @PersistenceContext(unitName = "ubisenderproPU")
@@ -51,21 +67,23 @@ public class ModeleDocxService {
             titre(doc, "Modèle de message — " + nvl(m.getNom()));
 
             String seg = segmentationLibelle(m.getSegmentationId());
-            champ(doc, "Nom", m.getNom());
-            champ(doc, "Type", m.getTypeModele());
-            champ(doc, "Langue", m.getLangue());
-            champ(doc, "Catégorie", m.getCategorie());
+            champ(doc, L_NOM, m.getNom());
+            champ(doc, L_TYPE, m.getTypeModele());
+            champ(doc, L_LANGUE, m.getLangue());
+            champ(doc, L_CATEGORIE, m.getCategorie());
             champ(doc, "Segmentation", seg == null ? "Toutes les segmentations" : seg);
-            champ(doc, "En-tête (texte)", m.getEnteteTexte());
-            champ(doc, "En-tête média (type)", m.getEnteteMediaType());
-            champ(doc, "En-tête média (URL)", m.getEnteteMediaUrl());
-            champ(doc, "Pied de page", m.getPiedDePage());
-            champ(doc, "Boutons (JSON)", m.getBoutonsJson());
-            champ(doc, "Nom du modèle Meta", m.getNomModeleWhatsapp());
-            champ(doc, "Approbation", m.getStatutApprobation());
+            champ(doc, L_ENT_TXT, m.getEnteteTexte());
+            champ(doc, L_ENT_MTYPE, m.getEnteteMediaType());
+            champ(doc, L_ENT_MURL, m.getEnteteMediaUrl());
+            champ(doc, L_PIED, m.getPiedDePage());
+            champ(doc, L_BOUTONS, m.getBoutonsJson());
+            champ(doc, L_META, m.getNomModeleWhatsapp());
+            champ(doc, L_APPRO, m.getStatutApprobation());
 
-            titre(doc, "Corps du message");
-            corps(doc, nvl(m.getCorps()));
+            // Corps encadré par des marqueurs ; une ligne = un paragraphe (édition libre dans Word).
+            ligne(doc, CORPS_DEBUT, true);
+            for (String l : nvl(m.getCorps()).split("\n", -1)) { ligne(doc, l, false); }
+            ligne(doc, CORPS_FIN, true);
 
             // Données structurées pour le ré-import.
             POIXMLProperties.CustomProperties cp = doc.getProperties().getCustomProperties();
@@ -76,19 +94,65 @@ public class ModeleDocxService {
         }
     }
 
-    /** Reconstruit un ModeleMessage à partir d'un .docx exporté (lecture de la propriété JSON). */
+    /**
+     * Reconstruit un ModeleMessage depuis un .docx exporté.
+     * Les données structurées (JSON) servent de base ; les retouches manuelles du
+     * contenu lisible (étiquettes + corps) les remplacent quand elles diffèrent.
+     */
     @SuppressWarnings("unchecked")
     public ModeleMessage importer(byte[] contenu) throws Exception {
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(contenu))) {
             POIXMLProperties.CustomProperties cp = doc.getProperties().getCustomProperties();
-            if (!cp.contains(PROP)) {
-                throw new ValidationException("fichier",
-                        "Ce fichier .docx n'est pas un modèle UbiSenderPro exporté (données absentes).");
+            ModeleMessage m;
+            if (cp.contains(PROP)) {
+                m = depuisMap(MAPPER.readValue(cp.getProperty(PROP).getLpwstr(), Map.class));
+            } else {
+                m = new ModeleMessage();
+                m.setTypeModele("marketing");
+                m.setLangue("fr");
+                m.setStatutApprobation("BROUILLON");
             }
-            String json = cp.getProperty(PROP).getLpwstr();
-            Map<String, Object> map = MAPPER.readValue(json, Map.class);
-            return depuisMap(map);
+            appliquerRetouches(doc, m);
+            if ((m.getNom() == null || m.getNom().isEmpty()) && (m.getCorps() == null || m.getCorps().isEmpty())) {
+                throw new ValidationException("fichier",
+                        "Ce fichier .docx n'est pas un modèle UbiSenderPro reconnaissable.");
+            }
+            if (m.getCorps() == null) { m.setCorps(""); }
+            return m;
         }
+    }
+
+    /** Lit le contenu lisible (étiquettes + corps) et applique les valeurs au modèle. */
+    private void appliquerRetouches(XWPFDocument doc, ModeleMessage m) {
+        Map<String, String> champs = new LinkedHashMap<>();
+        StringBuilder corps = new StringBuilder();
+        boolean dansCorps = false, corpsTrouve = false;
+        for (XWPFParagraph p : doc.getParagraphs()) {
+            String txt = p.getText();
+            if (txt == null) { continue; }
+            String t = txt.trim();
+            if (t.equals(CORPS_DEBUT)) { dansCorps = true; corpsTrouve = true; continue; }
+            if (t.equals(CORPS_FIN)) { dansCorps = false; continue; }
+            if (dansCorps) { if (corps.length() > 0) { corps.append("\n"); } corps.append(txt); continue; }
+            int idx = txt.indexOf(" : ");
+            if (idx > 0) { champs.put(txt.substring(0, idx).trim(), txt.substring(idx + 3)); }
+        }
+        appliquer(champs, L_NOM, m::setNom);
+        appliquer(champs, L_TYPE, m::setTypeModele);
+        appliquer(champs, L_LANGUE, m::setLangue);
+        appliquer(champs, L_CATEGORIE, m::setCategorie);
+        appliquer(champs, L_ENT_TXT, m::setEnteteTexte);
+        appliquer(champs, L_ENT_MTYPE, m::setEnteteMediaType);
+        appliquer(champs, L_ENT_MURL, m::setEnteteMediaUrl);
+        appliquer(champs, L_PIED, m::setPiedDePage);
+        appliquer(champs, L_BOUTONS, m::setBoutonsJson);
+        appliquer(champs, L_META, m::setNomModeleWhatsapp);
+        appliquer(champs, L_APPRO, m::setStatutApprobation);
+        if (corpsTrouve) { m.setCorps(corps.toString()); }
+    }
+
+    private void appliquer(Map<String, String> champs, String label, java.util.function.Consumer<String> setter) {
+        if (champs.containsKey(label)) { setter.accept(champs.get(label)); }
     }
 
     /* ---------- Sérialisation ---------- */
@@ -155,14 +219,12 @@ public class ModeleDocxService {
         val.setText(valeur);
     }
 
-    private void corps(XWPFDocument doc, String texte) {
+    /** Écrit une ligne (un paragraphe). marqueur = ligne grisée/italique de repère. */
+    private void ligne(XWPFDocument doc, String texte, boolean marqueur) {
         XWPFParagraph p = doc.createParagraph();
         XWPFRun r = p.createRun();
-        String[] lignes = texte.split("\n", -1);
-        for (int i = 0; i < lignes.length; i++) {
-            if (i > 0) { r.addBreak(); }
-            r.setText(lignes[i]);
-        }
+        if (marqueur) { r.setItalic(true); r.setColor("888888"); }
+        r.setText(texte == null ? "" : texte);
     }
 
     /* ---------- Divers ---------- */

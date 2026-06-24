@@ -104,26 +104,36 @@ Usp.settings.templatesPanel = function () {
             { text: 'Type', dataIndex: 'typeModele', width: 120 },
             { text: 'Langue', dataIndex: 'langue', width: 70 },
             { text: 'Nom Meta', dataIndex: 'nomModeleWhatsapp', width: 160 },
-            { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 }
+            { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 },
+            { text: 'Export', width: 90, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="tpl-docx" title="Exporter ce modèle au format Word (.docx)" ' +
+                      'style="cursor:pointer;color:#1976d2">📤 .docx</span>';
+              } }
         ],
         tbar: [
             { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } },
-            { text: '📤 Exporter .docx', tooltip: 'Exporter le modèle sélectionné au format Word', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Export', 'Sélectionnez d\'abord un modèle dans la liste.'); return; }
-                Usp.ajax({ url: '/templates/' + rec.get('id') + '/docx', method: 'GET',
-                    success: function (resp) {
-                        var r = Ext.decode(resp.responseText) || {};
-                        Usp.telechargerBase64(r.nomFichier, r.base64, r.mime);
-                        Usp.toast('Modèle exporté : ' + r.nomFichier);
-                    },
-                    failure: function () { Ext.Msg.alert('Erreur', 'Export impossible.'); } });
-            } },
-            { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer .docx',
+            { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer un .docx',
               listeners: { change: function (f) { Usp.settings.importerModeleDocx(f, store); } } }
         ],
-        listeners: { itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); } }
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.tpl-docx')) { Usp.settings.exporterModeleDocx(rec); }
+            }
+        }
     };
+};
+
+/* Exporte un modèle au format .docx (téléchargement). */
+Usp.settings.exporterModeleDocx = function (rec) {
+    Usp.ajax({ url: '/templates/' + rec.get('id') + '/docx', method: 'GET',
+        success: function (resp) {
+            var r = Ext.decode(resp.responseText) || {};
+            Usp.telechargerBase64(r.nomFichier, r.base64, r.mime);
+            Usp.toast('Modèle exporté : ' + r.nomFichier);
+        },
+        failure: function () { Ext.Msg.alert('Erreur', 'Export impossible.'); } });
 };
 
 Usp.settings.templateForm = function (store, rec) {
