@@ -43,7 +43,12 @@ Usp.catalogue.articlesPanel = function () {
             { text: 'UG', dataIndex: 'quantiteUg', width: 55, align: 'right' },
             { text: 'Promotions', dataIndex: 'promotions', width: 160, sortable: false, renderer: promoNoms },
             { text: 'Stock', dataIndex: 'stockDisponible', width: 75, align: 'right' },
-            { text: 'Actif', dataIndex: 'actif', width: 55, renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+            { text: 'Actif', dataIndex: 'actif', width: 55, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+            { text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="art-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                      '<span class="art-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
+              } }
         ],
         tbar: [
             { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
@@ -59,7 +64,21 @@ Usp.catalogue.articlesPanel = function () {
             { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } }
         ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
-        listeners: { itemdblclick: function (g, rec) { Usp.catalogue.articleForm(store, rec); } }
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.catalogue.articleForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.art-edit')) { Usp.catalogue.articleForm(store, rec); }
+                else if (e.getTarget('.art-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer l\'article « ' + Ext.String.htmlEncode(rec.get('designation')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/articles/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Article supprimé avec succès.'); },
+                                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+                        });
+                }
+            }
+        }
     };
 };
 

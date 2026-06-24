@@ -270,7 +270,7 @@ Usp.campaign.listPanel = function () {
             { text: 'Échoués', dataIndex: 'nbEchoues', width: 75, align: 'right',
               renderer: Usp.campaign.compteurRenderer('#c62828') },
             { text: 'Taux', dataIndex: 'nbEnvoyes', width: 70, align: 'right', renderer: Usp.campaign.tauxRenderer },
-            { text: 'Actions', width: 160, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Actions', width: 260, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = '<span class="camp-details" title="Voir les destinataires" ' +
                           'style="cursor:pointer;color:#1976d2">🔍 Détails</span>';
@@ -278,6 +278,8 @@ Usp.campaign.listPanel = function () {
                       s += ' &nbsp;<span class="camp-relance" title="Relancer les envois en échec" ' +
                            'style="cursor:pointer;color:#c62828">↻ Relance</span>';
                   }
+                  s += ' &nbsp;<span class="camp-edit" title="Modifier la campagne" style="cursor:pointer">✏️</span>' +
+                       ' &nbsp;<span class="camp-del" title="Supprimer la campagne" style="cursor:pointer;color:#c62828">🗑️</span>';
                   return s;
               } }
         ],
@@ -289,9 +291,49 @@ Usp.campaign.listPanel = function () {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.camp-details')) { Usp.campaign.details(rec); }
                 else if (e.getTarget('.camp-relance')) { Usp.campaign.relance(rec, store); }
+                else if (e.getTarget('.camp-edit')) { Usp.campaign.editForm(rec, store); }
+                else if (e.getTarget('.camp-del')) { Usp.campaign.supprimer(rec, store); }
             }
         }
     };
+};
+
+/* Modifie les informations d'une campagne (nom, objectif, description). */
+Usp.campaign.editForm = function (rec, store) {
+    // On récupère la campagne complète pour préserver tous ses champs au PUT.
+    Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'GET', success: function (resp) {
+        var camp = Ext.decode(resp.responseText) || {};
+        var win = Ext.create('Ext.window.Window', {
+            title: 'Modifier la campagne', width: 520, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false, value: camp.nom },
+                { xtype: 'textfield', name: 'objectif', fieldLabel: 'Objectif', value: camp.objectif },
+                { xtype: 'textarea', name: 'description', fieldLabel: 'Description', height: 80, value: camp.description }
+            ] }],
+            buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) { return; }
+                var v = f.getValues();
+                camp.nom = v.nom; camp.objectif = v.objectif; camp.description = v.description;
+                Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); },
+                    failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
+            } }]
+        });
+        win.show();
+    }, failure: function () { Ext.Msg.alert('Erreur', 'Chargement de la campagne impossible.'); } });
+};
+
+/* Supprime une campagne (et ses destinataires) après confirmation. */
+Usp.campaign.supprimer = function (rec, store) {
+    Ext.Msg.confirm('Supprimer la campagne',
+        'Supprimer définitivement la campagne « ' + Ext.String.htmlEncode(rec.get('nom')) +
+        ' » et ses destinataires ?', function (btn) {
+            if (btn !== 'yes') { return; }
+            Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'DELETE',
+                success: function () { store.load(); Usp.toast('Campagne supprimée avec succès.'); },
+                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+        });
 };
 
 /* Fenêtre des détails d'une campagne : destinataires + statut d'envoi. */

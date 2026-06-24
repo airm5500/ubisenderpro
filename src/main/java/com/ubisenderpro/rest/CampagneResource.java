@@ -64,6 +64,15 @@ public class CampagneResource {
         return Response.ok(campagneService.modifier(c)).build();
     }
 
+    @DELETE
+    @Path("/{id}")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response supprimer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        campagneService.supprimer(id);
+        auditService.tracer(auth, "SUPPRESSION", "Campagne", id, null);
+        return Response.noContent().build();
+    }
+
     @POST
     @Path("/{id}/recipients")
     @Secured(roles = {"ADMIN", "MARKETING"})

@@ -109,6 +109,11 @@ Usp.settings.templatesPanel = function () {
               renderer: function () {
                   return '<span class="tpl-docx" title="Exporter ce modèle au format Word (.docx)" ' +
                       'style="cursor:pointer;color:#1976d2">📤 .docx</span>';
+              } },
+            { text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="tpl-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                      '<span class="tpl-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
               } }
         ],
         tbar: [
@@ -120,6 +125,16 @@ Usp.settings.templatesPanel = function () {
             itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.tpl-docx')) { Usp.settings.exporterModeleDocx(rec); }
+                else if (e.getTarget('.tpl-edit')) { Usp.settings.templateForm(store, rec); }
+                else if (e.getTarget('.tpl-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer le modèle « ' + Ext.String.htmlEncode(rec.get('nom')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/templates/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Modèle supprimé avec succès.'); },
+                                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+                        });
+                }
             }
         }
     };

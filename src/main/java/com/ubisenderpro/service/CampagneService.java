@@ -58,6 +58,13 @@ public class CampagneService {
         return em.merge(c);
     }
 
+    /** Supprime une campagne et ses destinataires (la FK destinataire est purgée d'abord). */
+    public void supprimer(Long id) {
+        em.createQuery("DELETE FROM CampagneDestinataire d WHERE d.campagneId = :c")
+                .setParameter("c", id).executeUpdate();
+        parId(id).ifPresent(em::remove);
+    }
+
     /**
      * Construit la liste des destinataires depuis la liste statique et/ou le segment
      * dynamique attachés à la campagne, en supprimant les doublons et les désabonnés.
