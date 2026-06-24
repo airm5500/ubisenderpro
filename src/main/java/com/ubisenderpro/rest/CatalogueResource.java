@@ -36,7 +36,16 @@ public class CatalogueResource {
     @Secured(roles = {"ADMIN", "CATALOGUE"})
     public Response modifierCategorie(@PathParam("id") Long id, CategorieArticle c) {
         c.setId(id);
-        return Response.ok(catalogueService.modifierCategorie(c)).build();
+        CategorieArticle r = catalogueService.modifierCategorie(c);
+        return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
+    }
+
+    @DELETE
+    @Path("/categories/{id}")
+    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    public Response supprimerCategorie(@PathParam("id") Long id) {
+        catalogueService.supprimerCategorie(id);
+        return Response.noContent().build();
     }
 
     @GET
@@ -55,6 +64,15 @@ public class CatalogueResource {
     @Secured(roles = {"ADMIN", "CATALOGUE"})
     public Response modifierMarque(@PathParam("id") Long id, Marque m) {
         m.setId(id);
-        return Response.ok(catalogueService.modifierMarque(m)).build();
+        Marque r = catalogueService.modifierMarque(m);
+        return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
+    }
+
+    @DELETE
+    @Path("/marques/{id}")
+    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    public Response supprimerMarque(@PathParam("id") Long id) {
+        catalogueService.supprimerMarque(id);
+        return Response.noContent().build();
     }
 }

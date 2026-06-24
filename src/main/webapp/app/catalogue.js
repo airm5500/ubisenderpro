@@ -271,13 +271,32 @@ Usp.catalogue.promotionsPanel = function () {
             { text: 'Début', dataIndex: 'dateDebut', width: 110, renderer: fdate },
             { text: 'Fin', dataIndex: 'dateFin', width: 110, renderer: fdate },
             { text: 'Active', dataIndex: 'actif', width: 70, align: 'center',
-              renderer: function (v) { return v ? 'Oui' : 'Non'; } }
+              renderer: function (v) { return v ? 'Oui' : 'Non'; } },
+            { text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="promo-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                      '<span class="promo-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
+              } }
         ],
         tbar: [
             { text: '➕ Nouvelle promotion', tooltip: 'Créer une nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } },
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Promotions')),
-        listeners: { itemdblclick: function (g, rec) { Usp.catalogue.promotionForm(store, rec); } }
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.catalogue.promotionForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.promo-edit')) { Usp.catalogue.promotionForm(store, rec); }
+                else if (e.getTarget('.promo-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer la promotion « ' + Ext.String.htmlEncode(rec.get('nom')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/promotions/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Promotion supprimée avec succès.'); },
+                                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+                        });
+                }
+            }
+        }
     };
 };
 
@@ -332,28 +351,57 @@ Usp.catalogue.promotionForm = function (store, rec) {
 /* ---------- Catégories et marques ---------- */
 Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
     var store = Usp.catalogue.store(url, fields, root || '');
+    // Ouvre le formulaire en création (rec null) ou modification.
+    var ouvrir = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: titre + (rec ? ' — modifier' : ' — nouveau'), width: 420, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: Ext.clone(formFields) }],
+            buttons: [{ text: 'Enregistrer', handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) { return; }
+                Usp.ajax({ url: rec ? url + '/' + rec.get('id') : url, method: rec ? 'PUT' : 'POST',
+                    jsonData: form.getValues(),
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre(titre, !!rec); },
+                    failure: function (resp) {
+                        var m = 'Enregistrement impossible.';
+                        try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}
+                        Ext.Msg.alert('Erreur', m);
+                    } });
+            } }]
+        });
+        win.show();
+        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    };
+    var cols = fields.filter(function (f) { return f !== 'id'; }).map(function (f) {
+        return { text: f, dataIndex: f, flex: 1 };
+    });
+    cols.push({ text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+        renderer: function () {
+            return '<span class="sp-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                '<span class="sp-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
+        } });
     return {
-        xtype: 'grid', title: titre, store: store,
-        columns: fields.filter(function (f) { return f !== 'id'; }).map(function (f) {
-            return { text: f, dataIndex: f, flex: 1 };
-        }),
-        tbar: [{ text: '➕ Nouveau', tooltip: 'Ajouter une entrée', handler: function () {
-            var win = Ext.create('Ext.window.Window', {
-                title: titre, width: 420, modal: true, bodyPadding: 12,
-                items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: formFields }],
-                buttons: [{ text: 'Enregistrer', handler: function (b) {
-                    var form = b.up('window').down('form').getForm();
-                    if (!form.isValid()) { return; }
-                    Usp.ajax({ url: url, method: 'POST', jsonData: form.getValues(),
-                        success: function () {
-                            win.close(); store.load();
-                            Usp.toastEnregistre(titre, false);
-                        },
-                        failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); } });
-                } }]
-            });
-            win.show();
-        } }]
+        xtype: 'grid', title: titre, store: store, columns: cols,
+        tbar: [{ text: '➕ Nouveau', tooltip: 'Ajouter une entrée', handler: function () { ouvrir(null); } }]
+            .concat(Usp.export.boutons(titre)),
+        listeners: {
+            itemdblclick: function (g, rec) { ouvrir(rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.sp-edit')) { ouvrir(rec); }
+                else if (e.getTarget('.sp-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer cette entrée ?', function (btn) {
+                        if (btn !== 'yes') { return; }
+                        Usp.ajax({ url: url + '/' + rec.get('id'), method: 'DELETE',
+                            success: function () { store.load(); Usp.toast('Entrée supprimée avec succès.'); },
+                            failure: function (resp) {
+                                var m = 'Suppression impossible.';
+                                try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}
+                                Ext.Msg.alert('Erreur', m);
+                            } });
+                    });
+                }
+            }
+        }
     };
 };
 

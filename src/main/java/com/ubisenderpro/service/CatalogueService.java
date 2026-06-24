@@ -29,9 +29,47 @@ public class CatalogueService {
     }
 
     public CategorieArticle creerCategorie(CategorieArticle c) { em.persist(c); return c; }
-    public CategorieArticle modifierCategorie(CategorieArticle c) { return em.merge(c); }
+    public CategorieArticle modifierCategorie(CategorieArticle c) {
+        CategorieArticle ex = em.find(CategorieArticle.class, c.getId());
+        if (ex == null) { return null; }
+        if (c.getCode() != null) { ex.setCode(c.getCode()); }
+        if (c.getLibelle() != null) { ex.setLibelle(c.getLibelle()); }
+        ex.setDescription(c.getDescription());
+        return em.merge(ex);
+    }
     public Marque creerMarque(Marque m) { em.persist(m); return m; }
-    public Marque modifierMarque(Marque m) { return em.merge(m); }
+    public Marque modifierMarque(Marque m) {
+        Marque ex = em.find(Marque.class, m.getId());
+        if (ex == null) { return null; }
+        if (m.getCode() != null) { ex.setCode(m.getCode()); }
+        if (m.getNom() != null) { ex.setNom(m.getNom()); }
+        ex.setDescription(m.getDescription());
+        return em.merge(ex);
+    }
+
+    /** Supprime une catégorie inutilisée (refus clair si des articles y sont rattachés). */
+    public void supprimerCategorie(Long id) {
+        Long n = em.createQuery("SELECT COUNT(a) FROM Article a WHERE a.categorieId = :id", Long.class)
+                .setParameter("id", id).getSingleResult();
+        if (n > 0) {
+            throw new ValidationException("categorie",
+                    n + " article(s) utilisent cette catégorie : suppression impossible.");
+        }
+        CategorieArticle c = em.find(CategorieArticle.class, id);
+        if (c != null) { em.remove(c); }
+    }
+
+    /** Supprime une marque inutilisée (refus clair si des articles y sont rattachés). */
+    public void supprimerMarque(Long id) {
+        Long n = em.createQuery("SELECT COUNT(a) FROM Article a WHERE a.marqueId = :id", Long.class)
+                .setParameter("id", id).getSingleResult();
+        if (n > 0) {
+            throw new ValidationException("marque",
+                    n + " article(s) utilisent cette marque : suppression impossible.");
+        }
+        Marque m = em.find(Marque.class, id);
+        if (m != null) { em.remove(m); }
+    }
 
     public Optional<CategorieArticle> resoudreCategorie(String libelle, boolean creer) {
         if (libelle == null || libelle.trim().isEmpty()) return Optional.empty();

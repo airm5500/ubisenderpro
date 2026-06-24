@@ -298,25 +298,79 @@ Usp.campaign.listPanel = function () {
     };
 };
 
-/* Modifie les informations d'une campagne (nom, objectif, description). */
+/* Modifie une campagne. Si elle n'est pas lancée (BROUILLON) : édition complète
+   (canal, compte, modèle, ciblage) avec reconstruction des destinataires.
+   Sinon : métadonnées seules (nom/objectif/description) pour éviter toute incohérence. */
 Usp.campaign.editForm = function (rec, store) {
-    // On récupère la campagne complète pour préserver tous ses champs au PUT.
     Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'GET', success: function (resp) {
         var camp = Ext.decode(resp.responseText) || {};
+        var complet = (camp.statut === 'BROUILLON');
+
+        var items = [
+            { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false, value: camp.nom },
+            { xtype: 'textfield', name: 'objectif', fieldLabel: 'Objectif', value: camp.objectif },
+            { xtype: 'textarea', name: 'description', fieldLabel: 'Description', height: 70, value: camp.description }
+        ];
+        if (complet) {
+            items.push(
+                { xtype: 'combobox', name: 'canal', itemId: 'fCanal', fieldLabel: 'Canal d\'envoi', anchor: '100%',
+                  queryMode: 'local', editable: false, value: camp.canal || 'API',
+                  store: [['API', 'API WhatsApp (officielle)'], ['WEB', 'WhatsApp Web']],
+                  listeners: {
+                      change: function (cb, val) { Usp.campaign.toggleCanal(cb.up('form'), val); },
+                      afterrender: function (cb) { Usp.campaign.toggleCanal(cb.up('form'), cb.getValue()); }
+                  } },
+                Usp.campaign.combo('/whatsapp/accounts', '', 'id', 'libelle',
+                    { name: 'whatsappAccountId', itemId: 'fAccount', fieldLabel: 'Compte WhatsApp', value: camp.whatsappAccountId }),
+                { xtype: 'combobox', name: 'waWebSessionId', itemId: 'fWebSession', fieldLabel: 'Session WhatsApp Web',
+                  anchor: '100%', queryMode: 'local', editable: false, hidden: true, value: camp.waWebSessionId,
+                  store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle' },
+                Usp.campaign.combo('/templates', '', 'id', 'nom',
+                    { name: 'modeleId', fieldLabel: 'Modèle de message', value: camp.modeleId }),
+                { xtype: 'displayfield', value: '<span style="color:#888">Ciblage (les destinataires seront recalculés) :</span>' },
+                Usp.campaign.combo('/segmentations', '', 'id', 'libelle',
+                    { name: 'segmentationId', fieldLabel: 'Segmentation client', value: camp.segmentationId }),
+                Usp.campaign.combo('/lists', '', 'id', 'nom',
+                    { name: 'listeId', fieldLabel: 'Liste de diffusion', value: camp.listeId }),
+                Usp.campaign.combo('/segments', '', 'id', 'nom',
+                    { name: 'segmentId', fieldLabel: 'Segment dynamique', value: camp.segmentId }));
+        } else {
+            items.push({ xtype: 'displayfield',
+                value: '<span style="color:#888">Campagne déjà lancée : seules les informations ' +
+                       '(nom, objectif, description) sont modifiables.</span>' });
+        }
+
         var win = Ext.create('Ext.window.Window', {
-            title: 'Modifier la campagne', width: 520, modal: true, bodyPadding: 12,
-            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-                { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false, value: camp.nom },
-                { xtype: 'textfield', name: 'objectif', fieldLabel: 'Objectif', value: camp.objectif },
-                { xtype: 'textarea', name: 'description', fieldLabel: 'Description', height: 80, value: camp.description }
-            ] }],
+            title: 'Modifier la campagne' + (complet ? '' : ' (lancée)'),
+            width: 560, modal: true, bodyPadding: 12, autoScroll: true,
+            maxHeight: Ext.getBody().getViewSize().height - 40,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 160 }, items: items }],
             buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
                 var f = b.up('window').down('form').getForm();
                 if (!f.isValid()) { return; }
                 var v = f.getValues();
                 camp.nom = v.nom; camp.objectif = v.objectif; camp.description = v.description;
+                if (complet) {
+                    camp.canal = v.canal;
+                    camp.whatsappAccountId = (v.canal === 'WEB') ? null : (v.whatsappAccountId || null);
+                    camp.waWebSessionId = (v.canal === 'WEB') ? (v.waWebSessionId || null) : null;
+                    camp.modeleId = v.modeleId || null;
+                    camp.segmentationId = v.segmentationId || null;
+                    camp.listeId = v.listeId || null;
+                    camp.segmentId = v.segmentId || null;
+                    if (!camp.modeleId) { Ext.Msg.alert('Champ requis', 'Le modèle de message est obligatoire.'); return; }
+                    if (v.canal === 'WEB' && !camp.waWebSessionId) { Ext.Msg.alert('Champ requis', 'Choisissez la session WhatsApp Web.'); return; }
+                    if (v.canal !== 'WEB' && !camp.whatsappAccountId) { Ext.Msg.alert('Champ requis', 'Choisissez le compte WhatsApp.'); return; }
+                }
                 Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
-                    success: function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); },
+                    success: function () {
+                        var fin = function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); };
+                        // Recalcule les destinataires si le ciblage a pu changer (campagne non lancée).
+                        if (complet) {
+                            Usp.ajax({ url: '/campaigns/' + rec.get('id') + '/recipients', method: 'POST',
+                                success: fin, failure: fin });
+                        } else { fin(); }
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
             } }]
         });
