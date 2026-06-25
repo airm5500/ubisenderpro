@@ -26,8 +26,17 @@ public class CampagneService {
     @EJB
     private ListeService listeService;
 
-    public List<Campagne> lister() {
-        return em.createQuery("SELECT c FROM Campagne c ORDER BY c.createdAt DESC", Campagne.class).getResultList();
+    public List<Campagne> lister() { return lister(null); }
+
+    /** Liste les campagnes, éventuellement filtrées par catégorie (ex. PROMOTION). */
+    public List<Campagne> lister(String categorie) {
+        if (categorie == null || categorie.trim().isEmpty()) {
+            return em.createQuery("SELECT c FROM Campagne c ORDER BY c.createdAt DESC", Campagne.class)
+                    .getResultList();
+        }
+        return em.createQuery(
+                "SELECT c FROM Campagne c WHERE c.categorie = :cat ORDER BY c.createdAt DESC", Campagne.class)
+                .setParameter("cat", categorie).getResultList();
     }
 
     public Optional<Campagne> parId(Long id) { return Optional.ofNullable(em.find(Campagne.class, id)); }

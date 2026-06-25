@@ -33,7 +33,10 @@ Usp.marketing.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Marketing', listeners: Usp.tabListeners,
         items: [
-            Usp.marketing.calendrier()
+            Usp.marketing.calendrier(),
+            Usp.marketing.propositions(),
+            Usp.marketing.modelesPromo(),
+            Usp.marketing.campagnesPromo()
         ]
     };
 };
@@ -370,7 +373,183 @@ Usp.marketing.propStatutRenderer = function (v) {
     return '<span style="color:' + c + ';font-weight:bold">' + (v || '') + '</span>';
 };
 
+Usp.marketing.MOIS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+/* Onglet « Calendrier » : vue mensuelle visuelle des propositions par échéance. */
 Usp.marketing.calendrier = function () {
+    var now = new Date();
+    var state = { y: now.getFullYear(), m: now.getMonth() };
+
+    var render = function (panel) {
+        var lbl = panel.down('#calLabel');
+        if (lbl) { lbl.setText(Usp.marketing.MOIS_FR[state.m] + ' ' + state.y); }
+        Usp.ajax({ url: '/propositions', method: 'GET',
+            success: function (resp) {
+                var data = []; try { data = Ext.decode(resp.responseText) || []; } catch (e) {}
+                var c = panel.down('#calBody');
+                if (c) { c.update(Usp.marketing._calHtml(state.y, state.m, data)); }
+            },
+            failure: function () {
+                var c = panel.down('#calBody');
+                if (c) { c.update('<div style="padding:20px;color:#c62828">Chargement impossible.</div>'); }
+            } });
+    };
+
+    return {
+        xtype: 'panel', title: '📅 Calendrier', layout: { type: 'vbox', align: 'stretch' },
+        tbar: [
+            { text: '◀', tooltip: 'Mois précédent', handler: function (b) {
+                if (--state.m < 0) { state.m = 11; state.y--; } render(b.up('panel')); } },
+            { xtype: 'tbtext', itemId: 'calLabel', text: Usp.marketing.MOIS_FR[state.m] + ' ' + state.y },
+            { text: '▶', tooltip: 'Mois suivant', handler: function (b) {
+                if (++state.m > 11) { state.m = 0; state.y++; } render(b.up('panel')); } },
+            { text: 'Aujourd\'hui', handler: function (b) {
+                var d = new Date(); state.y = d.getFullYear(); state.m = d.getMonth(); render(b.up('panel')); } },
+            '->',
+            { text: '🔄 Rafraîchir', handler: function (b) { render(b.up('panel')); } }
+        ],
+        items: [{ xtype: 'container', itemId: 'calBody', flex: 1, autoScroll: true,
+            style: 'background:#fff;padding:6px',
+            html: '<div style="padding:20px;color:#888">Chargement…</div>' }],
+        listeners: { afterrender: function (p) { render(p); } }
+    };
+};
+
+/* Construit le tableau HTML du mois (lundi -> dimanche). */
+Usp.marketing._calHtml = function (y, m, data) {
+    var parJour = {};
+    (data || []).forEach(function (p) {
+        if (!p.datePrevue) { return; }
+        var s = String(p.datePrevue).substring(0, 10).split('-');
+        if (parseInt(s[0], 10) === y && parseInt(s[1], 10) === (m + 1)) {
+            var d = parseInt(s[2], 10);
+            (parJour[d] = parJour[d] || []).push(p);
+        }
+    });
+
+    var jourSemaine = (new Date(y, m, 1).getDay() + 6) % 7; // lundi = 0
+    var nbJours = new Date(y, m + 1, 0).getDate();
+    var au = new Date();
+    var estAujd = function (d) { return au.getFullYear() === y && au.getMonth() === m && au.getDate() === d; };
+
+    var vide = function () { return '<td style="border:1px solid #eee;height:96px;background:#fafafa"></td>'; };
+    var jour = function (d, items, today) {
+        var h = '<td style="border:1px solid #e0e0e0;height:96px;vertical-align:top;padding:3px;background:'
+            + (today ? '#e3f2fd' : '#fff') + '">';
+        h += '<div style="font-size:12px;font-weight:bold;color:#555">' + d + '</div>';
+        items.forEach(function (p) {
+            var c = Usp.marketing.COULEUR_PROP[p.statut] || '#1976d2';
+            var lib = Usp.marketing.LIB_TYPE[p.type] || p.type || '';
+            h += '<div title="' + Ext.String.htmlEncode((p.titre || '') + ' — ' + (p.statut || '')) + '"'
+                + ' style="margin:2px 0;padding:1px 4px;border-left:3px solid ' + c + ';background:#f7f7f7;'
+                + 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+                + Ext.String.htmlEncode(lib) + '</div>';
+        });
+        return h + '</td>';
+    };
+
+    var html = '<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tr>';
+    ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].forEach(function (e) {
+        html += '<th style="border:1px solid #e0e0e0;padding:4px;background:#f5f5f5;font-size:12px">' + e + '</th>';
+    });
+    html += '</tr><tr>';
+    var col = 0, i;
+    for (i = 0; i < jourSemaine; i++) { html += vide(); col++; }
+    for (var d = 1; d <= nbJours; d++) {
+        if (col === 7) { html += '</tr><tr>'; col = 0; }
+        html += jour(d, parJour[d] || [], estAujd(d));
+        col++;
+    }
+    while (col < 7) { html += vide(); col++; }
+    return html + '</tr></table>';
+};
+
+/* Onglet « Modèles de promo » : modèles ModeleMessage de type PROMOTION.
+ * Réutilise le formulaire des Paramètres -> les modèles restent partagés
+ * (visibles dans le menu Modèles, et inversement). */
+Usp.marketing.modelesPromo = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
+                 'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
+                 'segmentationId', 'statutApprobation', 'actif'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true,
+        filters: [{ filterFn: function (rec) {
+            return String(rec.get('typeModele') || '').toUpperCase() === 'PROMOTION'; } }]
+    });
+    return {
+        xtype: 'grid', title: '📝 Modèles de promo', store: store,
+        columns: [
+            { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Langue', dataIndex: 'langue', width: 70 },
+            { text: 'Pièce jointe', dataIndex: 'enteteMediaType', width: 150, renderer: function (v, m, rec) {
+                if (!v) { return '—'; }
+                var url = rec.get('enteteMediaUrl');
+                return url ? '<a href="' + Ext.String.htmlEncode(url) + '" target="_blank">' + Ext.String.htmlEncode(v) + '</a>' : v;
+            } },
+            { text: 'Approbation', dataIndex: 'statutApprobation', width: 120 },
+            { text: 'Actions', width: 90, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="mp-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                      '<span class="mp-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
+              } }
+        ],
+        tbar: [
+            { text: '➕ Nouveau modèle de promo', handler: function () { Usp.settings.templateForm(store, null); } },
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
+        ],
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.settings.templateForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.mp-edit')) { Usp.settings.templateForm(store, rec); }
+                else if (e.getTarget('.mp-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer le modèle « ' + Ext.String.htmlEncode(rec.get('nom')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/templates/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Modèle supprimé.'); },
+                                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+                        });
+                }
+            }
+        }
+    };
+};
+
+/* Onglet « Campagnes promo » : campagnes de catégorie PROMOTION + leurs stats. */
+Usp.marketing.campagnesPromo = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'statut', 'canal', 'categorie', 'nbDestinataires',
+                 'nbEnvoyes', 'nbDistribues', 'nbLus', 'nbEchoues'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns', extraParams: { categorie: 'PROMOTION' },
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    return {
+        xtype: 'grid', title: '🚀 Campagnes promo', store: store,
+        columns: [
+            { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Canal', dataIndex: 'canal', width: 70, renderer: function (v) { return v === 'WEB' ? 'WA Web' : 'API'; } },
+            { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.campaign.statutRenderer },
+            { text: 'Destinataires', dataIndex: 'nbDestinataires', width: 100, align: 'right' },
+            { text: 'Envoyés', dataIndex: 'nbEnvoyes', width: 75, align: 'right' },
+            { text: 'Distribués', dataIndex: 'nbDistribues', width: 85, align: 'right' },
+            { text: 'Lus', dataIndex: 'nbLus', width: 60, align: 'right' },
+            { text: 'Échoués', dataIndex: 'nbEchoues', width: 75, align: 'right' },
+            { text: 'Taux', dataIndex: 'nbEnvoyes', width: 70, align: 'right', renderer: Usp.campaign.tauxRenderer }
+        ],
+        tbar: [
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } },
+            '->',
+            { text: 'Ouvrir le menu Campagnes', tooltip: 'Aller à la gestion complète des campagnes',
+              handler: function () { Usp.ouvrirVue('campaigns'); } }
+        ]
+    };
+};
+
+Usp.marketing.propositions = function () {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'cle', 'type', 'promotionId', 'titre', 'message', 'datePrevue',
                  'statut', 'campagneId', 'listeId', 'segmentId', 'motifRejet'],
@@ -383,7 +562,7 @@ Usp.marketing.calendrier = function () {
     Usp.marketing._stores.push(store);
 
     return {
-        xtype: 'grid', title: '📅 Calendrier', store: store,
+        xtype: 'grid', title: '📨 Propositions d\'envoi', store: store,
         features: [{ ftype: 'grouping',
             groupHeaderTpl: 'Échéance : {name:this.fdate} ({rows.length})',
             startCollapsed: false,

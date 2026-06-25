@@ -32,7 +32,9 @@ public class CampagneResource {
     private SessionStore sessionStore;
 
     @GET
-    public List<Campagne> lister() { return campagneService.lister(); }
+    public List<Campagne> lister(@QueryParam("categorie") String categorie) {
+        return campagneService.lister(categorie);
+    }
 
     @GET
     @Path("/{id}")
