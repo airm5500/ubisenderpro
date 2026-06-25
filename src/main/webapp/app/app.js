@@ -965,6 +965,7 @@ Usp.MENU = [
     { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
     { text: 'Promotions',          view: 'promotions', icon: '🏷️', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Marketing',           view: 'marketing',  icon: '📣', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
+    { text: 'Disponibilités & Ruptures', view: 'dispo', icon: '📦', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
     { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
@@ -1017,6 +1018,7 @@ Usp.ouvrirVue = function (vue) {
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
         case 'promotions': Usp.loadCenter(Usp.marketing.promotionsPanel()); break;
         case 'marketing': Usp.loadCenter(Usp.marketing.panel()); break;
+        case 'dispo': Usp.loadCenter(Usp.dispo.panel()); break;
         case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
         case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
         case 'historique': Usp.loadCenter(Usp.history.panel()); break;
