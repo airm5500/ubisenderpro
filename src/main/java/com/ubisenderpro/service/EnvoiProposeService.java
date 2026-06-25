@@ -64,6 +64,8 @@ public class EnvoiProposeService {
     private DispoXlsxService dispoXlsxService;
     @EJB
     private ParametreService parametreService;
+    @EJB
+    private AudienceService audienceService;
 
     /** Paramètre technique (§12) : autorise le traitement auto des propositions rupture. */
     public static final String CLE_RUPTURE_SANS_AVIS = "rupture.envoi_sans_avis";
@@ -309,9 +311,11 @@ public class EnvoiProposeService {
         ModeleMessage modele;
         String categorie = "PROMOTION";
         String objectif = "Promotion";
+        String audienceCampagne = null;
         if (e.getEvenementId() != null) {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
+            audienceCampagne = e.getAudience() != null ? e.getAudience() : evt.getAudience();
             List<String> manquants = elementsDispoManquants(evt);
             if (!manquants.isEmpty()) {
                 throw new ValidationException("variables",
@@ -378,6 +382,11 @@ public class EnvoiProposeService {
         // par défaut ; l'opérateur peut basculer sur Cloud API avant l'envoi.
         c.setCanal("WEB");
         c.setModeleId(modele.getId());
+        // Audience (§16) : mémorise le ciblage et les segmentations résolues.
+        if (audienceCampagne != null && !audienceCampagne.isEmpty()) {
+            c.setAudience(audienceCampagne);
+            c.setSegmentationIds(audienceService.segmentationIdsCsv(audienceCampagne));
+        }
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
         if (listeId != null) { c.setListeId(listeId); }

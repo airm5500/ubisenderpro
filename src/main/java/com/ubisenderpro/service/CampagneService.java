@@ -165,6 +165,14 @@ public class CampagneService {
         if (c.getListeId() != null) contacts.addAll(listeService.contacts(c.getListeId()));
         if (c.getSegmentId() != null) contacts.addAll(segmentService.evaluer(c.getSegmentId()));
         if (c.getSegmentationId() != null) contacts.addAll(contactsParSegmentation(c.getSegmentationId()));
+        // Audience (§16) : tous les segments, ou une/plusieurs segmentations résolues.
+        if ("TOUS_LES_SEGMENTS".equals(c.getAudience())) { contacts.addAll(tousContacts()); }
+        if (c.getSegmentationIds() != null && !c.getSegmentationIds().trim().isEmpty()) {
+            for (String s : c.getSegmentationIds().split(",")) {
+                try { contacts.addAll(contactsParSegmentation(Long.valueOf(s.trim()))); }
+                catch (NumberFormatException ignore) { /* id invalide ignoré */ }
+            }
+        }
 
         java.util.Set<String> vus = new java.util.HashSet<>();
         int total = 0;
@@ -196,6 +204,14 @@ public class CampagneService {
                 "AND cl.segmentationId = :seg AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
                 ClientContact.class)
                 .setParameter("seg", segmentationId).getResultList();
+    }
+
+    /** Tous les contacts joignables (audience TOUS_LES_SEGMENTS). */
+    private List<ClientContact> tousContacts() {
+        return em.createQuery(
+                "SELECT ct FROM ClientContact ct WHERE ct.actif = true " +
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
+                ClientContact.class).getResultList();
     }
 
     /**

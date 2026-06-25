@@ -41,6 +41,14 @@ public class Campagne {
     @Column(name = "segmentation_id")
     private Long segmentationId;
 
+    /** Audience logique (§16) : TOUS_LES_SEGMENTS | DIAMOND | PLATINIUM | ... */
+    @Column(name = "audience", length = 40)
+    private String audience;
+
+    /** Segmentations résolues à cibler (liste d'IDs séparés par des virgules). */
+    @Column(name = "segmentation_ids", length = 255)
+    private String segmentationIds;
+
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
@@ -113,6 +121,10 @@ public class Campagne {
     public void setSegmentId(Long segmentId) { this.segmentId = segmentId; }
     public Long getSegmentationId() { return segmentationId; }
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
+    public String getAudience() { return audience; }
+    public void setAudience(String audience) { this.audience = audience; }
+    public String getSegmentationIds() { return segmentationIds; }
+    public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
     public String getCanal() { return canal; }

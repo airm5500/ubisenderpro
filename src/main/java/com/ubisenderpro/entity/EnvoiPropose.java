@@ -60,6 +60,10 @@ public class EnvoiPropose {
     @Column(name = "segment_id")
     private Long segmentId;
 
+    /** Audience suggérée (§16), notamment pour les propositions issues des règles. */
+    @Column(name = "audience", length = 40)
+    private String audience;
+
     @Column(name = "motif_rejet", length = 255)
     private String motifRejet;
 
@@ -101,6 +105,8 @@ public class EnvoiPropose {
     public void setListeId(Long listeId) { this.listeId = listeId; }
     public Long getSegmentId() { return segmentId; }
     public void setSegmentId(Long segmentId) { this.segmentId = segmentId; }
+    public String getAudience() { return audience; }
+    public void setAudience(String audience) { this.audience = audience; }
     public String getMotifRejet() { return motifRejet; }
     public void setMotifRejet(String motifRejet) { this.motifRejet = motifRejet; }
     public LocalDateTime getCreatedAt() { return createdAt; }
