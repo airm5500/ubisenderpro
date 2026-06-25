@@ -311,7 +311,14 @@ public class EnvoiProposeService {
         v.put("nb_produits", String.valueOf(nbProduitsActifs(p.getId()))); // alias
         BigDecimal taux = maxTauxUg(p.getId());
         v.put("taux_ug_max", taux == null ? "" : taux.stripTrailingZeros().toPlainString());
+        v.put("avantage_ug", avantageUg(taux));
         return v;
+    }
+
+    /** Formule d'avantage UG, jamais vide : « jusqu'à X % d'unités gratuites » ou « des unités gratuites ». */
+    private String avantageUg(BigDecimal taux) {
+        return taux == null ? "des unités gratuites"
+                : "jusqu'à " + taux.stripTrailingZeros().toPlainString() + " % d'unités gratuites";
     }
 
     /** Variables agrégées du mois pour l'annonce mensuelle. */
@@ -343,6 +350,7 @@ public class EnvoiProposeService {
         v.put("nombre_promotions", String.valueOf(promos.size()));
         v.put("nombre_produits", String.valueOf(nbProd));
         v.put("taux_ug_max", tauxMax == null ? "" : tauxMax.stripTrailingZeros().toPlainString());
+        v.put("avantage_ug", avantageUg(tauxMax));
         v.put("dates_fin_promotions", String.join(", ", fins));
         v.put("jours_restants_min", joursMin == Integer.MAX_VALUE ? "" : String.valueOf(joursMin));
         return v;
@@ -451,80 +459,37 @@ public class EnvoiProposeService {
     }
 
     /* ====================== Messages suggérés ======================
-     * Les modèles contiennent les variables de contexte ({{nom_promotion}},
-     * {{date_fin}}, {{taux_ug_max}}…) remplies à la génération/validation, et
-     * {{nom_contact}} laissé tel quel : il est résolu par destinataire à l'envoi.
-     * La clause « jusqu'à X % » est omise quand aucun UG en % n'existe. */
+     * Le texte provient des modèles « promo » éditables en base (clé système),
+     * avec repli sur les textes par défaut (PromoTemplates) si supprimés.
+     * Le contexte ({{nom_promotion}}, {{date_fin}}, {{avantage_ug}}…) est rempli
+     * ici ; {{nom_contact}} est laissé pour être résolu par destinataire à l'envoi. */
 
-    private String templateAnnonce(boolean taux) {
-        return "📢🔥 PROMOTIONS UG DU MOIS DE {{mois_promotion}} 🔥📢\n\n"
-                + "Cher(e) client(e) {{nom_contact}},\n\n"
-                + "🎉 Découvrez nos offres promotionnelles disponibles durant le mois de {{mois_promotion}}.\n\n"
-                + (taux ? "💥 Bénéficiez de jusqu'à {{taux_ug_max}} % d'unités gratuites sur une sélection de produits.\n\n" : "")
-                + "📅 Période des offres : du {{date_debut_globale}} au {{date_fin_globale}}.\n\n"
-                + "📦 Les offres et les stocks d'unités gratuites sont disponibles dans la limite des quantités prévues.\n\n"
-                + "📎 Consultez le fichier Excel joint pour découvrir les produits concernés et préparer facilement votre commande sur EXTRANET.\n\n"
-                + "💻 Profitez de ces offres dès maintenant !\n\n"
-                + "Direction Commerciale";
-    }
-
-    private String templateLancement(boolean taux) {
-        return "🚀🎁 NOUVELLE PROMOTION UG 🎁🚀\n\n"
-                + "Cher(e) client(e) {{nom_contact}},\n\n"
-                + "La promotion {{nom_promotion}} commence aujourd'hui !\n\n"
-                + "📅 Offre valable du {{date_debut}} au {{date_fin}}.\n\n"
-                + (taux ? "💥 Bénéficiez de jusqu'à {{taux_ug_max}} % d'unités gratuites sur {{nombre_produits}} produit(s) sélectionné(s).\n\n"
-                        : "💥 Bénéficiez d'unités gratuites sur {{nombre_produits}} produit(s) sélectionné(s).\n\n")
-                + "📎 Consultez le fichier Excel joint pour découvrir les produits et leurs conditions promotionnelles.\n\n"
-                + "💻 Passez votre commande via EXTRANET pendant la période de validité de l'offre.\n\n"
-                + "Direction Commerciale";
-    }
-
-    private String templateRappelFin(boolean taux) {
-        return "✨⏳ PROMOTION UG — DERNIERS JOURS ⏳✨\n\n"
-                + "Cher(e) client(e) {{nom_contact}},\n\n"
-                + "L'offre d'unités gratuites « {{nom_promotion}} » arrive bientôt à expiration.\n\n"
-                + "📅 Date de fin : {{date_fin}} — il reste {{jours_restants}} jour(s).\n\n"
-                + (taux ? "🎁 Profitez encore de jusqu'à {{taux_ug_max}} % d'UG sur {{nombre_produits}} produit(s).\n\n" : "")
-                + "📎 Le fichier Excel joint présente les produits concernés et leurs conditions.\n\n"
-                + "💻 Préparez votre commande et transmettez-la dès maintenant via EXTRANET.\n\n"
-                + "Ne laissez pas passer ces dernières opportunités !\n\n"
-                + "Direction Commerciale";
-    }
-
-    private String templateDerniereChance(boolean taux) {
-        return "⏰🔥 DERNIÈRE CHANCE — PROMOTION UG 🔥⏰\n\n"
-                + "Cher(e) client(e) {{nom_contact}},\n\n"
-                + "La promotion {{nom_promotion}} prend fin le {{date_fin}}.\n\n"
-                + "Il ne vous reste plus que {{jours_restants}} jour(s) pour "
-                + (taux ? "bénéficier de jusqu'à {{taux_ug_max}} % d'unités gratuites " : "bénéficier des unités gratuites ")
-                + "sur les produits concernés.\n\n"
-                + "📎 Consultez le fichier Excel joint et finalisez votre commande sur EXTRANET.\n\n"
-                + "Après cette date, les conditions promotionnelles ne seront plus applicables.\n\n"
-                + "Direction Commerciale";
+    /** Corps du modèle prédéfini (base de données, sinon texte par défaut). */
+    private String corpsTemplate(String cleSysteme) {
+        if (cleSysteme != null) {
+            List<ModeleMessage> l = em.createQuery(
+                    "SELECT m FROM ModeleMessage m WHERE m.cleSysteme = :c", ModeleMessage.class)
+                    .setParameter("c", cleSysteme).setMaxResults(1).getResultList();
+            if (!l.isEmpty() && l.get(0).getCorps() != null) { return l.get(0).getCorps(); }
+        }
+        return PromoTemplates.CORPS.getOrDefault(cleSysteme, "");
     }
 
     private String messageLancement(Promotion p) {
-        Map<String, String> v = variablesPromo(p);
-        return ModeleService.fusionner(templateLancement(aTaux(v)), v);
+        return ModeleService.fusionner(corpsTemplate(PromoTemplates.CLE_LANCEMENT), variablesPromo(p));
     }
 
     /** Rappel par promo : J-1 -> « dernière chance », sinon (J-3) -> « derniers jours ». */
     private String messageRappel(Promotion p, int joursAvant) {
         Map<String, String> v = variablesPromo(p);
         v.put("jours_restants", String.valueOf(joursAvant));
-        String tpl = joursAvant <= 1 ? templateDerniereChance(aTaux(v)) : templateRappelFin(aTaux(v));
-        return ModeleService.fusionner(tpl, v);
+        String cle = joursAvant <= 1 ? PromoTemplates.CLE_DERNIERE_CHANCE : PromoTemplates.CLE_RAPPEL_FIN;
+        return ModeleService.fusionner(corpsTemplate(cle), v);
     }
 
     private String messageMensuel(LocalDate premier, List<Promotion> promos, LocalDate prevue) {
-        Map<String, String> v = variablesMensuelles(premier, promos, prevue);
-        return ModeleService.fusionner(templateAnnonce(aTaux(v)), v);
-    }
-
-    private boolean aTaux(Map<String, String> v) {
-        String t = v.get("taux_ug_max");
-        return t != null && !t.isEmpty();
+        return ModeleService.fusionner(corpsTemplate(PromoTemplates.CLE_ANNONCE),
+                variablesMensuelles(premier, promos, prevue));
     }
 
     /** Reconstruit le message d'une proposition liée à une promo (à la validation). */

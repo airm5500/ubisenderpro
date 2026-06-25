@@ -60,6 +60,10 @@ public class ModeleMessage {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Rôle système d'un modèle prédéfini (ex. PROMO_LANCEMENT), null sinon. */
+    @Column(name = "cle_systeme", length = 40)
+    private String cleSysteme;
+
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
@@ -97,4 +101,6 @@ public class ModeleMessage {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getCleSysteme() { return cleSysteme; }
+    public void setCleSysteme(String cleSysteme) { this.cleSysteme = cleSysteme; }
 }
