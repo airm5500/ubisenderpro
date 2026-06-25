@@ -62,9 +62,11 @@ public class PromotionProduitService {
         p.setNomProduit(data.getNomProduit());
         p.setQuantiteMinimale(data.getQuantiteMinimale());
         p.setTauxUg(data.getTauxUg());
-        p.setTauxMaxUg(data.getTauxMaxUg());
         p.setQuantiteUg(data.getQuantiteUg());
-        p.setQuantiteUgMax(data.getQuantiteUgMax());
+        // Champs « max » non exposés dans le formulaire : on conserve la valeur
+        // d'import si la requête ne les renvoie pas.
+        if (data.getTauxMaxUg() != null) { p.setTauxMaxUg(data.getTauxMaxUg()); }
+        if (data.getQuantiteUgMax() != null) { p.setQuantiteUgMax(data.getQuantiteUgMax()); }
         p.setModeCalcul(data.getModeCalcul());
         p.setActif(data.isActif());
         valider(p, id);
@@ -88,10 +90,7 @@ public class PromotionProduitService {
         boolean aTaux = p.getTauxUg() != null && p.getTauxUg().signum() > 0;
         boolean aQte = p.getQuantiteUg() != null && p.getQuantiteUg() > 0;
         if (!aTaux && !aQte) {
-            throw new ValidationException("tauxUg", "Renseignez au moins un taux UG ou une quantité UG.");
-        }
-        if (aTaux && p.getTauxMaxUg() != null && p.getTauxUg().compareTo(p.getTauxMaxUg()) > 0) {
-            throw new ValidationException("tauxUg", "Le taux UG dépasse le taux maximal autorisé.");
+            throw new ValidationException("tauxUg", "Renseignez l'unité gratuite : un pourcentage (%) ou un nombre.");
         }
         if (negatif(p.getTauxUg()) || negatif(p.getTauxMaxUg())
                 || (p.getQuantiteUg() != null && p.getQuantiteUg() < 0)

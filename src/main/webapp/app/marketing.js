@@ -115,21 +115,22 @@ Usp.marketing.promotionForm = function (store, rec) {
         { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
     ];
 
-    var formItems = [{ xtype: 'form', itemId: 'promoForm', border: false, bodyPadding: 4,
+    var formItems = [{ xtype: 'form', itemId: 'promoForm', border: false, bodyPadding: '0 0 8 0',
         defaults: { anchor: '100%', labelWidth: 130 }, items: items }];
 
     if (rec) {
         formItems.push(Usp.marketing.produitsGrid(rec.get('id')));
     } else {
-        formItems.push({ xtype: 'component', margin: '8 0 0 0',
+        formItems.push({ xtype: 'component', margin: '4 0 0 0',
             html: '<span style="color:#888">Enregistrez la promotion pour pouvoir y ajouter des produits.</span>' });
     }
 
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Promotion — ' + Ext.String.htmlEncode(rec.get('nom')) : 'Nouvelle promotion',
-        width: 820, height: rec ? 620 : 360, modal: true, layout: 'fit', autoScroll: true,
+        width: 840, height: rec ? 600 : 300, modal: true,
+        layout: { type: 'vbox', align: 'stretch' }, bodyPadding: 12,
         maxHeight: Ext.getBody().getViewSize().height - 20,
-        items: [{ xtype: 'panel', layout: 'anchor', bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%' }, items: formItems }],
+        items: formItems,
         buttons: [{ text: 'Enregistrer', formBind: false, handler: function (b) {
             var form = b.up('window').down('#promoForm').getForm();
             if (!form.isValid()) { return; }
@@ -167,18 +168,19 @@ Usp.marketing.produitsGrid = function (promotionId) {
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
     });
     return {
-        xtype: 'grid', title: 'Produits de la promotion', height: 300, margin: '10 0 0 0', store: store,
+        xtype: 'grid', title: 'Produits de la promotion', flex: 1, minHeight: 200, margin: '10 0 0 0', store: store,
         columns: [
             { text: 'CIP7', dataIndex: 'cip7', width: 90 },
             { text: 'CIP13', dataIndex: 'cip13', width: 120 },
             { text: 'Produit', dataIndex: 'nomProduit', flex: 1 },
             { text: 'Qté min', dataIndex: 'quantiteMinimale', width: 70, align: 'right' },
-            { text: 'UG %', dataIndex: 'tauxUg', width: 70, align: 'right',
-              renderer: function (v) { return (v != null && v !== '') ? v + ' %' : ''; } },
-            { text: 'UG nb', dataIndex: 'quantiteUg', width: 70, align: 'right' },
-            { text: 'Taux max', dataIndex: 'tauxMaxUg', width: 75, align: 'right',
-              renderer: function (v) { return (v != null && v !== '') ? v + ' %' : ''; } },
-            { text: 'Lié', dataIndex: 'articleId', width: 50, align: 'center',
+            { text: 'UG', dataIndex: 'tauxUg', width: 90, align: 'right',
+              renderer: function (v, m, rec) {
+                  if (v != null && v !== '') { return v + ' %'; }
+                  var q = rec.get('quantiteUg');
+                  return (q != null && q !== '') ? q + ' u.' : '';
+              } },
+            { text: 'Catalogue', dataIndex: 'articleId', width: 70, align: 'center',
               renderer: function (v) { return v ? '✅' : '—'; } },
             { text: 'Actions', width: 80, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
@@ -209,37 +211,88 @@ Usp.marketing.produitsGrid = function (promotionId) {
 };
 
 Usp.marketing.produitForm = function (store, promotionId, rec) {
+    // Type d'UG déduit de l'enregistrement : pourcentage si un taux est présent, sinon nombre.
+    var typeUg = 'TAUX', valeurUg = null;
+    if (rec) {
+        var t = rec.get('tauxUg'), q = rec.get('quantiteUg');
+        if (t != null && t !== '' && Number(t) > 0) { typeUg = 'TAUX'; valeurUg = Number(t); }
+        else if (q != null && q !== '' && Number(q) > 0) { typeUg = 'QUANTITE'; valeurUg = Number(q); }
+    }
+
+    // Recherche d'un article du catalogue : pré-remplit CIP7/CIP13/nom et lie l'article.
+    var articleStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'designation', 'cip', 'codeBarres'], pageSize: 20,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/articles', queryParam: 'q',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
+            reader: { type: 'json', root: 'data', totalProperty: 'total' } }
+    });
+
+    var fld = function (n) { return win.down('form').getForm().findField(n); };
+
     var win = Ext.create('Ext.window.Window', {
-        title: rec ? 'Modifier le produit' : 'Ajouter un produit', width: 520, modal: true, bodyPadding: 12,
-        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 170 }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">CIP7 ou CIP13 obligatoire. L\'avantage UG est ' +
-              'défini <b>soit en pourcentage</b> (Taux UG), <b>soit en nombre</b> (Quantité UG).</span>' },
+        title: rec ? 'Modifier le produit' : 'Ajouter un produit', width: 560, modal: true, bodyPadding: 12,
+        layout: 'fit',
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 180 }, items: [
+            { xtype: 'combobox', fieldLabel: 'Produit du catalogue', name: '_recherche',
+              store: articleStore, queryMode: 'remote', queryParam: 'q', minChars: 2, hideTrigger: true,
+              displayField: 'designation', valueField: 'id', pageSize: 0,
+              emptyText: 'Rechercher un article (désignation, CIP)…',
+              listConfig: { getInnerTpl: function () {
+                  return '{designation} <span style="color:#999">{cip}</span>'; } },
+              listeners: { select: function (cb, r) {
+                  fld('cip7').setValue(r.get('cip') || '');
+                  fld('cip13').setValue(r.get('codeBarres') || '');
+                  fld('nomProduit').setValue(r.get('designation') || '');
+                  fld('articleId').setValue(r.get('id'));
+              } } },
+            { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
+              '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
+            { xtype: 'hidden', name: 'articleId', value: rec ? rec.get('articleId') : null },
             { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
             { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
-            { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale commandée', minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
-            { xtype: 'numberfield', name: 'tauxUg', fieldLabel: 'UG en pourcentage (%)', minValue: 0, value: rec ? rec.get('tauxUg') : null,
-              emptyText: 'ex. 20 pour 20 %' },
-            { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'UG en nombre', minValue: 0, value: rec ? rec.get('quantiteUg') : null,
-              emptyText: 'ex. 20 unités gratuites' },
-            { xtype: 'numberfield', name: 'tauxMaxUg', fieldLabel: 'Taux maximal UG autorisé (%)', minValue: 0, value: rec ? rec.get('tauxMaxUg') : null,
-              emptyText: 'facultatif (issu de l\'import)' },
+            { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale commandée',
+              minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
+            { xtype: 'fieldcontainer', fieldLabel: 'Unité gratuite (UG)', layout: 'hbox',
+              items: [
+                { xtype: 'combobox', name: 'typeUg', width: 150, editable: false, queryMode: 'local',
+                  value: typeUg, valueField: 'v', displayField: 't',
+                  store: { fields: ['v', 't'], data: [
+                      { v: 'TAUX', t: 'Pourcentage (%)' }, { v: 'QUANTITE', t: 'Nombre d\'unités' }] } },
+                { xtype: 'numberfield', name: 'valeurUg', flex: 1, margin: '0 0 0 8', minValue: 0,
+                  allowBlank: false, value: valeurUg, emptyText: 'Valeur de l\'UG' }
+              ] },
             { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: rec ? rec.get('actif') : true }
         ] }],
-        buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
-            var form = b.up('window').down('form').getForm();
-            if (!form.isValid()) { return; }
-            var v = form.getValues();
-            v.actif = form.findField('actif').getValue();
-            Usp.ajax({ url: rec ? '/promotions/' + promotionId + '/produits/' + rec.get('id') : '/promotions/' + promotionId + '/produits',
-                method: rec ? 'PUT' : 'POST', jsonData: v,
-                success: function () { win.close(); store.load(); Usp.toastEnregistre('Produit', !!rec); },
-                failure: function (resp) {
-                    var msg = 'Enregistrement impossible.';
-                    try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
-                    Ext.Msg.alert('Erreur', msg);
-                } });
-        } }]
+        buttons: [
+            { text: 'Annuler', handler: function () { win.close(); } },
+            { text: 'Enregistrer', formBind: true, handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) { return; }
+                var type = form.findField('typeUg').getValue();
+                var valeur = form.findField('valeurUg').getValue();
+                var aid = form.findField('articleId').getValue();
+                var payload = {
+                    articleId: aid ? Number(aid) : null,
+                    cip7: form.findField('cip7').getValue() || null,
+                    cip13: form.findField('cip13').getValue() || null,
+                    nomProduit: form.findField('nomProduit').getValue() || null,
+                    quantiteMinimale: form.findField('quantiteMinimale').getValue(),
+                    modeCalcul: type,
+                    tauxUg: type === 'TAUX' ? valeur : null,
+                    quantiteUg: type === 'QUANTITE' ? valeur : null,
+                    actif: form.findField('actif').getValue()
+                };
+                Usp.ajax({ url: rec ? '/promotions/' + promotionId + '/produits/' + rec.get('id') : '/promotions/' + promotionId + '/produits',
+                    method: rec ? 'PUT' : 'POST', jsonData: payload,
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre('Produit', !!rec); },
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    } });
+            } }
+        ]
     });
     win.show();
 };
