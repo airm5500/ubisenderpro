@@ -62,6 +62,13 @@ public class EnvoiProposeService {
     private DispoProduitService dispoProduitService;
     @EJB
     private DispoXlsxService dispoXlsxService;
+    @EJB
+    private ParametreService parametreService;
+
+    /** Paramètre technique (§12) : autorise le traitement auto des propositions rupture. */
+    public static final String CLE_RUPTURE_SANS_AVIS = "rupture.envoi_sans_avis";
+    /** URL publique de base (pour joindre les pièces jointes en mode auto, hors contexte HTTP). */
+    public static final String CLE_URL_BASE = "app.url_base";
 
     /* ====================== Lecture ====================== */
 
@@ -224,6 +231,59 @@ public class EnvoiProposeService {
                 .setParameter("now", LocalDateTime.now())
                 .setParameter("today", LocalDate.now())
                 .executeUpdate();
+    }
+
+    /* ====================== Traitement automatique (§12) ====================== */
+
+    /** Indique si l'envoi auto des propositions rupture est activé (paramètre technique). */
+    public boolean envoiRuptureSansAvis() {
+        return "true".equalsIgnoreCase(parametreService.valeur(CLE_RUPTURE_SANS_AVIS, "false"));
+    }
+
+    /**
+     * Traite automatiquement les propositions dispo/rupture dues, sans validation
+     * humaine, <b>uniquement si</b> le paramètre {@code rupture.envoi_sans_avis} = true
+     * et que les contrôles métier (§12) passent. Crée la campagne (brouillon) prête
+     * à l'envoi. Reste sans effet par défaut.
+     *
+     * @return nombre de propositions transformées en campagne.
+     */
+    public int traiterPropositionsAuto() {
+        if (!envoiRuptureSansAvis()) { return 0; }
+        String baseUrl = parametreService.valeur(CLE_URL_BASE, "");
+        if (baseUrl == null || baseUrl.trim().isEmpty()) { return 0; } // média non joignable -> on s'abstient
+        int traites = 0;
+        List<EnvoiPropose> props = em.createQuery(
+                "SELECT e FROM EnvoiPropose e WHERE e.statut = 'PROPOSEE' AND e.source = 'DISPO' " +
+                "AND e.datePrevue <= :d ORDER BY e.datePrevue", EnvoiPropose.class)
+                .setParameter("d", LocalDate.now()).getResultList();
+        for (EnvoiPropose e : props) {
+            if (!controlesEnvoiAuto(e)) { continue; }
+            try { valider(e.getId(), null, null, baseUrl); traites++; }
+            catch (Exception ignore) { /* proposition ignorée : un contrôle métier a échoué */ }
+        }
+        return traites;
+    }
+
+    /** Contrôles métier bloquant l'envoi auto (§12). */
+    private boolean controlesEnvoiAuto(EnvoiPropose e) {
+        if (e.getEvenementId() == null) { return false; }
+        DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
+        if (evt == null) { return false; }
+        String st = evt.getStatut();
+        if ("ANNULEE".equals(st) || "ARCHIVEE".equals(st) || "ENVOYEE".equals(st)) { return false; }
+        if (nbProduitsDispoActifs(evt.getId()) == 0) { return false; }          // aucun produit concerné
+        String cle = DispoTemplates.clePourTypeEvenement(evt.getType());
+        if (cle == null || corpsTemplate(cle).isEmpty()) { return false; }       // modèle invalide
+        String corps = messageDispo(evt);
+        if (VARIABLE_RESTANTE.matcher(retirerTokensContact(corps)).find()) { return false; } // variables non résolues
+        return true;
+    }
+
+    private String retirerTokensContact(String corps) {
+        String reste = corps == null ? "" : corps;
+        for (String t : TOKENS_CONTACT) { reste = reste.replace("{{" + t + "}}", ""); }
+        return reste;
     }
 
     /* ====================== Décisions humaines ====================== */

@@ -36,4 +36,10 @@ public class MarketingScheduler {
         envoiProposeService.genererPropositions();
         envoiProposeService.expirerDepassees();
     }
+
+    /** Traitement automatique des propositions rupture (§12) — inactif par défaut. */
+    @Schedule(hour = "*", minute = "*/30", persistent = false)
+    public void tickEnvoiAuto() {
+        envoiProposeService.traiterPropositionsAuto();
+    }
 }
