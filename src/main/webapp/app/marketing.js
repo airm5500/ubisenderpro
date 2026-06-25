@@ -29,8 +29,9 @@ Usp.marketing.reloadAll = function () {
 Usp.marketing.panel = function () {
     Usp.marketing._stores = [];
     return {
-        xtype: 'tabpanel', title: 'Promotions', listeners: Usp.tabListeners,
+        xtype: 'tabpanel', title: 'Marketing', listeners: Usp.tabListeners,
         items: [
+            Usp.marketing.calendrier(),
             Usp.marketing.grille('ACTIVE', '🟢 Actives'),
             Usp.marketing.grille('PROGRAMMEE', '🔵 Programmées'),
             Usp.marketing.grille('INACTIVE', '🔴 Inactives'),
@@ -282,4 +283,152 @@ Usp.marketing.rapportImport = function (r) {
     }
     html += '</div>';
     Ext.Msg.show({ title: 'Rapport d\'import', message: html, buttons: Ext.Msg.OK, width: 460 });
+};
+
+/* =====================================================================
+ * P2 - Calendrier marketing & propositions d'envoi
+ * Les propositions sont générées automatiquement (annonce mensuelle,
+ * lancement, rappels J-7/J-3/J-1) ; aucune ne devient une campagne sans
+ * validation humaine.
+ * ===================================================================== */
+
+Usp.marketing.LIB_TYPE = {
+    ANNONCE_MENSUELLE: '📣 Annonce', LANCEMENT: '🚀 Lancement',
+    RAPPEL_J7: '⏰ Rappel J-7', RAPPEL_J3: '⏰ Rappel J-3', RAPPEL_J1: '⏰ Rappel J-1'
+};
+Usp.marketing.COULEUR_PROP = {
+    PROPOSEE: '#1976d2', VALIDEE: '#2e7d32', REJETEE: '#c62828', EXPIREE: '#777'
+};
+
+Usp.marketing.propStatutRenderer = function (v) {
+    var c = Usp.marketing.COULEUR_PROP[v] || '#333';
+    return '<span style="color:' + c + ';font-weight:bold">' + (v || '') + '</span>';
+};
+
+Usp.marketing.calendrier = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'cle', 'type', 'promotionId', 'titre', 'message', 'datePrevue',
+                 'statut', 'campagneId', 'listeId', 'segmentId', 'motifRejet'],
+        groupField: 'datePrevue',
+        proxy: { type: 'ajax', url: Usp.apiBase + '/propositions',
+            extraParams: { statut: 'PROPOSEE' },
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    Usp.marketing._stores.push(store);
+
+    return {
+        xtype: 'grid', title: '📅 Calendrier', store: store,
+        features: [{ ftype: 'grouping',
+            groupHeaderTpl: 'Échéance : {name:this.fdate} ({rows.length})',
+            startCollapsed: false,
+            fdate: function (v) { return v ? String(v).substring(0, 10) : '(sans date)'; } }],
+        columns: [
+            { text: 'Type', dataIndex: 'type', width: 130,
+              renderer: function (v) { return Usp.marketing.LIB_TYPE[v] || v; } },
+            { text: 'Titre', dataIndex: 'titre', flex: 1 },
+            { text: 'Statut', dataIndex: 'statut', width: 100, renderer: Usp.marketing.propStatutRenderer },
+            { text: 'Lien', dataIndex: 'campagneId', width: 110, align: 'center',
+              renderer: function (v, m, rec) {
+                  if (v) { return '<a class="pm-gocamp" href="#" data-id="' + v + '">→ Campagne</a>'; }
+                  if (rec.get('statut') === 'REJETEE') {
+                      return '<span title="' + Ext.String.htmlEncode(rec.get('motifRejet') || '') + '">motif</span>';
+                  }
+                  return '';
+              } },
+            { text: 'Actions', xtype: 'actioncolumn', width: 150, align: 'center',
+              renderer: function (v, meta, rec) {
+                  if (rec.get('statut') !== 'PROPOSEE') { meta.style = 'color:#bbb'; }
+              },
+              items: [
+                { iconCls: 'x-fa fa-check', tooltip: 'Valider (créer la campagne brouillon)',
+                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
+                  handler: function (g, r, c, i, e, rec) { Usp.marketing.validerProposition(rec, store); } },
+                { iconCls: 'x-fa fa-times', tooltip: 'Rejeter',
+                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
+                  handler: function (g, r, c, i, e, rec) { Usp.marketing.rejeterProposition(rec, store); } },
+                { iconCls: 'x-fa fa-eye', tooltip: 'Voir le message proposé',
+                  handler: function (g, r, c, i, e, rec) {
+                      Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('titre')),
+                          message: '<pre style="white-space:pre-wrap;font-family:inherit">' +
+                                   Ext.String.htmlEncode(rec.get('message') || '') + '</pre>',
+                          buttons: Ext.Msg.OK, width: 460 });
+                  } }
+              ] }
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                var a = e.getTarget('.pm-gocamp');
+                if (a) { e.preventDefault(); Usp.ouvrirVue('campaigns'); }
+            }
+        },
+        tbar: [
+            'Afficher :',
+            { xtype: 'combobox', width: 160, editable: false, queryMode: 'local',
+              value: 'PROPOSEE',
+              store: [['PROPOSEE', 'Proposées'], ['VALIDEE', 'Validées'],
+                      ['REJETEE', 'Rejetées'], ['EXPIREE', 'Expirées'], ['', 'Toutes']],
+              listeners: { change: function (cb, v) {
+                  store.getProxy().setExtraParam('statut', v); store.load();
+              } } },
+            '->',
+            { text: '🔄 Générer maintenant', tooltip: 'Régénère les propositions à partir des promotions',
+              handler: function () {
+                  Usp.ajax({ url: '/propositions/generer', method: 'POST',
+                      success: function (resp) {
+                          var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                          store.load();
+                          Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' +
+                                    (r.expirees || 0) + ' expirée(s).');
+                      },
+                      failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
+              } }
+        ]
+    };
+};
+
+/* Validation : crée une campagne brouillon ; audience facultative choisie ici. */
+Usp.marketing.validerProposition = function (rec, store) {
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Valider — ' + Ext.String.htmlEncode(rec.get('titre')),
+        width: 480, modal: true, bodyPadding: 12, layout: 'fit',
+        items: [{ xtype: 'form', itemId: 'vForm', border: false, defaults: { anchor: '100%', labelWidth: 140 },
+            items: [
+                { xtype: 'displayfield', value: '<span style="color:#888">La proposition deviendra une ' +
+                  '<b>campagne en brouillon</b> (aucun envoi automatique). L\'audience est facultative ' +
+                  'et modifiable ensuite dans le module Campagnes.</span>' },
+                Usp.campaign.combo('/lists', '', 'id', 'nom',
+                    { name: 'listeId', fieldLabel: 'Liste de diffusion', value: rec.get('listeId') }),
+                Usp.campaign.combo('/segments', '', 'id', 'nom',
+                    { name: 'segmentId', fieldLabel: 'Segment dynamique', value: rec.get('segmentId') })
+            ] }],
+        buttons: [
+            { text: 'Annuler', handler: function (b) { b.up('window').close(); } },
+            { text: 'Valider', formBind: false, handler: function (b) {
+                var v = b.up('window').down('#vForm').getForm().getValues();
+                Usp.ajax({ url: '/propositions/' + rec.get('id') + '/valider', method: 'POST',
+                    jsonData: { listeId: v.listeId || null, segmentId: v.segmentId || null },
+                    success: function () {
+                        win.close(); store.load();
+                        Usp.toast('Campagne brouillon créée. Complétez-la dans Campagnes.');
+                    },
+                    failure: function (resp) {
+                        var m = 'Validation impossible.';
+                        try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}
+                        Ext.Msg.alert('Erreur', m);
+                    } });
+            } }
+        ]
+    });
+    win.show();
+};
+
+Usp.marketing.rejeterProposition = function (rec, store) {
+    Ext.Msg.prompt('Rejeter la proposition', 'Motif (facultatif) :', function (btn, txt) {
+        if (btn !== 'ok') { return; }
+        Usp.ajax({ url: '/propositions/' + rec.get('id') + '/rejeter', method: 'POST',
+            jsonData: { motif: txt || null },
+            success: function () { store.load(); Usp.toast('Proposition rejetée.'); },
+            failure: function () { Ext.Msg.alert('Erreur', 'Rejet impossible.'); } });
+    });
 };
