@@ -26,7 +26,7 @@ import java.util.Optional;
 public class EnvoiProposeService {
 
     /** Décalages (en jours avant la date de fin) des rappels générés. */
-    private static final int[] RAPPELS_JOURS = { 7, 3, 1 };
+    private static final int[] RAPPELS_JOURS = { 3, 1 };
     private static final Locale FR = Locale.FRENCH;
 
     @PersistenceContext(unitName = "ubisenderproPU")
