@@ -32,6 +32,16 @@ public class Promotion {
     @Column(name = "actif", nullable = false)
     private boolean actif = true;
 
+    /** PROGRAMMEE | ACTIVE | INACTIVE | ANNULEE | ARCHIVEE (auto sauf ANNULEE/ARCHIVEE). */
+    @Column(name = "statut", length = 20)
+    private String statut;
+
+    @Column(name = "responsable", length = 150)
+    private String responsable;
+
+    @Column(name = "cree_par", length = 100)
+    private String creePar;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -58,6 +68,12 @@ public class Promotion {
     public void setDateFin(LocalDateTime dateFin) { this.dateFin = dateFin; }
     public boolean isActif() { return actif; }
     public void setActif(boolean actif) { this.actif = actif; }
+    public String getStatut() { return statut; }
+    public void setStatut(String statut) { this.statut = statut; }
+    public String getResponsable() { return responsable; }
+    public void setResponsable(String responsable) { this.responsable = responsable; }
+    public String getCreePar() { return creePar; }
+    public void setCreePar(String creePar) { this.creePar = creePar; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
