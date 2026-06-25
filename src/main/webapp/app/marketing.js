@@ -172,10 +172,11 @@ Usp.marketing.produitsGrid = function (promotionId) {
             { text: 'CIP13', dataIndex: 'cip13', width: 120 },
             { text: 'Produit', dataIndex: 'nomProduit', flex: 1 },
             { text: 'Qté min', dataIndex: 'quantiteMinimale', width: 70, align: 'right' },
-            { text: 'Taux UG', dataIndex: 'tauxUg', width: 75, align: 'right' },
-            { text: 'Taux max', dataIndex: 'tauxMaxUg', width: 75, align: 'right' },
-            { text: 'Qté UG', dataIndex: 'quantiteUg', width: 70, align: 'right' },
-            { text: 'Mode', dataIndex: 'modeCalcul', width: 80 },
+            { text: 'UG %', dataIndex: 'tauxUg', width: 70, align: 'right',
+              renderer: function (v) { return (v != null && v !== '') ? v + ' %' : ''; } },
+            { text: 'UG nb', dataIndex: 'quantiteUg', width: 70, align: 'right' },
+            { text: 'Taux max', dataIndex: 'tauxMaxUg', width: 75, align: 'right',
+              renderer: function (v) { return (v != null && v !== '') ? v + ' %' : ''; } },
             { text: 'Lié', dataIndex: 'articleId', width: 50, align: 'center',
               renderer: function (v) { return v ? '✅' : '—'; } },
             { text: 'Actions', width: 80, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
@@ -210,18 +211,18 @@ Usp.marketing.produitForm = function (store, promotionId, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le produit' : 'Ajouter un produit', width: 520, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 170 }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Renseignez au moins le CIP7 ou le CIP13, ' +
-              'et au moins un taux UG ou une quantité UG.</span>' },
+            { xtype: 'displayfield', value: '<span style="color:#888">CIP7 ou CIP13 obligatoire. L\'avantage UG est ' +
+              'défini <b>soit en pourcentage</b> (Taux UG), <b>soit en nombre</b> (Quantité UG).</span>' },
             { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
             { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
-            { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale', minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
-            { xtype: 'numberfield', name: 'tauxUg', fieldLabel: 'Taux UG (%)', minValue: 0, value: rec ? rec.get('tauxUg') : null },
-            { xtype: 'numberfield', name: 'tauxMaxUg', fieldLabel: 'Taux maximal UG (%)', minValue: 0, value: rec ? rec.get('tauxMaxUg') : null },
-            { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'Quantité UG', minValue: 0, value: rec ? rec.get('quantiteUg') : null },
-            { xtype: 'numberfield', name: 'quantiteUgMax', fieldLabel: 'Quantité UG maximale', minValue: 0, value: rec ? rec.get('quantiteUgMax') : null },
-            { xtype: 'combobox', name: 'modeCalcul', fieldLabel: 'Mode de calcul', queryMode: 'local', editable: false,
-              store: ['TAUX', 'QUANTITE', 'MIXTE'], value: rec ? rec.get('modeCalcul') : null, emptyText: 'Déduit automatiquement' },
+            { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale commandée', minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
+            { xtype: 'numberfield', name: 'tauxUg', fieldLabel: 'UG en pourcentage (%)', minValue: 0, value: rec ? rec.get('tauxUg') : null,
+              emptyText: 'ex. 20 pour 20 %' },
+            { xtype: 'numberfield', name: 'quantiteUg', fieldLabel: 'UG en nombre', minValue: 0, value: rec ? rec.get('quantiteUg') : null,
+              emptyText: 'ex. 20 unités gratuites' },
+            { xtype: 'numberfield', name: 'tauxMaxUg', fieldLabel: 'Taux maximal UG autorisé (%)', minValue: 0, value: rec ? rec.get('tauxMaxUg') : null,
+              emptyText: 'facultatif (issu de l\'import)' },
             { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: rec ? rec.get('actif') : true }
         ] }],
         buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {

@@ -1014,7 +1014,7 @@ Usp.ouvrirVue = function (vue) {
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
-        case 'promotions': Usp.loadCenter(Usp.catalogue.promotionsPanel()); break;
+        case 'promotions':
         case 'marketing': Usp.loadCenter(Usp.marketing.panel()); break;
         case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
         case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
