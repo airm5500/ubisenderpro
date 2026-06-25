@@ -1,12 +1,12 @@
 package com.ubisenderpro.config;
 
-import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.security.PasswordHasher;
-import com.ubisenderpro.service.PromoTemplates;
+import com.ubisenderpro.service.ModeleService;
 import org.flywaydb.core.Flyway;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import javax.ejb.EJB;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import javax.ejb.TransactionAttribute;
@@ -14,7 +14,6 @@ import javax.ejb.TransactionAttributeType;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.sql.DataSource;
-import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -34,11 +33,20 @@ public class Bootstrap {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @EJB
+    private ModeleService modeleService;
+
     @PostConstruct
     public void init() {
         runMigrations();
         initAdminPassword();
-        initModelesPromo();
+        // Appel via le proxy EJB -> vraie transaction (REQUIRED) pour la persistance.
+        try {
+            int crees = modeleService.initModelesPromo();
+            if (crees > 0) { LOG.info("UbiSenderPro : " + crees + " modèle(s) promo créé(s)."); }
+        } catch (Exception e) {
+            LOG.warning("Initialisation des modèles promo ignorée : " + e.getMessage());
+        }
     }
 
     private void runMigrations() {
@@ -81,33 +89,6 @@ public class Bootstrap {
             }
         } catch (Exception e) {
             LOG.warning("Initialisation du mot de passe admin ignorée : " + e.getMessage());
-        }
-    }
-
-    /** Crée les 4 modèles de message « promotion » prédéfinis s'ils sont absents. */
-    @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
-    public void initModelesPromo() {
-        for (Map.Entry<String, String> entry : PromoTemplates.CORPS.entrySet()) {
-            String cle = entry.getKey();
-            try {
-                Long n = em.createQuery(
-                        "SELECT COUNT(m) FROM ModeleMessage m WHERE m.cleSysteme = :c", Long.class)
-                        .setParameter("c", cle).getSingleResult();
-                if (n != null && n > 0) { continue; }
-                ModeleMessage m = new ModeleMessage();
-                m.setNom(PromoTemplates.NOMS.get(cle));
-                m.setTypeModele("PROMOTION");
-                m.setCategorie("MARKETING");
-                m.setLangue("fr");
-                m.setCorps(entry.getValue());
-                m.setCleSysteme(cle);
-                m.setStatutApprobation("BROUILLON");
-                m.setActif(true);
-                em.persist(m);
-                LOG.info("UbiSenderPro : modèle promo créé (" + cle + ").");
-            } catch (Exception e) {
-                LOG.warning("Création du modèle promo " + cle + " ignorée : " + e.getMessage());
-            }
         }
     }
 }

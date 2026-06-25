@@ -6,6 +6,7 @@ import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Stateless
@@ -16,6 +17,34 @@ public class ModeleService {
 
     public List<ModeleMessage> lister() {
         return em.createQuery("SELECT m FROM ModeleMessage m ORDER BY m.nom", ModeleMessage.class).getResultList();
+    }
+
+    /**
+     * Crée les modèles de message « promotion » prédéfinis absents (idempotent).
+     * Exécuté dans une vraie transaction EJB (appel via proxy depuis Bootstrap).
+     * @return nombre de modèles créés.
+     */
+    public int initModelesPromo() {
+        int crees = 0;
+        for (Map.Entry<String, String> entry : PromoTemplates.CORPS.entrySet()) {
+            String cle = entry.getKey();
+            Long n = em.createQuery(
+                    "SELECT COUNT(m) FROM ModeleMessage m WHERE m.cleSysteme = :c", Long.class)
+                    .setParameter("c", cle).getSingleResult();
+            if (n != null && n > 0) { continue; }
+            ModeleMessage m = new ModeleMessage();
+            m.setNom(PromoTemplates.NOMS.get(cle));
+            m.setTypeModele("PROMOTION");
+            m.setCategorie("MARKETING");
+            m.setLangue("fr");
+            m.setCorps(entry.getValue());
+            m.setCleSysteme(cle);
+            m.setStatutApprobation("BROUILLON");
+            m.setActif(true);
+            em.persist(m);
+            crees++;
+        }
+        return crees;
     }
 
     public Optional<ModeleMessage> parId(Long id) { return Optional.ofNullable(em.find(ModeleMessage.class, id)); }
