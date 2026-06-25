@@ -27,8 +27,16 @@ public class EnvoiPropose {
     @Column(name = "type", nullable = false, length = 30)
     private String type;
 
+    /** Source de la proposition : PROMO (promotion) | DISPO (événement disponibilité/rupture). */
+    @Column(name = "source", length = 10)
+    private String source = "PROMO";
+
     @Column(name = "promotion_id")
     private Long promotionId;
+
+    /** Événement dispo/rupture source (si source = DISPO). */
+    @Column(name = "evenement_id")
+    private Long evenementId;
 
     @Column(name = "titre", nullable = false, length = 200)
     private String titre;
@@ -73,8 +81,12 @@ public class EnvoiPropose {
     public void setCle(String cle) { this.cle = cle; }
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     public Long getPromotionId() { return promotionId; }
     public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
+    public Long getEvenementId() { return evenementId; }
+    public void setEvenementId(Long evenementId) { this.evenementId = evenementId; }
     public String getTitre() { return titre; }
     public void setTitre(String titre) { this.titre = titre; }
     public String getMessage() { return message; }

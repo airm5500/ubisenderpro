@@ -27,6 +27,9 @@ public class CampagneSenderTx {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @javax.ejb.EJB
+    private VariablesContactService variablesContactService;
+
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
     public void marquerStatut(Long campagneId, String statut) {
         Campagne c = em.find(Campagne.class, campagneId);
@@ -68,7 +71,8 @@ public class CampagneSenderTx {
                 success = false; erreur = "Session WhatsApp Web non définie pour la campagne";
             } else {
                 WaWebClient web = new WaWebClient();
-                String texte = corpsPersonnalise(modele, d);
+                String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
+                String texte = variablesContactService.personnaliser(corps, d.getNumeroWhatsapp(), d.getNomContact());
                 String mediaType = nz(modele.getEnteteMediaType());
                 String mediaUrl = nz(modele.getEnteteMediaUrl());
                 WaWebClient.SendResult res;
@@ -109,27 +113,6 @@ public class CampagneSenderTx {
         }
         em.merge(d);
         if (c != null) em.merge(c);
-    }
-
-    /**
-     * Corps du modèle personnalisé pour un destinataire (canal WEB).
-     * Remplace {{1}} et {{nom_contact}} par le nom du contact, replie une
-     * formule de politesse dont le nom est absent (« Cher(e) client(e) {{nom_contact}}, »
-     * -> « Cher(e) client(e), ») et garantit qu'aucune variable {{...}} brute ne subsiste.
-     */
-    private String corpsPersonnalise(ModeleMessage modele, CampagneDestinataire d) {
-        String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
-        if (corps == null) { return ""; }
-        String nom = d.getNomContact() == null ? "" : d.getNomContact().trim();
-        corps = corps.replace("{{1}}", nom);
-        if (nom.isEmpty()) {
-            corps = corps.replace(" {{nom_contact}}", "").replace("{{nom_contact}}", "");
-        } else {
-            corps = corps.replace("{{nom_contact}}", nom);
-        }
-        // Filet de sécurité : aucune variable {{...}} ne doit apparaître au destinataire.
-        corps = corps.replaceAll("\\{\\{[^}]+\\}\\}", "");
-        return corps.replaceAll("[ \\t]{2,}", " ");
     }
 
     private String nz(String s) { return s == null ? "" : s; }

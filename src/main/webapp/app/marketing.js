@@ -362,8 +362,13 @@ Usp.marketing.rapportImport = function (r) {
 
 Usp.marketing.LIB_TYPE = {
     ANNONCE_MENSUELLE: '📣 Annonce', LANCEMENT: '🚀 Lancement',
-    RAPPEL_J7: '⏰ Rappel J-7', RAPPEL_J3: '⏰ Rappel J-3', RAPPEL_J1: '⏰ Rappel J-1'
+    RAPPEL_J7: '⏰ Rappel J-7', RAPPEL_J3: '⏰ Rappel J-3', RAPPEL_J1: '⏰ Rappel J-1',
+    // Types issus du module Disponibilités & Ruptures.
+    ANNONCE_DISPONIBILITE: '🟢 Disponibilité', RETOUR_RUPTURE: '🔵 Retour de rupture',
+    RISQUE_RUPTURE: '🟠 Risque de rupture', RUPTURE_CONFIRMEE: '🔴 Rupture confirmée',
+    STOCK_LIMITE: '🟡 Stock limité'
 };
+Usp.marketing.LIB_SOURCE = { PROMO: '🏷️ Promo', DISPO: '📦 Dispo' };
 Usp.marketing.COULEUR_PROP = {
     PROPOSEE: '#1976d2', VALIDEE: '#2e7d32', REJETEE: '#c62828', EXPIREE: '#777'
 };
@@ -526,14 +531,23 @@ Usp.marketing.campagnesPromo = function () {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'nom', 'statut', 'canal', 'categorie', 'nbDestinataires',
                  'nbEnvoyes', 'nbDistribues', 'nbLus', 'nbEchoues'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns', extraParams: { categorie: 'PROMOTION' },
+        proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true
+        autoLoad: true,
+        // Campagnes marketing : issues des promotions ou des disponibilités/ruptures.
+        filters: [{ filterFn: function (rec) {
+            var c = String(rec.get('categorie') || '').toUpperCase();
+            return c === 'PROMOTION' || c === 'DISPONIBILITE'; } }]
     });
+    var libCat = function (v) {
+        var c = String(v || '').toUpperCase();
+        return c === 'DISPONIBILITE' ? '📦 Dispo' : (c === 'PROMOTION' ? '🏷️ Promo' : (v || ''));
+    };
     return {
-        xtype: 'grid', title: '🚀 Campagnes promo', store: store,
+        xtype: 'grid', title: '🚀 Campagnes', store: store,
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Source', dataIndex: 'categorie', width: 90, renderer: libCat },
             { text: 'Canal', dataIndex: 'canal', width: 70, renderer: function (v) { return v === 'WEB' ? 'WA Web' : 'API'; } },
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.campaign.statutRenderer },
             { text: 'Destinataires', dataIndex: 'nbDestinataires', width: 100, align: 'right' },
@@ -554,7 +568,7 @@ Usp.marketing.campagnesPromo = function () {
 
 Usp.marketing.propositions = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'cle', 'type', 'promotionId', 'titre', 'message', 'datePrevue',
+        fields: ['id', 'cle', 'type', 'source', 'promotionId', 'evenementId', 'titre', 'message', 'datePrevue',
                  'statut', 'campagneId', 'listeId', 'segmentId', 'motifRejet'],
         groupField: 'datePrevue',
         proxy: { type: 'ajax', url: Usp.apiBase + '/propositions',
@@ -571,7 +585,9 @@ Usp.marketing.propositions = function () {
             startCollapsed: false,
             fdate: function (v) { return v ? String(v).substring(0, 10) : '(sans date)'; } }],
         columns: [
-            { text: 'Type', dataIndex: 'type', width: 130,
+            { text: 'Source', dataIndex: 'source', width: 90,
+              renderer: function (v) { return Usp.marketing.LIB_SOURCE[v] || v || '🏷️ Promo'; } },
+            { text: 'Type', dataIndex: 'type', width: 140,
               renderer: function (v) { return Usp.marketing.LIB_TYPE[v] || v; } },
             { text: 'Titre', dataIndex: 'titre', flex: 1 },
             { text: 'Statut', dataIndex: 'statut', width: 100, renderer: Usp.marketing.propStatutRenderer },

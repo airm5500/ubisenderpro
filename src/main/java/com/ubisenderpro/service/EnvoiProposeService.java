@@ -1,6 +1,8 @@
 package com.ubisenderpro.service;
 
 import com.ubisenderpro.entity.Campagne;
+import com.ubisenderpro.entity.DispoEvenement;
+import com.ubisenderpro.entity.DispoProduit;
 import com.ubisenderpro.entity.EnvoiPropose;
 import com.ubisenderpro.entity.MediaFichier;
 import com.ubisenderpro.entity.ModeleMessage;
@@ -54,6 +56,12 @@ public class EnvoiProposeService {
     private MediaFichierService mediaFichierService;
     @EJB
     private ModeleService modeleService;
+    @EJB
+    private DispoEvenementService dispoEvenementService;
+    @EJB
+    private DispoProduitService dispoProduitService;
+    @EJB
+    private DispoXlsxService dispoXlsxService;
 
     /* ====================== Lecture ====================== */
 
@@ -118,6 +126,24 @@ public class EnvoiProposeService {
                 }
             }
         }
+
+        // 3) Événements de disponibilité / rupture actifs avec au moins un produit.
+        crees += genererPropositionsDispo(today);
+        return crees;
+    }
+
+    /** Une proposition par événement dispo/rupture actif comportant des produits. */
+    private int genererPropositionsDispo(LocalDate today) {
+        int crees = 0;
+        for (DispoEvenement e : dispoEvenementService.lister()) {
+            String st = e.getStatut();
+            if ("ENVOYEE".equals(st) || "ANNULEE".equals(st) || "ARCHIVEE".equals(st)) { continue; }
+            if (nbProduitsDispoActifs(e.getId()) == 0) { continue; }
+            LocalDate prevue = e.getDateDebut() != null ? e.getDateDebut().toLocalDate() : today;
+            if (prevue.isBefore(today)) { prevue = today; }
+            crees += upsertSource("DISPO:" + e.getId(), e.getType(), "DISPO", null, e.getId(), prevue,
+                    e.getTitre(), messageDispo(e));
+        }
         return crees;
     }
 
@@ -160,6 +186,11 @@ public class EnvoiProposeService {
      */
     private int upsert(String cle, String type, Long promotionId, LocalDate datePrevue,
                        String titre, String message) {
+        return upsertSource(cle, type, "PROMO", promotionId, null, datePrevue, titre, message);
+    }
+
+    private int upsertSource(String cle, String type, String source, Long promotionId, Long evenementId,
+                             LocalDate datePrevue, String titre, String message) {
         Optional<EnvoiPropose> ex = parCle(cle);
         if (ex.isPresent()) {
             EnvoiPropose e = ex.get();
@@ -174,7 +205,9 @@ public class EnvoiProposeService {
         EnvoiPropose e = new EnvoiPropose();
         e.setCle(cle);
         e.setType(type);
+        e.setSource(source);
         e.setPromotionId(promotionId);
+        e.setEvenementId(evenementId);
         e.setDatePrevue(datePrevue);
         e.setTitre(titre);
         e.setMessage(message);
@@ -214,7 +247,27 @@ public class EnvoiProposeService {
 
         String corps;
         ModeleMessage modele;
-        if (p != null) {
+        String categorie = "PROMOTION";
+        String objectif = "Promotion";
+        if (e.getEvenementId() != null) {
+            DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
+            if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
+            List<String> manquants = elementsDispoManquants(evt);
+            if (!manquants.isEmpty()) {
+                throw new ValidationException("variables",
+                        "Validation impossible — éléments manquants : " + String.join(", ", manquants)
+                                + ". Complétez l'événement puis réessayez.");
+            }
+            corps = messageDispo(evt);
+            verifierResidu(corps);
+            // Bulletin .xlsx des produits de l'événement, attaché en en-tête document.
+            byte[] xlsx = dispoXlsxService.genererBulletin(evt.getId());
+            String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
+                    xlsx, DispoXlsxService.MIME, bulletinNom(evt)).getId());
+            modele = creerModele(e.getTitre(), corps, "document", url, nz(evt.getType()).isEmpty() ? "DISPONIBILITE" : evt.getType());
+            categorie = "DISPONIBILITE";
+            objectif = "Disponibilité / Rupture";
+        } else if (p != null) {
             // Contrôle anti-variable-vide : on bloque la validation tant qu'un
             // élément indispensable au message / à la pièce jointe manque.
             List<String> manquants = elementsManquants(p);
@@ -258,8 +311,8 @@ public class EnvoiProposeService {
         Campagne c = new Campagne();
         c.setNom(e.getTitre());
         c.setDescription(corps);
-        c.setObjectif("Promotion");
-        c.setCategorie("PROMOTION");
+        c.setObjectif(objectif);
+        c.setCategorie(categorie);
         c.setStatut("BROUILLON");
         // Messages riches (texte libre + emojis + pièce jointe) : canal WhatsApp Web
         // par défaut ; l'opérateur peut basculer sur Cloud API avant l'envoi.
@@ -282,9 +335,13 @@ public class EnvoiProposeService {
 
     /** Crée un modèle de message dédié (brouillon) rattaché à la campagne validée. */
     private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl) {
+        return creerModele(titre, corps, mediaType, mediaUrl, "PROMOTION");
+    }
+
+    private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl, String typeModele) {
         ModeleMessage m = new ModeleMessage();
         m.setNom(tronquer(titre, 150));
-        m.setTypeModele("PROMOTION");
+        m.setTypeModele(typeModele);
         m.setCategorie("MARKETING");
         m.setLangue("fr");
         m.setCorps(corps);
@@ -295,6 +352,89 @@ public class EnvoiProposeService {
         m.setStatutApprobation("BROUILLON");
         m.setActif(true);
         return modeleService.creer(m);
+    }
+
+    /* ====================== Disponibilités / Ruptures ====================== */
+
+    private int nbProduitsDispoActifs(Long evenementId) {
+        int n = 0;
+        for (DispoProduit pp : dispoProduitService.lister(evenementId)) { if (pp.isActif()) { n++; } }
+        return n;
+    }
+
+    private List<String> elementsDispoManquants(DispoEvenement evt) {
+        List<String> m = new ArrayList<>();
+        if (nz(evt.getTitre()).isEmpty()) { m.add("titre de l'événement"); }
+        if (nbProduitsDispoActifs(evt.getId()) == 0) { m.add("au moins un produit actif"); }
+        return m;
+    }
+
+    /** Message d'un événement dispo : texte du modèle (par type) + variables de contexte,
+     *  lignes à variable facultative vide supprimées ; {{nom_contact}}/{{segmentation}} conservés. */
+    private String messageDispo(DispoEvenement evt) {
+        String cle = DispoTemplates.clePourTypeEvenement(evt.getType());
+        String corps = corpsTemplate(cle);
+        Map<String, String> v = variablesDispo(evt);
+        corps = retirerLignesVides(corps, v);
+        return ModeleService.fusionner(corps, v);
+    }
+
+    private Map<String, String> variablesDispo(DispoEvenement evt) {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put("societe", nz(evt.getSociete()));
+        v.put("agence", nz(evt.getAgence()));
+        v.put("liste_produits", listeProduits(evt.getId()));
+        v.put("nombre_produits", String.valueOf(nbProduitsDispoActifs(evt.getId())));
+        v.put("date_bulletin", LocalDate.now().format(DF));
+        v.put("date_retour", fdate(evt.getDateFin()));
+        v.put("date_limite_reservation", fdate(evt.getDateFin()));
+        v.put("lien_reservation", premierLienReservation(evt.getId()));
+        return v;
+    }
+
+    /** Liste lisible des produits d'un événement (nom + péremption). */
+    private String listeProduits(Long evenementId) {
+        StringBuilder sb = new StringBuilder();
+        for (DispoProduit p : dispoProduitService.lister(evenementId)) {
+            if (!p.isActif()) { continue; }
+            if (sb.length() > 0) { sb.append('\n'); }
+            sb.append("✅ ").append(nz(p.getNomProduit()).isEmpty() ? nz(p.getCip7()) : p.getNomProduit());
+            if (p.getDatePeremption() != null) {
+                sb.append("\n   Péremption : ").append(p.getDatePeremption()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("MM/yyyy")));
+            }
+        }
+        return sb.toString();
+    }
+
+    private String premierLienReservation(Long evenementId) {
+        for (DispoProduit p : dispoProduitService.lister(evenementId)) {
+            if (p.isActif() && p.getLienReservation() != null && !p.getLienReservation().trim().isEmpty()) {
+                return p.getLienReservation().trim();
+            }
+        }
+        return "";
+    }
+
+    private String bulletinNom(DispoEvenement evt) {
+        String j = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "Bulletin_" + slug(nz(evt.getType()).isEmpty() ? "Dispo" : evt.getType()) + "_" + j + ".xlsx";
+    }
+
+    /** Supprime les lignes contenant une variable de contexte vide (spec §14). */
+    private String retirerLignesVides(String corps, Map<String, String> vars) {
+        if (corps == null) { return ""; }
+        StringBuilder sb = new StringBuilder();
+        for (String ligne : corps.split("\n", -1)) {
+            boolean drop = false;
+            for (Map.Entry<String, String> e : vars.entrySet()) {
+                if ((e.getValue() == null || e.getValue().isEmpty()) && ligne.contains("{{" + e.getKey() + "}}")) {
+                    drop = true; break;
+                }
+            }
+            if (!drop) { sb.append(ligne).append('\n'); }
+        }
+        return sb.toString().replaceAll("\n{3,}", "\n\n").trim();
     }
 
     /** Variables d'une promotion ({{nom_promotion}}, {{taux_ug_max}}, etc.).
@@ -416,11 +556,17 @@ public class EnvoiProposeService {
         return dp.withDayOfMonth(1);
     }
 
+    /** Variables résolues par destinataire à l'envoi (à ignorer dans le contrôle anti-résidu). */
+    private static final String[] TOKENS_CONTACT = {
+        "nom_contact", "segmentation", "nom_compte", "societe_client", "ville", "region", "email", "telephone"
+    };
+
     private void verifierResidu(String corps) {
-        String reste = corps == null ? "" : corps.replace("{{nom_contact}}", "");
+        String reste = corps == null ? "" : corps;
+        for (String t : TOKENS_CONTACT) { reste = reste.replace("{{" + t + "}}", ""); }
         if (VARIABLE_RESTANTE.matcher(reste).find()) {
             throw new ValidationException("variables",
-                    "Le message contient des variables non remplies. Vérifiez la promotion.");
+                    "Le message contient des variables non remplies. Vérifiez la source (promotion / événement).");
         }
     }
 
@@ -472,7 +618,9 @@ public class EnvoiProposeService {
                     .setParameter("c", cleSysteme).setMaxResults(1).getResultList();
             if (!l.isEmpty() && l.get(0).getCorps() != null) { return l.get(0).getCorps(); }
         }
-        return PromoTemplates.CORPS.getOrDefault(cleSysteme, "");
+        String def = PromoTemplates.CORPS.get(cleSysteme);
+        if (def == null) { def = DispoTemplates.CORPS.get(cleSysteme); }
+        return def == null ? "" : def;
     }
 
     private String messageLancement(Promotion p) {
