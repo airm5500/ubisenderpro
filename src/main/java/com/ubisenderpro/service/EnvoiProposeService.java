@@ -2,6 +2,8 @@ package com.ubisenderpro.service;
 
 import com.ubisenderpro.entity.Campagne;
 import com.ubisenderpro.entity.EnvoiPropose;
+import com.ubisenderpro.entity.MediaFichier;
+import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.entity.Promotion;
 
 import javax.ejb.EJB;
@@ -10,16 +12,20 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Calendrier marketing : génère des <b>propositions d'envoi</b> à partir des
- * promotions (annonce mensuelle, lancement, rappels J-7 / J-3 / J-1) et gère
- * leur cycle de vie. Aucune proposition ne devient une campagne sans validation
+ * promotions (annonce mensuelle, lancement, rappels J-3 / J-1) et gère leur
+ * cycle de vie. Aucune proposition ne devient une campagne sans validation
  * humaine ({@link #valider}).
  */
 @Stateless
@@ -28,6 +34,9 @@ public class EnvoiProposeService {
     /** Décalages (en jours avant la date de fin) des rappels générés. */
     private static final int[] RAPPELS_JOURS = { 3, 1 };
     private static final Locale FR = Locale.FRENCH;
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    /** Détecte une variable {{...}} non remplie (filet de sécurité anti-variable-vide). */
+    private static final Pattern VARIABLE_RESTANTE = Pattern.compile("\\{\\{[^}]+\\}\\}");
 
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
@@ -36,6 +45,14 @@ public class EnvoiProposeService {
     private PromotionService promotionService;
     @EJB
     private CampagneService campagneService;
+    @EJB
+    private PromotionProduitService promotionProduitService;
+    @EJB
+    private PromotionXlsxService xlsxService;
+    @EJB
+    private MediaFichierService mediaFichierService;
+    @EJB
+    private ModeleService modeleService;
 
     /* ====================== Lecture ====================== */
 
@@ -89,7 +106,7 @@ public class EnvoiProposeService {
                 }
             }
 
-            // Rappels avant la fin : J-7, J-3, J-1 (uniquement si encore à venir).
+            // Rappels avant la fin : J-3, J-1 (uniquement si encore à venir).
             if (p.getDateFin() != null) {
                 LocalDate fin = p.getDateFin().toLocalDate();
                 for (int j : RAPPELS_JOURS) {
@@ -181,20 +198,51 @@ public class EnvoiProposeService {
      * @param listeId   audience facultative (liste de diffusion) choisie à la validation
      * @param segmentId audience facultative (segment) choisie à la validation
      */
-    public EnvoiPropose valider(Long id, Long listeId, Long segmentId) {
+    public EnvoiPropose valider(Long id, Long listeId, Long segmentId, String baseUrl) {
         EnvoiPropose e = em.find(EnvoiPropose.class, id);
         if (e == null) { throw new IllegalArgumentException("Proposition introuvable"); }
         if (!"PROPOSEE".equals(e.getStatut())) {
             throw new ValidationException("statut",
                     "Seule une proposition au statut « PROPOSEE » peut être validée.");
         }
+
+        Promotion p = e.getPromotionId() != null ? em.find(Promotion.class, e.getPromotionId()) : null;
+
+        String corps;
+        ModeleMessage modele;
+        if (p != null) {
+            // Contrôle anti-variable-vide : on bloque la validation tant qu'un
+            // élément indispensable au message / à la pièce jointe manque.
+            List<String> manquants = elementsManquants(p);
+            if (!manquants.isEmpty()) {
+                throw new ValidationException("variables",
+                        "Validation impossible — éléments manquants : " + String.join(", ", manquants)
+                                + ". Complétez la promotion puis réessayez.");
+            }
+            corps = construireMessage(e, p);
+            if (VARIABLE_RESTANTE.matcher(corps).find()) {
+                throw new ValidationException("variables",
+                        "Le message contient des variables non remplies. Vérifiez la promotion.");
+            }
+            // Pièce jointe .xlsx (liste des produits) hébergée puis attachée en en-tête document.
+            byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
+            MediaFichier mf = mediaFichierService.enregistrer(
+                    xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx");
+            String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "media/" + mf.getId();
+            modele = creerModele(e.getTitre(), corps, "document", url);
+        } else {
+            corps = e.getMessage();
+            modele = creerModele(e.getTitre(), corps, null, null);
+        }
+
         Campagne c = new Campagne();
         c.setNom(e.getTitre());
-        c.setDescription(e.getMessage());
+        c.setDescription(corps);
         c.setObjectif("Promotion");
         c.setCategorie("PROMOTION");
         c.setStatut("BROUILLON");
         c.setCanal("API");
+        c.setModeleId(modele.getId());
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
         if (listeId != null) { c.setListeId(listeId); }
@@ -208,6 +256,68 @@ public class EnvoiProposeService {
         e.setListeId(c.getListeId());
         e.setSegmentId(c.getSegmentId());
         return em.merge(e);
+    }
+
+    /** Crée un modèle de message dédié (brouillon) rattaché à la campagne validée. */
+    private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl) {
+        ModeleMessage m = new ModeleMessage();
+        m.setNom(tronquer(titre, 150));
+        m.setTypeModele("PROMOTION");
+        m.setCategorie("MARKETING");
+        m.setLangue("fr");
+        m.setCorps(corps);
+        if (mediaType != null) {
+            m.setEnteteMediaType(mediaType);
+            m.setEnteteMediaUrl(mediaUrl);
+        }
+        m.setStatutApprobation("BROUILLON");
+        m.setActif(true);
+        return modeleService.creer(m);
+    }
+
+    /** Variables de promotion disponibles dans les messages ({{nom_promo}}, etc.). */
+    private Map<String, String> variablesPromo(Promotion p) {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put("nom_promo", nz(p.getNom()));
+        v.put("date_debut", fdate(p.getDateDebut()));
+        v.put("date_fin", fdate(p.getDateFin()));
+        v.put("responsable", nz(p.getResponsable()));
+        v.put("nb_produits", String.valueOf(nbProduitsActifs(p.getId())));
+        return v;
+    }
+
+    /** Éléments indispensables manquants (libellés lisibles pour l'opérateur). */
+    private List<String> elementsManquants(Promotion p) {
+        List<String> m = new ArrayList<>();
+        if (nz(p.getNom()).isEmpty()) { m.add("nom de la promotion"); }
+        if (nbProduitsActifs(p.getId()) == 0) { m.add("au moins un produit actif"); }
+        return m;
+    }
+
+    private int nbProduitsActifs(Long promotionId) {
+        int n = 0;
+        for (com.ubisenderpro.entity.PromotionProduit pp : promotionProduitService.lister(promotionId)) {
+            if (pp.isActif()) { n++; }
+        }
+        return n;
+    }
+
+    private String fdate(LocalDateTime d) { return d == null ? "" : d.toLocalDate().format(DF); }
+    private String nz(String s) { return s == null ? "" : s.trim(); }
+
+    private String tronquer(String s, int max) {
+        if (s == null) { return null; }
+        return s.length() <= max ? s : s.substring(0, max);
+    }
+
+    /** Nom de fichier sûr à partir du nom de la promotion. */
+    private String slug(String s) {
+        if (s == null || s.trim().isEmpty()) { return "produits"; }
+        String t = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replaceAll("[^A-Za-z0-9]+", "-")
+                .replaceAll("(^-+|-+$)", "");
+        return t.isEmpty() ? "produits" : t;
     }
 
     public EnvoiPropose rejeter(Long id, String motif) {
@@ -224,15 +334,45 @@ public class EnvoiProposeService {
 
     /* ====================== Messages suggérés ====================== */
 
+    /** Modèle de texte d'un lancement (avec variables {{...}}). */
+    private String templateLancement(Promotion p) {
+        return "Bonne nouvelle ! La promotion « {{nom_promo}} » démarre"
+                + (p.getDateFin() != null ? " et se termine le {{date_fin}}" : "")
+                + ". Profitez-en dès maintenant ({{nb_produits}} produit(s) concerné(s)).";
+    }
+
+    /** Modèle de texte d'un rappel ({{quand}} = « demain » ou « dans N jours »). */
+    private String templateRappel() {
+        return "Dernière ligne droite : la promotion « {{nom_promo}} » se termine {{quand}} "
+                + "(le {{date_fin}}). Ne passez pas à côté !";
+    }
+
     private String messageLancement(Promotion p) {
-        return "Bonne nouvelle ! La promotion « " + p.getNom() + " » démarre"
-                + (p.getDateFin() != null ? " et se termine le " + p.getDateFin().toLocalDate() : "")
-                + ". Profitez-en dès maintenant.";
+        return ModeleService.fusionner(templateLancement(p), variablesPromo(p));
     }
 
     private String messageRappel(Promotion p, int joursAvant, LocalDate fin) {
-        String quand = joursAvant == 1 ? "demain" : "dans " + joursAvant + " jours";
-        return "Dernière ligne droite : la promotion « " + p.getNom() + " » se termine "
-                + quand + " (le " + fin + "). Ne passez pas à côté !";
+        Map<String, String> vars = variablesPromo(p);
+        vars.put("quand", joursAvant == 1 ? "demain" : "dans " + joursAvant + " jours");
+        return ModeleService.fusionner(templateRappel(), vars);
+    }
+
+    /** Reconstruit le message d'une proposition à partir de la promotion (à la validation). */
+    private String construireMessage(EnvoiPropose e, Promotion p) {
+        String type = e.getType();
+        if ("LANCEMENT".equals(type)) {
+            return messageLancement(p);
+        }
+        if (type != null && type.startsWith("RAPPEL_J")) {
+            int j = joursRappel(type);
+            return messageRappel(p, j, p.getDateFin() != null ? p.getDateFin().toLocalDate() : null);
+        }
+        // Autres types (ex. annonce) : message déjà construit lors de la génération.
+        return e.getMessage();
+    }
+
+    private int joursRappel(String type) {
+        try { return Integer.parseInt(type.substring("RAPPEL_J".length())); }
+        catch (Exception ex) { return 1; }
     }
 }

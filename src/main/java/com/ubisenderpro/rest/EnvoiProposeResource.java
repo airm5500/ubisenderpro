@@ -6,8 +6,10 @@ import com.ubisenderpro.service.EnvoiProposeService;
 
 import javax.ejb.EJB;
 import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import java.util.List;
 import java.util.Map;
 
@@ -43,11 +45,11 @@ public class EnvoiProposeResource {
     @POST
     @Path("/{id}/valider")
     @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
-    public Response valider(@PathParam("id") Long id, Map<String, Object> body) {
+    public Response valider(@PathParam("id") Long id, Map<String, Object> body, @Context UriInfo uriInfo) {
         try {
             Long listeId = nombre(body, "listeId");
             Long segmentId = nombre(body, "segmentId");
-            EnvoiPropose e = service.valider(id, listeId, segmentId);
+            EnvoiPropose e = service.valider(id, listeId, segmentId, uriInfo.getBaseUri().toString());
             return Response.ok(e).build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", ex.getMessage())).build();
