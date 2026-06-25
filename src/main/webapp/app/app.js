@@ -731,7 +731,7 @@ Usp.clientForm = function (store, rec) {
 /* ---------- Contacts d'un client ---------- */
 Usp.contactsWindow = function (clientId, nomCompte) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nomComplet', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
+        fields: ['id', 'nomComplet', 'civilite', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
                  'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
@@ -763,6 +763,8 @@ Usp.contactForm = function (clientId, store, rec) {
             xtype: 'form', border: false, defaults: { anchor: '100%' },
             items: [
                 { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
+                { xtype: 'combobox', name: 'civilite', fieldLabel: 'Civilité', queryMode: 'local',
+                  emptyText: 'Aucune (formule générique)', store: ['Dr', 'Pr', 'M.', 'Mme', 'Mlle'] },
                 { xtype: 'textfield', name: 'fonction', fieldLabel: 'Fonction' },
                 { xtype: 'textfield', name: 'telephonePrincipal', fieldLabel: 'Téléphone' },
                 { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',

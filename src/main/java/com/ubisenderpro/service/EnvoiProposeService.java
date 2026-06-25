@@ -558,7 +558,7 @@ public class EnvoiProposeService {
 
     /** Variables résolues par destinataire à l'envoi (à ignorer dans le contrôle anti-résidu). */
     private static final String[] TOKENS_CONTACT = {
-        "nom_contact", "segmentation", "nom_compte", "societe_client", "ville", "region", "email", "telephone"
+        "nom_contact", "civilite", "segmentation", "nom_compte", "societe_client", "ville", "region", "email", "telephone"
     };
 
     private void verifierResidu(String corps) {

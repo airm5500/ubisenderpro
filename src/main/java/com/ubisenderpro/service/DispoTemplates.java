@@ -54,7 +54,7 @@ public final class DispoTemplates {
         CORPS.put(CLE_RETOUR_RUPTURE,
                 "📢🚨 UBI INFO — RETOUR DE RUPTURE 🚨📢\n\n"
                 + "🌟 Bonne nouvelle ! 🌟\n\n"
-                + "Bonjour Docteur {{nom_contact}},\n\n"
+                + "Bonjour {{civilite}} {{nom_contact}},\n\n"
                 + "En votre qualité de client {{segmentation}} de {{societe}}, nous avons le plaisir de vous informer du retour en stock des produits suivants :\n\n"
                 + "{{liste_produits}}\n\n"
                 + "⚠️ Attention : les quantités disponibles sont limitées.\n\n"
@@ -66,7 +66,7 @@ public final class DispoTemplates {
 
         CORPS.put(CLE_RISQUE_RUPTURE,
                 "📢🚨 UBI ALERTE — RISQUE DE RUPTURE PRODUITS 🚨📢\n\n"
-                + "Bonjour Docteur {{nom_contact}},\n\n"
+                + "Bonjour {{civilite}} {{nom_contact}},\n\n"
                 + "En votre qualité de client {{segmentation}} de {{societe}}, nous vous invitons à consulter le bulletin d'information sur les produits présentant un risque de rupture au {{date_bulletin}}.\n\n"
                 + "📄 Le document joint contient la liste des produits concernés et les informations utiles pour anticiper vos besoins.\n\n"
                 + "Nous vous recommandons d'évaluer votre stock et de préparer vos commandes dans les meilleurs délais.\n\n"

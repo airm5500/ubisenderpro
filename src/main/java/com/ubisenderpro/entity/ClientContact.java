@@ -17,6 +17,10 @@ public class ClientContact {
     @Column(name = "nom_complet", nullable = false)
     private String nomComplet;
 
+    /** Civilité / titre (Dr, Pr, M., Mme…) pour les formules de politesse. */
+    @Column(name = "civilite", length = 40)
+    private String civilite;
+
     @Column(name = "fonction", length = 150)
     private String fonction;
 
@@ -81,6 +85,8 @@ public class ClientContact {
     public void setClientId(Long clientId) { this.clientId = clientId; }
     public String getNomComplet() { return nomComplet; }
     public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
+    public String getCivilite() { return civilite; }
+    public void setCivilite(String civilite) { this.civilite = civilite; }
     public String getFonction() { return fonction; }
     public void setFonction(String fonction) { this.fonction = fonction; }
     public String getTelephonePrincipal() { return telephonePrincipal; }
