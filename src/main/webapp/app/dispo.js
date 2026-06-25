@@ -61,9 +61,98 @@ Usp.dispo.panel = function () {
             Usp.dispo.grille({ type: 'RISQUE_RUPTURE' }, '🟠 Risques de rupture'),
             Usp.dispo.grille({ type: 'RUPTURE_CONFIRMEE' }, '🔴 Ruptures confirmées'),
             Usp.dispo.grille({ statut: 'PROGRAMMEE' }, '📅 Annonces programmées'),
-            Usp.dispo.grille({ historique: true }, '🗂️ Historique')
+            Usp.dispo.grille({ historique: true }, '🗂️ Historique'),
+            Usp.dispo.regles()
         ]
     };
+};
+
+/* Onglet « Règles (risque) » : programmation configurable du risque de rupture (§11). */
+Usp.dispo.regles = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle', 'type', 'jourMois', 'heure', 'audience', 'canal', 'actif'],
+        autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/dispo-regles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var audienceLib = function (v) {
+        var m = Ext.Array.findBy(Usp.dispo.AUDIENCES, function (a) { return a[0] === v; });
+        return m ? m[1] : (v || '');
+    };
+    return {
+        xtype: 'grid', title: '⚙️ Règles (risque)', store: store,
+        columns: [
+            { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+            { text: 'Jour du mois', dataIndex: 'jourMois', width: 100, align: 'right' },
+            { text: 'Heure', dataIndex: 'heure', width: 70, align: 'right', renderer: function (v) { return v + ' h'; } },
+            { text: 'Audience', dataIndex: 'audience', width: 200, renderer: audienceLib },
+            { text: 'Canal', dataIndex: 'canal', width: 80, renderer: function (v) { return v === 'API' ? 'API' : 'WA Web'; } },
+            { text: 'Active', dataIndex: 'actif', width: 70, renderer: function (v) { return v ? '✅' : '—'; } },
+            { text: 'Actions', width: 90, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="dr-edit" title="Modifier" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                      '<span class="dr-del" title="Supprimer" style="cursor:pointer;margin:0 4px;color:#c62828">🗑️</span>';
+              } }
+        ],
+        tbar: [
+            { text: '➕ Nouvelle règle', handler: function () { Usp.dispo.regleForm(store, null); } },
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } },
+            '->',
+            { xtype: 'tbtext', text: '<span style="color:#888">Le risque de rupture est proposé selon ces règles (jour du mois + audience).</span>' }
+        ],
+        listeners: {
+            itemdblclick: function (g, rec) { Usp.dispo.regleForm(store, rec); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.dr-edit')) { Usp.dispo.regleForm(store, rec); }
+                else if (e.getTarget('.dr-del')) {
+                    Ext.Msg.confirm('Supprimer', 'Supprimer la règle « ' + Ext.String.htmlEncode(rec.get('libelle')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/dispo-regles/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Règle supprimée.'); },
+                                failure: function () { Ext.Msg.alert('Erreur', 'Suppression impossible.'); } });
+                        });
+                }
+            }
+        }
+    };
+};
+
+Usp.dispo.regleForm = function (store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier la règle' : 'Nouvelle règle de risque', width: 520, modal: true, bodyPadding: 12, layout: 'fit',
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 160 }, items: [
+            { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false, value: rec ? rec.get('libelle') : '' },
+            { xtype: 'numberfield', name: 'jourMois', fieldLabel: 'Jour du mois', minValue: 1, maxValue: 31,
+              allowBlank: false, value: rec ? rec.get('jourMois') : 1 },
+            { xtype: 'numberfield', name: 'heure', fieldLabel: 'Heure (0-23)', minValue: 0, maxValue: 23,
+              value: rec ? rec.get('heure') : 8 },
+            { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
+              store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'DIAMOND_ET_PLATINIUM' },
+            { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', editable: false, queryMode: 'local',
+              store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: rec ? (rec.get('canal') || 'WEB') : 'WEB' },
+            { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: rec ? rec.get('actif') : true }
+        ] }],
+        buttons: [
+            { text: 'Annuler', handler: function () { win.close(); } },
+            { text: 'Enregistrer', formBind: true, handler: function (b) {
+                var form = b.up('window').down('form').getForm();
+                if (!form.isValid()) { return; }
+                var v = form.getValues();
+                v.type = 'RISQUE_RUPTURE';
+                v.actif = form.findField('actif').getValue();
+                Usp.ajax({ url: rec ? '/dispo-regles/' + rec.get('id') : '/dispo-regles',
+                    method: rec ? 'PUT' : 'POST', jsonData: v,
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre('Règle', !!rec); },
+                    failure: function (resp) {
+                        var msg = 'Enregistrement impossible.';
+                        try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
+                        Ext.Msg.alert('Erreur', msg);
+                    } });
+            } }
+        ]
+    });
+    win.show();
 };
 
 Usp.dispo.grille = function (filtre, libelleTab) {

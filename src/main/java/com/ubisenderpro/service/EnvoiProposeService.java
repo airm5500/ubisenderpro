@@ -3,6 +3,7 @@ package com.ubisenderpro.service;
 import com.ubisenderpro.entity.Campagne;
 import com.ubisenderpro.entity.DispoEvenement;
 import com.ubisenderpro.entity.DispoProduit;
+import com.ubisenderpro.entity.DispoRegle;
 import com.ubisenderpro.entity.EnvoiPropose;
 import com.ubisenderpro.entity.MediaFichier;
 import com.ubisenderpro.entity.ModeleMessage;
@@ -66,6 +67,8 @@ public class EnvoiProposeService {
     private ParametreService parametreService;
     @EJB
     private AudienceService audienceService;
+    @EJB
+    private DispoRegleService dispoRegleService;
 
     /** Paramètre technique (§12) : autorise le traitement auto des propositions rupture. */
     public static final String CLE_RUPTURE_SANS_AVIS = "rupture.envoi_sans_avis";
@@ -141,19 +144,45 @@ public class EnvoiProposeService {
         return crees;
     }
 
-    /** Une proposition par événement dispo/rupture actif comportant des produits. */
+    /** Propositions issues des événements dispo/rupture actifs comportant des produits.
+     *  Le risque de rupture suit les règles de programmation configurables (§11). */
     private int genererPropositionsDispo(LocalDate today) {
         int crees = 0;
         for (DispoEvenement e : dispoEvenementService.lister()) {
             String st = e.getStatut();
             if ("ENVOYEE".equals(st) || "ANNULEE".equals(st) || "ARCHIVEE".equals(st)) { continue; }
             if (nbProduitsDispoActifs(e.getId()) == 0) { continue; }
+
+            if ("RISQUE_RUPTURE".equals(e.getType())) {
+                List<DispoRegle> regles = dispoRegleService.listerActives("RISQUE_RUPTURE");
+                if (!regles.isEmpty()) {
+                    for (DispoRegle r : regles) {
+                        LocalDate prevue = prochainJour(r.getJourMois(), today);
+                        crees += upsertSource("DISPO:" + e.getId() + ":R" + r.getId(), e.getType(), "DISPO",
+                                null, e.getId(), prevue, e.getTitre() + " — " + r.getLibelle(),
+                                messageDispo(e), r.getAudience());
+                    }
+                    continue;
+                }
+            }
+
             LocalDate prevue = e.getDateDebut() != null ? e.getDateDebut().toLocalDate() : today;
             if (prevue.isBefore(today)) { prevue = today; }
             crees += upsertSource("DISPO:" + e.getId(), e.getType(), "DISPO", null, e.getId(), prevue,
-                    e.getTitre(), messageDispo(e));
+                    e.getTitre(), messageDispo(e), e.getAudience());
         }
         return crees;
+    }
+
+    /** Prochaine date correspondant à un jour du mois (ce mois si à venir, sinon le mois suivant). */
+    private LocalDate prochainJour(int jourMois, LocalDate today) {
+        int jour = Math.min(jourMois, today.lengthOfMonth());
+        LocalDate d = today.withDayOfMonth(jour);
+        if (d.isBefore(today)) {
+            LocalDate m = today.plusMonths(1);
+            d = m.withDayOfMonth(Math.min(jourMois, m.lengthOfMonth()));
+        }
+        return d;
     }
 
     private int genererAnnonceMensuelle(LocalDate today) {
@@ -195,11 +224,16 @@ public class EnvoiProposeService {
      */
     private int upsert(String cle, String type, Long promotionId, LocalDate datePrevue,
                        String titre, String message) {
-        return upsertSource(cle, type, "PROMO", promotionId, null, datePrevue, titre, message);
+        return upsertSource(cle, type, "PROMO", promotionId, null, datePrevue, titre, message, null);
     }
 
     private int upsertSource(String cle, String type, String source, Long promotionId, Long evenementId,
                              LocalDate datePrevue, String titre, String message) {
+        return upsertSource(cle, type, source, promotionId, evenementId, datePrevue, titre, message, null);
+    }
+
+    private int upsertSource(String cle, String type, String source, Long promotionId, Long evenementId,
+                             LocalDate datePrevue, String titre, String message, String audience) {
         Optional<EnvoiPropose> ex = parCle(cle);
         if (ex.isPresent()) {
             EnvoiPropose e = ex.get();
@@ -207,6 +241,7 @@ public class EnvoiProposeService {
                 e.setDatePrevue(datePrevue);
                 e.setTitre(titre);
                 e.setMessage(message);
+                e.setAudience(audience);
                 em.merge(e);
             }
             return 0;
@@ -220,6 +255,7 @@ public class EnvoiProposeService {
         e.setDatePrevue(datePrevue);
         e.setTitre(titre);
         e.setMessage(message);
+        e.setAudience(audience);
         e.setStatut("PROPOSEE");
         em.persist(e);
         return 1;
