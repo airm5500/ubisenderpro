@@ -1,5 +1,6 @@
 package com.ubisenderpro.service;
 
+import com.ubisenderpro.entity.Promotion;
 import com.ubisenderpro.entity.PromotionProduit;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -11,42 +12,39 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import javax.ejb.EJB;
 import javax.ejb.Stateless;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Génère le classeur Excel (.xlsx) « liste des produits » d'une promotion,
- * destiné à être joint en pièce jointe (en-tête document) de la campagne.
+ * Génère le classeur Excel (.xlsx) « liste des produits » d'une ou plusieurs
+ * promotions, destiné à être joint en pièce jointe (en-tête document) de la campagne.
  */
 @Stateless
 public class PromotionXlsxService {
 
     public static final String MIME =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    @PersistenceContext(unitName = "ubisenderproPU")
+    private EntityManager em;
 
     @EJB
     private PromotionProduitService promotionProduitService;
 
-    /** Construit un .xlsx listant les produits actifs de la promotion. */
+    /** Construit un .xlsx listant les produits actifs d'une seule promotion. */
     public byte[] genererClasseurProduits(Long promotionId) {
         List<PromotionProduit> produits = promotionProduitService.lister(promotionId);
         try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("Produits");
 
-            CellStyle entete = wb.createCellStyle();
-            Font gras = wb.createFont();
-            gras.setBold(true);
-            entete.setFont(gras);
-
+            CellStyle entete = enteteStyle(wb);
             String[] cols = { "CIP7", "CIP13", "Produit", "Qté min. commandée", "Unité gratuite (UG)" };
             int[] largeurs = { 14, 18, 42, 20, 22 };
-            Row h = sheet.createRow(0);
-            for (int i = 0; i < cols.length; i++) {
-                Cell c = h.createCell(i);
-                c.setCellValue(cols[i]);
-                c.setCellStyle(entete);
-                sheet.setColumnWidth(i, largeurs[i] * 256);
-            }
+            ligneEntete(sheet, entete, cols, largeurs);
 
             int r = 1;
             for (PromotionProduit p : produits) {
@@ -63,6 +61,59 @@ public class PromotionXlsxService {
             return out.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException("Génération du classeur de promotion impossible : " + e.getMessage(), e);
+        }
+    }
+
+    /** Construit un .xlsx regroupant les produits actifs de plusieurs promotions. */
+    public byte[] genererClasseurPromos(List<Long> promotionIds) {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Produits");
+
+            CellStyle entete = enteteStyle(wb);
+            String[] cols = { "Promotion", "Date de fin", "CIP7", "CIP13", "Produit", "Qté min. commandée", "Unité gratuite (UG)" };
+            int[] largeurs = { 30, 14, 14, 18, 42, 20, 22 };
+            ligneEntete(sheet, entete, cols, largeurs);
+
+            int r = 1;
+            for (Long id : promotionIds) {
+                Promotion promo = em.find(Promotion.class, id);
+                String nomPromo = promo != null ? nz(promo.getNom()) : "";
+                String fin = promo != null && promo.getDateFin() != null ? promo.getDateFin().toLocalDate().format(DF) : "";
+                for (PromotionProduit p : promotionProduitService.lister(id)) {
+                    if (!p.isActif()) { continue; }
+                    Row row = sheet.createRow(r++);
+                    row.createCell(0).setCellValue(nomPromo);
+                    row.createCell(1).setCellValue(fin);
+                    row.createCell(2).setCellValue(nz(p.getCip7()));
+                    row.createCell(3).setCellValue(nz(p.getCip13()));
+                    row.createCell(4).setCellValue(nz(p.getNomProduit()));
+                    if (p.getQuantiteMinimale() != null) { row.createCell(5).setCellValue(p.getQuantiteMinimale()); }
+                    row.createCell(6).setCellValue(ug(p));
+                }
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Génération du classeur de promotions impossible : " + e.getMessage(), e);
+        }
+    }
+
+    private CellStyle enteteStyle(Workbook wb) {
+        CellStyle st = wb.createCellStyle();
+        Font gras = wb.createFont();
+        gras.setBold(true);
+        st.setFont(gras);
+        return st;
+    }
+
+    private void ligneEntete(Sheet sheet, CellStyle style, String[] cols, int[] largeurs) {
+        Row h = sheet.createRow(0);
+        for (int i = 0; i < cols.length; i++) {
+            Cell c = h.createCell(i);
+            c.setCellValue(cols[i]);
+            c.setCellStyle(style);
+            sheet.setColumnWidth(i, largeurs[i] * 256);
         }
     }
 

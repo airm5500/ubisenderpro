@@ -10,6 +10,7 @@ import javax.ejb.EJB;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -113,7 +114,7 @@ public class EnvoiProposeService {
                     LocalDate prevue = fin.minusDays(j);
                     if (prevue.isBefore(today)) { continue; }
                     crees += upsert("RAPPEL_J" + j + ":" + p.getId(), "RAPPEL_J" + j, p.getId(), prevue,
-                            "Rappel fin J-" + j + " — " + p.getNom(), messageRappel(p, j, fin));
+                            "Rappel fin J-" + j + " — " + p.getNom(), messageRappel(p, j));
                 }
             }
         }
@@ -122,18 +123,7 @@ public class EnvoiProposeService {
 
     private int genererAnnonceMensuelle(LocalDate today) {
         LocalDate premier = today.withDayOfMonth(1);
-        LocalDate finMois = today.withDayOfMonth(today.lengthOfMonth());
-        List<Promotion> duMois = new ArrayList<>();
-        for (Promotion p : promotionService.lister()) {
-            String st = p.getStatut();
-            if ("ANNULEE".equals(st) || "ARCHIVEE".equals(st)) { continue; }
-            LocalDate d = p.getDateDebut() != null ? p.getDateDebut().toLocalDate() : null;
-            LocalDate f = p.getDateFin() != null ? p.getDateFin().toLocalDate() : null;
-            // Promo qui chevauche le mois courant (dates ouvertes = on inclut).
-            boolean apresFin = f != null && f.isBefore(premier);
-            boolean avantDebut = d != null && d.isAfter(finMois);
-            if (!apresFin && !avantDebut) { duMois.add(p); }
-        }
+        List<Promotion> duMois = promosDuMois(premier);
         if (duMois.isEmpty()) { return 0; }
 
         String mois = premier.getMonth().getDisplayName(TextStyle.FULL, FR);
@@ -142,11 +132,25 @@ public class EnvoiProposeService {
         // L'annonce part le 1er du mois ; si déjà passé, on la prévoit pour aujourd'hui.
         LocalDate prevue = premier.isBefore(today) ? today : premier;
 
-        StringBuilder msg = new StringBuilder("Promotions du mois de " + moisCap + " "
-                + premier.getYear() + " :\n");
-        for (Promotion p : duMois) { msg.append("• ").append(p.getNom()).append('\n'); }
         return upsert(cle, "ANNONCE_MENSUELLE", null, prevue,
-                "Annonce promotions — " + moisCap + " " + premier.getYear(), msg.toString().trim());
+                "Annonce promotions — " + moisCap + " " + premier.getYear(),
+                messageMensuel(premier, duMois, prevue));
+    }
+
+    /** Promotions (non annulées/archivées) qui chevauchent le mois donné. */
+    private List<Promotion> promosDuMois(LocalDate premier) {
+        LocalDate finMois = premier.withDayOfMonth(premier.lengthOfMonth());
+        List<Promotion> duMois = new ArrayList<>();
+        for (Promotion p : promotionService.lister()) {
+            String st = p.getStatut();
+            if ("ANNULEE".equals(st) || "ARCHIVEE".equals(st)) { continue; }
+            LocalDate d = p.getDateDebut() != null ? p.getDateDebut().toLocalDate() : null;
+            LocalDate f = p.getDateFin() != null ? p.getDateFin().toLocalDate() : null;
+            boolean apresFin = f != null && f.isBefore(premier);
+            boolean avantDebut = d != null && d.isAfter(finMois);
+            if (!apresFin && !avantDebut) { duMois.add(p); }
+        }
+        return duMois;
     }
 
     /**
@@ -220,15 +224,31 @@ public class EnvoiProposeService {
                                 + ". Complétez la promotion puis réessayez.");
             }
             corps = construireMessage(e, p);
-            if (VARIABLE_RESTANTE.matcher(corps).find()) {
-                throw new ValidationException("variables",
-                        "Le message contient des variables non remplies. Vérifiez la promotion.");
-            }
-            // Pièce jointe .xlsx (liste des produits) hébergée puis attachée en en-tête document.
+            verifierResidu(corps);
+            // Pièce jointe .xlsx (produits de la promo) hébergée puis attachée en en-tête document.
             byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
-            MediaFichier mf = mediaFichierService.enregistrer(
-                    xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx");
-            String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "media/" + mf.getId();
+            String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
+                    xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
+            modele = creerModele(e.getTitre(), corps, "document", url);
+        } else if ("ANNONCE_MENSUELLE".equals(e.getType())) {
+            LocalDate premier = premierDuMois(e);
+            List<Promotion> promos = promosDuMois(premier);
+            List<String> manquants = elementsMensuelsManquants(promos);
+            if (!manquants.isEmpty()) {
+                throw new ValidationException("variables",
+                        "Validation impossible — éléments manquants : " + String.join(", ", manquants)
+                                + ". Complétez les promotions du mois puis réessayez.");
+            }
+            corps = messageMensuel(premier, promos, e.getDatePrevue());
+            verifierResidu(corps);
+            // Pièce jointe .xlsx regroupant les produits de toutes les promos du mois.
+            List<Long> ids = new ArrayList<>();
+            for (Promotion pr : promos) { ids.add(pr.getId()); }
+            byte[] xlsx = xlsxService.genererClasseurPromos(ids);
+            String nomFichier = "Promotions-" + premier.getYear() + "-"
+                    + String.format("%02d", premier.getMonthValue()) + ".xlsx";
+            String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
+                    xlsx, PromotionXlsxService.MIME, nomFichier).getId());
             modele = creerModele(e.getTitre(), corps, "document", url);
         } else {
             corps = e.getMessage();
@@ -241,7 +261,9 @@ public class EnvoiProposeService {
         c.setObjectif("Promotion");
         c.setCategorie("PROMOTION");
         c.setStatut("BROUILLON");
-        c.setCanal("API");
+        // Messages riches (texte libre + emojis + pièce jointe) : canal WhatsApp Web
+        // par défaut ; l'opérateur peut basculer sur Cloud API avant l'envoi.
+        c.setCanal("WEB");
         c.setModeleId(modele.getId());
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
@@ -275,23 +297,94 @@ public class EnvoiProposeService {
         return modeleService.creer(m);
     }
 
-    /** Variables de promotion disponibles dans les messages ({{nom_promo}}, etc.). */
+    /** Variables d'une promotion ({{nom_promotion}}, {{taux_ug_max}}, etc.).
+     *  {{nom_contact}} n'y figure pas : il est résolu par destinataire à l'envoi. */
     private Map<String, String> variablesPromo(Promotion p) {
         Map<String, String> v = new LinkedHashMap<>();
-        v.put("nom_promo", nz(p.getNom()));
+        String nom = nz(p.getNom());
+        v.put("nom_promotion", nom);
+        v.put("nom_promo", nom); // alias rétro-compatible
         v.put("date_debut", fdate(p.getDateDebut()));
         v.put("date_fin", fdate(p.getDateFin()));
         v.put("responsable", nz(p.getResponsable()));
-        v.put("nb_produits", String.valueOf(nbProduitsActifs(p.getId())));
+        v.put("nombre_produits", String.valueOf(nbProduitsActifs(p.getId())));
+        v.put("nb_produits", String.valueOf(nbProduitsActifs(p.getId()))); // alias
+        BigDecimal taux = maxTauxUg(p.getId());
+        v.put("taux_ug_max", taux == null ? "" : taux.stripTrailingZeros().toPlainString());
         return v;
     }
 
-    /** Éléments indispensables manquants (libellés lisibles pour l'opérateur). */
+    /** Variables agrégées du mois pour l'annonce mensuelle. */
+    private Map<String, String> variablesMensuelles(LocalDate premier, List<Promotion> promos, LocalDate prevue) {
+        Map<String, String> v = new LinkedHashMap<>();
+        String mois = premier.getMonth().getDisplayName(TextStyle.FULL, FR);
+        v.put("mois_promotion", mois.substring(0, 1).toUpperCase(FR) + mois.substring(1));
+
+        LocalDate minD = null, maxF = null;
+        int nbProd = 0, joursMin = Integer.MAX_VALUE;
+        BigDecimal tauxMax = null;
+        java.util.LinkedHashSet<String> fins = new java.util.LinkedHashSet<>();
+        for (Promotion p : promos) {
+            LocalDate d = p.getDateDebut() != null ? p.getDateDebut().toLocalDate() : null;
+            LocalDate f = p.getDateFin() != null ? p.getDateFin().toLocalDate() : null;
+            if (d != null && (minD == null || d.isBefore(minD))) { minD = d; }
+            if (f != null && (maxF == null || f.isAfter(maxF))) { maxF = f; }
+            nbProd += nbProduitsActifs(p.getId());
+            BigDecimal t = maxTauxUg(p.getId());
+            if (t != null && (tauxMax == null || t.compareTo(tauxMax) > 0)) { tauxMax = t; }
+            if (f != null) {
+                fins.add(f.format(DF));
+                long j = java.time.temporal.ChronoUnit.DAYS.between(prevue, f);
+                if (j >= 0 && j < joursMin) { joursMin = (int) j; }
+            }
+        }
+        v.put("date_debut_globale", minD == null ? "" : minD.format(DF));
+        v.put("date_fin_globale", maxF == null ? "" : maxF.format(DF));
+        v.put("nombre_promotions", String.valueOf(promos.size()));
+        v.put("nombre_produits", String.valueOf(nbProd));
+        v.put("taux_ug_max", tauxMax == null ? "" : tauxMax.stripTrailingZeros().toPlainString());
+        v.put("dates_fin_promotions", String.join(", ", fins));
+        v.put("jours_restants_min", joursMin == Integer.MAX_VALUE ? "" : String.valueOf(joursMin));
+        return v;
+    }
+
+    /** Éléments indispensables manquants pour une promo (libellés lisibles). */
     private List<String> elementsManquants(Promotion p) {
         List<String> m = new ArrayList<>();
         if (nz(p.getNom()).isEmpty()) { m.add("nom de la promotion"); }
+        if (p.getDateDebut() == null) { m.add("date de début"); }
+        if (p.getDateFin() == null) { m.add("date de fin"); }
         if (nbProduitsActifs(p.getId()) == 0) { m.add("au moins un produit actif"); }
         return m;
+    }
+
+    /** Éléments manquants pour l'annonce mensuelle agrégée. */
+    private List<String> elementsMensuelsManquants(List<Promotion> promos) {
+        List<String> m = new ArrayList<>();
+        if (promos == null || promos.isEmpty()) {
+            m.add("au moins une promotion active sur le mois");
+            return m;
+        }
+        int prod = 0; boolean dDeb = false, dFin = false;
+        for (Promotion p : promos) {
+            prod += nbProduitsActifs(p.getId());
+            if (p.getDateDebut() != null) { dDeb = true; }
+            if (p.getDateFin() != null) { dFin = true; }
+        }
+        if (prod == 0) { m.add("au moins un produit actif"); }
+        if (!dDeb) { m.add("une date de début"); }
+        if (!dFin) { m.add("une date de fin"); }
+        return m;
+    }
+
+    /** Taux d'UG (%) maximal parmi les produits actifs (null si aucun UG en %). */
+    private BigDecimal maxTauxUg(Long promotionId) {
+        BigDecimal max = null;
+        for (com.ubisenderpro.entity.PromotionProduit pp : promotionProduitService.lister(promotionId)) {
+            if (!pp.isActif() || pp.getTauxUg() == null || pp.getTauxUg().signum() <= 0) { continue; }
+            if (max == null || pp.getTauxUg().compareTo(max) > 0) { max = pp.getTauxUg(); }
+        }
+        return max;
     }
 
     private int nbProduitsActifs(Long promotionId) {
@@ -300,6 +393,31 @@ public class EnvoiProposeService {
             if (pp.isActif()) { n++; }
         }
         return n;
+    }
+
+    /** Mois (1er jour) ciblé par une proposition d'annonce, depuis sa clé "ANNONCE:yyyy-MM". */
+    private LocalDate premierDuMois(EnvoiPropose e) {
+        String cle = e.getCle();
+        if (cle != null && cle.startsWith("ANNONCE:")) {
+            try {
+                String[] ym = cle.substring("ANNONCE:".length()).split("-");
+                return LocalDate.of(Integer.parseInt(ym[0]), Integer.parseInt(ym[1]), 1);
+            } catch (Exception ignore) { /* repli sur datePrevue */ }
+        }
+        LocalDate dp = e.getDatePrevue() != null ? e.getDatePrevue() : LocalDate.now();
+        return dp.withDayOfMonth(1);
+    }
+
+    private void verifierResidu(String corps) {
+        String reste = corps == null ? "" : corps.replace("{{nom_contact}}", "");
+        if (VARIABLE_RESTANTE.matcher(reste).find()) {
+            throw new ValidationException("variables",
+                    "Le message contient des variables non remplies. Vérifiez la promotion.");
+        }
+    }
+
+    private String urlMedia(String baseUrl, Long id) {
+        return baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "media/" + id;
     }
 
     private String fdate(LocalDateTime d) { return d == null ? "" : d.toLocalDate().format(DF); }
@@ -332,42 +450,88 @@ public class EnvoiProposeService {
         return em.merge(e);
     }
 
-    /* ====================== Messages suggérés ====================== */
+    /* ====================== Messages suggérés ======================
+     * Les modèles contiennent les variables de contexte ({{nom_promotion}},
+     * {{date_fin}}, {{taux_ug_max}}…) remplies à la génération/validation, et
+     * {{nom_contact}} laissé tel quel : il est résolu par destinataire à l'envoi.
+     * La clause « jusqu'à X % » est omise quand aucun UG en % n'existe. */
 
-    /** Modèle de texte d'un lancement (avec variables {{...}}). */
-    private String templateLancement(Promotion p) {
-        return "Bonne nouvelle ! La promotion « {{nom_promo}} » démarre"
-                + (p.getDateFin() != null ? " et se termine le {{date_fin}}" : "")
-                + ". Profitez-en dès maintenant ({{nb_produits}} produit(s) concerné(s)).";
+    private String templateAnnonce(boolean taux) {
+        return "📢🔥 PROMOTIONS UG DU MOIS DE {{mois_promotion}} 🔥📢\n\n"
+                + "Cher(e) client(e) {{nom_contact}},\n\n"
+                + "🎉 Découvrez nos offres promotionnelles disponibles durant le mois de {{mois_promotion}}.\n\n"
+                + (taux ? "💥 Bénéficiez de jusqu'à {{taux_ug_max}} % d'unités gratuites sur une sélection de produits.\n\n" : "")
+                + "📅 Période des offres : du {{date_debut_globale}} au {{date_fin_globale}}.\n\n"
+                + "📦 Les offres et les stocks d'unités gratuites sont disponibles dans la limite des quantités prévues.\n\n"
+                + "📎 Consultez le fichier Excel joint pour découvrir les produits concernés et préparer facilement votre commande sur EXTRANET.\n\n"
+                + "💻 Profitez de ces offres dès maintenant !\n\n"
+                + "Direction Commerciale";
     }
 
-    /** Modèle de texte d'un rappel ({{quand}} = « demain » ou « dans N jours »). */
-    private String templateRappel() {
-        return "Dernière ligne droite : la promotion « {{nom_promo}} » se termine {{quand}} "
-                + "(le {{date_fin}}). Ne passez pas à côté !";
+    private String templateLancement(boolean taux) {
+        return "🚀🎁 NOUVELLE PROMOTION UG 🎁🚀\n\n"
+                + "Cher(e) client(e) {{nom_contact}},\n\n"
+                + "La promotion {{nom_promotion}} commence aujourd'hui !\n\n"
+                + "📅 Offre valable du {{date_debut}} au {{date_fin}}.\n\n"
+                + (taux ? "💥 Bénéficiez de jusqu'à {{taux_ug_max}} % d'unités gratuites sur {{nombre_produits}} produit(s) sélectionné(s).\n\n"
+                        : "💥 Bénéficiez d'unités gratuites sur {{nombre_produits}} produit(s) sélectionné(s).\n\n")
+                + "📎 Consultez le fichier Excel joint pour découvrir les produits et leurs conditions promotionnelles.\n\n"
+                + "💻 Passez votre commande via EXTRANET pendant la période de validité de l'offre.\n\n"
+                + "Direction Commerciale";
+    }
+
+    private String templateRappelFin(boolean taux) {
+        return "✨⏳ PROMOTION UG — DERNIERS JOURS ⏳✨\n\n"
+                + "Cher(e) client(e) {{nom_contact}},\n\n"
+                + "L'offre d'unités gratuites « {{nom_promotion}} » arrive bientôt à expiration.\n\n"
+                + "📅 Date de fin : {{date_fin}} — il reste {{jours_restants}} jour(s).\n\n"
+                + (taux ? "🎁 Profitez encore de jusqu'à {{taux_ug_max}} % d'UG sur {{nombre_produits}} produit(s).\n\n" : "")
+                + "📎 Le fichier Excel joint présente les produits concernés et leurs conditions.\n\n"
+                + "💻 Préparez votre commande et transmettez-la dès maintenant via EXTRANET.\n\n"
+                + "Ne laissez pas passer ces dernières opportunités !\n\n"
+                + "Direction Commerciale";
+    }
+
+    private String templateDerniereChance(boolean taux) {
+        return "⏰🔥 DERNIÈRE CHANCE — PROMOTION UG 🔥⏰\n\n"
+                + "Cher(e) client(e) {{nom_contact}},\n\n"
+                + "La promotion {{nom_promotion}} prend fin le {{date_fin}}.\n\n"
+                + "Il ne vous reste plus que {{jours_restants}} jour(s) pour "
+                + (taux ? "bénéficier de jusqu'à {{taux_ug_max}} % d'unités gratuites " : "bénéficier des unités gratuites ")
+                + "sur les produits concernés.\n\n"
+                + "📎 Consultez le fichier Excel joint et finalisez votre commande sur EXTRANET.\n\n"
+                + "Après cette date, les conditions promotionnelles ne seront plus applicables.\n\n"
+                + "Direction Commerciale";
     }
 
     private String messageLancement(Promotion p) {
-        return ModeleService.fusionner(templateLancement(p), variablesPromo(p));
+        Map<String, String> v = variablesPromo(p);
+        return ModeleService.fusionner(templateLancement(aTaux(v)), v);
     }
 
-    private String messageRappel(Promotion p, int joursAvant, LocalDate fin) {
-        Map<String, String> vars = variablesPromo(p);
-        vars.put("quand", joursAvant == 1 ? "demain" : "dans " + joursAvant + " jours");
-        return ModeleService.fusionner(templateRappel(), vars);
+    /** Rappel par promo : J-1 -> « dernière chance », sinon (J-3) -> « derniers jours ». */
+    private String messageRappel(Promotion p, int joursAvant) {
+        Map<String, String> v = variablesPromo(p);
+        v.put("jours_restants", String.valueOf(joursAvant));
+        String tpl = joursAvant <= 1 ? templateDerniereChance(aTaux(v)) : templateRappelFin(aTaux(v));
+        return ModeleService.fusionner(tpl, v);
     }
 
-    /** Reconstruit le message d'une proposition à partir de la promotion (à la validation). */
+    private String messageMensuel(LocalDate premier, List<Promotion> promos, LocalDate prevue) {
+        Map<String, String> v = variablesMensuelles(premier, promos, prevue);
+        return ModeleService.fusionner(templateAnnonce(aTaux(v)), v);
+    }
+
+    private boolean aTaux(Map<String, String> v) {
+        String t = v.get("taux_ug_max");
+        return t != null && !t.isEmpty();
+    }
+
+    /** Reconstruit le message d'une proposition liée à une promo (à la validation). */
     private String construireMessage(EnvoiPropose e, Promotion p) {
         String type = e.getType();
-        if ("LANCEMENT".equals(type)) {
-            return messageLancement(p);
-        }
-        if (type != null && type.startsWith("RAPPEL_J")) {
-            int j = joursRappel(type);
-            return messageRappel(p, j, p.getDateFin() != null ? p.getDateFin().toLocalDate() : null);
-        }
-        // Autres types (ex. annonce) : message déjà construit lors de la génération.
+        if ("LANCEMENT".equals(type)) { return messageLancement(p); }
+        if (type != null && type.startsWith("RAPPEL_J")) { return messageRappel(p, joursRappel(type)); }
         return e.getMessage();
     }
 

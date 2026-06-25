@@ -61,13 +61,23 @@ public class CampagneSenderTx {
         String erreur;
 
         if (c != null && "WEB".equalsIgnoreCase(c.getCanal())) {
-            // Canal non officiel : envoi du corps du modèle (placeholder {{1}} = nom du contact).
+            // Canal non officiel : texte libre + variables ({{1}} / {{nom_contact}}).
+            // Une pièce jointe (en-tête média : document/image…) est envoyée avec
+            // le message en légende.
             if (c.getWaWebSessionId() == null || c.getWaWebSessionId().isEmpty()) {
                 success = false; erreur = "Session WhatsApp Web non définie pour la campagne";
             } else {
                 WaWebClient web = new WaWebClient();
-                WaWebClient.SendResult res = web.sendText(
-                        c.getWaWebSessionId(), d.getNumeroWhatsapp(), corpsPersonnalise(modele, d));
+                String texte = corpsPersonnalise(modele, d);
+                String mediaType = nz(modele.getEnteteMediaType());
+                String mediaUrl = nz(modele.getEnteteMediaUrl());
+                WaWebClient.SendResult res;
+                if (!mediaType.isEmpty() && !mediaUrl.isEmpty()) {
+                    res = web.sendMedia(c.getWaWebSessionId(), d.getNumeroWhatsapp(),
+                            mediaType.toLowerCase(), mediaUrl, texte, null, nomMedia(mediaType));
+                } else {
+                    res = web.sendText(c.getWaWebSessionId(), d.getNumeroWhatsapp(), texte);
+                }
                 success = res.success; waMessageId = res.id; erreur = res.erreur;
             }
         } else {
@@ -101,10 +111,31 @@ public class CampagneSenderTx {
         if (c != null) em.merge(c);
     }
 
-    /** Corps du modèle avec le placeholder {{1}} remplacé par le nom du contact (canal WEB). */
+    /**
+     * Corps du modèle personnalisé pour un destinataire (canal WEB).
+     * Remplace {{1}} et {{nom_contact}} par le nom du contact, replie une
+     * formule de politesse dont le nom est absent (« Cher(e) client(e) {{nom_contact}}, »
+     * -> « Cher(e) client(e), ») et garantit qu'aucune variable {{...}} brute ne subsiste.
+     */
     private String corpsPersonnalise(ModeleMessage modele, CampagneDestinataire d) {
         String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
-        String nom = d.getNomContact() == null ? "" : d.getNomContact();
-        return corps.replace("{{1}}", nom);
+        if (corps == null) { return ""; }
+        String nom = d.getNomContact() == null ? "" : d.getNomContact().trim();
+        corps = corps.replace("{{1}}", nom);
+        if (nom.isEmpty()) {
+            corps = corps.replace(" {{nom_contact}}", "").replace("{{nom_contact}}", "");
+        } else {
+            corps = corps.replace("{{nom_contact}}", nom);
+        }
+        // Filet de sécurité : aucune variable {{...}} ne doit apparaître au destinataire.
+        corps = corps.replaceAll("\\{\\{[^}]+\\}\\}", "");
+        return corps.replaceAll("[ \\t]{2,}", " ");
+    }
+
+    private String nz(String s) { return s == null ? "" : s; }
+
+    /** Nom de fichier affiché pour une pièce jointe (document promo = .xlsx). */
+    private String nomMedia(String mediaType) {
+        return "document".equalsIgnoreCase(mediaType) ? "Promotion.xlsx" : null;
     }
 }
