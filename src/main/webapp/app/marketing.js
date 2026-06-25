@@ -36,7 +36,8 @@ Usp.marketing.panel = function () {
             Usp.marketing.calendrier(),
             Usp.marketing.propositions(),
             Usp.marketing.modelesMessages(),
-            Usp.marketing.campagnesPromo()
+            Usp.marketing.campagnesPromo(),
+            Usp.marketing.performance()
         ]
     };
 };
@@ -564,6 +565,77 @@ Usp.marketing.campagnesPromo = function () {
               handler: function () { Usp.ouvrirVue('campaigns'); } }
         ]
     };
+};
+
+/* Onglet « Performance » (§18) : agrégats d'envoi des campagnes + filtres. */
+Usp.marketing.performance = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'canal', 'categorie', 'statut', 'nbDestinataires', 'nbEnvoyes',
+                 'nbDistribues', 'nbLus', 'nbRepondus', 'nbEchoues',
+                 'tauxDistribution', 'tauxLecture', 'tauxReponse']
+    });
+    var charger = function (panel) {
+        var tb = panel.down('toolbar');
+        var du = tb.down('[name=du]').getSubmitValue() || '';
+        var au = tb.down('[name=au]').getSubmitValue() || '';
+        var canal = tb.down('[name=canal]').getValue() || '';
+        var cat = tb.down('[name=categorie]').getValue() || '';
+        Usp.ajax({ url: '/campaigns/performance?du=' + du + '&au=' + au + '&canal=' + canal + '&categorie=' + cat,
+            method: 'GET',
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                store.loadData(r.lignes || []);
+                var s = panel.down('#perfSummary');
+                if (s) { s.update(Usp.marketing._perfHtml(r.totaux || {})); }
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Chargement de la performance impossible.'); } });
+    };
+    return {
+        xtype: 'panel', title: '📈 Performance', layout: { type: 'vbox', align: 'stretch' },
+        tbar: [
+            'Du', { xtype: 'datefield', name: 'du', format: 'd/m/Y', submitFormat: 'Y-m-d', width: 110 },
+            'Au', { xtype: 'datefield', name: 'au', format: 'd/m/Y', submitFormat: 'Y-m-d', width: 110 },
+            { xtype: 'combobox', name: 'canal', width: 130, editable: false, queryMode: 'local', value: '',
+              store: [['', 'Tous canaux'], ['WEB', 'WhatsApp Web'], ['API', 'API']] },
+            { xtype: 'combobox', name: 'categorie', width: 150, editable: false, queryMode: 'local', value: '',
+              store: [['', 'Toutes sources'], ['PROMOTION', 'Promotions'], ['DISPONIBILITE', 'Dispo / Ruptures']] },
+            { text: '🔎 Appliquer', handler: function (b) { charger(b.up('panel')); } },
+            '->',
+            { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } }
+        ],
+        items: [
+            { xtype: 'component', itemId: 'perfSummary', style: 'padding:10px;background:#fafafa;border-bottom:1px solid #eee', html: '' },
+            { xtype: 'grid', flex: 1, store: store, columns: [
+                { text: 'Campagne', dataIndex: 'nom', flex: 1 },
+                { text: 'Source', dataIndex: 'categorie', width: 100, renderer: function (v) {
+                    return v === 'DISPONIBILITE' ? '📦 Dispo' : (v === 'PROMOTION' ? '🏷️ Promo' : (v || '')); } },
+                { text: 'Canal', dataIndex: 'canal', width: 70, renderer: function (v) { return v === 'WEB' ? 'WA Web' : 'API'; } },
+                { text: 'Ciblés', dataIndex: 'nbDestinataires', width: 75, align: 'right' },
+                { text: 'Envoyés', dataIndex: 'nbEnvoyes', width: 75, align: 'right' },
+                { text: 'Distribués', dataIndex: 'nbDistribues', width: 85, align: 'right' },
+                { text: 'Lus', dataIndex: 'nbLus', width: 60, align: 'right' },
+                { text: 'Réponses', dataIndex: 'nbRepondus', width: 80, align: 'right' },
+                { text: 'Échoués', dataIndex: 'nbEchoues', width: 75, align: 'right' },
+                { text: '% Distrib.', dataIndex: 'tauxDistribution', width: 80, align: 'right', renderer: function (v) { return (v || 0) + ' %'; } },
+                { text: '% Lecture', dataIndex: 'tauxLecture', width: 80, align: 'right', renderer: function (v) { return (v || 0) + ' %'; } },
+                { text: '% Réponse', dataIndex: 'tauxReponse', width: 80, align: 'right', renderer: function (v) { return (v || 0) + ' %'; } }
+            ] }
+        ],
+        listeners: { afterrender: function (p) { charger(p); } }
+    };
+};
+
+Usp.marketing._perfHtml = function (t) {
+    var b = function (l, v) {
+        return '<span style="display:inline-block;min-width:130px;margin:0 14px 6px 0">' +
+            '<b style="font-size:16px">' + v + '</b><br><span style="color:#888;font-size:11px">' + l + '</span></span>';
+    };
+    return '<div style="font-family:sans-serif">' +
+        b('Campagnes', t.nbCampagnes || 0) + b('Ciblés', t.cibles || 0) + b('Envoyés', t.envoyes || 0) +
+        b('Distribués', (t.distribues || 0) + ' (' + (t.tauxDistribution || 0) + '%)') +
+        b('Lus', (t.lus || 0) + ' (' + (t.tauxLecture || 0) + '%)') +
+        b('Réponses', (t.repondus || 0) + ' (' + (t.tauxReponse || 0) + '%)') +
+        b('Échoués', t.echoues || 0) + '</div>';
 };
 
 Usp.marketing.propositions = function () {

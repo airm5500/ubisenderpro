@@ -36,6 +36,21 @@ public class CampagneResource {
         return campagneService.lister(categorie);
     }
 
+    /** Tableau de performance (§18) : totaux + lignes, filtrés période/canal/catégorie. */
+    @GET
+    @Path("/performance")
+    public Response performance(@QueryParam("du") String du, @QueryParam("au") String au,
+                                @QueryParam("canal") String canal, @QueryParam("categorie") String categorie) {
+        java.time.LocalDate dDu = parseDate(du);
+        java.time.LocalDate dAu = parseDate(au);
+        return Response.ok(campagneService.performance(dDu, dAu, canal, categorie)).build();
+    }
+
+    private static java.time.LocalDate parseDate(String s) {
+        if (s == null || s.isEmpty()) { return null; }
+        try { return java.time.LocalDate.parse(s.substring(0, 10)); } catch (Exception e) { return null; }
+    }
+
     @GET
     @Path("/{id}")
     public Response parId(@PathParam("id") Long id) {

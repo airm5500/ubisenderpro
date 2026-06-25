@@ -6,8 +6,12 @@ import javax.ejb.EJB;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -40,6 +44,77 @@ public class CampagneService {
     }
 
     public Optional<Campagne> parId(Long id) { return Optional.ofNullable(em.find(Campagne.class, id)); }
+
+    /**
+     * Tableau de performance (§18) : agrège les campagnes filtrées (période sur
+     * la date de création, canal, catégorie) et calcule les taux.
+     * @return { totaux:{...}, lignes:[{...}] }.
+     */
+    public Map<String, Object> performance(LocalDate du, LocalDate au, String canal, String categorie) {
+        StringBuilder jpql = new StringBuilder("SELECT c FROM Campagne c WHERE 1=1");
+        if (du != null) { jpql.append(" AND c.createdAt >= :du"); }
+        if (au != null) { jpql.append(" AND c.createdAt < :au"); }
+        if (canal != null && !canal.isEmpty()) { jpql.append(" AND c.canal = :canal"); }
+        if (categorie != null && !categorie.isEmpty()) { jpql.append(" AND c.categorie = :cat"); }
+        jpql.append(" ORDER BY c.createdAt DESC");
+
+        Query q = em.createQuery(jpql.toString(), Campagne.class);
+        if (du != null) { q.setParameter("du", du.atStartOfDay()); }
+        if (au != null) { q.setParameter("au", au.plusDays(1).atStartOfDay()); }
+        if (canal != null && !canal.isEmpty()) { q.setParameter("canal", canal); }
+        if (categorie != null && !categorie.isEmpty()) { q.setParameter("cat", categorie); }
+
+        @SuppressWarnings("unchecked")
+        List<Campagne> camps = q.getResultList();
+
+        List<Map<String, Object>> lignes = new ArrayList<>();
+        long cibles = 0, envoyes = 0, distribues = 0, lus = 0, repondus = 0, echoues = 0;
+        for (Campagne c : camps) {
+            cibles += c.getNbDestinataires();
+            envoyes += c.getNbEnvoyes();
+            distribues += c.getNbDistribues();
+            lus += c.getNbLus();
+            repondus += c.getNbRepondus();
+            echoues += c.getNbEchoues();
+            Map<String, Object> l = new LinkedHashMap<>();
+            l.put("id", c.getId());
+            l.put("nom", c.getNom());
+            l.put("canal", c.getCanal());
+            l.put("categorie", c.getCategorie());
+            l.put("statut", c.getStatut());
+            l.put("nbDestinataires", c.getNbDestinataires());
+            l.put("nbEnvoyes", c.getNbEnvoyes());
+            l.put("nbDistribues", c.getNbDistribues());
+            l.put("nbLus", c.getNbLus());
+            l.put("nbRepondus", c.getNbRepondus());
+            l.put("nbEchoues", c.getNbEchoues());
+            l.put("tauxDistribution", taux(c.getNbDistribues(), c.getNbEnvoyes()));
+            l.put("tauxLecture", taux(c.getNbLus(), c.getNbEnvoyes()));
+            l.put("tauxReponse", taux(c.getNbRepondus(), c.getNbEnvoyes()));
+            lignes.add(l);
+        }
+
+        Map<String, Object> totaux = new LinkedHashMap<>();
+        totaux.put("nbCampagnes", camps.size());
+        totaux.put("cibles", cibles);
+        totaux.put("envoyes", envoyes);
+        totaux.put("distribues", distribues);
+        totaux.put("lus", lus);
+        totaux.put("repondus", repondus);
+        totaux.put("echoues", echoues);
+        totaux.put("tauxDistribution", taux(distribues, envoyes));
+        totaux.put("tauxLecture", taux(lus, envoyes));
+        totaux.put("tauxReponse", taux(repondus, envoyes));
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("totaux", totaux);
+        res.put("lignes", lignes);
+        return res;
+    }
+
+    private int taux(long part, long total) {
+        return total <= 0 ? 0 : (int) Math.round(part * 100.0 / total);
+    }
 
     public Campagne creer(Campagne c) {
         valider(c);
