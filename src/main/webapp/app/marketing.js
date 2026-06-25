@@ -25,13 +25,25 @@ Usp.marketing.reloadAll = function () {
     Usp.marketing._stores.forEach(function (s) { s.load(); });
 };
 
-/* Vue principale : un onglet par statut. */
+/* Vue MARKETING : espace de travail transverse (calendrier de propositions,
+ * et à venir les remontées Ruptures / Disponibilité). Ne contient PAS la
+ * gestion des promotions, qui dispose de son propre menu (voir promotionsPanel). */
 Usp.marketing.panel = function () {
     Usp.marketing._stores = [];
     return {
         xtype: 'tabpanel', title: 'Marketing', listeners: Usp.tabListeners,
         items: [
-            Usp.marketing.calendrier(),
+            Usp.marketing.calendrier()
+        ]
+    };
+};
+
+/* Vue PROMOTIONS : un onglet par statut. Menu dédié, distinct de Marketing. */
+Usp.marketing.promotionsPanel = function () {
+    Usp.marketing._stores = [];
+    return {
+        xtype: 'tabpanel', title: 'Promotions', listeners: Usp.tabListeners,
+        items: [
             Usp.marketing.grille('ACTIVE', '🟢 Actives'),
             Usp.marketing.grille('PROGRAMMEE', '🔵 Programmées'),
             Usp.marketing.grille('INACTIVE', '🔴 Inactives'),

@@ -963,6 +963,7 @@ Usp.MENU = [
     { text: 'Discussions',         view: 'inbox',      icon: '💬', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Comptes clients',     view: 'clients',    icon: '🏢', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
     { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
+    { text: 'Promotions',          view: 'promotions', icon: '🏷️', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Marketing',           view: 'marketing',  icon: '📣', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
     { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
     { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
@@ -1014,7 +1015,7 @@ Usp.ouvrirVue = function (vue) {
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
-        case 'promotions':
+        case 'promotions': Usp.loadCenter(Usp.marketing.promotionsPanel()); break;
         case 'marketing': Usp.loadCenter(Usp.marketing.panel()); break;
         case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
         case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
