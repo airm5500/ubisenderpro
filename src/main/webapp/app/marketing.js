@@ -35,7 +35,7 @@ Usp.marketing.panel = function () {
         items: [
             Usp.marketing.calendrier(),
             Usp.marketing.propositions(),
-            Usp.marketing.modelesPromo(),
+            Usp.marketing.modelesMessages(),
             Usp.marketing.campagnesPromo()
         ]
     };
@@ -465,24 +465,27 @@ Usp.marketing._calHtml = function (y, m, data) {
     return html + '</tr></table>';
 };
 
-/* Onglet « Modèles de promo » : modèles ModeleMessage de type PROMOTION.
- * Réutilise le formulaire des Paramètres -> les modèles restent partagés
- * (visibles dans le menu Modèles, et inversement). */
-Usp.marketing.modelesPromo = function () {
+/* Onglet « Modèles de messages » : modèles marketing (promo + dispo/rupture).
+ * Agrégateur commun (spec §10). Réutilise le formulaire des Paramètres ->
+ * les modèles restent partagés (visibles dans le menu Modèles, et inversement). */
+Usp.marketing.modelesMessages = function () {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
                  'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
-                 'segmentationId', 'statutApprobation', 'actif'],
+                 'segmentationId', 'statutApprobation', 'actif', 'cleSysteme'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true,
         filters: [{ filterFn: function (rec) {
-            return String(rec.get('typeModele') || '').toUpperCase() === 'PROMOTION'; } }]
+            // Modèles marketing : catégorie MARKETING ou modèle système prédéfini.
+            return String(rec.get('categorie') || '').toUpperCase() === 'MARKETING'
+                || !!rec.get('cleSysteme'); } }]
     });
     return {
-        xtype: 'grid', title: '📝 Modèles de promo', store: store,
+        xtype: 'grid', title: '📝 Modèles de messages', store: store,
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Type', dataIndex: 'typeModele', width: 140 },
             { text: 'Langue', dataIndex: 'langue', width: 70 },
             { text: 'Pièce jointe', dataIndex: 'enteteMediaType', width: 150, renderer: function (v, m, rec) {
                 if (!v) { return '—'; }
@@ -497,7 +500,7 @@ Usp.marketing.modelesPromo = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouveau modèle de promo', handler: function () { Usp.settings.templateForm(store, null); } },
+            { text: '➕ Nouveau modèle', handler: function () { Usp.settings.templateForm(store, null); } },
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
         ],
         listeners: {

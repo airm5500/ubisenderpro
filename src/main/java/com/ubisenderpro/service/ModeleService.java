@@ -20,21 +20,28 @@ public class ModeleService {
     }
 
     /**
-     * Crée les modèles de message « promotion » prédéfinis absents (idempotent).
-     * Exécuté dans une vraie transaction EJB (appel via proxy depuis Bootstrap).
+     * Crée les modèles de message marketing prédéfinis absents (promo + dispo/rupture),
+     * idempotent. Exécuté dans une vraie transaction EJB (appel via proxy depuis Bootstrap).
      * @return nombre de modèles créés.
      */
-    public int initModelesPromo() {
+    public int initModelesMarketing() {
         int crees = 0;
-        for (Map.Entry<String, String> entry : PromoTemplates.CORPS.entrySet()) {
+        crees += seedModeles(PromoTemplates.NOMS, PromoTemplates.CORPS, PromoTemplates.TYPES);
+        crees += seedModeles(DispoTemplates.NOMS, DispoTemplates.CORPS, DispoTemplates.TYPES);
+        return crees;
+    }
+
+    private int seedModeles(Map<String, String> noms, Map<String, String> corps, Map<String, String> types) {
+        int crees = 0;
+        for (Map.Entry<String, String> entry : corps.entrySet()) {
             String cle = entry.getKey();
             Long n = em.createQuery(
                     "SELECT COUNT(m) FROM ModeleMessage m WHERE m.cleSysteme = :c", Long.class)
                     .setParameter("c", cle).getSingleResult();
             if (n != null && n > 0) { continue; }
             ModeleMessage m = new ModeleMessage();
-            m.setNom(PromoTemplates.NOMS.get(cle));
-            m.setTypeModele("PROMOTION");
+            m.setNom(noms.get(cle));
+            m.setTypeModele(types.get(cle));
             m.setCategorie("MARKETING");
             m.setLangue("fr");
             m.setCorps(entry.getValue());

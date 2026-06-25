@@ -28,6 +28,8 @@ public final class PromoTemplates {
 
     /** Libellés (nom affiché) des modèles prédéfinis. */
     public static final Map<String, String> NOMS = new LinkedHashMap<>();
+    /** Type de modèle (tous PROMOTION ici). */
+    public static final Map<String, String> TYPES = new LinkedHashMap<>();
     /** Corps par défaut des modèles prédéfinis. */
     public static final Map<String, String> CORPS = new LinkedHashMap<>();
 
@@ -36,6 +38,8 @@ public final class PromoTemplates {
         NOMS.put(CLE_LANCEMENT, "Promo — Lancement");
         NOMS.put(CLE_RAPPEL_FIN, "Promo — Derniers jours (J-3)");
         NOMS.put(CLE_DERNIERE_CHANCE, "Promo — Dernière chance (J-1)");
+
+        for (String c : NOMS.keySet()) { TYPES.put(c, "PROMOTION"); }
 
         CORPS.put(CLE_ANNONCE,
                 "📢🔥 PROMOTIONS UG DU MOIS DE {{mois_promotion}} 🔥📢\n\n"

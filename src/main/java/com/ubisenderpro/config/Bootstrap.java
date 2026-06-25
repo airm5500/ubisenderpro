@@ -42,10 +42,10 @@ public class Bootstrap {
         initAdminPassword();
         // Appel via le proxy EJB -> vraie transaction (REQUIRED) pour la persistance.
         try {
-            int crees = modeleService.initModelesPromo();
-            if (crees > 0) { LOG.info("UbiSenderPro : " + crees + " modèle(s) promo créé(s)."); }
+            int crees = modeleService.initModelesMarketing();
+            if (crees > 0) { LOG.info("UbiSenderPro : " + crees + " modèle(s) marketing créé(s)."); }
         } catch (Exception e) {
-            LOG.warning("Initialisation des modèles promo ignorée : " + e.getMessage());
+            LOG.warning("Initialisation des modèles marketing ignorée : " + e.getMessage());
         }
     }
 
