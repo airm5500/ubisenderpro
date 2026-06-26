@@ -94,7 +94,7 @@ public class CampagneSenderTx {
                         d.getNumeroWhatsapp(),
                         modele.getNomModeleWhatsapp() != null ? modele.getNomModeleWhatsapp() : modele.getNom(),
                         modele.getLangue(),
-                        Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()),
+                        parametresCorps(modele, d),
                         modele.getEnteteMediaType(), modele.getEnteteMediaUrl());
                 success = res.success; waMessageId = res.waMessageId; erreur = res.erreur;
             }
@@ -113,6 +113,30 @@ public class CampagneSenderTx {
         }
         em.merge(d);
         if (c != null) em.merge(c);
+    }
+
+    /**
+     * Paramètres du corps d'un template Meta ({{1}},{{2}}…), résolus par destinataire.
+     * Si {@code paramsCorps} est défini (CSV de variables), chaque variable est résolue
+     * dans l'ordre ; vide => aucun paramètre (template sans variable) ; non défini =>
+     * nom du contact par défaut ({{1}}).
+     */
+    private java.util.List<String> parametresCorps(ModeleMessage modele, CampagneDestinataire d) {
+        String spec = modele.getParamsCorps();
+        if (spec == null) {
+            return Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact());
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (spec.trim().isEmpty()) { return out; }
+        java.util.Map<String, String> vars =
+                variablesContactService.resoudre(d.getNumeroWhatsapp(), d.getNomContact());
+        for (String token : spec.split(",")) {
+            String k = token.trim().toUpperCase();
+            if (k.isEmpty()) { continue; }
+            String val = vars.get(k);
+            out.add(val == null ? "" : val);
+        }
+        return out;
     }
 
     private String nz(String s) { return s == null ? "" : s; }

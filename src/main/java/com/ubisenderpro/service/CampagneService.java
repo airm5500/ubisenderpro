@@ -283,8 +283,17 @@ public class CampagneService {
         if ("WEB".equalsIgnoreCase(c.getCanal())) {
             if (c.getWaWebSessionId() == null || c.getWaWebSessionId().isEmpty())
                 throw new IllegalArgumentException("Session WhatsApp Web non définie");
-        } else if (c.getWhatsappAccountId() == null) {
-            throw new IllegalArgumentException("Compte WhatsApp non défini");
+        } else {
+            if (c.getWhatsappAccountId() == null) {
+                throw new IllegalArgumentException("Compte WhatsApp non défini");
+            }
+            // Hors fenêtre de 24 h, l'API Cloud n'accepte que des modèles approuvés par Meta.
+            ModeleMessage m = em.find(ModeleMessage.class, c.getModeleId());
+            if (m == null || m.getNomModeleWhatsapp() == null || m.getNomModeleWhatsapp().trim().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Canal API : un modèle approuvé par Meta est requis. Renseignez le « Nom du modèle Meta » "
+                        + "sur le modèle, ou utilisez le canal WhatsApp Web.");
+            }
         }
     }
 

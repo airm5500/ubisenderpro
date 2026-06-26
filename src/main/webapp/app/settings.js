@@ -94,7 +94,7 @@ Usp.settings.accountForm = function (store, rec) {
 Usp.settings.templatesPanel = function () {
     var store = Usp.settings.jsonStore('/templates',
         ['id', 'nom', 'typeModele', 'langue', 'categorie', 'enteteTexte', 'enteteMediaType',
-         'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp',
+         'enteteMediaUrl', 'corps', 'piedDePage', 'boutonsJson', 'nomModeleWhatsapp', 'paramsCorps',
          'segmentationId', 'statutApprobation', 'actif']);
 
     return {
@@ -210,7 +210,9 @@ Usp.settings.templateForm = function (store, rec) {
                   emptyText: '[{"type":"URL","text":"Commander","url":"https://..."}]',
                   listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom du modèle Meta',
-                  emptyText: 'Nom approuvé côté Meta (pour les campagnes)' },
+                  emptyText: 'Nom approuvé côté Meta (requis pour le canal API)' },
+                { xtype: 'textfield', name: 'paramsCorps', fieldLabel: 'Paramètres du corps (Meta)',
+                  emptyText: 'Variables ordonnées pour {{1}},{{2}}… ex. nom_contact,nom_compte (vide = aucun)' },
                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',
                   store: ['BROUILLON', 'EN_ATTENTE', 'APPROUVE', 'REJETE'], queryMode: 'local' },
                 { xtype: 'displayfield',

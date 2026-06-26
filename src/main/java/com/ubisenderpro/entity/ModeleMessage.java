@@ -64,6 +64,10 @@ public class ModeleMessage {
     @Column(name = "cle_systeme", length = 40)
     private String cleSysteme;
 
+    /** Variables (CSV ordonné) injectées dans les paramètres {{1}},{{2}}… d'un template Meta. */
+    @Column(name = "params_corps", length = 500)
+    private String paramsCorps;
+
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
@@ -103,4 +107,6 @@ public class ModeleMessage {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public String getCleSysteme() { return cleSysteme; }
     public void setCleSysteme(String cleSysteme) { this.cleSysteme = cleSysteme; }
+    public String getParamsCorps() { return paramsCorps; }
+    public void setParamsCorps(String paramsCorps) { this.paramsCorps = paramsCorps; }
 }

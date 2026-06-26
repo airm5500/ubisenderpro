@@ -264,12 +264,30 @@ public class WhatsappCloudClient {
                 String id = node.path("messages").path(0).path("id").asText(null);
                 return new SendResult(true, id, null);
             }
-            return new SendResult(false, null, "HTTP " + code + " : " + reponse);
+            return new SendResult(false, null, messageErreur(code, reponse));
         } catch (Exception e) {
             return new SendResult(false, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    /** Extrait un message lisible de l'erreur Meta (code + libellé + détails). */
+    private String messageErreur(int code, String reponse) {
+        try {
+            JsonNode err = MAPPER.readTree(reponse).path("error");
+            if (!err.isMissingNode() && !err.isNull()) {
+                int c = err.path("code").asInt(0);
+                String msg = err.path("message").asText("");
+                String details = err.path("error_data").path("details").asText("");
+                StringBuilder sb = new StringBuilder();
+                if (c > 0) { sb.append("Meta ").append(c).append(" : "); }
+                sb.append(msg.isEmpty() ? ("HTTP " + code) : msg);
+                if (!details.isEmpty()) { sb.append(" — ").append(details); }
+                return sb.toString();
+            }
+        } catch (Exception ignore) { /* réponse non-JSON : on retombe sur le brut */ }
+        return "HTTP " + code + " : " + reponse;
     }
 
     private String lire(java.io.InputStream is) {
