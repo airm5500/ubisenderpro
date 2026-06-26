@@ -30,6 +30,13 @@ public class WhatsappService {
 
     public Optional<WhatsappAccount> compte(Long id) { return Optional.ofNullable(em.find(WhatsappAccount.class, id)); }
 
+    /** Modèles (templates) approuvés/connus côté Meta pour un compte. */
+    public java.util.List<java.util.Map<String, Object>> templatesMeta(Long accountId) {
+        WhatsappAccount a = em.find(WhatsappAccount.class, accountId);
+        if (a == null) { throw new IllegalArgumentException("Compte WhatsApp introuvable"); }
+        return new com.ubisenderpro.whatsapp.WhatsappCloudClient(a).listerTemplates();
+    }
+
     public WhatsappAccount creerCompte(WhatsappAccount a) { em.persist(a); return a; }
     public WhatsappAccount modifierCompte(WhatsappAccount a) {
         WhatsappAccount ex = em.find(WhatsappAccount.class, a.getId());

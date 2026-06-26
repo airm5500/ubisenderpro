@@ -211,6 +211,8 @@ Usp.settings.templateForm = function (store, rec) {
                   listeners: { focus: function (f) { Usp.waweb._lastMsgField = f; } } },
                 { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom du modèle Meta',
                   emptyText: 'Nom approuvé côté Meta (requis pour le canal API)' },
+                { xtype: 'button', text: '📥 Importer depuis Meta', margin: '0 0 8 130',
+                  handler: function (b) { Usp.settings.importerTemplatesMeta(b.up('form')); } },
                 { xtype: 'textfield', name: 'paramsCorps', fieldLabel: 'Paramètres du corps (Meta)',
                   emptyText: 'Variables ordonnées pour {{1}},{{2}}… ex. nom_contact,nom_compte (vide = aucun)' },
                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',
@@ -243,6 +245,55 @@ Usp.settings.templateForm = function (store, rec) {
         win.down('form').getForm().setValues(rec.getData());
         Usp.settings.previewMedia(win.down('form'), rec.get('enteteMediaUrl'), rec.get('enteteMediaType'));
     }
+};
+
+/* Sélecteur des modèles (templates) approuvés côté Meta : remplit Nom Meta + langue. */
+Usp.settings.importerTemplatesMeta = function (form) {
+    var accStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/whatsapp/accounts',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var tplStore = Ext.create('Ext.data.Store', { fields: ['name', 'language', 'status', 'category'] });
+    var charger = function (win) {
+        var id = win.down('[name=acc]').getValue();
+        if (!id) { return; }
+        Usp.ajax({ url: '/whatsapp/accounts/' + id + '/templates', method: 'GET',
+            success: function (resp) { var d = []; try { d = Ext.decode(resp.responseText) || []; } catch (e) {} tplStore.loadData(d); },
+            failure: function (resp) {
+                var m = 'Récupération impossible.';
+                try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}
+                tplStore.removeAll(); Ext.Msg.alert('Erreur', m);
+            } });
+    };
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Modèles approuvés par Meta', width: 660, height: 460, modal: true, layout: 'fit',
+        tbar: ['Compte :',
+            { xtype: 'combobox', name: 'acc', store: accStore, valueField: 'id', displayField: 'libelle',
+              queryMode: 'local', editable: false, width: 240,
+              listeners: {
+                  select: function (c) { charger(c.up('window')); },
+                  afterrender: function (c) {
+                      accStore.on('load', function () {
+                          if (accStore.getCount()) { c.setValue(accStore.getAt(0).get('id')); charger(c.up('window')); }
+                      });
+                  }
+              } },
+            '->', { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('window')); } }],
+        items: [{ xtype: 'grid', store: tplStore, columns: [
+            { text: 'Nom Meta', dataIndex: 'name', flex: 1 },
+            { text: 'Langue', dataIndex: 'language', width: 80 },
+            { text: 'Catégorie', dataIndex: 'category', width: 120 },
+            { text: 'Statut', dataIndex: 'status', width: 130,
+              renderer: function (v) { return v === 'APPROVED' ? '✅ ' + v : v; } }
+        ],
+        listeners: { itemdblclick: function (g, rec) {
+            form.down('[name=nomModeleWhatsapp]').setValue(rec.get('name'));
+            var lf = form.down('[name=langue]'); if (lf) { lf.setValue(rec.get('language')); }
+            win.close();
+            Usp.toast('Modèle Meta « ' + rec.get('name') + ' » sélectionné.');
+        } } }],
+        bbar: [{ xtype: 'tbtext', text: '<span style="color:#888">Double-cliquez un modèle approuvé pour le sélectionner.</span>' }]
+    });
+    win.show();
 };
 
 /* Téléverse le fichier choisi vers l'app, remplit l'URL et le type d'en-tête, affiche l'aperçu. */

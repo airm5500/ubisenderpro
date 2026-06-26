@@ -234,6 +234,47 @@ public class WhatsappCloudClient {
         return body;
     }
 
+    /** Liste les modèles (templates) du compte Meta : nom, langue, statut, catégorie. */
+    public java.util.List<Map<String, Object>> listerTemplates() {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        if (account.getBusinessAccountId() == null || account.getBusinessAccountId().trim().isEmpty()) {
+            throw new RuntimeException("Le compte n'a pas de « WhatsApp Business Account ID » renseigné.");
+        }
+        HttpURLConnection conn = null;
+        try {
+            String endpoint = String.format(
+                    "https://graph.facebook.com/%s/%s/message_templates?limit=200&fields=name,language,status,category",
+                    account.getApiVersion(), account.getBusinessAccountId());
+            conn = (HttpURLConnection) new URL(endpoint).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(20000);
+            conn.setRequestProperty("Authorization", "Bearer " + account.getAccessToken());
+
+            int code = conn.getResponseCode();
+            String reponse = lire(code >= 400 ? conn.getErrorStream() : conn.getInputStream());
+            if (code >= 200 && code < 300) {
+                JsonNode data = MAPPER.readTree(reponse).path("data");
+                for (JsonNode n : data) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("name", n.path("name").asText(""));
+                    m.put("language", n.path("language").asText(""));
+                    m.put("status", n.path("status").asText(""));
+                    m.put("category", n.path("category").asText(""));
+                    out.add(m);
+                }
+                return out;
+            }
+            throw new RuntimeException(messageErreur(code, reponse));
+        } catch (RuntimeException re) {
+            throw re;
+        } catch (Exception e) {
+            throw new RuntimeException("Récupération des modèles Meta impossible : " + e.getMessage(), e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     private SendResult envoyer(Map<String, Object> body) {
         if (account.isModeTest()) {
             // Mode test : aucun appel à Meta, on simule un envoi réussi.

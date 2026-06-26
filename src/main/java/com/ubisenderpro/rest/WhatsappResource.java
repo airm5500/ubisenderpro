@@ -34,6 +34,18 @@ public class WhatsappResource {
     @Path("/accounts")
     public List<WhatsappAccount> comptes() { return whatsappService.listerComptes(); }
 
+    /** Modèles (templates) Meta d'un compte (nom, langue, statut, catégorie). */
+    @GET
+    @Path("/accounts/{id}/templates")
+    public Response templatesMeta(@PathParam("id") Long id) {
+        try {
+            return Response.ok(whatsappService.templatesMeta(id)).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("erreur", e.getMessage() == null ? "Récupération impossible." : e.getMessage())).build();
+        }
+    }
+
     @POST
     @Path("/accounts")
     @Secured(roles = {"ADMIN"})
