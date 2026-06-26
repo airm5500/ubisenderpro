@@ -20,7 +20,9 @@ Usp.info.PRIORITES = [['NORMALE', 'Normale'], ['IMPORTANTE', 'Importante'], ['UR
 Usp.info.AUDIENCES = [
     ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
     ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'],
-    ['AGENCE', 'Clients de l\'agence'], ['REGION', 'Clients de la région']
+    ['AGENCE', 'Clients de l\'agence'], ['REGION', 'Clients de la région'],
+    ['TOURNEE', 'Clients de la tournée'], ['LISTE_DE_DIFFUSION', 'Liste de diffusion'],
+    ['CONTACTS_MANUELS', 'Contacts sélectionnés']
 ];
 Usp.info.COULEUR_STATUT = {
     BROUILLON: '#777', EN_ATTENTE: '#777', PROGRAMMEE: '#1976d2', EN_COURS: '#ef6c00',
@@ -59,7 +61,7 @@ Usp.info.panel = function () {
 Usp.info.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'region', 'tournee',
-                 'audience', 'segmentationId', 'listeId', 'canal', 'dateEnvoi', 'dateFinValidite',
+                 'audience', 'segmentationId', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
                  'statut', 'responsable', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
                  'causeInterne', 'causeCommunicable', 'dateResolution', 'jourFerie', 'dateGarde',
                  'heureLimiteCommande', 'consignesLivraison', 'pharmacienGarde', 'telephonePharmacien'],
@@ -155,7 +157,21 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               emptyText: 'Sert au texte et au ciblage « Clients de l\'agence »' },
             { xtype: 'textfield', name: 'region', fieldLabel: 'Région', value: g('region') || '',
               emptyText: 'Sert au ciblage « Clients de la région »' },
-            { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée', value: g('tournee') || '' },
+            { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée', value: g('tournee') || '',
+              emptyText: 'Sert au ciblage « Clients de la tournée »' },
+            { xtype: 'combobox', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
+              valueField: 'id', displayField: 'nom', value: g('listeId'), emptyText: '(si audience = Liste de diffusion)',
+              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
+                  proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
+                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
+            { xtype: 'tagfield', name: 'contactIds', fieldLabel: 'Contacts sélectionnés', queryMode: 'remote',
+              queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom',
+              emptyText: '(si audience = Contacts sélectionnés) — tapez 2 lettres',
+              value: g('contactIds') ? String(g('contactIds')).split(',') : [],
+              listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } },
+              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero'],
+                  proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
+                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Direction / signataire', value: g('responsable') || '' },
             { xtype: 'datefield', name: 'dateEnvoi', fieldLabel: 'Date d\'envoi', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateEnvoi') },
             { xtype: 'datefield', name: 'dateFinValidite', fieldLabel: 'Fin de validité', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateFinValidite') },
@@ -183,6 +199,8 @@ Usp.info.form = function (store, rec, typeParDefaut) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var v = form.getValues();
+                // listeId : null si non choisi (évite l'échec de désérialisation Long).
+                if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
                 Usp.ajax({ url: rec ? '/infos/' + rec.get('id') : '/infos', method: rec ? 'PUT' : 'POST', jsonData: v,
                     success: function () { win.close(); Usp.info.reloadAll(); Usp.toastEnregistre('Information « ' + v.titre + ' »', !!rec); },
                     failure: function (resp) {

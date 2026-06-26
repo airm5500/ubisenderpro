@@ -447,6 +447,8 @@ public class EnvoiProposeService {
         Long cibleSegmentationId = null;
         String cibleAgence = null;
         String cibleRegion = null;
+        String cibleTournee = null;
+        String cibleContactIds = null;
         if ("ANNIVERSAIRE_CLIENT".equals(e.getType()) && e.getInfoId() == null) {
             corps = corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT"));
             verifierResidu(corps);
@@ -469,10 +471,12 @@ public class EnvoiProposeService {
             categorie = "INFORMATION";
             objectif = "Information";
             audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
-            cibleListeId = info.getListeId();
-            cibleSegmentationId = info.getSegmentationId();
-            if ("AGENCE".equals(audienceCampagne)) { cibleAgence = info.getAgence(); }
+            if ("LISTE_DE_DIFFUSION".equals(audienceCampagne)) { cibleListeId = info.getListeId(); }
+            else if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) { cibleSegmentationId = info.getSegmentationId(); }
+            else if ("AGENCE".equals(audienceCampagne)) { cibleAgence = info.getAgence(); }
             else if ("REGION".equals(audienceCampagne)) { cibleRegion = info.getRegion(); }
+            else if ("TOURNEE".equals(audienceCampagne)) { cibleTournee = info.getTournee(); }
+            else if ("CONTACTS_MANUELS".equals(audienceCampagne)) { cibleContactIds = info.getContactIds(); }
         } else if (e.getEvenementId() != null) {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
@@ -553,6 +557,8 @@ public class EnvoiProposeService {
         if (cibleSegmentationId != null) { c.setSegmentationId(cibleSegmentationId); }
         if (cibleAgence != null && !cibleAgence.isEmpty()) { c.setAgenceCible(cibleAgence); }
         if (cibleRegion != null && !cibleRegion.isEmpty()) { c.setRegionCible(cibleRegion); }
+        if (cibleTournee != null && !cibleTournee.isEmpty()) { c.setTourneeCible(cibleTournee); }
+        if (cibleContactIds != null && !cibleContactIds.isEmpty()) { c.setContactIds(cibleContactIds); }
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
         if (listeId != null) { c.setListeId(listeId); }

@@ -174,6 +174,12 @@ public class CampagneService {
         if ("REGION".equals(c.getAudience()) && c.getRegionCible() != null && !c.getRegionCible().isEmpty()) {
             contacts.addAll(contactsParChamp("region", c.getRegionCible()));
         }
+        if ("TOURNEE".equals(c.getAudience()) && c.getTourneeCible() != null && !c.getTourneeCible().isEmpty()) {
+            contacts.addAll(contactsParChamp("tournee", c.getTourneeCible()));
+        }
+        if ("CONTACTS_MANUELS".equals(c.getAudience()) && c.getContactIds() != null && !c.getContactIds().trim().isEmpty()) {
+            contacts.addAll(contactsParIds(c.getContactIds()));
+        }
         if (c.getSegmentationIds() != null && !c.getSegmentationIds().trim().isEmpty()) {
             for (String s : c.getSegmentationIds().split(",")) {
                 try { contacts.addAll(contactsParSegmentation(Long.valueOf(s.trim()))); }
@@ -213,7 +219,20 @@ public class CampagneService {
                 .setParameter("seg", segmentationId).getResultList();
     }
 
-    /** Contacts joignables d'une agence ou d'une région (audience AGENCE / REGION). */
+    /** Contacts d'une sélection manuelle (IDs CSV). */
+    private List<ClientContact> contactsParIds(String csv) {
+        List<Long> ids = new ArrayList<>();
+        for (String s : csv.split(",")) {
+            try { ids.add(Long.valueOf(s.trim())); } catch (NumberFormatException ignore) { /* id invalide */ }
+        }
+        if (ids.isEmpty()) { return new ArrayList<>(); }
+        return em.createQuery(
+                "SELECT ct FROM ClientContact ct WHERE ct.id IN :ids " +
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''", ClientContact.class)
+                .setParameter("ids", ids).getResultList();
+    }
+
+    /** Contacts joignables d'une agence, région ou tournée (audiences correspondantes). */
     private List<ClientContact> contactsParChamp(String champ, String valeur) {
         return em.createQuery(
                 "SELECT ct FROM ClientContact ct, Client cl WHERE ct.clientId = cl.id " +

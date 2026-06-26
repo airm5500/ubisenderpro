@@ -57,6 +57,14 @@ public class Campagne {
     @Column(name = "region_cible", length = 150)
     private String regionCible;
 
+    /** Ciblage par tournée (audience TOURNEE). */
+    @Column(name = "tournee_cible", length = 150)
+    private String tourneeCible;
+
+    /** Sélection manuelle de contacts (IDs séparés par des virgules). */
+    @Column(name = "contact_ids", length = 2000)
+    private String contactIds;
+
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
@@ -137,6 +145,10 @@ public class Campagne {
     public void setAgenceCible(String agenceCible) { this.agenceCible = agenceCible; }
     public String getRegionCible() { return regionCible; }
     public void setRegionCible(String regionCible) { this.regionCible = regionCible; }
+    public String getTourneeCible() { return tourneeCible; }
+    public void setTourneeCible(String tourneeCible) { this.tourneeCible = tourneeCible; }
+    public String getContactIds() { return contactIds; }
+    public void setContactIds(String contactIds) { this.contactIds = contactIds; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
     public String getCanal() { return canal; }

@@ -395,7 +395,7 @@ Usp._clientStores = [];
 
 Usp.createClientStore = function (actif) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'commune',
+        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'tournee', 'commune',
                  'emailPrincipal', 'statut', 'segmentationId', 'actif'],
         pageSize: 25,
         proxy: {
@@ -680,6 +680,7 @@ Usp.clientForm = function (store, rec) {
                 { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
                 { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
                 { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
+                { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
                 { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
                 Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
                 { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },

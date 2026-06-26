@@ -54,6 +54,10 @@ public class InfoEvenement {
     @Column(name = "liste_id")
     private Long listeId;
 
+    /** Sélection manuelle de contacts (IDs séparés par des virgules). */
+    @Column(name = "contact_ids", length = 2000)
+    private String contactIds;
+
     @Column(name = "canal", length = 10)
     private String canal;
 
@@ -147,6 +151,8 @@ public class InfoEvenement {
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
     public Long getListeId() { return listeId; }
     public void setListeId(Long listeId) { this.listeId = listeId; }
+    public String getContactIds() { return contactIds; }
+    public void setContactIds(String contactIds) { this.contactIds = contactIds; }
     public String getCanal() { return canal; }
     public void setCanal(String canal) { this.canal = canal; }
     public Long getModeleId() { return modeleId; }
