@@ -39,6 +39,9 @@ public class InfoEvenement {
     @Column(name = "agence", length = 150)
     private String agence;
 
+    @Column(name = "region", length = 150)
+    private String region;
+
     @Column(name = "tournee", length = 150)
     private String tournee;
 
@@ -134,6 +137,8 @@ public class InfoEvenement {
     public void setSociete(String societe) { this.societe = societe; }
     public String getAgence() { return agence; }
     public void setAgence(String agence) { this.agence = agence; }
+    public String getRegion() { return region; }
+    public void setRegion(String region) { this.region = region; }
     public String getTournee() { return tournee; }
     public void setTournee(String tournee) { this.tournee = tournee; }
     public String getAudience() { return audience; }

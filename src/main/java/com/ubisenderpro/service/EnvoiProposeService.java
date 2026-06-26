@@ -165,13 +165,16 @@ public class EnvoiProposeService {
                 corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT")), AUDIENCE_ANNIVERSAIRE);
     }
 
-    /** Nombre de contacts éligibles aux vœux d'anniversaire pour un jour/mois (§10). */
+    /** Nombre de contacts éligibles aux vœux d'anniversaire pour un jour/mois (§10),
+     *  hors contacts ayant déjà reçu leurs vœux cette année (dédup annuel). */
     private long compteAnniversairesEligibles(int jour, int mois) {
         return em.createQuery(
                 "SELECT COUNT(ct) FROM ClientContact ct WHERE ct.actif = true AND ct.consentRelationnel = true " +
                 "AND ct.desabonne = false AND ct.bloque = false AND ct.jourNaissance = :j AND ct.moisNaissance = :m " +
-                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''", Long.class)
-                .setParameter("j", jour).setParameter("m", mois).getSingleResult();
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
+                "AND NOT EXISTS (SELECT 1 FROM AnniversaireEnvoi a WHERE a.contactId = ct.id AND a.annee = :an)", Long.class)
+                .setParameter("j", jour).setParameter("m", mois)
+                .setParameter("an", LocalDate.now().getYear()).getSingleResult();
     }
 
     /** Une proposition par information active (hors anniversaires, générés à part). */
@@ -442,6 +445,8 @@ public class EnvoiProposeService {
         String audienceCampagne = null;
         Long cibleListeId = null;
         Long cibleSegmentationId = null;
+        String cibleAgence = null;
+        String cibleRegion = null;
         if ("ANNIVERSAIRE_CLIENT".equals(e.getType()) && e.getInfoId() == null) {
             corps = corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT"));
             verifierResidu(corps);
@@ -466,6 +471,8 @@ public class EnvoiProposeService {
             audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
             cibleListeId = info.getListeId();
             cibleSegmentationId = info.getSegmentationId();
+            if ("AGENCE".equals(audienceCampagne)) { cibleAgence = info.getAgence(); }
+            else if ("REGION".equals(audienceCampagne)) { cibleRegion = info.getRegion(); }
         } else if (e.getEvenementId() != null) {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
@@ -541,9 +548,11 @@ public class EnvoiProposeService {
             c.setAudience(audienceCampagne);
             c.setSegmentationIds(audienceService.segmentationIdsCsv(audienceCampagne));
         }
-        // Ciblage explicite porté par l'information (liste / segmentation choisies).
+        // Ciblage explicite porté par l'information (liste / segmentation / agence / région).
         if (cibleListeId != null) { c.setListeId(cibleListeId); }
         if (cibleSegmentationId != null) { c.setSegmentationId(cibleSegmentationId); }
+        if (cibleAgence != null && !cibleAgence.isEmpty()) { c.setAgenceCible(cibleAgence); }
+        if (cibleRegion != null && !cibleRegion.isEmpty()) { c.setRegionCible(cibleRegion); }
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
         if (listeId != null) { c.setListeId(listeId); }

@@ -49,6 +49,14 @@ public class Campagne {
     @Column(name = "segmentation_ids", length = 255)
     private String segmentationIds;
 
+    /** Ciblage par agence (audience AGENCE). */
+    @Column(name = "agence_cible", length = 150)
+    private String agenceCible;
+
+    /** Ciblage par région (audience REGION). */
+    @Column(name = "region_cible", length = 150)
+    private String regionCible;
+
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
@@ -125,6 +133,10 @@ public class Campagne {
     public void setAudience(String audience) { this.audience = audience; }
     public String getSegmentationIds() { return segmentationIds; }
     public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
+    public String getAgenceCible() { return agenceCible; }
+    public void setAgenceCible(String agenceCible) { this.agenceCible = agenceCible; }
+    public String getRegionCible() { return regionCible; }
+    public void setRegionCible(String regionCible) { this.regionCible = regionCible; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
     public String getCanal() { return canal; }

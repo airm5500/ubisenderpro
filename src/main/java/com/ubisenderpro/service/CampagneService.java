@@ -168,6 +168,12 @@ public class CampagneService {
         // Audience (§16) : tous les segments, ou une/plusieurs segmentations résolues.
         if ("TOUS_LES_SEGMENTS".equals(c.getAudience())) { contacts.addAll(tousContacts()); }
         if ("ANNIVERSAIRE_JOUR".equals(c.getAudience())) { contacts.addAll(contactsAnniversaireDuJour()); }
+        if ("AGENCE".equals(c.getAudience()) && c.getAgenceCible() != null && !c.getAgenceCible().isEmpty()) {
+            contacts.addAll(contactsParChamp("agence", c.getAgenceCible()));
+        }
+        if ("REGION".equals(c.getAudience()) && c.getRegionCible() != null && !c.getRegionCible().isEmpty()) {
+            contacts.addAll(contactsParChamp("region", c.getRegionCible()));
+        }
         if (c.getSegmentationIds() != null && !c.getSegmentationIds().trim().isEmpty()) {
             for (String s : c.getSegmentationIds().split(",")) {
                 try { contacts.addAll(contactsParSegmentation(Long.valueOf(s.trim()))); }
@@ -207,14 +213,36 @@ public class CampagneService {
                 .setParameter("seg", segmentationId).getResultList();
     }
 
-    /** Contacts éligibles aux vœux d'anniversaire aujourd'hui (§10). */
+    /** Contacts joignables d'une agence ou d'une région (audience AGENCE / REGION). */
+    private List<ClientContact> contactsParChamp(String champ, String valeur) {
+        return em.createQuery(
+                "SELECT ct FROM ClientContact ct, Client cl WHERE ct.clientId = cl.id " +
+                "AND cl." + champ + " = :v AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
+                ClientContact.class).setParameter("v", valeur).getResultList();
+    }
+
+    /**
+     * Contacts éligibles aux vœux d'anniversaire aujourd'hui (§10), hors contacts
+     * déjà fêtés cette année. Trace l'envoi (un seul vœu par contact et par an).
+     */
     private List<ClientContact> contactsAnniversaireDuJour() {
         LocalDate t = LocalDate.now();
-        return em.createQuery(
+        int annee = t.getYear();
+        List<ClientContact> contacts = em.createQuery(
                 "SELECT ct FROM ClientContact ct WHERE ct.actif = true AND ct.consentRelationnel = true " +
                 "AND ct.desabonne = false AND ct.bloque = false AND ct.jourNaissance = :j AND ct.moisNaissance = :m " +
-                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''", ClientContact.class)
-                .setParameter("j", t.getDayOfMonth()).setParameter("m", t.getMonthValue()).getResultList();
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
+                "AND NOT EXISTS (SELECT 1 FROM AnniversaireEnvoi a WHERE a.contactId = ct.id AND a.annee = :an)",
+                ClientContact.class)
+                .setParameter("j", t.getDayOfMonth()).setParameter("m", t.getMonthValue())
+                .setParameter("an", annee).getResultList();
+        for (ClientContact ct : contacts) {
+            AnniversaireEnvoi a = new AnniversaireEnvoi();
+            a.setContactId(ct.getId());
+            a.setAnnee(annee);
+            em.persist(a);
+        }
+        return contacts;
     }
 
     /** Tous les contacts joignables (audience TOUS_LES_SEGMENTS). */

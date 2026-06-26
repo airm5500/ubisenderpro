@@ -19,7 +19,8 @@ Usp.info.TYPES = [
 Usp.info.PRIORITES = [['NORMALE', 'Normale'], ['IMPORTANTE', 'Importante'], ['URGENTE', 'Urgente'], ['CRITIQUE', 'Critique']];
 Usp.info.AUDIENCES = [
     ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
-    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium']
+    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'],
+    ['AGENCE', 'Clients de l\'agence'], ['REGION', 'Clients de la région']
 ];
 Usp.info.COULEUR_STATUT = {
     BROUILLON: '#777', EN_ATTENTE: '#777', PROGRAMMEE: '#1976d2', EN_COURS: '#ef6c00',
@@ -57,7 +58,7 @@ Usp.info.panel = function () {
 
 Usp.info.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'tournee',
+        fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'region', 'tournee',
                  'audience', 'segmentationId', 'listeId', 'canal', 'dateEnvoi', 'dateFinValidite',
                  'statut', 'responsable', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
                  'causeInterne', 'causeCommunicable', 'dateResolution', 'jourFerie', 'dateGarde',
@@ -150,7 +151,10 @@ Usp.info.form = function (store, rec, typeParDefaut) {
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', editable: false, queryMode: 'local',
               store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: g('canal') || 'WEB' },
             { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || '' },
-            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: g('agence') || '' },
+            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: g('agence') || '',
+              emptyText: 'Sert au texte et au ciblage « Clients de l\'agence »' },
+            { xtype: 'textfield', name: 'region', fieldLabel: 'Région', value: g('region') || '',
+              emptyText: 'Sert au ciblage « Clients de la région »' },
             { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée', value: g('tournee') || '' },
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Direction / signataire', value: g('responsable') || '' },
             { xtype: 'datefield', name: 'dateEnvoi', fieldLabel: 'Date d\'envoi', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateEnvoi') },
