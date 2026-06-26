@@ -436,6 +436,10 @@ public class EnvoiProposeService {
                     "Seule une proposition au statut « PROPOSEE » peut être validée.");
         }
 
+        // URL publique des pièces jointes : préférer app.url_base (reverse proxy HTTPS) si défini.
+        String paramBase = parametreService.valeur(CLE_URL_BASE, "");
+        if (paramBase != null && !paramBase.trim().isEmpty()) { baseUrl = paramBase.trim(); }
+
         Promotion p = e.getPromotionId() != null ? em.find(Promotion.class, e.getPromotionId()) : null;
 
         String corps;

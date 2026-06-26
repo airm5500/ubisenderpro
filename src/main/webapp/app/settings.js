@@ -391,6 +391,13 @@ Usp.settings.generalPanel = function () {
             { xtype: 'textfield', name: 'lienCommande', itemId: 'lienCommandeField',
               fieldLabel: 'Lien de commande', width: 520,
               emptyText: 'https://… (variable [LIEN_COMMANDE])' },
+            { xtype: 'textfield', name: 'urlBase', itemId: 'urlBaseField',
+              fieldLabel: 'URL publique (HTTPS)', width: 520,
+              emptyText: 'https://domaine/ubisenderpro/api/v1 — pour que Meta télécharge images & pièces jointes' },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Base HTTPS publique de l\'API. Sert à générer les liens ' +
+                     'd\'images de template et de bulletins .xlsx téléchargeables par Meta (derrière un reverse proxy). ' +
+                     'Laisser vide en accès direct.</span>' },
             { xtype: 'fieldcontainer', fieldLabel: 'Icône de l\'application', layout: 'hbox', items: [
                 { xtype: 'hiddenfield', itemId: 'faviconField' },
                 { xtype: 'component', itemId: 'faviconApercu', margin: '0 8 0 0',
@@ -415,6 +422,7 @@ Usp.settings.generalPanel = function () {
             var societeTel = p.down('#societeTelField').getValue() || '';
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
+            var urlBase = (p.down('#urlBaseField').getValue() || '').trim();
             var favicon = p.down('#faviconField').getValue() || '';
             var put = function (cle, valeur) {
                 return function (cb) {
@@ -430,9 +438,11 @@ Usp.settings.generalPanel = function () {
                     put('app.societe_tel', societeTel)(function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
+                            put('app.url_base', urlBase)(function () {
                             put('app.favicon', favicon)(function () {
                                 Usp.appliquerFavicon(favicon);
                                 Usp.toast('Paramètres enregistrés avec succès.');
+                            });
                             });
                             });
                         });
@@ -454,6 +464,7 @@ Usp.settings.generalPanel = function () {
         charger('app.societe_tel', 'societeTelField', '');
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
+        charger('app.url_base', 'urlBaseField', '');
         Usp.ajax({ url: '/parametres/app.favicon', method: 'GET', success: function (resp) {
             var url = (Ext.decode(resp.responseText) || {}).valeur || '';
             form.down('#faviconField').setValue(url);

@@ -29,6 +29,8 @@ public class MediaResource {
 
     @EJB
     private MediaFichierService mediaFichierService;
+    @EJB
+    private com.ubisenderpro.service.ParametreService parametreService;
 
     @POST
     @Path("/upload")
@@ -49,10 +51,18 @@ public class MediaResource {
         }
         MediaFichier mf = mediaFichierService.enregistrer(contenu, req.getMimeType(), req.getNomFichier());
 
-        URI url = uriInfo.getBaseUriBuilder().path("media").path(String.valueOf(mf.getId())).build();
+        // URL publique : base configurée (app.url_base, derrière reverse proxy HTTPS)
+        // sinon la base de la requête.
+        String base = parametreService.valeur("app.url_base", "");
+        String url;
+        if (base != null && !base.trim().isEmpty()) {
+            url = base.trim() + (base.trim().endsWith("/") ? "" : "/") + "media/" + mf.getId();
+        } else {
+            url = uriInfo.getBaseUriBuilder().path("media").path(String.valueOf(mf.getId())).build().toString();
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("id", mf.getId());
-        result.put("url", url.toString());
+        result.put("url", url);
         result.put("mimeType", mf.getMimeType());
         result.put("nomFichier", mf.getNomFichier());
         result.put("taille", mf.getTaille());
