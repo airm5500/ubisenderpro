@@ -243,7 +243,7 @@ public class WhatsappCloudClient {
         HttpURLConnection conn = null;
         try {
             String endpoint = String.format(
-                    "https://graph.facebook.com/%s/%s/message_templates?limit=200&fields=name,language,status,category",
+                    "https://graph.facebook.com/%s/%s/message_templates?limit=200&fields=name,language,status,category,components",
                     account.getApiVersion(), account.getBusinessAccountId());
             conn = (HttpURLConnection) new URL(endpoint).openConnection();
             conn.setRequestMethod("GET");
@@ -261,6 +261,17 @@ public class WhatsappCloudClient {
                     m.put("language", n.path("language").asText(""));
                     m.put("status", n.path("status").asText(""));
                     m.put("category", n.path("category").asText(""));
+                    // Corps + nombre de paramètres + format d'en-tête (depuis components).
+                    String bodyText = "";
+                    String headerFormat = "";
+                    for (JsonNode comp : n.path("components")) {
+                        String t = comp.path("type").asText("");
+                        if ("BODY".equalsIgnoreCase(t)) { bodyText = comp.path("text").asText(""); }
+                        else if ("HEADER".equalsIgnoreCase(t)) { headerFormat = comp.path("format").asText(""); }
+                    }
+                    m.put("bodyText", bodyText);
+                    m.put("headerFormat", headerFormat);
+                    m.put("nbParams", compterParams(bodyText));
                     out.add(m);
                 }
                 return out;
@@ -273,6 +284,17 @@ public class WhatsappCloudClient {
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    /** Nombre de paramètres positionnels {{1}},{{2}}… d'un corps de template. */
+    private int compterParams(String texte) {
+        if (texte == null || texte.isEmpty()) { return 0; }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{\\{\\s*(\\d+)\\s*\\}\\}").matcher(texte);
+        int max = 0;
+        while (m.find()) {
+            try { max = Math.max(max, Integer.parseInt(m.group(1))); } catch (NumberFormatException ignore) { }
+        }
+        return max;
     }
 
     private SendResult envoyer(Map<String, Object> body) {

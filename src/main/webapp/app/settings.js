@@ -252,7 +252,7 @@ Usp.settings.importerTemplatesMeta = function (form) {
     var accStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/whatsapp/accounts',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
-    var tplStore = Ext.create('Ext.data.Store', { fields: ['name', 'language', 'status', 'category'] });
+    var tplStore = Ext.create('Ext.data.Store', { fields: ['name', 'language', 'status', 'category', 'bodyText', 'headerFormat', 'nbParams'] });
     var charger = function (win) {
         var id = win.down('[name=acc]').getValue();
         if (!id) { return; }
@@ -280,16 +280,36 @@ Usp.settings.importerTemplatesMeta = function (form) {
             '->', { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('window')); } }],
         items: [{ xtype: 'grid', store: tplStore, columns: [
             { text: 'Nom Meta', dataIndex: 'name', flex: 1 },
-            { text: 'Langue', dataIndex: 'language', width: 80 },
-            { text: 'Catégorie', dataIndex: 'category', width: 120 },
-            { text: 'Statut', dataIndex: 'status', width: 130,
+            { text: 'Langue', dataIndex: 'language', width: 70 },
+            { text: 'Params', dataIndex: 'nbParams', width: 70, align: 'center' },
+            { text: 'En-tête', dataIndex: 'headerFormat', width: 90 },
+            { text: 'Catégorie', dataIndex: 'category', width: 110 },
+            { text: 'Statut', dataIndex: 'status', width: 120,
               renderer: function (v) { return v === 'APPROVED' ? '✅ ' + v : v; } }
         ],
         listeners: { itemdblclick: function (g, rec) {
             form.down('[name=nomModeleWhatsapp]').setValue(rec.get('name'));
             var lf = form.down('[name=langue]'); if (lf) { lf.setValue(rec.get('language')); }
+            // Corps (canal WEB) : pré-rempli si vide, à partir du corps Meta.
+            var cf = form.down('[name=corps]');
+            if (cf && !cf.getValue() && rec.get('bodyText')) { cf.setValue(rec.get('bodyText')); }
+            // Paramètres du corps : pré-remplis selon le nombre de {{n}} si vide.
+            var pf = form.down('[name=paramsCorps]');
+            var nb = rec.get('nbParams') || 0;
+            if (pf && !pf.getValue() && nb > 0) {
+                var arr = [];
+                for (var i = 0; i < nb; i++) { arr.push(i === 0 ? 'nom_contact' : 'a_definir'); }
+                pf.setValue(arr.join(','));
+            }
+            // En-tête média : si le template a un en-tête média, on positionne le type.
+            var hf = (rec.get('headerFormat') || '').toUpperCase();
+            var mt = form.down('[name=enteteMediaType]');
+            if (mt && !mt.getValue() && (hf === 'IMAGE' || hf === 'VIDEO' || hf === 'DOCUMENT')) { mt.setValue(hf); }
             win.close();
-            Usp.toast('Modèle Meta « ' + rec.get('name') + ' » sélectionné.');
+            var msg = 'Modèle Meta « ' + rec.get('name') + ' » sélectionné.';
+            if (nb > 1) { msg += ' ⚠️ ' + nb + ' paramètres : ajustez « Paramètres du corps » (a_definir).'; }
+            if (hf === 'IMAGE' || hf === 'VIDEO' || hf === 'DOCUMENT') { msg += ' En-tête ' + hf + ' : ajoutez le média.'; }
+            Usp.toast(msg);
         } } }],
         bbar: [{ xtype: 'tbtext', text: '<span style="color:#888">Double-cliquez un modèle approuvé pour le sélectionner.</span>' }]
     });
