@@ -367,9 +367,15 @@ Usp.marketing.LIB_TYPE = {
     // Types issus du module Disponibilités & Ruptures.
     ANNONCE_DISPONIBILITE: '🟢 Disponibilité', RETOUR_RUPTURE: '🔵 Retour de rupture',
     RISQUE_RUPTURE: '🟠 Risque de rupture', RUPTURE_CONFIRMEE: '🔴 Rupture confirmée',
-    STOCK_LIMITE: '🟡 Stock limité'
+    STOCK_LIMITE: '🟡 Stock limité',
+    // Types issus du module Informations Clients.
+    RETARD_LIVRAISON: '🚚 Retard livraison', MODIFICATION_TOURNEE: '🚚 Modif. tournée',
+    ANNULATION_TOURNEE: '🚫 Annulation tournée', REPRISE_LIVRAISON: '✅ Reprise livraison',
+    INFORMATION_GARDE: '🏥 Garde', INFORMATION_JOUR_FERIE: '📅 Jour férié',
+    MODIFICATION_HORAIRES: '🕒 Horaires', FERMETURE_AGENCE: '🚪 Fermeture',
+    INFORMATION_GENERALE: '📢 Info générale', ALERTE_URGENTE: '🚨 Alerte', ANNIVERSAIRE_CLIENT: '🎂 Anniversaire'
 };
-Usp.marketing.LIB_SOURCE = { PROMO: '🏷️ Promo', DISPO: '📦 Dispo' };
+Usp.marketing.LIB_SOURCE = { PROMO: '🏷️ Promo', DISPO: '📦 Dispo', INFO: '📨 Info' };
 Usp.marketing.COULEUR_PROP = {
     PROPOSEE: '#1976d2', VALIDEE: '#2e7d32', REJETEE: '#c62828', EXPIREE: '#777'
 };
@@ -538,11 +544,12 @@ Usp.marketing.campagnesPromo = function () {
         // Campagnes marketing : issues des promotions ou des disponibilités/ruptures.
         filters: [{ filterFn: function (rec) {
             var c = String(rec.get('categorie') || '').toUpperCase();
-            return c === 'PROMOTION' || c === 'DISPONIBILITE'; } }]
+            return c === 'PROMOTION' || c === 'DISPONIBILITE' || c === 'INFORMATION'; } }]
     });
     var libCat = function (v) {
         var c = String(v || '').toUpperCase();
-        return c === 'DISPONIBILITE' ? '📦 Dispo' : (c === 'PROMOTION' ? '🏷️ Promo' : (v || ''));
+        return c === 'DISPONIBILITE' ? '📦 Dispo' : (c === 'PROMOTION' ? '🏷️ Promo'
+            : (c === 'INFORMATION' ? '📨 Info' : (v || '')));
     };
     return {
         xtype: 'grid', title: '🚀 Campagnes', store: store,
@@ -598,7 +605,7 @@ Usp.marketing.performance = function () {
             { xtype: 'combobox', name: 'canal', width: 130, editable: false, queryMode: 'local', value: '',
               store: [['', 'Tous canaux'], ['WEB', 'WhatsApp Web'], ['API', 'API']] },
             { xtype: 'combobox', name: 'categorie', width: 150, editable: false, queryMode: 'local', value: '',
-              store: [['', 'Toutes sources'], ['PROMOTION', 'Promotions'], ['DISPONIBILITE', 'Dispo / Ruptures']] },
+              store: [['', 'Toutes sources'], ['PROMOTION', 'Promotions'], ['DISPONIBILITE', 'Dispo / Ruptures'], ['INFORMATION', 'Informations']] },
             { text: '🔎 Appliquer', handler: function (b) { charger(b.up('panel')); } },
             '->',
             { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } }

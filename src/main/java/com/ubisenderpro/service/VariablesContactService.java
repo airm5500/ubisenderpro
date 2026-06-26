@@ -55,6 +55,9 @@ public class VariablesContactService {
         vars.put("NAME", nom);
         vars.put("NOM_CONTACT", nom);
         vars.put("CIVILITE", civilite);
+        // Formule complète, jamais vide (repli générique si ni titre ni nom).
+        String civComplete = (vide(civilite) + " " + nom).trim();
+        vars.put("CIVILITE_COMPLETE", civComplete.isEmpty() ? "Cher(e) client(e)" : civComplete);
         vars.put("TELEPHONE", tel);
         vars.put("EMAIL", email);
         vars.put("NOM_COMPTE", nomCompte);

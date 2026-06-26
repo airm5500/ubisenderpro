@@ -38,6 +38,10 @@ public class EnvoiPropose {
     @Column(name = "evenement_id")
     private Long evenementId;
 
+    /** Information source (si source = INFO). */
+    @Column(name = "info_id")
+    private Long infoId;
+
     @Column(name = "titre", nullable = false, length = 200)
     private String titre;
 
@@ -91,6 +95,8 @@ public class EnvoiPropose {
     public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
     public Long getEvenementId() { return evenementId; }
     public void setEvenementId(Long evenementId) { this.evenementId = evenementId; }
+    public Long getInfoId() { return infoId; }
+    public void setInfoId(Long infoId) { this.infoId = infoId; }
     public String getTitre() { return titre; }
     public void setTitre(String titre) { this.titre = titre; }
     public String getMessage() { return message; }

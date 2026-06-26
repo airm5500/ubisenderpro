@@ -4,6 +4,7 @@ import com.ubisenderpro.entity.Campagne;
 import com.ubisenderpro.entity.DispoEvenement;
 import com.ubisenderpro.entity.DispoProduit;
 import com.ubisenderpro.entity.DispoRegle;
+import com.ubisenderpro.entity.InfoEvenement;
 import com.ubisenderpro.entity.EnvoiPropose;
 import com.ubisenderpro.entity.MediaFichier;
 import com.ubisenderpro.entity.ModeleMessage;
@@ -69,6 +70,8 @@ public class EnvoiProposeService {
     private AudienceService audienceService;
     @EJB
     private DispoRegleService dispoRegleService;
+    @EJB
+    private InfoEvenementService infoEvenementService;
 
     /** Paramètre technique (§12) : autorise le traitement auto des propositions rupture. */
     public static final String CLE_RUPTURE_SANS_AVIS = "rupture.envoi_sans_avis";
@@ -141,7 +144,52 @@ public class EnvoiProposeService {
 
         // 3) Événements de disponibilité / rupture actifs avec au moins un produit.
         crees += genererPropositionsDispo(today);
+        // 4) Informations clients / alertes opérationnelles actives.
+        crees += genererPropositionsInfo(today);
         return crees;
+    }
+
+    /** Une proposition par information active (hors anniversaires, générés à part). */
+    private int genererPropositionsInfo(LocalDate today) {
+        int crees = 0;
+        for (InfoEvenement i : infoEvenementService.lister()) {
+            String st = i.getStatut();
+            if ("ENVOYEE".equals(st) || "ANNULEE".equals(st) || "ARCHIVEE".equals(st) || "EXPIREE".equals(st)) { continue; }
+            if ("ANNIVERSAIRE_CLIENT".equals(i.getType())) { continue; } // géré par la génération anniversaires
+            LocalDate prevue = i.getDateEnvoi() != null ? i.getDateEnvoi().toLocalDate() : today;
+            if (prevue.isBefore(today)) { prevue = today; }
+            crees += upsertInfo("INFO:" + i.getId(), i.getType(), i.getId(), prevue,
+                    i.getTitre(), messageInfo(i), i.getAudience());
+        }
+        return crees;
+    }
+
+    private int upsertInfo(String cle, String type, Long infoId, LocalDate datePrevue,
+                           String titre, String message, String audience) {
+        Optional<EnvoiPropose> ex = parCle(cle);
+        if (ex.isPresent()) {
+            EnvoiPropose e = ex.get();
+            if ("PROPOSEE".equals(e.getStatut())) {
+                e.setDatePrevue(datePrevue);
+                e.setTitre(titre);
+                e.setMessage(message);
+                e.setAudience(audience);
+                em.merge(e);
+            }
+            return 0;
+        }
+        EnvoiPropose e = new EnvoiPropose();
+        e.setCle(cle);
+        e.setType(type);
+        e.setSource("INFO");
+        e.setInfoId(infoId);
+        e.setDatePrevue(datePrevue);
+        e.setTitre(titre);
+        e.setMessage(message);
+        e.setAudience(audience);
+        e.setStatut("PROPOSEE");
+        em.persist(e);
+        return 1;
     }
 
     /** Propositions issues des événements dispo/rupture actifs comportant des produits.
@@ -348,7 +396,26 @@ public class EnvoiProposeService {
         String categorie = "PROMOTION";
         String objectif = "Promotion";
         String audienceCampagne = null;
-        if (e.getEvenementId() != null) {
+        Long cibleListeId = null;
+        Long cibleSegmentationId = null;
+        if (e.getInfoId() != null) {
+            InfoEvenement info = em.find(InfoEvenement.class, e.getInfoId());
+            if (info == null) { throw new ValidationException("info", "Information introuvable."); }
+            List<String> manquants = elementsInfoManquants(info);
+            if (!manquants.isEmpty()) {
+                throw new ValidationException("variables",
+                        "Validation impossible — éléments manquants : " + String.join(", ", manquants)
+                                + ". Complétez l'information puis réessayez.");
+            }
+            corps = messageInfo(info);
+            verifierResidu(corps);
+            modele = creerModele(e.getTitre(), corps, null, null, nz(info.getType()).isEmpty() ? "INFORMATION" : info.getType());
+            categorie = "INFORMATION";
+            objectif = "Information";
+            audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
+            cibleListeId = info.getListeId();
+            cibleSegmentationId = info.getSegmentationId();
+        } else if (e.getEvenementId() != null) {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
             audienceCampagne = e.getAudience() != null ? e.getAudience() : evt.getAudience();
@@ -423,6 +490,9 @@ public class EnvoiProposeService {
             c.setAudience(audienceCampagne);
             c.setSegmentationIds(audienceService.segmentationIdsCsv(audienceCampagne));
         }
+        // Ciblage explicite porté par l'information (liste / segmentation choisies).
+        if (cibleListeId != null) { c.setListeId(cibleListeId); }
+        if (cibleSegmentationId != null) { c.setSegmentationId(cibleSegmentationId); }
         // L'envoi est programmé à 9h le jour prévu ; l'opérateur peut l'ajuster.
         c.setDateProgrammee(e.getDatePrevue().atTime(9, 0));
         if (listeId != null) { c.setListeId(listeId); }
@@ -524,6 +594,46 @@ public class EnvoiProposeService {
     private String bulletinNom(DispoEvenement evt) {
         String j = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
         return "Bulletin_" + slug(nz(evt.getType()).isEmpty() ? "Dispo" : evt.getType()) + "_" + j + ".xlsx";
+    }
+
+    /* ====================== Informations clients ====================== */
+
+    private List<String> elementsInfoManquants(InfoEvenement i) {
+        List<String> m = new ArrayList<>();
+        if (nz(i.getTitre()).isEmpty()) { m.add("titre"); }
+        String t = i.getType();
+        boolean libre = "INFORMATION_GENERALE".equals(t) || "ALERTE_URGENTE".equals(t)
+                || "MODIFICATION_HORAIRES".equals(t) || "FERMETURE_AGENCE".equals(t);
+        if (libre && nz(i.getMessage()).isEmpty()) { m.add("le message"); }
+        return m;
+    }
+
+    /** Message d'une information : modèle (par type) + variables de contexte ; lignes
+     *  à variable facultative vide supprimées ; tokens contact conservés pour l'envoi. */
+    private String messageInfo(InfoEvenement i) {
+        String corps = corpsTemplate(InfoTemplates.clePourType(i.getType()));
+        if (corps == null || corps.isEmpty()) { corps = nz(i.getMessage()); }
+        Map<String, String> v = variablesInfo(i);
+        corps = retirerLignesVides(corps, v);
+        return ModeleService.fusionner(corps, v);
+    }
+
+    private Map<String, String> variablesInfo(InfoEvenement i) {
+        Map<String, String> v = new LinkedHashMap<>();
+        v.put("agence", nz(i.getAgence()));
+        v.put("tournee", nz(i.getTournee()));
+        v.put("agence_ou_tournee", !nz(i.getTournee()).isEmpty() ? i.getTournee() : nz(i.getAgence()));
+        v.put("jour_ferie", nz(i.getJourFerie()));
+        v.put("heure_limite_commande", nz(i.getHeureLimiteCommande()));
+        v.put("consignes_livraison", nz(i.getConsignesLivraison()));
+        v.put("pharmacien_garde", nz(i.getPharmacienGarde()));
+        v.put("telephone_pharmacien", nz(i.getTelephonePharmacien()));
+        v.put("nouvelle_estimation_livraison",
+                nz(i.getNouvelleHeure()).isEmpty() ? "" : "Nouvelle estimation de livraison : " + i.getNouvelleHeure());
+        v.put("direction_signataire", !nz(i.getResponsable()).isEmpty() ? i.getResponsable()
+                : ("Direction " + (nz(i.getAgence()).isEmpty() ? "Commerciale" : i.getAgence())));
+        v.put("message", nz(i.getMessage()));
+        return v;
     }
 
     /** Supprime les lignes contenant une variable de contexte vide (spec §14). */
@@ -663,7 +773,8 @@ public class EnvoiProposeService {
 
     /** Variables résolues par destinataire à l'envoi (à ignorer dans le contrôle anti-résidu). */
     private static final String[] TOKENS_CONTACT = {
-        "nom_contact", "civilite", "segmentation", "nom_compte", "societe_client", "ville", "region", "email", "telephone"
+        "nom_contact", "civilite", "civilite_complete", "segmentation", "nom_compte", "societe_client",
+        "societe", "ville", "region", "email", "telephone"
     };
 
     private void verifierResidu(String corps) {
@@ -725,6 +836,7 @@ public class EnvoiProposeService {
         }
         String def = PromoTemplates.CORPS.get(cleSysteme);
         if (def == null) { def = DispoTemplates.CORPS.get(cleSysteme); }
+        if (def == null) { def = InfoTemplates.CORPS.get(cleSysteme); }
         return def == null ? "" : def;
     }
 

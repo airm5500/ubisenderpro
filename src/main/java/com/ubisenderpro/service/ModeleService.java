@@ -28,6 +28,7 @@ public class ModeleService {
         int crees = 0;
         crees += seedModeles(PromoTemplates.NOMS, PromoTemplates.CORPS, PromoTemplates.TYPES);
         crees += seedModeles(DispoTemplates.NOMS, DispoTemplates.CORPS, DispoTemplates.TYPES);
+        crees += seedModeles(InfoTemplates.NOMS, InfoTemplates.CORPS, InfoTemplates.TYPES);
         return crees;
     }
 
