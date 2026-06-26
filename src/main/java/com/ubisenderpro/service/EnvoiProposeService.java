@@ -73,10 +73,14 @@ public class EnvoiProposeService {
     @EJB
     private InfoEvenementService infoEvenementService;
 
-    /** Paramètre technique (§12) : autorise le traitement auto des propositions rupture. */
+    /** Paramètres techniques (§12, §11 info) : traitement auto sans validation. */
     public static final String CLE_RUPTURE_SANS_AVIS = "rupture.envoi_sans_avis";
+    public static final String CLE_INFO_SANS_AVIS = "information.envoi_sans_avis";
+    public static final String CLE_ANNIV_SANS_AVIS = "anniversaire.envoi_sans_avis";
     /** URL publique de base (pour joindre les pièces jointes en mode auto, hors contexte HTTP). */
     public static final String CLE_URL_BASE = "app.url_base";
+    /** Audience virtuelle : contacts dont c'est l'anniversaire aujourd'hui. */
+    public static final String AUDIENCE_ANNIVERSAIRE = "ANNIVERSAIRE_JOUR";
 
     /* ====================== Lecture ====================== */
 
@@ -146,7 +150,28 @@ public class EnvoiProposeService {
         crees += genererPropositionsDispo(today);
         // 4) Informations clients / alertes opérationnelles actives.
         crees += genererPropositionsInfo(today);
+        // 5) Anniversaires du jour (s'il y a des contacts éligibles).
+        crees += genererAnniversaires(today);
         return crees;
+    }
+
+    /** Génère une proposition « anniversaires du jour » s'il existe des contacts éligibles. */
+    private int genererAnniversaires(LocalDate today) {
+        long n = compteAnniversairesEligibles(today.getDayOfMonth(), today.getMonthValue());
+        if (n == 0) { return 0; }
+        String jj = String.format("%02d/%02d", today.getDayOfMonth(), today.getMonthValue());
+        return upsertInfo("ANNIV:" + today, "ANNIVERSAIRE_CLIENT", null, today,
+                "Anniversaires du " + jj + " (" + n + ")",
+                corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT")), AUDIENCE_ANNIVERSAIRE);
+    }
+
+    /** Nombre de contacts éligibles aux vœux d'anniversaire pour un jour/mois (§10). */
+    private long compteAnniversairesEligibles(int jour, int mois) {
+        return em.createQuery(
+                "SELECT COUNT(ct) FROM ClientContact ct WHERE ct.actif = true AND ct.consentRelationnel = true " +
+                "AND ct.desabonne = false AND ct.bloque = false AND ct.jourNaissance = :j AND ct.moisNaissance = :m " +
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''", Long.class)
+                .setParameter("j", jour).setParameter("m", mois).getSingleResult();
     }
 
     /** Une proposition par information active (hors anniversaires, générés à part). */
@@ -321,34 +346,53 @@ public class EnvoiProposeService {
 
     /* ====================== Traitement automatique (§12) ====================== */
 
-    /** Indique si l'envoi auto des propositions rupture est activé (paramètre technique). */
-    public boolean envoiRuptureSansAvis() {
-        return "true".equalsIgnoreCase(parametreService.valeur(CLE_RUPTURE_SANS_AVIS, "false"));
+    private boolean flag(String cle) {
+        return "true".equalsIgnoreCase(parametreService.valeur(cle, "false"));
     }
 
     /**
-     * Traite automatiquement les propositions dispo/rupture dues, sans validation
-     * humaine, <b>uniquement si</b> le paramètre {@code rupture.envoi_sans_avis} = true
-     * et que les contrôles métier (§12) passent. Crée la campagne (brouillon) prête
-     * à l'envoi. Reste sans effet par défaut.
+     * Traite automatiquement les propositions dues sans validation humaine, selon
+     * les paramètres techniques (rupture / information / anniversaire), si les
+     * contrôles métier passent. Crée la campagne (brouillon) prête à l'envoi.
+     * Reste sans effet par défaut.
      *
      * @return nombre de propositions transformées en campagne.
      */
     public int traiterPropositionsAuto() {
-        if (!envoiRuptureSansAvis()) { return 0; }
+        boolean dispoAuto = flag(CLE_RUPTURE_SANS_AVIS);
+        boolean infoAuto = flag(CLE_INFO_SANS_AVIS);
+        boolean annivAuto = flag(CLE_ANNIV_SANS_AVIS);
+        if (!dispoAuto && !infoAuto && !annivAuto) { return 0; }
         String baseUrl = parametreService.valeur(CLE_URL_BASE, "");
-        if (baseUrl == null || baseUrl.trim().isEmpty()) { return 0; } // média non joignable -> on s'abstient
         int traites = 0;
         List<EnvoiPropose> props = em.createQuery(
-                "SELECT e FROM EnvoiPropose e WHERE e.statut = 'PROPOSEE' AND e.source = 'DISPO' " +
-                "AND e.datePrevue <= :d ORDER BY e.datePrevue", EnvoiPropose.class)
+                "SELECT e FROM EnvoiPropose e WHERE e.statut = 'PROPOSEE' AND e.datePrevue <= :d " +
+                "ORDER BY e.datePrevue", EnvoiPropose.class)
                 .setParameter("d", LocalDate.now()).getResultList();
         for (EnvoiPropose e : props) {
-            if (!controlesEnvoiAuto(e)) { continue; }
+            boolean ok = false;
+            if ("DISPO".equals(e.getSource())) {
+                ok = dispoAuto && baseUrl != null && !baseUrl.trim().isEmpty() && controlesEnvoiAuto(e);
+            } else if ("INFO".equals(e.getSource())) {
+                boolean anniv = "ANNIVERSAIRE_CLIENT".equals(e.getType()) && e.getInfoId() == null;
+                ok = anniv ? annivAuto : (infoAuto && controlesInfoAuto(e));
+            }
+            if (!ok) { continue; }
             try { valider(e.getId(), null, null, baseUrl); traites++; }
             catch (Exception ignore) { /* proposition ignorée : un contrôle métier a échoué */ }
         }
         return traites;
+    }
+
+    /** Contrôles métier bloquant l'envoi auto d'une information. */
+    private boolean controlesInfoAuto(EnvoiPropose e) {
+        if (e.getInfoId() == null) { return false; }
+        InfoEvenement i = em.find(InfoEvenement.class, e.getInfoId());
+        if (i == null) { return false; }
+        String st = i.getStatut();
+        if ("ANNULEE".equals(st) || "ARCHIVEE".equals(st) || "ENVOYEE".equals(st) || "EXPIREE".equals(st)) { return false; }
+        if (!elementsInfoManquants(i).isEmpty()) { return false; }
+        return !VARIABLE_RESTANTE.matcher(retirerTokensContact(messageInfo(i))).find();
     }
 
     /** Contrôles métier bloquant l'envoi auto (§12). */
@@ -398,7 +442,14 @@ public class EnvoiProposeService {
         String audienceCampagne = null;
         Long cibleListeId = null;
         Long cibleSegmentationId = null;
-        if (e.getInfoId() != null) {
+        if ("ANNIVERSAIRE_CLIENT".equals(e.getType()) && e.getInfoId() == null) {
+            corps = corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT"));
+            verifierResidu(corps);
+            modele = creerModele(e.getTitre(), corps, null, null, "ANNIVERSAIRE_CLIENT");
+            categorie = "INFORMATION";
+            objectif = "Anniversaire";
+            audienceCampagne = AUDIENCE_ANNIVERSAIRE;
+        } else if (e.getInfoId() != null) {
             InfoEvenement info = em.find(InfoEvenement.class, e.getInfoId());
             if (info == null) { throw new ValidationException("info", "Information introuvable."); }
             List<String> manquants = elementsInfoManquants(info);

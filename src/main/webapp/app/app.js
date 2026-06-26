@@ -732,7 +732,8 @@ Usp.clientForm = function (store, rec) {
 Usp.contactsWindow = function (clientId, nomCompte) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'nomComplet', 'civilite', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
-                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne'],
+                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne',
+                 'jourNaissance', 'moisNaissance', 'anneeNaissance', 'consentRelationnel'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
             reader: { type: 'json', root: 'data', totalProperty: 'total' } },
@@ -770,8 +771,20 @@ Usp.contactForm = function (clientId, store, rec) {
                 { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',
                   emptyText: 'Format international, ex. 2250700000000' },
                 { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                { xtype: 'fieldcontainer', fieldLabel: 'Anniversaire', layout: 'hbox',
+                  items: [
+                    { xtype: 'numberfield', name: 'jourNaissance', emptyText: 'Jour', width: 70, minValue: 1, maxValue: 31 },
+                    { xtype: 'combobox', name: 'moisNaissance', emptyText: 'Mois', width: 120, margin: '0 0 0 6',
+                      editable: false, queryMode: 'local', valueField: 'v', displayField: 't',
+                      store: { fields: ['v', 't'], data: [
+                        { v: 1, t: 'Janvier' }, { v: 2, t: 'Février' }, { v: 3, t: 'Mars' }, { v: 4, t: 'Avril' },
+                        { v: 5, t: 'Mai' }, { v: 6, t: 'Juin' }, { v: 7, t: 'Juillet' }, { v: 8, t: 'Août' },
+                        { v: 9, t: 'Septembre' }, { v: 10, t: 'Octobre' }, { v: 11, t: 'Novembre' }, { v: 12, t: 'Décembre' }] } },
+                    { xtype: 'numberfield', name: 'anneeNaissance', emptyText: 'Année', width: 80, margin: '0 0 0 6', hideTrigger: true }
+                  ] },
                 { xtype: 'checkbox', name: 'contactPrincipal', boxLabel: 'Contact principal' },
-                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' }
+                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' },
+                { xtype: 'checkbox', name: 'consentRelationnel', boxLabel: 'Autorise les messages relationnels (anniversaire…)' }
             ]
         }],
         buttons: [{
@@ -783,6 +796,11 @@ Usp.contactForm = function (clientId, store, rec) {
                 data.clientId = clientId;
                 data.contactPrincipal = form.findField('contactPrincipal').getValue();
                 data.consentementWhatsapp = form.findField('consentementWhatsapp').getValue();
+                data.consentRelationnel = form.findField('consentRelationnel').getValue();
+                // Nombres : null si vide (évite l'échec de désérialisation Integer).
+                ['jourNaissance', 'moisNaissance', 'anneeNaissance'].forEach(function (n) {
+                    data[n] = form.findField(n).getValue();
+                });
                 Usp.ajax({
                     url: rec ? '/contacts/' + rec.get('id') : '/contacts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,

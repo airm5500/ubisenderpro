@@ -167,6 +167,7 @@ public class CampagneService {
         if (c.getSegmentationId() != null) contacts.addAll(contactsParSegmentation(c.getSegmentationId()));
         // Audience (§16) : tous les segments, ou une/plusieurs segmentations résolues.
         if ("TOUS_LES_SEGMENTS".equals(c.getAudience())) { contacts.addAll(tousContacts()); }
+        if ("ANNIVERSAIRE_JOUR".equals(c.getAudience())) { contacts.addAll(contactsAnniversaireDuJour()); }
         if (c.getSegmentationIds() != null && !c.getSegmentationIds().trim().isEmpty()) {
             for (String s : c.getSegmentationIds().split(",")) {
                 try { contacts.addAll(contactsParSegmentation(Long.valueOf(s.trim()))); }
@@ -204,6 +205,16 @@ public class CampagneService {
                 "AND cl.segmentationId = :seg AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
                 ClientContact.class)
                 .setParameter("seg", segmentationId).getResultList();
+    }
+
+    /** Contacts éligibles aux vœux d'anniversaire aujourd'hui (§10). */
+    private List<ClientContact> contactsAnniversaireDuJour() {
+        LocalDate t = LocalDate.now();
+        return em.createQuery(
+                "SELECT ct FROM ClientContact ct WHERE ct.actif = true AND ct.consentRelationnel = true " +
+                "AND ct.desabonne = false AND ct.bloque = false AND ct.jourNaissance = :j AND ct.moisNaissance = :m " +
+                "AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''", ClientContact.class)
+                .setParameter("j", t.getDayOfMonth()).setParameter("m", t.getMonthValue()).getResultList();
     }
 
     /** Tous les contacts joignables (audience TOUS_LES_SEGMENTS). */
