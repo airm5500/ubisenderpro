@@ -218,8 +218,10 @@ Usp.settings.templateForm = function (store, rec) {
                 { xtype: 'combobox', name: 'statutApprobation', fieldLabel: 'Approbation', value: 'BROUILLON',
                   store: ['BROUILLON', 'EN_ATTENTE', 'APPROUVE', 'REJETE'], queryMode: 'local' },
                 { xtype: 'displayfield',
-                  value: 'Variables disponibles : {{nom_contact}}, {{nom_compte}}, {{article}}, {{prix}}, ' +
-                         '{{prix_promotionnel}}, {{numero_commande}}, {{montant_commande}}, {{agent}}' }
+                  value: 'Par contact : nom_contact, nom_compte, civilite_complete, segmentation, article, prix, ' +
+                         'prix_promotionnel, numero_commande, montant_commande, agent.<br>' +
+                         'Contexte campagne (modèles auto promo/dispo/info) : mois_promotion, nom_promotion, ' +
+                         'date_debut, date_fin, avantage_ug, nombre_produits, jours_restants…' }
             ]
         }],
         buttons: [{

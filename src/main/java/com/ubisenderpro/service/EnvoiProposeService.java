@@ -10,6 +10,8 @@ import com.ubisenderpro.entity.MediaFichier;
 import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.entity.Promotion;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import javax.ejb.EJB;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
@@ -42,6 +44,8 @@ public class EnvoiProposeService {
     private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     /** Détecte une variable {{...}} non remplie (filet de sécurité anti-variable-vide). */
     private static final Pattern VARIABLE_RESTANTE = Pattern.compile("\\{\\{[^}]+\\}\\}");
+    /** Sérialisation des variables de contexte (figées sur le modèle à la validation). */
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
@@ -453,10 +457,13 @@ public class EnvoiProposeService {
         String cibleRegion = null;
         String cibleTournee = null;
         String cibleContactIds = null;
+        // Variables de contexte figées sur le modèle : permettent de remplir les
+        // paramètres d'un template Meta (canal API) avec les valeurs de la campagne.
+        Map<String, String> contexte = new LinkedHashMap<>();
         if ("ANNIVERSAIRE_CLIENT".equals(e.getType()) && e.getInfoId() == null) {
             corps = corpsTemplate(InfoTemplates.clePourType("ANNIVERSAIRE_CLIENT"));
             verifierResidu(corps);
-            modele = creerModele(e.getTitre(), corps, null, null, "ANNIVERSAIRE_CLIENT");
+            modele = creerModele(e.getTitre(), corps, null, null, "ANNIVERSAIRE_CLIENT", contexte);
             categorie = "INFORMATION";
             objectif = "Anniversaire";
             audienceCampagne = AUDIENCE_ANNIVERSAIRE;
@@ -471,7 +478,8 @@ public class EnvoiProposeService {
             }
             corps = messageInfo(info);
             verifierResidu(corps);
-            modele = creerModele(e.getTitre(), corps, null, null, nz(info.getType()).isEmpty() ? "INFORMATION" : info.getType());
+            contexte = variablesInfo(info);
+            modele = creerModele(e.getTitre(), corps, null, null, nz(info.getType()).isEmpty() ? "INFORMATION" : info.getType(), contexte);
             categorie = "INFORMATION";
             objectif = "Information";
             audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
@@ -493,11 +501,12 @@ public class EnvoiProposeService {
             }
             corps = messageDispo(evt);
             verifierResidu(corps);
+            contexte = variablesDispo(evt);
             // Bulletin .xlsx des produits de l'événement, attaché en en-tête document.
             byte[] xlsx = dispoXlsxService.genererBulletin(evt.getId());
             String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
                     xlsx, DispoXlsxService.MIME, bulletinNom(evt)).getId());
-            modele = creerModele(e.getTitre(), corps, "document", url, nz(evt.getType()).isEmpty() ? "DISPONIBILITE" : evt.getType());
+            modele = creerModele(e.getTitre(), corps, "document", url, nz(evt.getType()).isEmpty() ? "DISPONIBILITE" : evt.getType(), contexte);
             categorie = "DISPONIBILITE";
             objectif = "Disponibilité / Rupture";
         } else if (p != null) {
@@ -511,11 +520,12 @@ public class EnvoiProposeService {
             }
             corps = construireMessage(e, p);
             verifierResidu(corps);
+            contexte = variablesContextePromo(e, p);
             // Pièce jointe .xlsx (produits de la promo) hébergée puis attachée en en-tête document.
             byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
             String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
                     xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
-            modele = creerModele(e.getTitre(), corps, "document", url);
+            modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
         } else if ("ANNONCE_MENSUELLE".equals(e.getType())) {
             LocalDate premier = premierDuMois(e);
             List<Promotion> promos = promosDuMois(premier);
@@ -527,6 +537,7 @@ public class EnvoiProposeService {
             }
             corps = messageMensuel(premier, promos, e.getDatePrevue());
             verifierResidu(corps);
+            contexte = variablesMensuelles(premier, promos, e.getDatePrevue());
             // Pièce jointe .xlsx regroupant les produits de toutes les promos du mois.
             List<Long> ids = new ArrayList<>();
             for (Promotion pr : promos) { ids.add(pr.getId()); }
@@ -535,10 +546,10 @@ public class EnvoiProposeService {
                     + String.format("%02d", premier.getMonthValue()) + ".xlsx";
             String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
                     xlsx, PromotionXlsxService.MIME, nomFichier).getId());
-            modele = creerModele(e.getTitre(), corps, "document", url);
+            modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
         } else {
             corps = e.getMessage();
-            modele = creerModele(e.getTitre(), corps, null, null);
+            modele = creerModele(e.getTitre(), corps, null, null, "PROMOTION", contexte);
         }
 
         Campagne c = new Campagne();
@@ -580,10 +591,11 @@ public class EnvoiProposeService {
 
     /** Crée un modèle de message dédié (brouillon) rattaché à la campagne validée. */
     private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl) {
-        return creerModele(titre, corps, mediaType, mediaUrl, "PROMOTION");
+        return creerModele(titre, corps, mediaType, mediaUrl, "PROMOTION", null);
     }
 
-    private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl, String typeModele) {
+    private ModeleMessage creerModele(String titre, String corps, String mediaType, String mediaUrl,
+                                      String typeModele, Map<String, String> contexte) {
         ModeleMessage m = new ModeleMessage();
         m.setNom(tronquer(titre, 150));
         m.setTypeModele(typeModele);
@@ -594,9 +606,30 @@ public class EnvoiProposeService {
             m.setEnteteMediaType(mediaType);
             m.setEnteteMediaUrl(mediaUrl);
         }
+        m.setVariablesContexte(serialiserContexte(contexte));
         m.setStatutApprobation("BROUILLON");
         m.setActif(true);
         return modeleService.creer(m);
+    }
+
+    /** Variables de contexte d'une proposition promo (lancement / rappel J-n). */
+    private Map<String, String> variablesContextePromo(EnvoiPropose e, Promotion p) {
+        Map<String, String> v = variablesPromo(p);
+        String type = e.getType();
+        if (type != null && type.startsWith("RAPPEL_J")) {
+            v.put("jours_restants", String.valueOf(joursRappel(type)));
+        }
+        return v;
+    }
+
+    /** Sérialise les variables de contexte en JSON (null si vide). */
+    private String serialiserContexte(Map<String, String> contexte) {
+        if (contexte == null || contexte.isEmpty()) { return null; }
+        try {
+            return JSON.writeValueAsString(contexte);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     /* ====================== Disponibilités / Ruptures ====================== */

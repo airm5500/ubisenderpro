@@ -68,6 +68,14 @@ public class ModeleMessage {
     @Column(name = "params_corps", length = 500)
     private String paramsCorps;
 
+    /**
+     * Variables de contexte de la campagne (JSON clé→valeur) figées à la validation :
+     * mois_promotion, date_debut, date_fin, avantage_ug… Utilisées pour remplir les
+     * paramètres d'un template Meta (canal API) qui ne sont pas résolus par contact.
+     */
+    @Column(name = "variables_contexte", columnDefinition = "TEXT")
+    private String variablesContexte;
+
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
@@ -109,4 +117,6 @@ public class ModeleMessage {
     public void setCleSysteme(String cleSysteme) { this.cleSysteme = cleSysteme; }
     public String getParamsCorps() { return paramsCorps; }
     public void setParamsCorps(String paramsCorps) { this.paramsCorps = paramsCorps; }
+    public String getVariablesContexte() { return variablesContexte; }
+    public void setVariablesContexte(String variablesContexte) { this.variablesContexte = variablesContexte; }
 }

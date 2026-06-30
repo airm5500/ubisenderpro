@@ -6,6 +6,8 @@ import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.entity.WhatsappAccount;
 import com.ubisenderpro.whatsapp.WaWebClient;
 import com.ubisenderpro.whatsapp.WhatsappCloudClient;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
@@ -29,6 +31,9 @@ public class CampagneSenderTx {
 
     @javax.ejb.EJB
     private VariablesContactService variablesContactService;
+
+    /** Lecture des variables de contexte figées sur le modèle (JSON). */
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
     public void marquerStatut(Long campagneId, String statut) {
@@ -128,15 +133,30 @@ public class CampagneSenderTx {
         }
         java.util.List<String> out = new java.util.ArrayList<>();
         if (spec.trim().isEmpty()) { return out; }
+        // Variables par contact (NOM_CONTACT, NOM_COMPTE, SEGMENTATION…) — clés en MAJUSCULES.
         java.util.Map<String, String> vars =
                 variablesContactService.resoudre(d.getNumeroWhatsapp(), d.getNomContact());
+        // Variables de contexte figées sur le modèle (mois_promotion, date_fin…) — clés en minuscules.
+        java.util.Map<String, String> contexte = contexteModele(modele);
         for (String token : spec.split(",")) {
-            String k = token.trim().toUpperCase();
-            if (k.isEmpty()) { continue; }
-            String val = vars.get(k);
+            String raw = token.trim();
+            if (raw.isEmpty()) { continue; }
+            String val = vars.get(raw.toUpperCase());
+            if (val == null) { val = contexte.get(raw.toLowerCase()); }
             out.add(val == null ? "" : val);
         }
         return out;
+    }
+
+    /** Désérialise les variables de contexte du modèle (JSON), map vide si absent/illisible. */
+    private java.util.Map<String, String> contexteModele(ModeleMessage modele) {
+        String json = modele.getVariablesContexte();
+        if (json == null || json.trim().isEmpty()) { return Collections.emptyMap(); }
+        try {
+            return JSON.readValue(json, new TypeReference<java.util.Map<String, String>>() {});
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
     }
 
     private String nz(String s) { return s == null ? "" : s; }
