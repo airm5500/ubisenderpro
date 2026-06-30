@@ -400,6 +400,21 @@ Usp.settings.generalPanel = function () {
               value: '<span style="color:#888">Base HTTPS publique de l\'API. Sert à générer les liens ' +
                      'd\'images de template et de bulletins .xlsx téléchargeables par Meta (derrière un reverse proxy). ' +
                      'Laisser vide en accès direct.</span>' },
+            { xtype: 'fieldcontainer', fieldLabel: 'Logo de la société', layout: 'hbox', items: [
+                { xtype: 'hiddenfield', itemId: 'logoField' },
+                { xtype: 'component', itemId: 'logoApercu', margin: '0 8 0 0',
+                  html: '<span style="color:#888;font-size:11px">aucun logo</span>' },
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Choisir une image…',
+                  listeners: { change: function (f) { Usp.settings.uploadLogo(f); } } },
+                { xtype: 'button', text: 'Retirer', margin: '0 0 0 6', handler: function (b) {
+                    var p = b.up('panel');
+                    p.down('#logoField').setValue('');
+                    p.down('#logoApercu').update('<span style="color:#888;font-size:11px">aucun logo</span>');
+                } }
+            ] },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Logo de votre société (PNG/SVG conseillé). ' +
+                     'Stocké pour l\'en-tête de l\'application et les documents. Appliqué après enregistrement.</span>' },
             { xtype: 'fieldcontainer', fieldLabel: 'Icône de l\'application', layout: 'hbox', items: [
                 { xtype: 'hiddenfield', itemId: 'faviconField' },
                 { xtype: 'component', itemId: 'faviconApercu', margin: '0 8 0 0',
@@ -425,6 +440,7 @@ Usp.settings.generalPanel = function () {
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
             var urlBase = (p.down('#urlBaseField').getValue() || '').trim();
+            var logo = p.down('#logoField').getValue() || '';
             var favicon = p.down('#faviconField').getValue() || '';
             var put = function (cle, valeur) {
                 return function (cb) {
@@ -441,9 +457,11 @@ Usp.settings.generalPanel = function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.url_base', urlBase)(function () {
+                            put('app.logo', logo)(function () {
                             put('app.favicon', favicon)(function () {
                                 Usp.appliquerFavicon(favicon);
                                 Usp.toast('Paramètres enregistrés avec succès.');
+                            });
                             });
                             });
                             });
@@ -467,6 +485,14 @@ Usp.settings.generalPanel = function () {
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
         charger('app.url_base', 'urlBaseField', '');
+        Usp.ajax({ url: '/parametres/app.logo', method: 'GET', success: function (resp) {
+            var url = (Ext.decode(resp.responseText) || {}).valeur || '';
+            form.down('#logoField').setValue(url);
+            if (url) {
+                form.down('#logoApercu').update('<img src="' + url +
+                    '" style="height:32px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            }
+        } });
         Usp.ajax({ url: '/parametres/app.favicon', method: 'GET', success: function (resp) {
             var url = (Ext.decode(resp.responseText) || {}).valeur || '';
             form.down('#faviconField').setValue(url);
@@ -477,6 +503,29 @@ Usp.settings.generalPanel = function () {
         } });
     });
     return form;
+};
+
+/* Téléverse le logo de la société choisi et l'affiche en aperçu. */
+Usp.settings.uploadLogo = function (f) {
+    var file = f.fileInputEl.dom.files[0];
+    if (!file) { return; }
+    var panel = f.up('panel');
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var b64 = e.target.result.split(',')[1];
+        Usp.ajax({
+            url: '/media/upload', method: 'POST',
+            jsonData: { fichierBase64: b64, mimeType: file.type || 'image/png', nomFichier: file.name },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText);
+                panel.down('#logoField').setValue(r.url);
+                panel.down('#logoApercu').update('<img src="' + r.url +
+                    '" style="height:32px;vertical-align:middle;border:1px solid #ddd;border-radius:4px"/>');
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Téléversement du logo impossible.'); }
+        });
+    };
+    reader.readAsDataURL(file);
 };
 
 /* Téléverse l'icône d'application choisie et l'affiche en aperçu. */

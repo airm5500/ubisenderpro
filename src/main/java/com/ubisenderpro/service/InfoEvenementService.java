@@ -73,6 +73,10 @@ public class InfoEvenementService {
     }
 
     public InfoEvenement creer(InfoEvenement i) {
+        // Code généré par défaut (modifiable) s'il n'a pas été saisi.
+        if (i.getCode() == null || i.getCode().trim().isEmpty()) {
+            i.setCode(Codes.generer("INFO", c -> parCode(c).isPresent()));
+        }
         valider(i, true);
         if (i.getStatut() == null || i.getStatut().isEmpty()) { i.setStatut("BROUILLON"); }
         em.persist(i);

@@ -672,23 +672,29 @@ Usp.segmentationCombo = function (cfg) {
 Usp.clientForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le client' : 'Nouveau client',
-        width: 520, modal: true, bodyPadding: 12, autoScroll: true,
+        width: 700, modal: true, bodyPadding: 12, autoScroll: false,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, layout: 'column',
+            defaults: { columnWidth: 0.5, xtype: 'container', layout: 'anchor', border: false,
+                        defaults: { anchor: '96%', labelWidth: 95 } },
             items: [
-                { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
-                { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
-                { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
-                { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
-                { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
-                { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
-                Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
-                { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
-                { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
-                { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
-                { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
-                  store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
-                { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
+                { items: [
+                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
+                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
+                    { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
+                    { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
+                    { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
+                    { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' }
+                ] },
+                { items: [
+                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
+                    { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
+                    { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
+                    { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
+                    { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
+                      store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
+                    { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
+                ] }
             ]
         }],
         buttons: [{

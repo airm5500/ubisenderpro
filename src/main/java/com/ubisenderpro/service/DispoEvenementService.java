@@ -65,6 +65,10 @@ public class DispoEvenementService {
     }
 
     public DispoEvenement creer(DispoEvenement e) {
+        // Code généré par défaut (modifiable) s'il n'a pas été saisi.
+        if (e.getCode() == null || e.getCode().trim().isEmpty()) {
+            e.setCode(Codes.generer("DISPO", c -> parCode(c).isPresent()));
+        }
         valider(e, true);
         if (e.getStatut() == null || e.getStatut().isEmpty()) { e.setStatut("BROUILLON"); }
         em.persist(e);

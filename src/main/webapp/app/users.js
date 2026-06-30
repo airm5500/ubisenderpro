@@ -112,7 +112,7 @@ Usp.users.form = function (store, rec) {
     });
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur',
-        width: 660, maxHeight: 580, modal: true, bodyPadding: 12, autoScroll: true,
+        width: 680, modal: true, bodyPadding: 12, autoScroll: false,
         items: [{
             xtype: 'form', border: false, layout: { type: 'hbox', align: 'stretch' },
             items: [

@@ -67,8 +67,9 @@ public class PromotionService {
     }
 
     public Promotion creer(Promotion p) {
+        // Code généré par défaut (modifiable) s'il n'a pas été saisi.
         if (p.getCode() == null || p.getCode().trim().isEmpty()) {
-            throw new IllegalArgumentException("Le code de la promotion est obligatoire");
+            p.setCode(Codes.generer("PROMO", c -> parCode(c).isPresent()));
         }
         if (p.getNom() == null || p.getNom().trim().isEmpty()) {
             throw new IllegalArgumentException("Le nom de la promotion est obligatoire");

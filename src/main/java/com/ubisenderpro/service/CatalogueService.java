@@ -28,7 +28,13 @@ public class CatalogueService {
         return em.createQuery("SELECT m FROM Marque m ORDER BY m.nom", Marque.class).getResultList();
     }
 
-    public CategorieArticle creerCategorie(CategorieArticle c) { em.persist(c); return c; }
+    public CategorieArticle creerCategorie(CategorieArticle c) {
+        if (c.getCode() == null || c.getCode().trim().isEmpty()) {
+            c.setCode(Codes.generer("CAT", this::codeCategorieExiste));
+        }
+        em.persist(c);
+        return c;
+    }
     public CategorieArticle modifierCategorie(CategorieArticle c) {
         CategorieArticle ex = em.find(CategorieArticle.class, c.getId());
         if (ex == null) { return null; }
@@ -37,7 +43,23 @@ public class CatalogueService {
         ex.setDescription(c.getDescription());
         return em.merge(ex);
     }
-    public Marque creerMarque(Marque m) { em.persist(m); return m; }
+    public Marque creerMarque(Marque m) {
+        if (m.getCode() == null || m.getCode().trim().isEmpty()) {
+            m.setCode(Codes.generer("MARQ", this::codeMarqueExiste));
+        }
+        em.persist(m);
+        return m;
+    }
+
+    private boolean codeCategorieExiste(String code) {
+        return !em.createQuery("SELECT c FROM CategorieArticle c WHERE c.code = :c", CategorieArticle.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty();
+    }
+
+    private boolean codeMarqueExiste(String code) {
+        return !em.createQuery("SELECT m FROM Marque m WHERE m.code = :c", Marque.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty();
+    }
     public Marque modifierMarque(Marque m) {
         Marque ex = em.find(Marque.class, m.getId());
         if (ex == null) { return null; }
