@@ -1,5 +1,7 @@
 package com.ubisenderpro.security;
 
+import com.ubisenderpro.service.PermissionService;
+
 import javax.annotation.Priority;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -36,6 +38,9 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
     @Inject
     private SessionStore sessionStore;
 
+    @Inject
+    private PermissionService permissionService;
+
     @Override
     public void filter(ContainerRequestContext requestContext) {
         String header = requestContext.getHeaderString("Authorization");
@@ -54,6 +59,16 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
         if (requiredRoles.length > 0 && Arrays.stream(requiredRoles).noneMatch(user::hasRole)) {
             requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
                     .entity("{\"erreur\":\"Accès non autorisé pour ce rôle\"}").build());
+            return;
+        }
+
+        // Contrôle fin par permission (menu, action) lorsqu'il est déclaré sur la ressource.
+        Secured perm = permissionRequise();
+        if (perm != null && !perm.menu().isEmpty()
+                && !permissionService.autorise(user.getRoles(), perm.menu(), perm.action())) {
+            requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
+                    .entity("{\"erreur\":\"Action non autorisée : " + perm.action()
+                            + " sur " + perm.menu() + "\"}").build());
             return;
         }
 
@@ -91,6 +106,21 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
             return clazz.getAnnotation(Secured.class).roles();
         }
         return new String[0];
+    }
+
+    /** @Secured portant un menu/action (méthode prioritaire sur la classe). */
+    private Secured permissionRequise() {
+        Method method = resourceInfo.getResourceMethod();
+        if (method != null && method.isAnnotationPresent(Secured.class)) {
+            Secured s = method.getAnnotation(Secured.class);
+            if (!s.menu().isEmpty()) { return s; }
+        }
+        Class<?> clazz = resourceInfo.getResourceClass();
+        if (clazz != null && clazz.isAnnotationPresent(Secured.class)) {
+            Secured s = clazz.getAnnotation(Secured.class);
+            if (!s.menu().isEmpty()) { return s; }
+        }
+        return null;
     }
 
     private void abort(ContainerRequestContext ctx, String message) {

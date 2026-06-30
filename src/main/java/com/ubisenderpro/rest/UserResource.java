@@ -18,7 +18,7 @@ import java.util.Map;
  * Gestion des utilisateurs applicatifs — réservée aux administrateurs.
  */
 @Path("/users")
-@Secured(roles = {"ADMIN"})
+@Secured(menu = "users", action = "VOIR")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class UserResource {
@@ -41,15 +41,16 @@ public class UserResource {
         return userService.listerRoles();
     }
 
-    /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — au-delà des seuls admins. */
+    /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — accès « Discussions ». */
     @GET
     @Path("/affectables")
-    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
+    @Secured(menu = "inbox", action = "VOIR")
     public List<Map<String, Object>> affectables() {
         return userService.listerAffectables();
     }
 
     @POST
+    @Secured(menu = "users", action = "CREER")
     public Response creer(UserRequest req) {
         if (req.getLogin() == null || req.getLogin().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -64,6 +65,7 @@ public class UserResource {
 
     @PUT
     @Path("/{id}")
+    @Secured(menu = "users", action = "MODIFIER")
     public Response modifier(@PathParam("id") Long id, UserRequest req) {
         Map<String, Object> u = userService.modifier(id, req);
         return u == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(u).build();
@@ -80,6 +82,7 @@ public class UserResource {
 
     @POST
     @Path("/{id}/activate")
+    @Secured(menu = "users", action = "DESACTIVER")
     public Response activer(@PathParam("id") Long id) {
         userService.definirActif(id, true);
         return Response.ok().build();
@@ -87,6 +90,7 @@ public class UserResource {
 
     @POST
     @Path("/{id}/deactivate")
+    @Secured(menu = "users", action = "DESACTIVER")
     public Response desactiver(@PathParam("id") Long id) {
         userService.definirActif(id, false);
         return Response.ok().build();
@@ -94,6 +98,7 @@ public class UserResource {
 
     @POST
     @Path("/{id}/reset-password")
+    @Secured(menu = "users", action = "MODIFIER")
     public Response reinitialiser(@PathParam("id") Long id, Map<String, Object> body) {
         String nouveau = body == null ? null : (String) body.get("motDePasse");
         String applique = userService.reinitialiserMotDePasse(id, nouveau);

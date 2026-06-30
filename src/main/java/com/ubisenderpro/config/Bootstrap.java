@@ -2,6 +2,7 @@ package com.ubisenderpro.config;
 
 import com.ubisenderpro.security.PasswordHasher;
 import com.ubisenderpro.service.ModeleService;
+import com.ubisenderpro.service.PermissionService;
 import org.flywaydb.core.Flyway;
 
 import javax.annotation.PostConstruct;
@@ -36,6 +37,9 @@ public class Bootstrap {
     @EJB
     private ModeleService modeleService;
 
+    @EJB
+    private PermissionService permissionService;
+
     @PostConstruct
     public void init() {
         runMigrations();
@@ -46,6 +50,12 @@ public class Bootstrap {
             if (crees > 0) { LOG.info("UbiSenderPro : " + crees + " modèle(s) marketing créé(s)."); }
         } catch (Exception e) {
             LOG.warning("Initialisation des modèles marketing ignorée : " + e.getMessage());
+        }
+        try {
+            int menus = permissionService.initPermissions();
+            if (menus > 0) { LOG.info("UbiSenderPro : " + menus + " menu(s) et permissions par défaut initialisés."); }
+        } catch (Exception e) {
+            LOG.warning("Initialisation des permissions ignorée : " + e.getMessage());
         }
     }
 

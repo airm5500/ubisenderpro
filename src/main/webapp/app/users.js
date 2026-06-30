@@ -29,7 +29,82 @@ Usp.users.fmtDuree = function (s) {
 Usp.users.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Utilisateurs', listeners: Usp.tabListeners,
-        items: [Usp.users.gridPanel(), Usp.users.connexionsPanel(), Usp.users.journalPanel()]
+        items: [Usp.users.gridPanel(), Usp.users.permissionsPanel(),
+                Usp.users.connexionsPanel(), Usp.users.journalPanel()]
+    };
+};
+
+/* ---------- Rôles & permissions (menus + actions par rôle) ---------- */
+Usp.users.permissionsPanel = function () {
+    var roleStore = Ext.create('Ext.data.Store', {
+        fields: ['code', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/roles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    var menus = { data: [] };
+
+    var construire = function (panel, accordees) {
+        var body = panel.down('#permBody');
+        body.removeAll();
+        var items = menus.data.map(function (m) {
+            var cbs = (m.actions || []).map(function (a) {
+                return { xtype: 'checkbox', boxLabel: a.libelle, name: m.code + ':' + a.code,
+                         checked: accordees.indexOf(m.code + ':' + a.code) !== -1, margin: '0 14 0 0' };
+            });
+            return { xtype: 'fieldset', title: m.libelle, margin: '0 0 8 0',
+                     layout: { type: 'table', columns: 3 }, items: cbs };
+        });
+        body.add(items.length ? items : [{ xtype: 'displayfield',
+            value: '<span style="color:#888">Choisissez un rôle pour afficher ses permissions.</span>' }]);
+    };
+
+    var charger = function (panel) {
+        var code = panel.down('#permRole').getValue();
+        if (!code) { return; }
+        Usp.ajax({ url: '/permissions/menus', method: 'GET', success: function (r1) {
+            menus.data = Ext.decode(r1.responseText) || [];
+            Usp.ajax({ url: '/permissions/roles/' + code, method: 'GET', success: function (r2) {
+                construire(panel, Ext.decode(r2.responseText) || []);
+            } });
+        } });
+    };
+
+    var cocherTout = function (panel, val) {
+        panel.down('#permBody').query('checkbox').forEach(function (c) { c.setValue(val); });
+    };
+
+    var enregistrer = function (panel) {
+        var code = panel.down('#permRole').getValue();
+        if (!code) { Ext.Msg.alert('Rôle', 'Sélectionnez d\'abord un rôle.'); return; }
+        var perms = [];
+        panel.down('#permBody').query('checkbox').forEach(function (c) {
+            if (c.getValue()) { perms.push(c.name); }
+        });
+        Usp.ajax({ url: '/permissions/roles/' + code, method: 'PUT', jsonData: { permissions: perms },
+            success: function () { Usp.toast('Permissions du rôle « ' + code + ' » enregistrées.'); },
+            failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement des permissions impossible.'); } });
+    };
+
+    return {
+        xtype: 'panel', title: '🔐 Rôles & permissions', layout: { type: 'vbox', align: 'stretch' },
+        bodyPadding: 10,
+        tbar: [
+            { xtype: 'combobox', itemId: 'permRole', fieldLabel: 'Rôle', labelWidth: 40, width: 300,
+              store: roleStore, valueField: 'code', displayField: 'libelle', queryMode: 'local',
+              editable: false, emptyText: 'Choisir un rôle…',
+              listeners: { select: function (c) { charger(c.up('panel')); } } },
+            '->',
+            { text: 'Tout cocher', handler: function (b) { cocherTout(b.up('panel'), true); } },
+            { text: 'Tout décocher', handler: function (b) { cocherTout(b.up('panel'), false); } },
+            { text: '💾 Enregistrer', handler: function (b) { enregistrer(b.up('panel')); } }
+        ],
+        items: [
+            { xtype: 'displayfield', margin: '0 0 6 0',
+              value: '<span style="color:#666">Cochez les menus (Voir / accéder) et les actions ' +
+                     'autorisés pour le rôle sélectionné. Le rôle ADMIN dispose toujours de tous les droits.</span>' },
+            { xtype: 'container', itemId: 'permBody', flex: 1, autoScroll: true }
+        ]
     };
 };
 
@@ -107,8 +182,12 @@ Usp.users.reset = function (rec) {
 
 Usp.users.form = function (store, rec) {
     var avatarData = Usp.users.AVATARS.map(function (a) { return { v: a }; });
-    var roleItems = Usp.users.ROLES.map(function (r) {
-        return { boxLabel: r[1], name: 'role_' + r[0], inputValue: r[0] };
+    // Rôles depuis la table des rôles (liste déroulante, un seul rôle par utilisateur).
+    var roleStore = Ext.create('Ext.data.Store', {
+        fields: ['code', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/roles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
     });
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur',
@@ -127,11 +206,13 @@ Usp.users.form = function (store, rec) {
                     { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
                     { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
                       emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
-                    { xtype: 'fieldset', title: 'Rôles (accès aux menus)', items: [
-                        { xtype: 'displayfield',
-                          value: '<span style="color:#666">Cochez les menus auxquels cet utilisateur a accès :</span>' },
-                        { xtype: 'checkboxgroup', columns: 2, items: roleItems }
-                    ] }
+                    { xtype: 'combobox', name: 'role', fieldLabel: 'Rôle', allowBlank: false,
+                      store: roleStore, valueField: 'code', displayField: 'libelle',
+                      queryMode: 'local', editable: false, forceSelection: true,
+                      emptyText: 'Sélectionner un rôle…' },
+                    { xtype: 'displayfield',
+                      value: '<span style="color:#888">Les droits (menus + actions) dépendent du rôle. ' +
+                             'Gérez-les dans l\'onglet « Rôles & permissions ».</span>' }
                 ] },
                 // Colonne droite : photo de profil (cadre + Parcourir).
                 { xtype: 'container', width: 168, margin: '0 0 0 16',
@@ -151,11 +232,8 @@ Usp.users.form = function (store, rec) {
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
-                var roles = [];
-                Usp.users.ROLES.forEach(function (r) {
-                    var cb = form.findField('role_' + r[0]);
-                    if (cb && cb.getValue()) { roles.push(r[0]); }
-                });
+                var roleSel = form.findField('role').getValue();
+                var roles = roleSel ? [roleSel] : [];
                 var data = {
                     login: form.findField('login').getValue(),
                     nomComplet: form.findField('nomComplet').getValue(),
@@ -191,10 +269,7 @@ Usp.users.form = function (store, rec) {
             email: rec.get('email')
         });
         var roles = rec.get('roles') || [];
-        roles.forEach(function (code) {
-            var cb = form.findField('role_' + code);
-            if (cb) { cb.setValue(true); }
-        });
+        if (roles.length) { form.findField('role').setValue(roles[0]); }
         // Charge la photo existante dans le cadre (hors des listes, à la demande).
         Usp.ajax({ url: '/users/' + rec.get('id') + '/photo', method: 'GET',
             success: function (resp) {

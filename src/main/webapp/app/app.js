@@ -359,6 +359,7 @@ Usp.showLogin = function () {
                     Usp.showMain();
                 };
                 // Charge les paramètres globaux (mode + préfixe + favicon) puis ouvre l'application.
+                var chargerParams = function () {
                 Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
                     success: function (r) {
                         Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
@@ -372,6 +373,13 @@ Usp.showLogin = function () {
                                     }, failure: ouvrir });
                             }, failure: ouvrir });
                     }, failure: ouvrir });
+                };
+                // Permissions effectives (menus + actions) -> pilotent menus et boutons.
+                Usp.ajax({ url: '/permissions/me', method: 'GET',
+                    success: function (rp) {
+                        Usp.perms = Ext.decode(rp.responseText) || {};
+                        chargerParams();
+                    }, failure: function () { Usp.perms = null; chargerParams(); } });
             },
             failure: function () {
                 loader.style.display = 'none';
@@ -502,9 +510,11 @@ Usp.clientsGrid = function (actif) {
     ];
     if (actif) {
         tbar.push('->',
-            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } },
+            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client',
+              hidden: !Usp.can('clients', 'CREER'), handler: function () { Usp.clientForm(store, null); } },
             { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport });
+            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier',
+              hidden: !Usp.can('clients', 'CREER'), handler: Usp.showImport });
     }
 
     return {
@@ -1026,6 +1036,16 @@ Usp.canSee = function (roles) {
     return roles.some(function (r) { return mine.indexOf(r) !== -1; });
 };
 
+/* Droit fin : l'utilisateur peut-il l'action sur le menu ? ADMIN = tout.
+ * Repli permissif si les permissions n'ont pas pu être chargées (ne rien bloquer). */
+Usp.can = function (menu, action) {
+    var mine = (Usp.user && Usp.user.roles) || [];
+    if (mine.indexOf('ADMIN') !== -1) { return true; }
+    if (!Usp.perms) { return true; }
+    var acts = Usp.perms[menu];
+    return !!acts && acts.indexOf(action) !== -1;
+};
+
 /* Pastille sur l'onglet actif d'un tabpanel. */
 Usp.tabPastille = function (tp, active) {
     if (!tp || !tp.items) { return; }
@@ -1040,7 +1060,10 @@ Usp.tabListeners = {
 };
 
 Usp.menuChildren = function () {
-    return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
+    return Usp.MENU.filter(function (m) {
+            // Permissions chargées : visibilité par droit « VOIR » ; sinon repli par rôle.
+            return Usp.perms ? Usp.can(m.view, 'VOIR') : Usp.canSee(m.roles);
+        })
         .map(function (m) {
             var pre = m.iconHtml ? m.iconHtml + ' ' : (m.icon ? m.icon + '  ' : '');
             var t = pre + m.text;
