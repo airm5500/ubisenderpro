@@ -48,6 +48,28 @@ public class UserResource {
         return Response.status(Response.Status.CREATED).entity(userService.creerRole(r)).build();
     }
 
+    @GET
+    @Path("/roles/all")
+    @Secured(roles = {"ADMIN"})
+    public List<Role> tousRoles() {
+        return userService.listerTousRoles();
+    }
+
+    @PUT
+    @Path("/roles/{id}")
+    @Secured(roles = {"ADMIN"})
+    public Response modifierRole(@PathParam("id") Long id, Role r) {
+        return Response.ok(userService.modifierRole(id, r)).build();
+    }
+
+    @PUT
+    @Path("/roles/{id}/actif")
+    @Secured(roles = {"ADMIN"})
+    public Response actifRole(@PathParam("id") Long id, @QueryParam("actif") @DefaultValue("true") boolean actif) {
+        userService.definirActifRole(id, actif);
+        return Response.noContent().build();
+    }
+
     /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — accès « Discussions ». */
     @GET
     @Path("/affectables")

@@ -34,96 +34,135 @@ Usp.users.panel = function () {
     };
 };
 
-/* ---------- Rôles & permissions (menus + actions par rôle) ---------- */
+/* ---------- Rôles & permissions : une ligne par rôle + actions ---------- */
 Usp.users.permissionsPanel = function () {
-    var roleStore = Ext.create('Ext.data.Store', {
-        fields: ['code', 'libelle'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/users/roles',
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle', 'description', 'actif'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/roles/all',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
     });
-    var menus = { data: [] };
 
-    var construire = function (panel, accordees) {
-        var body = panel.down('#permBody');
-        body.removeAll();
-        var items = menus.data.map(function (m) {
-            var cbs = (m.actions || []).map(function (a) {
-                return { xtype: 'checkbox', boxLabel: a.libelle, name: m.code + ':' + a.code,
-                         checked: accordees.indexOf(m.code + ':' + a.code) !== -1, margin: '0 14 0 0' };
-            });
-            return { xtype: 'fieldset', title: m.libelle, margin: '0 0 8 0',
-                     layout: { type: 'table', columns: 3 }, items: cbs };
-        });
-        body.add(items.length ? items : [{ xtype: 'displayfield',
-            value: '<span style="color:#888">Choisissez un rôle pour afficher ses permissions.</span>' }]);
-    };
-
-    var charger = function (panel) {
-        var code = panel.down('#permRole').getValue();
-        if (!code) { return; }
-        Usp.ajax({ url: '/permissions/menus', method: 'GET', success: function (r1) {
-            menus.data = Ext.decode(r1.responseText) || [];
-            Usp.ajax({ url: '/permissions/roles/' + code, method: 'GET', success: function (r2) {
-                construire(panel, Ext.decode(r2.responseText) || []);
-            } });
-        } });
-    };
-
-    var cocherTout = function (panel, val) {
-        panel.down('#permBody').query('checkbox').forEach(function (c) { c.setValue(val); });
-    };
-
-    var enregistrer = function (panel) {
-        var code = panel.down('#permRole').getValue();
-        if (!code) { Ext.Msg.alert('Rôle', 'Sélectionnez d\'abord un rôle.'); return; }
-        var perms = [];
-        panel.down('#permBody').query('checkbox').forEach(function (c) {
-            if (c.getValue()) { perms.push(c.name); }
-        });
-        Usp.ajax({ url: '/permissions/roles/' + code, method: 'PUT', jsonData: { permissions: perms },
-            success: function () { Usp.toast('Permissions du rôle « ' + code + ' » enregistrées.'); },
-            failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement des permissions impossible.'); } });
-    };
-
-    var creerRole = function (panel) {
+    var nouveau = function () {
         Ext.Msg.prompt('Nouveau rôle', 'Libellé du rôle (ex. Responsable RH) :', function (btn, libelle) {
             if (btn !== 'ok' || !libelle || !libelle.trim()) { return; }
             Usp.ajax({ url: '/users/roles', method: 'POST', jsonData: { libelle: libelle.trim() },
                 success: function (resp) {
+                    store.load();
                     var r = Ext.decode(resp.responseText) || {};
-                    roleStore.load({ callback: function () {
-                        var combo = panel.down('#permRole');
-                        combo.setValue(r.code);
-                        charger(panel);
-                    } });
-                    Usp.toast('Rôle « ' + (r.libelle || '') + ' » créé. Cochez ses permissions puis « Enregistrer ».');
+                    Usp.toast('Rôle « ' + (r.libelle || '') + ' » créé. Cliquez « 🔐 Privilèges » pour le configurer.');
                 },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         });
     };
 
-    return {
-        xtype: 'panel', title: '🔐 Rôles & permissions', layout: { type: 'vbox', align: 'stretch' },
-        bodyPadding: 10,
-        tbar: [
-            { xtype: 'combobox', itemId: 'permRole', fieldLabel: 'Rôle', labelWidth: 40, width: 300,
-              store: roleStore, valueField: 'code', displayField: 'libelle', queryMode: 'local',
-              editable: false, emptyText: 'Choisir un rôle…',
-              listeners: { select: function (c) { charger(c.up('panel')); } } },
-            { text: '➕ Nouveau rôle', tooltip: 'Créer un nouveau rôle', handler: function (b) { creerRole(b.up('panel')); } },
-            '->',
-            { text: 'Tout cocher', handler: function (b) { cocherTout(b.up('panel'), true); } },
-            { text: 'Tout décocher', handler: function (b) { cocherTout(b.up('panel'), false); } },
-            { text: '💾 Enregistrer', handler: function (b) { enregistrer(b.up('panel')); } }
-        ],
-        items: [
-            { xtype: 'displayfield', margin: '0 0 6 0',
-              value: '<span style="color:#666">Cochez les menus (Voir / accéder) et les actions ' +
-                     'autorisés pour le rôle sélectionné. Le rôle ADMIN dispose toujours de tous les droits.</span>' },
-            { xtype: 'container', itemId: 'permBody', flex: 1, autoScroll: true }
-        ]
+    var modifier = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: 'Modifier le rôle — ' + rec.get('code'), width: 440, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'displayfield', fieldLabel: 'Code', value: rec.get('code') },
+                { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false, value: rec.get('libelle') },
+                { xtype: 'textfield', name: 'description', fieldLabel: 'Description', value: rec.get('description') || '' }
+            ] }],
+            buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) { return; }
+                Usp.ajax({ url: '/users/roles/' + rec.get('id'), method: 'PUT', jsonData: f.getValues(),
+                    success: function () { win.close(); store.load(); Usp.toast('Rôle modifié.'); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }]
+        });
+        win.show();
     };
+
+    var toggle = function (rec) {
+        if (rec.get('code') === 'ADMIN' && rec.get('actif')) {
+            Ext.Msg.alert('Action impossible', 'Le rôle ADMIN ne peut pas être désactivé.'); return;
+        }
+        Usp.ajax({ url: '/users/roles/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')), method: 'PUT',
+            success: function () { store.load(); },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
+
+    return {
+        xtype: 'grid', title: '🔐 Rôles & permissions', store: store,
+        columns: [
+            { text: 'Code', dataIndex: 'code', width: 170 },
+            { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+            { text: 'Description', dataIndex: 'description', flex: 1 },
+            { text: 'Actif', dataIndex: 'actif', width: 70, align: 'center',
+              renderer: function (v) { return v ? '<span style="color:#2e7d32">✔</span>' : '<span style="color:#c62828">✖</span>'; } },
+            { text: 'Actions', width: 300, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  var s = '<span class="role-priv" title="Privilèges" style="cursor:pointer;color:#1976d2;margin-right:10px">🔐 Privilèges</span>' +
+                          '<span class="role-edit" title="Modifier" style="cursor:pointer;margin-right:10px">✏️ Modifier</span>';
+                  if (rec.get('code') !== 'ADMIN') {
+                      s += rec.get('actif')
+                          ? '<span class="role-toggle" title="Désactiver" style="cursor:pointer;color:#c62828">⛔ Désactiver</span>'
+                          : '<span class="role-toggle" title="Activer" style="cursor:pointer;color:#2e7d32">✅ Activer</span>';
+                  }
+                  return s;
+              } }
+        ],
+        tbar: [
+            { text: '➕ Nouveau rôle', tooltip: 'Créer un nouveau rôle', handler: nouveau },
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.role-priv')) { Usp.users.privilegesWindow(rec); }
+                else if (e.getTarget('.role-edit')) { modifier(rec); }
+                else if (e.getTarget('.role-toggle')) { toggle(rec); }
+            }
+        }
+    };
+};
+
+/* Fenêtre des privilèges d'un rôle : menus + actions cochables (état actuel) + Enregistrer. */
+Usp.users.privilegesWindow = function (rec) {
+    var code = rec.get('code');
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Privilèges — ' + (rec.get('libelle') || code), width: 740, modal: true,
+        height: Math.min(700, Ext.getBody().getViewSize().height - 60), layout: 'fit',
+        items: [{ xtype: 'container', itemId: 'body', autoScroll: true, padding: 10,
+                  html: '<span style="color:#888">Chargement…</span>' }],
+        tbar: [
+            { xtype: 'displayfield', value: code === 'ADMIN'
+                ? '<b>ADMIN</b> dispose toujours de tous les droits.'
+                : 'Cochez les menus (Voir / accéder) et les actions autorisés.' },
+            '->',
+            { text: 'Tout cocher', handler: function (b) { b.up('window').down('#body').query('checkbox').forEach(function (c) { c.setValue(true); }); } },
+            { text: 'Tout décocher', handler: function (b) { b.up('window').down('#body').query('checkbox').forEach(function (c) { c.setValue(false); }); } }
+        ],
+        buttons: [
+            { text: 'Fermer', handler: function () { win.close(); } },
+            { text: '💾 Enregistrer', handler: function () {
+                var perms = [];
+                win.down('#body').query('checkbox').forEach(function (c) { if (c.getValue()) { perms.push(c.name); } });
+                Usp.ajax({ url: '/permissions/roles/' + code, method: 'PUT', jsonData: { permissions: perms },
+                    success: function () { win.close(); Usp.toast('Privilèges du rôle « ' + code + ' » enregistrés.'); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }
+        ]
+    });
+    win.show();
+    Usp.ajax({ url: '/permissions/menus', method: 'GET', success: function (r1) {
+        var menus = Ext.decode(r1.responseText) || [];
+        Usp.ajax({ url: '/permissions/roles/' + code, method: 'GET', success: function (r2) {
+            var accordees = Ext.decode(r2.responseText) || [];
+            var body = win.down('#body');
+            body.removeAll();
+            body.update('');
+            body.add(menus.map(function (mn) {
+                var cbs = (mn.actions || []).map(function (a) {
+                    return { xtype: 'checkbox', boxLabel: a.libelle, name: mn.code + ':' + a.code,
+                             checked: accordees.indexOf(mn.code + ':' + a.code) !== -1, margin: '0 14 4 0' };
+                });
+                return { xtype: 'fieldset', title: mn.libelle, margin: '0 0 8 0',
+                         layout: { type: 'table', columns: 3 }, items: cbs };
+            }));
+        } });
+    } });
 };
 
 Usp.users.gridPanel = function () {
