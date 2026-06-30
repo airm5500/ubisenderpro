@@ -26,7 +26,7 @@ Usp.campaign.show = function (store) {
     var campagneId = null;
 
     var step1 = {
-        title: '1. Informations', bodyPadding: 12, border: false,
+        title: '1. Informations', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
@@ -52,7 +52,7 @@ Usp.campaign.show = function (store) {
     };
 
     var step2 = {
-        title: '2. Destinataires', bodyPadding: 12, border: false,
+        title: '2. Destinataires', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'displayfield', value: 'Ciblez par segmentation client, et/ou liste statique, et/ou segment dynamique.' },
@@ -67,7 +67,7 @@ Usp.campaign.show = function (store) {
     };
 
     var step3 = {
-        title: '3. Contenu', bodyPadding: 12, border: false,
+        title: '3. Contenu', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         items: [
             { xtype: 'displayfield', value: 'Le contenu provient du modèle WhatsApp approuvé sélectionné.' },
             { xtype: 'component', itemId: 'apercu', html: '<div style="border:1px solid #ddd;padding:10px;background:#dcf8c6;border-radius:8px;max-width:320px">Aperçu du modèle…</div>' }
@@ -75,7 +75,7 @@ Usp.campaign.show = function (store) {
     };
 
     var step4 = {
-        title: '4. Programmation', bodyPadding: 12, border: false,
+        title: '4. Programmation', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         defaults: { anchor: '100%', labelWidth: 165 },
         items: [
             { xtype: 'radiogroup', fieldLabel: 'Envoi', columns: 1, items: [
@@ -88,7 +88,7 @@ Usp.campaign.show = function (store) {
     };
 
     var step5 = {
-        title: '5. Validation', bodyPadding: 12, border: false,
+        title: '5. Validation', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         items: [{ xtype: 'component', itemId: 'recap', html: 'Cliquez sur « Construire » pour calculer les destinataires.' }]
     };
 
@@ -179,7 +179,7 @@ Usp.campaign.build = function (wizard) {
                     'Cliquez sur « Lancer » pour démarrer l\'envoi en arrière-plan.');
                 wizard.down('#launch').setDisabled(r.nbDestinataires === 0);
             },
-            failure: function () { Ext.Msg.alert('Erreur', 'Construction des destinataires impossible.'); }
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Construction des destinataires impossible.')); }
         });
     };
 
@@ -192,7 +192,7 @@ Usp.campaign.build = function (wizard) {
                 wizard.campagneId = Ext.decode(resp.responseText).id;
                 finishBuild(wizard.campagneId);
             },
-            failure: function () { Ext.Msg.alert('Erreur', 'Création de la campagne impossible.'); }
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Création de la campagne impossible.')); }
         });
     }
 };
