@@ -140,7 +140,7 @@ Usp.users.gridPanel = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouvel utilisateur', tooltip: 'Créer un nouvel utilisateur', handler: function () { Usp.users.form(store, null); } },
+            Usp.permBtn('users', 'CREER', { text: '➕ Nouvel utilisateur', tooltip: 'Créer un nouvel utilisateur', handler: function () { Usp.users.form(store, null); } }),
             { text: '🔄 Rafraîchir', tooltip: 'Recharger la liste', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Utilisateurs')),
         listeners: {

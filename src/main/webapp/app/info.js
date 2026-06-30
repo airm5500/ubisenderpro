@@ -101,7 +101,7 @@ Usp.info.grille = function (filtre, libelleTab) {
         tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
                 .concat(Usp.export.boutons('Informations historique'))
             : [
-                { text: '➕ Nouvelle information', handler: function () { Usp.info.form(store, null, filtre.type); } },
+                Usp.permBtn('infos', 'CREER', { text: '➕ Nouvelle information', handler: function () { Usp.info.form(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
             ].concat(Usp.export.boutons('Informations')),
         listeners: {

@@ -91,7 +91,7 @@ Usp.marketing.grille = function (statut, libelleTab) {
               } }
         ],
         tbar: [
-            { text: '➕ Nouvelle promotion', tooltip: 'Créer une promotion', handler: function () { Usp.marketing.promotionForm(store, null); } },
+            Usp.permBtn('promotions', 'CREER', { text: '➕ Nouvelle promotion', tooltip: 'Créer une promotion', handler: function () { Usp.marketing.promotionForm(store, null); } }),
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Promotions ' + statut)),
         listeners: {
@@ -205,7 +205,7 @@ Usp.marketing.produitsGrid = function (promotionId) {
               } }
         ],
         tbar: [
-            { text: '➕ Ajouter un produit', handler: function () { Usp.marketing.produitForm(store, promotionId, null); } },
+            Usp.permBtn('promotions', 'CREER', { text: '➕ Ajouter un produit', handler: function () { Usp.marketing.produitForm(store, promotionId, null); } }),
             { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer Excel',
               listeners: { change: function (f) { Usp.marketing.importProduits(f, promotionId, store); } } }
         ],
@@ -512,7 +512,7 @@ Usp.marketing.modelesMessages = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouveau modèle', handler: function () { Usp.settings.templateForm(store, null); } },
+            Usp.permBtn('marketing', 'CREER', { text: '➕ Nouveau modèle', handler: function () { Usp.settings.templateForm(store, null); } }),
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
         ],
         listeners: {

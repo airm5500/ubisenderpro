@@ -284,7 +284,7 @@ Usp.campaign.listPanel = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouvelle campagne', tooltip: 'Créer et lancer une nouvelle campagne', handler: function () { Usp.campaign.show(store); } },
+            Usp.permBtn('campaigns', 'CREER', { text: '➕ Nouvelle campagne', tooltip: 'Créer et lancer une nouvelle campagne', handler: function () { Usp.campaign.show(store); } }),
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Campagnes')),
         listeners: {

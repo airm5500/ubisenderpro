@@ -54,14 +54,14 @@ Usp.catalogue.articlesPanel = function () {
             { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
                 change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
             '->',
-            { text: '➕ Nouvel article', tooltip: 'Créer un nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } },
-            { text: 'Ajuster stock', handler: function (b) {
+            Usp.permBtn('catalogue', 'CREER', { text: '➕ Nouvel article', tooltip: 'Créer un nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } }),
+            Usp.permBtn('catalogue', 'CREER', { text: 'Ajuster stock', handler: function (b) {
                 var rec = b.up('grid').getSelectionModel().getSelection()[0];
                 if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un article.'); return; }
                 Usp.catalogue.stockForm(store, rec);
-            } },
-            { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } },
-            { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } }
+            } }),
+            Usp.permBtn('catalogue', 'CREER', { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } }),
+            Usp.permBtn('catalogue', 'CREER', { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } })
         ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
@@ -279,7 +279,7 @@ Usp.catalogue.promotionsPanel = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouvelle promotion', tooltip: 'Créer une nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } },
+            Usp.permBtn('promotions', 'CREER', { text: '➕ Nouvelle promotion', tooltip: 'Créer une nouvelle promotion', handler: function () { Usp.catalogue.promotionForm(store, null); } }),
             { text: 'Rafraîchir', handler: function () { store.load(); } }
         ].concat(Usp.export.boutons('Promotions')),
         listeners: {
@@ -382,7 +382,7 @@ Usp.catalogue.simplePanel = function (titre, url, fields, formFields, root) {
         } });
     return {
         xtype: 'grid', title: titre, store: store, columns: cols,
-        tbar: [{ text: '➕ Nouveau', tooltip: 'Ajouter une entrée', handler: function () { ouvrir(null); } }]
+        tbar: [Usp.permBtn('catalogue', 'CREER', { text: '➕ Nouveau', tooltip: 'Ajouter une entrée', handler: function () { ouvrir(null); } })]
             .concat(Usp.export.boutons(titre)),
         listeners: {
             itemdblclick: function (g, rec) { ouvrir(rec); },

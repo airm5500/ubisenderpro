@@ -95,7 +95,7 @@ Usp.dispo.regles = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouvelle règle', handler: function () { Usp.dispo.regleForm(store, null); } },
+            Usp.permBtn('dispo', 'CREER', { text: '➕ Nouvelle règle', handler: function () { Usp.dispo.regleForm(store, null); } }),
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } },
             '->',
             { xtype: 'tbtext', text: '<span style="color:#888">Le risque de rupture est proposé selon ces règles (jour du mois + audience).</span>' }
@@ -197,8 +197,8 @@ Usp.dispo.grille = function (filtre, libelleTab) {
         tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
                 .concat(Usp.export.boutons('Disponibilités historique'))
             : [
-                { text: '➕ Nouvel événement', tooltip: 'Créer un événement disponibilité / rupture',
-                  handler: function () { Usp.dispo.evenementForm(store, null, filtre.type); } },
+                Usp.permBtn('dispo', 'CREER', { text: '➕ Nouvel événement', tooltip: 'Créer un événement disponibilité / rupture',
+                  handler: function () { Usp.dispo.evenementForm(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
             ].concat(Usp.export.boutons('Disponibilités ' + (filtre.type || filtre.statut || ''))),
         listeners: {
@@ -312,7 +312,7 @@ Usp.dispo.produitsGrid = function (evenementId) {
               } }
         ],
         tbar: [
-            { text: '➕ Ajouter un produit', handler: function () { Usp.dispo.produitForm(store, evenementId, null); } },
+            Usp.permBtn('dispo', 'CREER', { text: '➕ Ajouter un produit', handler: function () { Usp.dispo.produitForm(store, evenementId, null); } }),
             { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer Excel',
               listeners: { change: function (f) { Usp.dispo.importProduits(f, evenementId, store); } } }
         ],
