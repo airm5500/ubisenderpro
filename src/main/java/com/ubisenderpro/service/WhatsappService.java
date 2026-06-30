@@ -45,6 +45,11 @@ public class WhatsappService {
         return em.merge(a);
     }
 
+    public void supprimerCompte(Long id) {
+        WhatsappAccount ex = em.find(WhatsappAccount.class, id);
+        if (ex != null) { em.remove(ex); }
+    }
+
     public Optional<WhatsappAccount> compteParPhoneNumberId(String phoneNumberId) {
         List<WhatsappAccount> l = em.createQuery(
                 "SELECT w FROM WhatsappAccount w WHERE w.phoneNumberId = :p", WhatsappAccount.class)

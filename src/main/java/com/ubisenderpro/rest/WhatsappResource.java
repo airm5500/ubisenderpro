@@ -55,10 +55,18 @@ public class WhatsappResource {
 
     @PUT
     @Path("/accounts/{id}")
-    @Secured(roles = {"ADMIN"})
+    @Secured(menu = "settings", action = "MODIFIER")
     public Response modifierCompte(@PathParam("id") Long id, WhatsappAccount a) {
         a.setId(id);
         return Response.ok(whatsappService.modifierCompte(a)).build();
+    }
+
+    @DELETE
+    @Path("/accounts/{id}")
+    @Secured(menu = "settings", action = "SUPPRIMER")
+    public Response supprimerCompte(@PathParam("id") Long id) {
+        whatsappService.supprimerCompte(id);
+        return Response.noContent().build();
     }
 
     @POST

@@ -105,6 +105,13 @@ Usp.inbox.panel = function () {
 
     var loadConversation = function (rec) {
         Usp.inbox.currentConv = rec;
+        // Privilège « Voir le contenu des discussions » (point 5).
+        if (!Usp.can('inbox', 'VOIR_CONTENU')) {
+            msgStore.removeAll();
+            contactPanel.update('<div style="padding:14px;color:#c62828">🔒 Vous n\'avez pas le droit de voir le ' +
+                'contenu des discussions.<br>Contactez l\'administrateur de votre système.</div>');
+            return;
+        }
         Usp.inbox._msgSig = null; // force le rafraîchissement à l'ouverture
         msgStore.getProxy().url = Usp.apiBase + '/conversations/' + rec.get('id') + '/messages';
         msgStore.load();
@@ -604,6 +611,7 @@ Usp.inbox.bot = function (actif) {
 };
 
 Usp.inbox.reloadMessages = function () {
+    if (!Usp.can('inbox', 'VOIR_CONTENU')) { return; }
     if (Usp.inbox.msgStore && Usp.inbox.currentConv) {
         Usp.inbox.msgStore.getProxy().url = Usp.apiBase + '/conversations/' + Usp.inbox.currentConv.get('id') + '/messages';
         Usp.inbox.msgStore.load();

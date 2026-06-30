@@ -26,7 +26,7 @@ public class SegmentationResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "clients")
     public Response creer(SegmentationClient s) {
         try {
             return Response.status(Response.Status.CREATED).entity(segmentationService.creer(s)).build();
@@ -37,7 +37,7 @@ public class SegmentationResource {
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "clients")
     public Response modifier(@PathParam("id") Long id, SegmentationClient s) {
         try {
             return Response.ok(segmentationService.modifier(id, s)).build();
@@ -48,7 +48,7 @@ public class SegmentationResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "clients")
     public Response supprimer(@PathParam("id") Long id) {
         try {
             segmentationService.supprimer(id);

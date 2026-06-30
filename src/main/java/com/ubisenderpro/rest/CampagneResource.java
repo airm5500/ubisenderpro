@@ -112,7 +112,7 @@ public class CampagneResource {
      */
     @POST
     @Path("/{id}/relancer")
-    @Secured(menu = "campaigns")
+    @Secured(menu = "campaigns", action = "RENVOI_ECHECS")
     public Response relancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         int reinities = campagneService.reinitialiserEchecs(id);
         if (reinities == 0) {

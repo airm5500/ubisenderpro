@@ -33,6 +33,22 @@ Usp.settings.accountsPanel = function () {
         ],
         tbar: [
             { text: '➕ Nouveau compte', tooltip: 'Configurer un nouveau compte WhatsApp', handler: function () { Usp.settings.accountForm(store, null); } },
+            Usp.permBtn('settings', 'MODIFIER', { text: '✏️ Modifier', handler: function (b) {
+                var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un compte.'); return; }
+                Usp.settings.accountForm(store, rec);
+            } }),
+            Usp.permBtn('settings', 'SUPPRIMER', { text: '🗑️ Supprimer', handler: function (b) {
+                var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un compte.'); return; }
+                Ext.Msg.confirm('Supprimer', 'Supprimer le compte WhatsApp « ' + Ext.String.htmlEncode(rec.get('libelle')) + ' » ?',
+                    function (btn) {
+                        if (btn !== 'yes') { return; }
+                        Usp.ajax({ url: '/whatsapp/accounts/' + rec.get('id'), method: 'DELETE',
+                            success: function () { store.load(); Usp.toast('Compte supprimé.'); },
+                            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                    });
+            } }),
             { text: 'Webhook', tooltip: 'Rappel de l\'URL de webhook', handler: function () {
                 var base = window.location.origin + window.location.pathname.replace(/\/$/, '');
                 Ext.Msg.alert('URL de webhook Meta',

@@ -21,7 +21,7 @@ import java.util.Map;
  * Envoi en masse via WhatsApp Web (5 variantes, pièce jointe, débit).
  */
 @Path("/wa-bulk")
-@Secured(roles = {"ADMIN", "MARKETING"})
+@Secured(menu = "waweb", action = "VOIR")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class WaBulkResource {
@@ -52,6 +52,7 @@ public class WaBulkResource {
     /** Analyse un fichier CSV/Excel de destinataires sans rien enregistrer (envoi ponctuel). */
     @POST
     @Path("/preparer-fichier")
+    @Secured(menu = "waweb", action = "ENVOI_MASSE")
     public Response preparerFichier(Map<String, Object> body) {
         try {
             String b64 = body == null ? null : (String) body.get("fichierBase64");
@@ -63,6 +64,7 @@ public class WaBulkResource {
     }
 
     @POST
+    @Secured(menu = "waweb", action = "ENVOI_MASSE")
     public Response creer(WaBulkRequest req, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         try {
             WaBulkJob j = service.creer(req, utilisateurId(authHeader));
@@ -81,6 +83,7 @@ public class WaBulkResource {
 
     @POST
     @Path("/{id}/relancer")
+    @Secured(menu = "waweb", action = "RENVOI_ECHECS")
     public Response relancerEchecs(@PathParam("id") Long id) {
         try {
             return Response.ok(service.relancerEchecs(id)).build();
@@ -91,6 +94,7 @@ public class WaBulkResource {
 
     @POST
     @Path("/{id}/launch")
+    @Secured(menu = "waweb", action = "ENVOI_MASSE")
     public Response lancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         try {
             WaBulkJob j = service.lancer(id);

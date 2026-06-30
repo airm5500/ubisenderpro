@@ -289,8 +289,14 @@ Usp.campaign.listPanel = function () {
         ].concat(Usp.export.boutons('Campagnes')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
-                if (e.getTarget('.camp-details')) { Usp.campaign.details(rec); }
-                else if (e.getTarget('.camp-relance')) { Usp.campaign.relance(rec, store); }
+                if (e.getTarget('.camp-details')) {
+                    if (!Usp.can('campaigns', 'VOIR_DETAILS')) { Usp.refusPermission(); return; }
+                    Usp.campaign.details(rec);
+                }
+                else if (e.getTarget('.camp-relance')) {
+                    if (!Usp.can('campaigns', 'RENVOI_ECHECS')) { Usp.refusPermission(); return; }
+                    Usp.campaign.relance(rec, store);
+                }
                 else if (e.getTarget('.camp-edit')) { Usp.campaign.editForm(rec, store); }
                 else if (e.getTarget('.camp-del')) { Usp.campaign.supprimer(rec, store); }
             }

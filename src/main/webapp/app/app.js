@@ -621,12 +621,18 @@ Usp.segmentationsManager = function () {
                   renderer: function () { return '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
             ],
             tbar: [
-                { text: 'Nouvelle segmentation', handler: function () { form(null); } },
+                Usp.permBtn('clients', 'CREER', { text: 'Nouvelle segmentation', handler: function () { form(null); } }),
+                Usp.permBtn('clients', 'MODIFIER', { text: '✏️ Modifier', handler: function (b) {
+                    var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                    if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une segmentation.'); return; }
+                    form(rec);
+                } }),
                 { text: 'Rafraîchir', handler: function () { store.load(); } }
             ],
             listeners: {
                 cellclick: function (g, td, ci, rec, tr, ri, e) {
                     if (e.getTarget('.seg-del')) {
+                        if (!Usp.can('clients', 'SUPPRIMER')) { Usp.refusPermission(); return; }
                         // Désactive une segmentation utilisée par des clients (au lieu de la supprimer).
                         var desactiver = function () {
                             var data = rec.getData();

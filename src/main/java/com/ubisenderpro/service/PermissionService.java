@@ -78,13 +78,14 @@ public class PermissionService {
     private static List<String> actionsDuMenu(String code) {
         List<String> a = new ArrayList<>();
         a.add("VOIR");
+        a.add("VOIR_DETAILS"); // privilège « voir les détails » (transverse, point 5)
         if (Arrays.asList("clients", "catalogue", "promotions", "marketing", "dispo",
                 "infos", "users", "campaigns").contains(code)) {
             a.add("CREER"); a.add("MODIFIER"); a.add("SUPPRIMER"); a.add("DESACTIVER");
         }
         if (Arrays.asList("campaigns", "marketing", "waweb").contains(code)) { a.add("ENVOYER"); }
         if (Arrays.asList("clients", "historique").contains(code)) { a.add("EXPORTER"); }
-        if ("settings".equals(code) && !a.contains("MODIFIER")) { a.add("MODIFIER"); }
+        if ("settings".equals(code)) { if (!a.contains("MODIFIER")) { a.add("MODIFIER"); } a.add("SUPPRIMER"); }
         // Actions spécifiques (point 11 / 5).
         if ("catalogue".equals(code)) { a.add("AJUSTER_STOCK"); a.add("MAJ_PROMO"); }
         if ("inbox".equals(code)) { a.add("CREER"); a.add("VOIR_CONTENU"); }
