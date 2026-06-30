@@ -7,7 +7,7 @@ import javax.persistence.*;
  * {@code actionCode} sur un {@code menuCode}.
  */
 @Entity
-@Table(name = "usp_role_permission")
+@Table(name = "usp_role_menu_action")
 public class RolePermission {
 
     @Id
