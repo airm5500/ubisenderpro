@@ -7,7 +7,7 @@
 -- =====================================================================
 
 -- Menus de l'application (dynamiques : on peut en ajouter à tout moment).
-CREATE TABLE usp_menu (
+CREATE TABLE IF NOT EXISTS usp_menu (
     id BIGINT NOT NULL AUTO_INCREMENT,
     code VARCHAR(50) NOT NULL,
     libelle VARCHAR(100) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE usp_menu (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Actions disponibles par menu (VOIR, CREER, MODIFIER, SUPPRIMER, DESACTIVER, ENVOYER…).
-CREATE TABLE usp_menu_action (
+CREATE TABLE IF NOT EXISTS usp_menu_action (
     id BIGINT NOT NULL AUTO_INCREMENT,
     menu_code VARCHAR(50) NOT NULL,
     action_code VARCHAR(30) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE usp_menu_action (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Permissions accordées à un rôle (par code de rôle).
-CREATE TABLE usp_role_permission (
+CREATE TABLE IF NOT EXISTS usp_role_permission (
     id BIGINT NOT NULL AUTO_INCREMENT,
     role_code VARCHAR(50) NOT NULL,
     menu_code VARCHAR(50) NOT NULL,

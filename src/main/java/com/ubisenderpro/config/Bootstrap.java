@@ -73,6 +73,10 @@ public class Bootstrap {
                     .locations("classpath:db/migration")
                     .baselineOnMigrate(true)
                     .load();
+            // Auto-réparation : supprime les entrées de migration en échec (DDL MySQL
+            // auto-commit -> application partielle possible) et réaligne les checksums,
+            // avant de relancer la migration. Sans effet lorsque l'historique est sain.
+            flyway.repair();
             flyway.migrate();
             LOG.info("UbiSenderPro : migrations Flyway appliquées.");
         } catch (Exception e) {
