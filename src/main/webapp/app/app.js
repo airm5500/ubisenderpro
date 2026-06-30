@@ -510,11 +510,11 @@ Usp.clientsGrid = function (actif) {
     ];
     if (actif) {
         tbar.push('->',
-            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client',
-              hidden: !Usp.can('clients', 'CREER'), handler: function () { Usp.clientForm(store, null); } },
+            Usp.permBtn('clients', 'CREER', { text: '➕ Nouveau client',
+              tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } }),
             { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier',
-              hidden: !Usp.can('clients', 'CREER'), handler: Usp.showImport });
+            Usp.permBtn('clients', 'CREER', { text: '📥 Importer Excel/CSV',
+              tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport }));
     }
 
     return {
@@ -1044,6 +1044,26 @@ Usp.can = function (menu, action) {
     if (!Usp.perms) { return true; }
     var acts = Usp.perms[menu];
     return !!acts && acts.indexOf(action) !== -1;
+};
+
+/* Pastille « droit non accordé » (HTML) à accoler au libellé d'un bouton.
+ * Vide si l'action est autorisée. */
+Usp.permBadge = function (menu, action) {
+    if (Usp.can(menu, action)) { return ''; }
+    return ' <span style="color:#e74c3c;font-size:11px;vertical-align:middle"' +
+           ' title="Droit non accordé : ' + action + ' sur ' + menu + '">●</span>';
+};
+
+/* Prépare une config de bouton : si l'action n'est pas autorisée, ajoute une
+ * pastille au libellé et un libellé d'aide, SANS toucher au handler (le clic
+ * conserve son comportement habituel, qui aboutira au refus serveur clair). */
+Usp.permBtn = function (menu, action, cfg) {
+    cfg = cfg || {};
+    if (!Usp.can(menu, action)) {
+        cfg.text = (cfg.text || '') + Usp.permBadge(menu, action);
+        cfg.tooltip = (cfg.tooltip ? cfg.tooltip + ' — ' : '') + 'Droit non accordé (' + action + ')';
+    }
+    return cfg;
 };
 
 /* Pastille sur l'onglet actif d'un tabpanel. */
