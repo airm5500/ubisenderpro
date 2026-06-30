@@ -40,9 +40,9 @@ Usp.recouvrement.clientCombo = function (cfg) {
 Usp.recouvrement.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Suivi Relance et Recouvrements', listeners: Usp.tabListeners,
-        items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.modelesPanel(),
-                Usp.recouvrement.historiquePanel(), Usp.recouvrement.importPanel(),
-                Usp.recouvrement.referentielsPanel()]
+        items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.assistantPanel(),
+                Usp.recouvrement.modelesPanel(), Usp.recouvrement.historiquePanel(),
+                Usp.recouvrement.importPanel(), Usp.recouvrement.referentielsPanel()]
     };
 };
 
@@ -433,6 +433,92 @@ Usp.recouvrement.relanceForm = function (rec) {
                     if (e.statut === 'ENVOYE') { Usp.toast('Relance envoyée (' + e.canal + ').'); }
                     else { Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
                 },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        } }]
+    });
+    win.show();
+};
+
+/* ---------------------------- Assistant de relance ---------------------------- */
+Usp.recouvrement.MOTIFS = {
+    RELANCE_PREVENTIVE: 'Relance préventive', FACTURE_ECHUE: 'Facture échue',
+    DEUXIEME_RELANCE: 'Deuxième relance', PROMESSE_NON_TENUE: 'Promesse non tenue',
+    PAIEMENT_PARTIEL: 'Paiement partiel', CLIENT_CRITIQUE: 'Client critique'
+};
+Usp.recouvrement.assistantPanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'clientId', 'nomCompte', 'motif', 'priorite', 'joursRetard', 'montant',
+                 'canalRecommande', 'modeleId', 'modeleNom'],
+        autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/propositions',
+            extraParams: { statut: 'PROPOSEE' },
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var prioColor = { CRITIQUE: '#c62828', HAUTE: '#ef6c00', NORMALE: '#555' };
+    return {
+        xtype: 'grid', title: '🤖 Assistant', store: store,
+        columns: [
+            { text: 'Client', dataIndex: 'nomCompte', flex: 1 },
+            { text: 'Motif', dataIndex: 'motif', width: 160, renderer: function (v) { return Usp.recouvrement.MOTIFS[v] || v; } },
+            { text: 'Priorité', dataIndex: 'priorite', width: 90, renderer: function (v) {
+                return '<span style="color:' + (prioColor[v] || '#555') + ';font-weight:bold">' + (v || '') + '</span>'; } },
+            { text: 'Retard (j)', dataIndex: 'joursRetard', width: 80, align: 'right' },
+            { text: 'Montant dû', dataIndex: 'montant', width: 120, align: 'right', renderer: Usp.recouvrement.money },
+            { text: 'Canal', dataIndex: 'canalRecommande', width: 90 },
+            { text: 'Modèle conseillé', dataIndex: 'modeleNom', width: 160 },
+            { text: 'Actions', width: 200, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="prop-ok" title="Valider et envoyer" style="cursor:pointer;color:#2e7d32;margin-right:12px">✅ Valider</span>'
+                      + '<span class="prop-no" title="Rejeter" style="cursor:pointer;color:#c62828">✖ Rejeter</span>';
+              } }
+        ],
+        tbar: [
+            { xtype: 'combobox', fieldLabel: 'Statut', labelWidth: 45, width: 200, value: 'PROPOSEE',
+              queryMode: 'local', editable: false, store: [['PROPOSEE', 'En attente'], ['VALIDEE', 'Validées'], ['REJETEE', 'Rejetées']],
+              listeners: { select: function (c) { store.getProxy().extraParams = { statut: c.getValue() }; store.load(); } } },
+            '->',
+            Usp.permBtn('recouvrement', 'CREER', { text: '🔍 Analyser maintenant', handler: function () {
+                Usp.ajax({ url: '/recouvrement/propositions/generer', method: 'POST',
+                    success: function (resp) { store.load();
+                        Usp.toast(((Ext.decode(resp.responseText) || {}).crees || 0) + ' proposition(s) générée(s).'); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }),
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.prop-ok')) {
+                    if (!Usp.can('recouvrement', 'ENVOYER')) { Usp.refusPermission(); return; }
+                    Usp.recouvrement.validerProposition(rec, store);
+                } else if (e.getTarget('.prop-no')) {
+                    Usp.ajax({ url: '/recouvrement/propositions/' + rec.get('id') + '/rejeter', method: 'POST',
+                        success: function () { store.load(); },
+                        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                }
+            }
+        }
+    };
+};
+
+Usp.recouvrement.validerProposition = function (rec, store) {
+    var modeleStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/modeles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Valider la relance — ' + rec.get('nomCompte'), width: 480, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 120 }, items: [
+            { xtype: 'displayfield', fieldLabel: 'Motif', value: Usp.recouvrement.MOTIFS[rec.get('motif')] || rec.get('motif') },
+            { xtype: 'combobox', name: 'modeleId', fieldLabel: 'Modèle', allowBlank: false, store: modeleStore,
+              valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false,
+              value: rec.get('modeleId') || null, emptyText: 'Choisir un modèle…' },
+            { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
+              store: Usp.recouvrement.CANAUX, value: rec.get('canalRecommande') || 'WHATSAPP' }
+        ] }],
+        buttons: [{ text: '✅ Valider et envoyer', formBind: true, handler: function (b) {
+            var f = b.up('window').down('form').getForm();
+            if (!f.isValid()) { return; }
+            Usp.ajax({ url: '/recouvrement/propositions/' + rec.get('id') + '/valider', method: 'POST', jsonData: f.getValues(),
+                success: function () { win.close(); store.load(); Usp.toast('Relance envoyée.'); },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
     });

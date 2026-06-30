@@ -6,11 +6,13 @@ import com.ubisenderpro.entity.Message;
 import com.ubisenderpro.entity.RecEnvoi;
 import com.ubisenderpro.entity.RecModele;
 import com.ubisenderpro.entity.WhatsappAccount;
+import com.ubisenderpro.whatsapp.WhatsappCloudClient;
 
 import javax.ejb.EJB;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -88,10 +90,26 @@ public class RecEnvoiService {
                 if (compte == null) {
                     throw new ValidationException("compte", "Aucun compte WhatsApp actif configuré.");
                 }
-                Message m = whatsappService.envoyerTexte(compte.getId(), numero, corps, expediteurId);
                 env.setDestinataire(numero);
-                env.setWaMessageId(m == null ? null : m.getWaMessageId());
-                env.setStatut("ENVOYE");
+                if (modele.getNomModeleWhatsapp() != null && !modele.getNomModeleWhatsapp().trim().isEmpty()) {
+                    // Template Meta approuvé (valable hors fenêtre 24h) : paramètres résolus depuis les variables finance.
+                    WhatsappCloudClient cloud = new WhatsappCloudClient(compte);
+                    WhatsappCloudClient.SendResult res = cloud.envoyerModele(
+                            numero, modele.getNomModeleWhatsapp().trim(), "fr",
+                            parametres(modele.getParamsCorps(), vars), null, null);
+                    if (res != null && res.success) {
+                        env.setWaMessageId(res.waMessageId);
+                        env.setStatut("ENVOYE");
+                    } else {
+                        env.setStatut("ECHOUE");
+                        env.setErreur(res == null ? "Échec de l'envoi du template." : res.erreur);
+                    }
+                } else {
+                    // Texte libre (valable uniquement dans la fenêtre de 24h).
+                    Message m = whatsappService.envoyerTexte(compte.getId(), numero, corps, expediteurId);
+                    env.setWaMessageId(m == null ? null : m.getWaMessageId());
+                    env.setStatut("ENVOYE");
+                }
             }
         } catch (Exception ex) {
             env.setStatut("ECHOUE");
@@ -99,6 +117,21 @@ public class RecEnvoiService {
         }
         em.persist(env);
         return env;
+    }
+
+    /** Valeurs ordonnées des paramètres {{1}},{{2}}… d'un template, depuis les variables finance. */
+    private List<String> parametres(String spec, Map<String, String> vars) {
+        List<String> out = new ArrayList<>();
+        if (spec == null || spec.trim().isEmpty()) {
+            out.add(vars.getOrDefault("nom_client", ""));
+            return out;
+        }
+        for (String token : spec.split(",")) {
+            String k = token.trim().toLowerCase();
+            if (k.isEmpty()) { continue; }
+            out.add(vars.getOrDefault(k, ""));
+        }
+        return out;
     }
 
     private String numeroWhatsapp(Long clientId) {
