@@ -120,4 +120,58 @@ public class ReferentielGeoService {
         ReferentielGeo ex = em.find(ReferentielGeo.class, id);
         if (ex != null) { ex.setActif(actif); ex.setUpdatedAt(LocalDateTime.now()); em.merge(ex); }
     }
+
+    /**
+     * Importe des valeurs depuis un contenu texte (une ligne par valeur).
+     * Colonnes acceptées : {@code id,code,nom} ou {@code code,nom} ou {@code nom}
+     * (séparateur , ou ;). Dédupliqué par libellé. Renvoie le nombre créé.
+     */
+    public int importer(String type, String contenu) {
+        String t = typeValide(type);
+        if (contenu == null || contenu.trim().isEmpty()) { return 0; }
+        int crees = 0;
+        boolean premiere = true;
+        for (String ligne : contenu.split("\\r?\\n")) {
+            if (ligne == null || ligne.trim().isEmpty()) { continue; }
+            String[] cols = ligne.split("[;,\\t]");
+            for (int i = 0; i < cols.length; i++) { cols[i] = cols[i].trim(); }
+            if (premiere) {
+                premiere = false;
+                if (estEntete(cols)) { continue; }
+            }
+            String code = null, nom;
+            if (cols.length >= 3) { code = cols[1]; nom = cols[2]; }
+            else if (cols.length == 2) { code = cols[0]; nom = cols[1]; }
+            else { nom = cols[0]; }
+            if (nom == null || nom.isEmpty()) { continue; }
+            if (importerUn(t, code, nom)) { crees++; }
+        }
+        return crees;
+    }
+
+    private boolean estEntete(String[] cols) {
+        for (String c : cols) {
+            String v = c.toLowerCase();
+            if (v.equals("id") || v.equals("code") || v.equals("nom")
+                    || v.equals("libelle") || v.equals("libellé")) { return true; }
+        }
+        return false;
+    }
+
+    private boolean importerUn(String type, String code, String nom) {
+        boolean existe = !em.createQuery(
+                "SELECT r FROM ReferentielGeo r WHERE r.type = :t AND LOWER(r.libelle) = :l", ReferentielGeo.class)
+                .setParameter("t", type).setParameter("l", nom.toLowerCase())
+                .setMaxResults(1).getResultList().isEmpty();
+        if (existe) { return false; }
+        ReferentielGeo r = new ReferentielGeo();
+        r.setType(type);
+        r.setLibelle(nom);
+        String c = (code == null || code.isEmpty() || codeExiste(type, code))
+                ? Codes.generer(prefixe(type), x -> codeExiste(type, x)) : code;
+        r.setCode(c);
+        r.setActif(true);
+        em.persist(r);
+        return true;
+    }
 }

@@ -555,8 +555,116 @@ Usp.settings.tabs = function () {
     return {
         xtype: 'tabpanel', title: 'Paramètres', listeners: Usp.tabListeners,
         items: [Usp.settings.generalPanel(), Usp.settings.accountsPanel(),
-                Usp.settings.templatesPanel(), Usp.settings.botPanel()]
+                Usp.settings.referentielsPanel(), Usp.settings.templatesPanel(), Usp.settings.botPanel()]
     };
+};
+
+/* ---------- Référentiels géographiques (Pays / Régions / Villes / Communes / Agences) ---------- */
+Usp.settings.refGeoGrid = function (type, titre) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle', 'actif'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    var form = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: (rec ? 'Modifier' : 'Ajouter') + ' — ' + titre, width: 420, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'textfield', name: 'code', fieldLabel: 'Code',
+                  emptyText: 'Laisser vide = généré automatiquement' },
+                { xtype: 'textfield', name: 'libelle', fieldLabel: 'Libellé', allowBlank: false }
+            ] }],
+            buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) { return; }
+                var vals = f.getValues();
+                Usp.ajax({
+                    url: '/referentiels/' + type + (rec ? '/' + rec.get('id') : ''),
+                    method: rec ? 'PUT' : 'POST', jsonData: vals,
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre(titre + ' « ' + (vals.libelle || '') + ' »', !!rec); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); }
+                });
+            } }]
+        });
+        win.show();
+        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    };
+    return {
+        xtype: 'grid', title: titre, store: store, flex: 1,
+        columns: [
+            { text: 'Code', dataIndex: 'code', width: 160 },
+            { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+            { text: 'Actif', dataIndex: 'actif', width: 70, align: 'center',
+              renderer: function (v) { return v ? '✅' : '—'; } }
+        ],
+        tbar: [
+            { text: '➕ Ajouter', handler: function () { form(null); } },
+            { text: '✏️ Modifier', handler: function (b) {
+                var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
+                form(rec);
+            } },
+            { text: '🗑️ Activer/Désactiver', handler: function (b) {
+                var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
+                Usp.ajax({ url: '/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
+                    method: 'PUT', success: function () { store.load(); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } },
+            '->',
+            { text: '📥 Importer (CSV id,code,nom)', handler: function () { Usp.settings.importerRefGeo(type, store); } },
+            { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
+        ]
+    };
+};
+
+Usp.settings.referentielsPanel = function () {
+    return {
+        title: '🌍 Référentiels', xtype: 'panel', layout: 'fit', bodyPadding: 6,
+        items: [{
+            xtype: 'tabpanel',
+            items: [
+                Usp.settings.refGeoGrid('PAYS', 'Pays'),
+                Usp.settings.refGeoGrid('REGION', 'Régions'),
+                Usp.settings.refGeoGrid('VILLE', 'Villes'),
+                Usp.settings.refGeoGrid('COMMUNE', 'Communes'),
+                Usp.settings.refGeoGrid('AGENCE', 'Agences')
+            ]
+        }]
+    };
+};
+
+/* Import CSV (id,code,nom) ou (code,nom) ou (nom) d'un référentiel géographique. */
+Usp.settings.importerRefGeo = function (type, store) {
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'displayfield', value: '<span style="color:#888">Une ligne par valeur. Colonnes acceptées : ' +
+                '<b>id,code,nom</b> ou <b>code,nom</b> ou <b>nom</b> (séparateur , ou ;). ' +
+                'Une éventuelle ligne d\'en-tête est ignorée.</span>' },
+            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'CI,Côte d\'Ivoire\nABJ,Abidjan' },
+            { xtype: 'filefield', buttonOnly: false, fieldLabel: 'ou fichier .csv', msgTarget: 'side',
+              listeners: { change: function (f) {
+                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  var reader = new FileReader();
+                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
+                  reader.readAsText(file);
+              } } }
+        ] }],
+        buttons: [{ text: 'Importer', handler: function (b) {
+            var contenu = b.up('window').down('[name=contenu]').getValue();
+            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée à importer.'); return; }
+            Usp.ajax({ url: '/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
+                success: function (resp) {
+                    win.close(); store.load();
+                    var r = Ext.decode(resp.responseText) || {};
+                    Usp.toast((r.crees || 0) + ' valeur(s) importée(s).');
+                },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        } }]
+    });
+    win.show();
 };
 
 /* Importe un modèle depuis un fichier .docx exporté (lecture base64 -> POST). */
