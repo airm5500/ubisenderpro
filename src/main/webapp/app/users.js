@@ -86,6 +86,23 @@ Usp.users.permissionsPanel = function () {
             failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement des permissions impossible.'); } });
     };
 
+    var creerRole = function (panel) {
+        Ext.Msg.prompt('Nouveau rôle', 'Libellé du rôle (ex. Responsable RH) :', function (btn, libelle) {
+            if (btn !== 'ok' || !libelle || !libelle.trim()) { return; }
+            Usp.ajax({ url: '/users/roles', method: 'POST', jsonData: { libelle: libelle.trim() },
+                success: function (resp) {
+                    var r = Ext.decode(resp.responseText) || {};
+                    roleStore.load({ callback: function () {
+                        var combo = panel.down('#permRole');
+                        combo.setValue(r.code);
+                        charger(panel);
+                    } });
+                    Usp.toast('Rôle « ' + (r.libelle || '') + ' » créé. Cochez ses permissions puis « Enregistrer ».');
+                },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        });
+    };
+
     return {
         xtype: 'panel', title: '🔐 Rôles & permissions', layout: { type: 'vbox', align: 'stretch' },
         bodyPadding: 10,
@@ -94,6 +111,7 @@ Usp.users.permissionsPanel = function () {
               store: roleStore, valueField: 'code', displayField: 'libelle', queryMode: 'local',
               editable: false, emptyText: 'Choisir un rôle…',
               listeners: { select: function (c) { charger(c.up('panel')); } } },
+            { text: '➕ Nouveau rôle', tooltip: 'Créer un nouveau rôle', handler: function (b) { creerRole(b.up('panel')); } },
             '->',
             { text: 'Tout cocher', handler: function (b) { cocherTout(b.up('panel'), true); } },
             { text: 'Tout décocher', handler: function (b) { cocherTout(b.up('panel'), false); } },
@@ -152,6 +170,23 @@ Usp.users.gridPanel = function () {
             itemdblclick: function (g, rec) { Usp.users.form(store, rec); }
         }
     };
+};
+
+/* Crée un rôle à la volée depuis un formulaire et le sélectionne dans le combo. */
+Usp.users.creerRoleInline = function (roleStore, formPanel) {
+    Ext.Msg.prompt('Nouveau rôle', 'Libellé du rôle (ex. Responsable RH) :', function (btn, libelle) {
+        if (btn !== 'ok' || !libelle || !libelle.trim()) { return; }
+        Usp.ajax({ url: '/users/roles', method: 'POST', jsonData: { libelle: libelle.trim() },
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                roleStore.load({ callback: function () {
+                    var combo = formPanel.down('combobox[name=role]');
+                    if (combo) { combo.setValue(r.code); }
+                } });
+                Usp.toast('Rôle « ' + (r.libelle || '') + ' » créé. Configurez ses permissions dans « Rôles & permissions ».');
+            },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    });
 };
 
 /* Active / désactive un utilisateur depuis la ligne. */
@@ -214,10 +249,14 @@ Usp.users.form = function (store, rec) {
                       } } },
                     { xtype: 'textfield', name: 'motDePasse2', itemId: 'mdp2', fieldLabel: 'Confirmer', inputType: 'password',
                       hidden: true, emptyText: 'Confirmez le mot de passe' },
-                    { xtype: 'combobox', name: 'role', fieldLabel: 'Rôle', allowBlank: false,
-                      store: roleStore, valueField: 'code', displayField: 'libelle',
-                      queryMode: 'local', editable: false, forceSelection: true,
-                      emptyText: 'Sélectionner un rôle…' },
+                    { xtype: 'fieldcontainer', fieldLabel: 'Rôle', layout: 'hbox', items: [
+                        { xtype: 'combobox', name: 'role', allowBlank: false, flex: 1,
+                          store: roleStore, valueField: 'code', displayField: 'libelle',
+                          queryMode: 'local', editable: false, forceSelection: true,
+                          emptyText: 'Sélectionner un rôle…' },
+                        { xtype: 'button', text: '➕', tooltip: 'Créer un nouveau rôle', margin: '0 0 0 6',
+                          handler: function (b) { Usp.users.creerRoleInline(roleStore, b.up('form')); } }
+                    ] },
                     { xtype: 'displayfield',
                       value: '<span style="color:#888">Les droits (menus + actions) dépendent du rôle. ' +
                              'Gérez-les dans l\'onglet « Rôles & permissions ».</span>' }

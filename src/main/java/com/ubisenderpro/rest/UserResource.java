@@ -41,6 +41,13 @@ public class UserResource {
         return userService.listerRoles();
     }
 
+    @POST
+    @Path("/roles")
+    @Secured(roles = {"ADMIN"})
+    public Response creerRole(Role r) {
+        return Response.status(Response.Status.CREATED).entity(userService.creerRole(r)).build();
+    }
+
     /** Utilisateurs actifs (id + nom) pour l'affectation des discussions — accès « Discussions ». */
     @GET
     @Path("/affectables")

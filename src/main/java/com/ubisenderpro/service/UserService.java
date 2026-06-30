@@ -30,6 +30,30 @@ public class UserService {
                 .getResultList();
     }
 
+    /** Crée un rôle (code normalisé, unique). Le code sert d'identifiant de permission. */
+    public Role creerRole(Role r) {
+        if (r == null || r.getLibelle() == null || r.getLibelle().trim().isEmpty()) {
+            throw new ValidationException("libelle", "Le libellé du rôle est obligatoire.");
+        }
+        String code = (r.getCode() == null || r.getCode().trim().isEmpty())
+                ? r.getLibelle() : r.getCode();
+        code = code.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("(^_+|_+$)", "");
+        if (code.isEmpty()) {
+            throw new ValidationException("code", "Le code du rôle est invalide.");
+        }
+        if (!em.createQuery("SELECT r FROM Role r WHERE r.code = :c", Role.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty()) {
+            throw new ValidationException("code", "Un rôle avec le code « " + code + " » existe déjà.");
+        }
+        Role n = new Role();
+        n.setCode(code);
+        n.setLibelle(r.getLibelle().trim());
+        n.setDescription(r.getDescription());
+        n.setActif(true);
+        em.persist(n);
+        return n;
+    }
+
     /** Liste des utilisateurs sans exposer le hash du mot de passe. */
     public List<Map<String, Object>> lister() {
         List<Utilisateur> users = em.createQuery(
