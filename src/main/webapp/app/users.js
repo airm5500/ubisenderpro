@@ -159,7 +159,7 @@ Usp.users.toggle = function (rec, store) {
     var action = rec.get('actif') ? 'deactivate' : 'activate';
     Usp.ajax({ url: '/users/' + rec.get('id') + '/' + action, method: 'POST',
         success: function () { store.load(); },
-        failure: function () { Ext.Msg.alert('Erreur', 'Action impossible.'); } });
+        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
 };
 
 /* Réinitialise le mot de passe d'un utilisateur. */
@@ -176,7 +176,7 @@ Usp.users.reset = function (rec) {
                     Ext.Msg.alert('Mot de passe réinitialisé',
                         'Nouveau mot de passe : <b>' + Ext.String.htmlEncode(r.motDePasse || '') + '</b>');
                 },
-                failure: function () { Ext.Msg.alert('Erreur', 'Réinitialisation impossible.'); } });
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         });
 };
 
@@ -204,8 +204,16 @@ Usp.users.form = function (store, rec) {
                       store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
                       listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
                     { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
-                    { xtype: 'textfield', name: 'motDePasse', fieldLabel: 'Mot de passe', inputType: 'password',
-                      emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026' },
+                    { xtype: 'textfield', name: 'motDePasse', itemId: 'mdp', fieldLabel: 'Mot de passe', inputType: 'password',
+                      emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026',
+                      listeners: { change: function (f) {
+                          var c = f.up('form').down('#mdp2');
+                          var afficher = !!f.getValue();
+                          c.setVisible(afficher);
+                          if (!afficher) { c.setValue(''); c.clearInvalid(); }
+                      } } },
+                    { xtype: 'textfield', name: 'motDePasse2', itemId: 'mdp2', fieldLabel: 'Confirmer', inputType: 'password',
+                      hidden: true, emptyText: 'Confirmez le mot de passe' },
                     { xtype: 'combobox', name: 'role', fieldLabel: 'Rôle', allowBlank: false,
                       store: roleStore, valueField: 'code', displayField: 'libelle',
                       queryMode: 'local', editable: false, forceSelection: true,
@@ -215,13 +223,13 @@ Usp.users.form = function (store, rec) {
                              'Gérez-les dans l\'onglet « Rôles & permissions ».</span>' }
                 ] },
                 // Colonne droite : photo de profil (cadre + Parcourir).
-                { xtype: 'container', width: 168, margin: '0 0 0 16',
-                  layout: { type: 'vbox', align: 'center' }, items: [
+                { xtype: 'container', width: 180, margin: '0 0 0 16',
+                  layout: { type: 'vbox', align: 'center', pack: 'start' }, items: [
                     { xtype: 'component', itemId: 'photoPreview', html: Usp.users.photoImgHtml(null) },
                     { xtype: 'filefield', itemId: 'photoFile', buttonOnly: true, hideLabel: true,
                       buttonText: 'Parcourir…', margin: '10 0 0 0', width: 150,
                       listeners: { change: function (f) { Usp.users.chargerPhoto(f); } } },
-                    { xtype: 'button', itemId: 'photoClear', text: 'Retirer la photo', margin: '6 0 0 0',
+                    { xtype: 'button', itemId: 'photoClear', text: 'Retirer la photo', margin: '6 0 0 0', width: 150,
                       handler: function (b) { Usp.users.definirPhoto(b.up('window'), ''); } },
                     { xtype: 'hidden', name: 'photo', itemId: 'photoField' }
                   ] }
@@ -232,6 +240,12 @@ Usp.users.form = function (store, rec) {
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
+                var mdp = form.findField('motDePasse').getValue();
+                var mdp2 = form.findField('motDePasse2').getValue();
+                if (mdp && mdp !== mdp2) {
+                    Ext.Msg.alert('Mot de passe', 'La confirmation ne correspond pas au mot de passe.');
+                    return;
+                }
                 var roleSel = form.findField('role').getValue();
                 var roles = roleSel ? [roleSel] : [];
                 var data = {
