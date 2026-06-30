@@ -167,7 +167,7 @@ Usp.users.privilegesWindow = function (rec) {
 
 Usp.users.gridPanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'login', 'nomComplet', 'avatar', 'email', 'actif', 'roles', 'derniereConnexion'],
+        fields: ['id', 'login', 'nomComplet', 'avatar', 'email', 'agence', 'actif', 'roles', 'derniereConnexion'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/users',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
@@ -278,6 +278,8 @@ Usp.users.form = function (store, rec) {
                       store: Ext.create('Ext.data.Store', { fields: ['v'], data: avatarData }),
                       listConfig: { getInnerTpl: function () { return '<span style="font-size:18px">{v}</span>'; } } },
                     { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                    Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence (recouvrement)',
+                      emptyText: 'Vide = pas de cloisonnement' }),
                     { xtype: 'textfield', name: 'motDePasse', itemId: 'mdp', fieldLabel: 'Mot de passe', inputType: 'password',
                       emptyText: rec ? 'Laisser vide pour ne pas changer' : 'Par défaut : Change@2026',
                       listeners: { change: function (f) {
@@ -332,6 +334,7 @@ Usp.users.form = function (store, rec) {
                     avatar: form.findField('avatar').getValue(),
                     photo: form.findField('photo').getValue(),
                     email: form.findField('email').getValue(),
+                    agence: form.findField('agence').getValue(),
                     motDePasse: form.findField('motDePasse').getValue(),
                     roles: roles
                 };
@@ -358,7 +361,8 @@ Usp.users.form = function (store, rec) {
             login: rec.get('login'),
             nomComplet: rec.get('nomComplet'),
             avatar: rec.get('avatar') || '👤',
-            email: rec.get('email')
+            email: rec.get('email'),
+            agence: rec.get('agence') || ''
         });
         var roles = rec.get('roles') || [];
         if (roles.length) { form.findField('role').setValue(roles[0]); }

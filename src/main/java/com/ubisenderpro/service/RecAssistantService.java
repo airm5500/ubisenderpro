@@ -116,7 +116,7 @@ public class RecAssistantService {
         return l.isEmpty() ? null : l.get(0).getId();
     }
 
-    public List<Map<String, Object>> lister(String statut) {
+    public List<Map<String, Object>> lister(String statut, String agence) {
         String st = (statut == null || statut.isEmpty()) ? "PROPOSEE" : statut;
         List<RecProposition> props = em.createQuery(
                 "SELECT p FROM RecProposition p WHERE p.statut = :s ORDER BY p.priorite DESC, p.montant DESC, p.id DESC",
@@ -124,6 +124,8 @@ public class RecAssistantService {
         List<Map<String, Object>> out = new ArrayList<>();
         for (RecProposition p : props) {
             Client c = em.find(Client.class, p.getClientId());
+            // Cloisonnement : on n'expose que les clients de l'agence portée.
+            if (agence != null && (c == null || !agence.equalsIgnoreCase(c.getAgence()))) { continue; }
             RecModele m = p.getModeleId() == null ? null : em.find(RecModele.class, p.getModeleId());
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("id", p.getId());

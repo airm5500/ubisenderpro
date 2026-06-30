@@ -27,14 +27,17 @@ public class RecCampagneResource {
 
     @EJB
     private RecCampagneService service;
+    @EJB
+    private com.ubisenderpro.service.RecScopeService scope;
     @Inject
     private SessionStore sessionStore;
 
     @POST
     @Path("/preview")
-    public Response preview(Map<String, Object> body) {
+    public Response preview(Map<String, Object> body, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        String agence = portee(authHeader, str(body, "agence"));
         List<Map<String, Object>> cibles = service.cibler(
-                str(body, "agence"), str(body, "responsable"), str(body, "segment"), str(body, "profil"),
+                agence, str(body, "responsable"), str(body, "segment"), str(body, "profil"),
                 montant(body, "montantMin"), entier(body, "joursMin"));
         Map<String, Object> r = new java.util.LinkedHashMap<>();
         r.put("count", cibles.size());
@@ -52,8 +55,9 @@ public class RecCampagneResource {
                     .entity(Collections.singletonMap("erreur", "Choisissez un modèle de relance.")).build();
         }
         AuthenticatedUser u = utilisateur(authHeader);
+        String agence = portee(authHeader, str(body, "agence"));
         Map<String, Object> r = service.envoyer(
-                str(body, "agence"), str(body, "responsable"), str(body, "segment"), str(body, "profil"),
+                agence, str(body, "responsable"), str(body, "segment"), str(body, "profil"),
                 montant(body, "montantMin"), entier(body, "joursMin"), modeleId, str(body, "canal"),
                 u == null ? null : u.getId(), u == null ? null : u.getLogin());
         return Response.ok(r).build();
@@ -62,6 +66,12 @@ public class RecCampagneResource {
     private AuthenticatedUser utilisateur(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
         return sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+    }
+
+    /** Force l'agence de l'utilisateur si cloisonné, sinon garde l'agence demandée. */
+    private String portee(String authHeader, String demandee) {
+        String p = scope.agencePortee(utilisateur(authHeader));
+        return p != null ? p : demandee;
     }
 
     private String str(Map<String, Object> b, String k) {

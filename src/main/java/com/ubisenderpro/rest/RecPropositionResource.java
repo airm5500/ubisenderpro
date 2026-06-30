@@ -26,12 +26,15 @@ public class RecPropositionResource {
 
     @EJB
     private RecAssistantService service;
+    @EJB
+    private com.ubisenderpro.service.RecScopeService scope;
     @Inject
     private SessionStore sessionStore;
 
     @GET
-    public List<Map<String, Object>> lister(@QueryParam("statut") String statut) {
-        return service.lister(statut);
+    public List<Map<String, Object>> lister(@QueryParam("statut") String statut,
+                                            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        return service.lister(statut, scope.agencePortee(utilisateur(authHeader)));
     }
 
     @POST

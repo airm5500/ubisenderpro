@@ -40,10 +40,10 @@ Usp.recouvrement.clientCombo = function (cfg) {
 Usp.recouvrement.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Suivi Relance et Recouvrements', listeners: Usp.tabListeners,
-        items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.assistantPanel(),
-                Usp.recouvrement.campagnesPanel(), Usp.recouvrement.modelesPanel(),
-                Usp.recouvrement.historiquePanel(), Usp.recouvrement.importPanel(),
-                Usp.recouvrement.referentielsPanel()]
+        items: [Usp.recouvrement.dashboardPanel(), Usp.recouvrement.fichesPanel(),
+                Usp.recouvrement.assistantPanel(), Usp.recouvrement.campagnesPanel(),
+                Usp.recouvrement.modelesPanel(), Usp.recouvrement.historiquePanel(),
+                Usp.recouvrement.importPanel(), Usp.recouvrement.referentielsPanel()]
     };
 };
 
@@ -51,6 +51,54 @@ Usp.recouvrement.TYPES_MODELE = [
     ['RELANCE_PREVENTIVE', 'Relance préventive'], ['FACTURE_ECHUE', 'Facture échue'],
     ['IMPAYE', 'Impayé'], ['MISE_EN_DEMEURE', 'Mise en demeure'], ['DIVERS', 'Divers']
 ];
+
+/* ---------------------------- Tableau de bord ---------------------------- */
+Usp.recouvrement.dashboardPanel = function () {
+    var agStore = Ext.create('Ext.data.Store', {
+        fields: ['agence', 'encours', 'factures', 'avoirs', 'recouvre', 'solde', 'clients', 'facturesEchues', 'promesses', 'tauxRecouvrement'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/dashboard/par-agence',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var kpi = Ext.create('Ext.Component', { html: '<div style="padding:10px;color:#888">Chargement…</div>', height: 90 });
+    var chargerKpi = function () {
+        Usp.ajax({ url: '/recouvrement/dashboard/groupe', method: 'GET', success: function (resp) {
+            var s = Ext.decode(resp.responseText) || {};
+            var carte = function (lib, val, couleur) {
+                return '<div style="display:inline-block;min-width:150px;margin:4px 8px;padding:8px 12px;border:1px solid #e0e0e0;' +
+                    'border-radius:8px;background:#fff"><div style="color:#888;font-size:11px">' + lib + '</div>' +
+                    '<div style="font-size:17px;font-weight:bold;color:' + (couleur || '#333') + '">' + val + '</div></div>';
+            };
+            kpi.update('<div style="padding:6px">' +
+                carte('Encours global', Usp.recouvrement.money(s.encours)) +
+                carte('Encaissé', Usp.recouvrement.money(s.recouvre), '#2e7d32') +
+                carte('Solde restant', Usp.recouvrement.money(s.solde), '#c62828') +
+                carte('Taux de recouvrement', (s.tauxRecouvrement || 0) + ' %', '#1976d2') +
+                carte('Clients', s.clients) +
+                carte('Factures échues', s.facturesEchues, '#ef6c00') +
+                carte('Promesses', s.promesses) + '</div>');
+        } });
+    };
+    return {
+        title: '📊 Tableau de bord', xtype: 'panel', layout: 'border', bodyPadding: 0,
+        items: [
+            { region: 'north', xtype: 'container', items: [kpi], height: 100, style: 'background:#f4f6f8;border-bottom:1px solid #ddd' },
+            { region: 'center', xtype: 'grid', store: agStore, title: 'Point par agence',
+              columns: [
+                  { text: 'Agence', dataIndex: 'agence', flex: 1 },
+                  { text: 'Encours', dataIndex: 'encours', width: 120, align: 'right', renderer: Usp.recouvrement.money },
+                  { text: 'Encaissé', dataIndex: 'recouvre', width: 120, align: 'right', renderer: Usp.recouvrement.money },
+                  { text: 'Solde', dataIndex: 'solde', width: 130, align: 'right',
+                    renderer: function (v) { return '<span style="color:#c62828;font-weight:bold">' + Usp.recouvrement.money(v) + '</span>'; } },
+                  { text: 'Taux', dataIndex: 'tauxRecouvrement', width: 80, align: 'right', renderer: function (v) { return (v || 0) + ' %'; } },
+                  { text: 'Clients', dataIndex: 'clients', width: 80, align: 'right' },
+                  { text: 'Factures échues', dataIndex: 'facturesEchues', width: 110, align: 'right' },
+                  { text: 'Promesses', dataIndex: 'promesses', width: 90, align: 'right' }
+              ],
+              tbar: [{ text: '🔄 Rafraîchir', handler: function () { chargerKpi(); agStore.load(); } }]
+                  .concat(Usp.export.boutons('Recouvrement - par agence')) }
+        ],
+        listeners: { afterrender: function () { chargerKpi(); agStore.load(); } }
+    };
+};
 
 /* ---------------------------- Clients & encours ---------------------------- */
 Usp.recouvrement.fichesPanel = function () {

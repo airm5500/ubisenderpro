@@ -1,11 +1,16 @@
 package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.RecFiche;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.RecFicheService;
+import com.ubisenderpro.service.RecScopeService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
@@ -22,13 +27,26 @@ public class RecFicheResource {
 
     @EJB
     private RecFicheService service;
+    @EJB
+    private RecScopeService scope;
+    @Inject
+    private SessionStore sessionStore;
 
     @GET
     public List<Map<String, Object>> lister(@QueryParam("q") String q,
                                             @QueryParam("agence") String agence,
                                             @QueryParam("segment") String segment,
-                                            @QueryParam("profil") String profil) {
+                                            @QueryParam("profil") String profil,
+                                            @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        // Cloisonnement : si l'utilisateur est limité à une agence, on force ce filtre.
+        String portee = scope.agencePortee(utilisateur(auth));
+        if (portee != null) { agence = portee; }
         return service.listerAvecSolde(q, agence, segment, profil);
+    }
+
+    private AuthenticatedUser utilisateur(String auth) {
+        if (auth == null || !auth.startsWith("Bearer ")) { return null; }
+        return sessionStore.validate(auth.substring("Bearer ".length()).trim());
     }
 
     @GET
