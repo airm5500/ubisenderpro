@@ -52,8 +52,11 @@ public class RecPropositionResource {
                             @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         Long modeleId = nombre(body, "modeleId");
         String canal = body == null || body.get("canal") == null ? null : String.valueOf(body.get("canal"));
+        Long pieceMediaId = nombre(body, "pieceMediaId");
+        boolean releveAuto = booleen(body, "releveAuto");
         AuthenticatedUser u = utilisateur(authHeader);
-        service.valider(id, modeleId, canal, u == null ? null : u.getId(), u == null ? null : u.getLogin());
+        service.valider(id, modeleId, canal, u == null ? null : u.getId(), u == null ? null : u.getLogin(),
+                pieceMediaId, releveAuto);
         return Response.noContent().build();
     }
 
@@ -75,5 +78,12 @@ public class RecPropositionResource {
         Object v = body.get(cle);
         if (v instanceof Number) { return ((Number) v).longValue(); }
         try { return Long.valueOf(v.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private static boolean booleen(Map<String, Object> body, String cle) {
+        if (body == null || body.get(cle) == null) { return false; }
+        Object v = body.get(cle);
+        if (v instanceof Boolean) { return (Boolean) v; }
+        return "true".equalsIgnoreCase(String.valueOf(v));
     }
 }

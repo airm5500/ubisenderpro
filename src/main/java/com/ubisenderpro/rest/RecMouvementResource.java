@@ -24,6 +24,21 @@ public class RecMouvementResource {
 
     @EJB
     private RecCreanceService service;
+    @EJB
+    private com.ubisenderpro.service.RecRelevePdfService relevePdfService;
+
+    /* -------- Relevé de compte (PDF) -------- */
+
+    @GET
+    @Path("/releve")
+    @Produces("application/pdf")
+    public Response releve(@PathParam("clientId") Long clientId) {
+        byte[] pdf = relevePdfService.genererReleve(clientId);
+        return Response.ok(pdf)
+                .type("application/pdf")
+                .header("Content-Disposition", "inline; filename=\"" + relevePdfService.nomFichier(clientId) + "\"")
+                .build();
+    }
 
     /* -------- Créances -------- */
 

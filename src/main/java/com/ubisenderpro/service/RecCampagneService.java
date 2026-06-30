@@ -77,12 +77,25 @@ public class RecCampagneService {
     public Map<String, Object> envoyer(String agence, String responsable, String segment, String profil,
                                        BigDecimal montantMin, Integer joursMin,
                                        Long modeleId, String canal, Long expediteurId, String login) {
+        return envoyer(agence, responsable, segment, profil, montantMin, joursMin,
+                modeleId, canal, expediteurId, login, null, false);
+    }
+
+    /**
+     * Envoi groupé avec pièces jointes optionnelles : {@code pieceMediaId} document commun
+     * à tous, {@code releveAuto} relevé de compte PDF généré par client.
+     */
+    public Map<String, Object> envoyer(String agence, String responsable, String segment, String profil,
+                                       BigDecimal montantMin, Integer joursMin,
+                                       Long modeleId, String canal, Long expediteurId, String login,
+                                       Long pieceMediaId, boolean releveAuto) {
         List<Map<String, Object>> cibles = cibler(agence, responsable, segment, profil, montantMin, joursMin);
         int envoyes = 0, echecs = 0;
         for (Map<String, Object> cible : cibles) {
             Long clientId = (Long) cible.get("clientId");
             try {
-                com.ubisenderpro.entity.RecEnvoi e = envoiService.envoyer(clientId, modeleId, canal, expediteurId, login);
+                com.ubisenderpro.entity.RecEnvoi e = envoiService.envoyer(clientId, modeleId, canal,
+                        expediteurId, login, pieceMediaId, releveAuto);
                 if ("ENVOYE".equals(e.getStatut())) { envoyes++; } else { echecs++; }
             } catch (Exception ex) {
                 echecs++;

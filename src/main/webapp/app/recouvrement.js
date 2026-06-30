@@ -24,6 +24,23 @@ Usp.recouvrement.refCombo = function (type, cfg) {
         queryMode: 'local', forceSelection: false, anchor: '100%' }, cfg || {});
 };
 
+/* Télécharge/ouvre le relevé de compte PDF d'un client (avec jeton d'authentification). */
+Usp.recouvrement.ouvrirReleve = function (clientId) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', Usp.apiBase + '/recouvrement/clients/' + clientId + '/releve', true);
+    xhr.responseType = 'blob';
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            var url = window.URL.createObjectURL(xhr.response);
+            window.open(url, '_blank');
+            setTimeout(function () { window.URL.revokeObjectURL(url); }, 60000);
+        } else { Ext.Msg.alert('Erreur', 'Impossible de générer le relevé de compte.'); }
+    };
+    xhr.onerror = function () { Ext.Msg.alert('Erreur', 'Impossible de générer le relevé de compte.'); };
+    xhr.send();
+};
+
 /* Combo de sélection d'un client (recherche distante sur /clients). */
 Usp.recouvrement.clientCombo = function (cfg) {
     var store = Ext.create('Ext.data.Store', {
@@ -130,9 +147,10 @@ Usp.recouvrement.fichesPanel = function () {
                   return '<span style="color:' + (n > 0 ? '#c62828' : '#2e7d32') + ';font-weight:bold">'
                       + Usp.recouvrement.money(v) + '</span>';
               } },
-            { text: 'Actions', width: 320, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Actions', width: 400, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
                   return '<span class="rec-mouv" title="Créances / paiements" style="cursor:pointer;color:#1976d2;margin-right:10px">📂 Créances</span>'
+                      + '<span class="rec-releve" title="Relevé de compte PDF" style="cursor:pointer;color:#6a1b9a;margin-right:10px">📄 Relevé</span>'
                       + '<span class="rec-send" title="Envoyer une relance" style="cursor:pointer;color:#2e7d32;margin-right:10px">📨 Relancer</span>'
                       + '<span class="rec-edit" title="Modifier la fiche" style="cursor:pointer">✏️ Fiche</span>';
               } }
@@ -147,6 +165,7 @@ Usp.recouvrement.fichesPanel = function () {
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.rec-mouv')) { Usp.recouvrement.mouvementsWindow(rec, store); }
+                else if (e.getTarget('.rec-releve')) { Usp.recouvrement.ouvrirReleve(rec.get('clientId')); }
                 else if (e.getTarget('.rec-send')) {
                     if (!Usp.can('recouvrement', 'ENVOYER')) { Usp.refusPermission(); return; }
                     Usp.recouvrement.relanceForm(rec);
@@ -455,6 +474,57 @@ Usp.recouvrement.referentielsPanel = function () {
     };
 };
 
+/* ---------------------------- Pièces jointes (relances) ---------------------------- */
+/* Items de formulaire pour joindre un document (upload) et/ou un relevé de compte PDF.
+ * cfg.releve : afficher la case « relevé auto » (true par défaut). */
+Usp.recouvrement.pieceItems = function (cfg) {
+    cfg = cfg || {};
+    var items = [
+        { xtype: 'hiddenfield', name: 'pieceMediaId' },
+        { xtype: 'fieldcontainer', fieldLabel: 'Pièce jointe', layout: 'hbox', items: [
+            { xtype: 'filefield', flex: 1, buttonText: 'Choisir un fichier…', buttonOnly: false, msgTarget: 'side',
+              emptyText: 'PDF ou image (optionnel)',
+              listeners: { change: function (f) {
+                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  var statut = f.up('fieldcontainer').down('#pieceStatut');
+                  statut.update('<span style="color:#888">Téléversement…</span>');
+                  var reader = new FileReader();
+                  reader.onload = function (e) {
+                      var data = String(e.target.result || '');
+                      var b64 = data.indexOf(',') >= 0 ? data.substring(data.indexOf(',') + 1) : data;
+                      Usp.ajax({ url: '/media/upload', method: 'POST',
+                          jsonData: { fichierBase64: b64, mimeType: file.type || 'application/octet-stream', nomFichier: file.name },
+                          success: function (resp) {
+                              var r = Ext.decode(resp.responseText) || {};
+                              f.up('form').getForm().findField('pieceMediaId').setValue(r.id);
+                              statut.update('<span style="color:#2e7d32">📎 ' + Ext.String.htmlEncode(file.name) + '</span>');
+                          },
+                          failure: function (resp) {
+                              statut.update('<span style="color:#c62828">Échec du téléversement.</span>');
+                              Ext.Msg.alert('Erreur', Usp.erreurServeur(resp));
+                          } });
+                  };
+                  reader.readAsDataURL(file);
+              } } },
+            { xtype: 'component', itemId: 'pieceStatut', margin: '4 0 0 8', width: 160, html: '' }
+        ] }
+    ];
+    if (cfg.releve !== false) {
+        items.push({ xtype: 'checkbox', name: 'releveAuto', boxLabel: 'Joindre un relevé de compte (PDF) généré automatiquement',
+            hideLabel: true, margin: '0 0 0 0' });
+    }
+    return items;
+};
+
+/* Complète l'objet de données envoyé au serveur avec les champs de pièce jointe. */
+Usp.recouvrement.appliquerPiece = function (form, data) {
+    var media = form.findField('pieceMediaId');
+    var releve = form.findField('releveAuto');
+    if (media && media.getValue()) { data.pieceMediaId = media.getValue(); }
+    if (releve) { data.releveAuto = !!releve.getValue(); }
+    return data;
+};
+
 /* ---------------------------- Envoyer une relance ---------------------------- */
 Usp.recouvrement.relanceForm = function (rec) {
     var modeleStore = Ext.create('Ext.data.Store', {
@@ -469,12 +539,13 @@ Usp.recouvrement.relanceForm = function (rec) {
               valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false, emptyText: 'Choisir un modèle…' },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
               store: Usp.recouvrement.CANAUX, value: rec.get('canalPrefere') || 'WHATSAPP' }
-        ] }],
+        ].concat(Usp.recouvrement.pieceItems()) }],
         buttons: [{ text: '📨 Envoyer', formBind: true, handler: function (b) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
             var v = f.getValues();
             v.clientId = rec.get('clientId');
+            Usp.recouvrement.appliquerPiece(f, v);
             Usp.ajax({ url: '/recouvrement/envois', method: 'POST', jsonData: v,
                 success: function (resp) {
                     var e = Ext.decode(resp.responseText) || {};
@@ -562,11 +633,12 @@ Usp.recouvrement.validerProposition = function (rec, store) {
               value: rec.get('modeleId') || null, emptyText: 'Choisir un modèle…' },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
               store: Usp.recouvrement.CANAUX, value: rec.get('canalRecommande') || 'WHATSAPP' }
-        ] }],
+        ].concat(Usp.recouvrement.pieceItems()) }],
         buttons: [{ text: '✅ Valider et envoyer', formBind: true, handler: function (b) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
-            Usp.ajax({ url: '/recouvrement/propositions/' + rec.get('id') + '/valider', method: 'POST', jsonData: f.getValues(),
+            Usp.ajax({ url: '/recouvrement/propositions/' + rec.get('id') + '/valider', method: 'POST',
+                jsonData: Usp.recouvrement.appliquerPiece(f, f.getValues()),
                 success: function () { win.close(); store.load(); Usp.toast('Relance envoyée.'); },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
@@ -599,9 +671,9 @@ Usp.recouvrement.campagnesPanel = function () {
             { xtype: 'combobox', name: 'modeleId', fieldLabel: 'Modèle de relance', store: modeleStore,
               valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false, emptyText: 'Choisir…' },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
-              store: Usp.recouvrement.CANAUX, value: 'WHATSAPP' },
-            { xtype: 'component', itemId: 'apercu', margin: '6 0 0 0', html: '' }
-        ],
+              store: Usp.recouvrement.CANAUX, value: 'WHATSAPP' }
+        ].concat(Usp.recouvrement.pieceItems())
+         .concat([{ xtype: 'component', itemId: 'apercu', margin: '6 0 0 0', html: '' }]),
         bbar: ['->',
             { text: '👁️ Aperçu', handler: function (b) {
                 var form = b.up('form').getForm();
@@ -618,6 +690,7 @@ Usp.recouvrement.campagnesPanel = function () {
                 var data = filtre(form);
                 data.modeleId = form.findField('modeleId').getValue();
                 data.canal = form.findField('canal').getValue();
+                Usp.recouvrement.appliquerPiece(form, data);
                 if (!data.modeleId) { Ext.Msg.alert('Modèle', 'Choisissez un modèle de relance.'); return; }
                 Ext.Msg.confirm('Envoyer', 'Lancer la campagne de relance vers les clients ciblés ?', function (btn) {
                     if (btn !== 'yes') { return; }
@@ -697,7 +770,7 @@ Usp.recouvrement.modeleForm = function (store, rec) {
 /* ---------------------------- Historique des envois ---------------------------- */
 Usp.recouvrement.historiquePanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'clientId', 'canal', 'destinataire', 'sujet', 'message', 'statut', 'erreur', 'creePar', 'createdAt'],
+        fields: ['id', 'clientId', 'canal', 'destinataire', 'sujet', 'message', 'statut', 'erreur', 'creePar', 'createdAt', 'pieceJointe'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/envois',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
@@ -708,6 +781,8 @@ Usp.recouvrement.historiquePanel = function () {
             { text: 'Canal', dataIndex: 'canal', width: 90 },
             { text: 'Destinataire', dataIndex: 'destinataire', width: 160 },
             { text: 'Message', dataIndex: 'message', flex: 1, renderer: function (v) { return Ext.String.htmlEncode((v || '').substring(0, 120)); } },
+            { text: 'Pièce jointe', dataIndex: 'pieceJointe', width: 150, renderer: function (v) {
+                return v ? '📎 ' + Ext.String.htmlEncode(v) : ''; } },
             { text: 'Statut', dataIndex: 'statut', width: 90, renderer: function (v) {
                 return '<span style="color:' + (v === 'ENVOYE' ? '#2e7d32' : '#c62828') + ';font-weight:bold">' + (v || '') + '</span>'; } },
             { text: 'Erreur', dataIndex: 'erreur', width: 200 },

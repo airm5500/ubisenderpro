@@ -59,7 +59,8 @@ public class RecCampagneResource {
         Map<String, Object> r = service.envoyer(
                 agence, str(body, "responsable"), str(body, "segment"), str(body, "profil"),
                 montant(body, "montantMin"), entier(body, "joursMin"), modeleId, str(body, "canal"),
-                u == null ? null : u.getId(), u == null ? null : u.getLogin());
+                u == null ? null : u.getId(), u == null ? null : u.getLogin(),
+                entierLong(body, "pieceMediaId"), booleen(body, "releveAuto"));
         return Response.ok(r).build();
     }
 
@@ -89,5 +90,10 @@ public class RecCampagneResource {
     private BigDecimal montant(Map<String, Object> b, String k) {
         String s = str(b, k);
         try { return s == null ? null : new BigDecimal(s.replace(",", ".")); } catch (NumberFormatException e) { return null; }
+    }
+    private boolean booleen(Map<String, Object> b, String k) {
+        Object v = b == null ? null : b.get(k);
+        if (v instanceof Boolean) { return (Boolean) v; }
+        return "true".equalsIgnoreCase(String.valueOf(v));
     }
 }

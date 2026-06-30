@@ -144,6 +144,11 @@ public class RecAssistantService {
     }
 
     public void valider(Long id, Long modeleId, String canal, Long expediteurId, String login) {
+        valider(id, modeleId, canal, expediteurId, login, null, false);
+    }
+
+    public void valider(Long id, Long modeleId, String canal, Long expediteurId, String login,
+                        Long pieceMediaId, boolean releveAuto) {
         RecProposition p = em.find(RecProposition.class, id);
         if (p == null) { throw new IllegalArgumentException("Proposition introuvable"); }
         if (!"PROPOSEE".equals(p.getStatut())) {
@@ -154,7 +159,7 @@ public class RecAssistantService {
             throw new ValidationException("modele", "Choisissez un modèle de relance.");
         }
         String c = canal != null && !canal.isEmpty() ? canal : p.getCanalRecommande();
-        envoiService.envoyer(p.getClientId(), mid, c, expediteurId, login);
+        envoiService.envoyer(p.getClientId(), mid, c, expediteurId, login, pieceMediaId, releveAuto);
         p.setStatut("VALIDEE");
         p.setModeleId(mid);
         p.setUpdatedAt(LocalDateTime.now());

@@ -44,6 +44,9 @@ public class RecEnvoi {
     @Column(name = "cree_par", length = 100)
     private String creePar;
 
+    @Column(name = "piece_jointe", length = 255)
+    private String pieceJointe;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -72,6 +75,8 @@ public class RecEnvoi {
     public void setWaMessageId(String waMessageId) { this.waMessageId = waMessageId; }
     public String getCreePar() { return creePar; }
     public void setCreePar(String creePar) { this.creePar = creePar; }
+    public String getPieceJointe() { return pieceJointe; }
+    public void setPieceJointe(String pieceJointe) { this.pieceJointe = pieceJointe; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
