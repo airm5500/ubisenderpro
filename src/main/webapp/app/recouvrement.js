@@ -41,8 +41,9 @@ Usp.recouvrement.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Suivi Relance et Recouvrements', listeners: Usp.tabListeners,
         items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.assistantPanel(),
-                Usp.recouvrement.modelesPanel(), Usp.recouvrement.historiquePanel(),
-                Usp.recouvrement.importPanel(), Usp.recouvrement.referentielsPanel()]
+                Usp.recouvrement.campagnesPanel(), Usp.recouvrement.modelesPanel(),
+                Usp.recouvrement.historiquePanel(), Usp.recouvrement.importPanel(),
+                Usp.recouvrement.referentielsPanel()]
     };
 };
 
@@ -523,6 +524,66 @@ Usp.recouvrement.validerProposition = function (rec, store) {
         } }]
     });
     win.show();
+};
+
+/* ---------------------------- Campagnes ciblées ---------------------------- */
+Usp.recouvrement.campagnesPanel = function () {
+    var modeleStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/modeles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var filtre = function (form) {
+        var v = form.getValues();
+        return { agence: v.agence, responsable: v.responsable, segment: v.segment, profil: v.profil,
+                 montantMin: v.montantMin, joursMin: v.joursMin };
+    };
+    return {
+        title: '📣 Campagnes', xtype: 'form', bodyPadding: 14, autoScroll: true,
+        defaults: { anchor: '60%', labelWidth: 170 },
+        items: [
+            { xtype: 'displayfield', value: '<b>Cibler les clients à relancer</b> selon les critères, puis envoyer un modèle.' },
+            Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
+            { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable recouvrement' },
+            Usp.recouvrement.refCombo('SEGMENT_COMMERCIAL', { name: 'segment', fieldLabel: 'Segment commercial' }),
+            Usp.recouvrement.refCombo('PROFIL_PAIEMENT', { name: 'profil', fieldLabel: 'Profil de paiement' }),
+            { xtype: 'numberfield', name: 'montantMin', fieldLabel: 'Montant dû minimum', hideTrigger: true, minValue: 0 },
+            { xtype: 'numberfield', name: 'joursMin', fieldLabel: 'Ancienneté min. (jours retard)', hideTrigger: true, minValue: 0 },
+            { xtype: 'combobox', name: 'modeleId', fieldLabel: 'Modèle de relance', store: modeleStore,
+              valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false, emptyText: 'Choisir…' },
+            { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
+              store: Usp.recouvrement.CANAUX, value: 'WHATSAPP' },
+            { xtype: 'component', itemId: 'apercu', margin: '6 0 0 0', html: '' }
+        ],
+        bbar: ['->',
+            { text: '👁️ Aperçu', handler: function (b) {
+                var form = b.up('form').getForm();
+                Usp.ajax({ url: '/recouvrement/campagnes/preview', method: 'POST', jsonData: filtre(form),
+                    success: function (resp) {
+                        var r = Ext.decode(resp.responseText) || {};
+                        b.up('form').down('#apercu').update('<span style="color:#1976d2"><b>' + (r.count || 0)
+                            + '</b> client(s) ciblé(s).</span>');
+                    },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } },
+            Usp.permBtn('recouvrement', 'ENVOYER', { text: '📨 Envoyer la campagne', handler: function (b) {
+                var form = b.up('form').getForm();
+                var data = filtre(form);
+                data.modeleId = form.findField('modeleId').getValue();
+                data.canal = form.findField('canal').getValue();
+                if (!data.modeleId) { Ext.Msg.alert('Modèle', 'Choisissez un modèle de relance.'); return; }
+                Ext.Msg.confirm('Envoyer', 'Lancer la campagne de relance vers les clients ciblés ?', function (btn) {
+                    if (btn !== 'yes') { return; }
+                    Usp.ajax({ url: '/recouvrement/campagnes/envoyer', method: 'POST', jsonData: data,
+                        success: function (resp) {
+                            var r = Ext.decode(resp.responseText) || {};
+                            Ext.Msg.alert('Campagne terminée', (r.envoyes || 0) + ' envoi(s) réussi(s), '
+                                + (r.echecs || 0) + ' échec(s) sur ' + (r.cibles || 0) + ' cible(s).');
+                        },
+                        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                });
+            } })
+        ]
+    };
 };
 
 /* ---------------------------- Modèles de relance ---------------------------- */
