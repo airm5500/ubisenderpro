@@ -114,7 +114,7 @@ Usp.marketing.action = function (rec, action, message) {
                 Usp.marketing.reloadAll();
                 Usp.toast('Opération effectuée avec succès.');
             },
-            failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
     });
 };
 

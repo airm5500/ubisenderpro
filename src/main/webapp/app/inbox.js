@@ -600,7 +600,7 @@ Usp.inbox.bot = function (actif) {
             Usp.toast(actif ? 'Le bot répondra de nouveau sur cette discussion.'
                             : 'Vous avez repris la main ; le bot ne répondra plus ici.');
         },
-        failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
 };
 
 Usp.inbox.reloadMessages = function () {

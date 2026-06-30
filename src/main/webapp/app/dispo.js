@@ -219,7 +219,7 @@ Usp.dispo.action = function (rec, action, message) {
         if (btn !== 'yes') { return; }
         Usp.ajax({ url: '/dispo-evenements/' + rec.get('id') + '/' + action, method: 'POST',
             success: function () { Usp.dispo.reloadAll(); Usp.toast('Opération effectuée avec succès.'); },
-            failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
     });
 };
 

@@ -560,7 +560,7 @@ Usp.clientActif = function (rec, actif) {
                 Usp.reloadClients();
                 Usp.toast('Compte « ' + nom + ' » ' + (actif ? 'réactivé' : 'désactivé') + ' avec succès.');
             },
-            failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
     };
     if (actif) { faire(); return; }
     Ext.Msg.confirm('Désactiver', 'Désactiver le compte « ' + Ext.String.htmlEncode(nom) +
@@ -1062,8 +1062,30 @@ Usp.permBtn = function (menu, action, cfg) {
     if (!Usp.can(menu, action)) {
         cfg.text = (cfg.text || '') + Usp.permBadge(menu, action);
         cfg.tooltip = (cfg.tooltip ? cfg.tooltip + ' — ' : '') + 'Droit non accordé (' + action + ')';
+        // Bloque l'action au clic et informe l'utilisateur (il ne peut pas poursuivre).
+        cfg.handler = function () { Usp.refusPermission(); };
     }
     return cfg;
+};
+
+/* Extrait le message d'erreur explicite renvoyé par le serveur ({erreur:...}),
+ * avec repli si la réponse n'est pas exploitable. */
+Usp.erreurServeur = function (resp, repli) {
+    try {
+        var r = Ext.decode(resp.responseText);
+        if (r && r.erreur) { return r.erreur; }
+    } catch (e) { /* réponse non JSON */ }
+    return repli || 'Opération impossible.';
+};
+
+/* Message standard de refus de permission (clic sur une action non autorisée). */
+Usp.refusPermission = function () {
+    Ext.Msg.show({
+        title: 'Action non autorisée',
+        msg: 'Vous n\'avez pas la permission pour cette action.<br>' +
+             'Merci de contacter l\'administrateur de votre système.',
+        buttons: Ext.Msg.OK, icon: Ext.Msg.WARNING
+    });
 };
 
 /* Pastille sur l'onglet actif d'un tabpanel. */

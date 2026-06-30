@@ -86,9 +86,25 @@ public class ClientService {
 
     public Client modifier(Client client) {
         valider(client, false);
+        Client ex = em.find(Client.class, client.getId());
+        if (ex == null) { throw new ValidationException("id", "Compte client introuvable."); }
         canonicaliserGeo(client);
-        client.setUpdatedAt(LocalDateTime.now());
-        return em.merge(client);
+        // Copie des champs éditables : created_at et actif (géré par activer/désactiver)
+        // sont préservés ; updated_at est positionné par @PreUpdate.
+        ex.setNumeroClient(client.getNumeroClient());
+        ex.setNomCompte(client.getNomCompte());
+        ex.setAgence(client.getAgence());
+        ex.setRegion(client.getRegion());
+        ex.setTournee(client.getTournee());
+        ex.setEmailPrincipal(client.getEmailPrincipal());
+        ex.setSegmentationId(client.getSegmentationId());
+        ex.setAdresse(client.getAdresse());
+        ex.setVille(client.getVille());
+        ex.setCommune(client.getCommune());
+        ex.setPays(client.getPays());
+        ex.setStatut(client.getStatut());
+        ex.setNotes(client.getNotes());
+        return em.merge(ex);
     }
 
     /**
