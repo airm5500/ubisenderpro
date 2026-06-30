@@ -1031,6 +1031,7 @@ Usp.MENU = [
     { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
+    { text: 'Suivi Relance et Recouvrements', view: 'recouvrement', icon: '💰', roles: ['ADMIN'] },
     { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
     { text: 'Utilisateurs',        view: 'users',      icon: '👤', roles: ['ADMIN'] }
 ];
@@ -1143,6 +1144,7 @@ Usp.ouvrirVue = function (vue) {
         case 'settings': Usp.loadCenter(Usp.settings.tabs()); break;
         case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
         case 'users': Usp.loadCenter(Usp.users.panel()); break;
+        case 'recouvrement': Usp.loadCenter(Usp.recouvrement.panel()); break;
         case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
         case 'import': Usp.showImport(); break;
         default: Usp.loadCenter(Usp.dashboardPanel());
