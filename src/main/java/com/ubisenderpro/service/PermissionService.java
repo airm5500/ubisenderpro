@@ -87,7 +87,7 @@ public class PermissionService {
         if ("settings".equals(code) && !a.contains("MODIFIER")) { a.add("MODIFIER"); }
         // Actions spécifiques (point 11 / 5).
         if ("catalogue".equals(code)) { a.add("AJUSTER_STOCK"); a.add("MAJ_PROMO"); }
-        if ("inbox".equals(code)) { a.add("VOIR_CONTENU"); }
+        if ("inbox".equals(code)) { a.add("CREER"); a.add("VOIR_CONTENU"); }
         if (Arrays.asList("campaigns", "waweb").contains(code)) { a.add("ENVOI_MASSE"); a.add("RENVOI_ECHECS"); }
         return a;
     }
@@ -160,13 +160,14 @@ public class PermissionService {
         // déjà y créer (writers), une seule fois, pour ne pas régresser leurs droits.
         for (String[] na : nouvellesActions) {
             if ("VOIR".equals(na[1])) { continue; }
-            List<String> writers = em.createQuery(
-                    "SELECT DISTINCT p.roleCode FROM RolePermission p WHERE p.menuCode = :m AND p.actionCode = 'CREER'",
+            // Rôles qui voient déjà le menu (ils pouvaient agir avant l'ajout) — sauf
+            // ADMIN (déjà tout) et LECTURE (lecture seule).
+            List<String> viewers = em.createQuery(
+                    "SELECT DISTINCT p.roleCode FROM RolePermission p WHERE p.menuCode = :m AND p.actionCode = 'VOIR'",
                     String.class).setParameter("m", na[0]).getResultList();
-            for (String r : writers) {
-                if (!ADMIN.equals(r) && !permExiste(r, na[0], na[1])) {
-                    em.persist(new RolePermission(r, na[0], na[1]));
-                }
+            for (String r : viewers) {
+                if (ADMIN.equals(r) || "LECTURE".equals(r)) { continue; }
+                if (!permExiste(r, na[0], na[1])) { em.persist(new RolePermission(r, na[0], na[1])); }
             }
         }
         // Rôles non-admin : initialisation par défaut uniquement à la première fois.

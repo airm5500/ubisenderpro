@@ -148,7 +148,7 @@ Usp.inbox.panel = function () {
                     }
                 }],
                 tbar: [
-                    { xtype: 'button', text: '➕ Nouveau', tooltip: 'Créer un nouveau chat (message texte/image hors modèle)', handler: function () { Usp.inbox.nouveauMessage(); } },
+                    Usp.permBtn('inbox', 'CREER', { xtype: 'button', text: '➕ Nouveau', tooltip: 'Créer un nouveau chat (message texte/image hors modèle)', handler: function () { Usp.inbox.nouveauMessage(); } }),
                     { xtype: 'button', text: '📋 Toutes', tooltip: 'Afficher toutes les discussions', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
                     { xtype: 'button', text: '🔔 Non lues', tooltip: 'N\'afficher que les discussions ayant des messages non lus', handler: function () { convStore.getProxy().extraParams = { nonLu: true }; convStore.load(); } },
                     '->',

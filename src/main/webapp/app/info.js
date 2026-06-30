@@ -164,8 +164,8 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
                   proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
                       headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
-            { xtype: 'tagfield', name: 'contactIds', fieldLabel: 'Contacts sélectionnés', queryMode: 'remote',
-              queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom',
+            { xtype: 'combobox', multiSelect: true, name: 'contactIds', fieldLabel: 'Contacts sélectionnés',
+              queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom',
               emptyText: '(si audience = Contacts sélectionnés) — tapez 2 lettres',
               value: g('contactIds') ? String(g('contactIds')).split(',') : [],
               listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } },
@@ -201,6 +201,8 @@ Usp.info.form = function (store, rec, typeParDefaut) {
                 var v = form.getValues();
                 // listeId : null si non choisi (évite l'échec de désérialisation Long).
                 if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
+                // contactIds (multi-sélection) -> CSV attendu par le serveur.
+                if (Ext.isArray(v.contactIds)) { v.contactIds = v.contactIds.join(','); }
                 Usp.ajax({ url: rec ? '/infos/' + rec.get('id') : '/infos', method: rec ? 'PUT' : 'POST', jsonData: v,
                     success: function () { win.close(); Usp.info.reloadAll(); Usp.toastEnregistre('Information « ' + v.titre + ' »', !!rec); },
                     failure: function (resp) {
