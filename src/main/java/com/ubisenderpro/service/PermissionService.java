@@ -87,7 +87,7 @@ public class PermissionService {
             a.add("CREER"); a.add("MODIFIER"); a.add("SUPPRIMER"); a.add("DESACTIVER");
         }
         if ("recouvrement".equals(code)) { a.add("IMPORTER"); a.add("EXPORTER"); a.add("GERER_REFERENTIELS"); }
-        if (Arrays.asList("campaigns", "marketing", "waweb").contains(code)) { a.add("ENVOYER"); }
+        if (Arrays.asList("campaigns", "marketing", "waweb", "recouvrement").contains(code)) { a.add("ENVOYER"); }
         if (Arrays.asList("clients", "historique").contains(code)) { a.add("EXPORTER"); }
         if ("settings".equals(code)) { if (!a.contains("MODIFIER")) { a.add("MODIFIER"); } a.add("SUPPRIMER"); }
         // Actions spécifiques (point 11 / 5).

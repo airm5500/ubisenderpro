@@ -40,9 +40,16 @@ Usp.recouvrement.clientCombo = function (cfg) {
 Usp.recouvrement.panel = function () {
     return {
         xtype: 'tabpanel', title: 'Suivi Relance et Recouvrements', listeners: Usp.tabListeners,
-        items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.referentielsPanel()]
+        items: [Usp.recouvrement.fichesPanel(), Usp.recouvrement.modelesPanel(),
+                Usp.recouvrement.historiquePanel(), Usp.recouvrement.importPanel(),
+                Usp.recouvrement.referentielsPanel()]
     };
 };
+
+Usp.recouvrement.TYPES_MODELE = [
+    ['RELANCE_PREVENTIVE', 'Relance préventive'], ['FACTURE_ECHUE', 'Facture échue'],
+    ['IMPAYE', 'Impayé'], ['MISE_EN_DEMEURE', 'Mise en demeure'], ['DIVERS', 'Divers']
+];
 
 /* ---------------------------- Clients & encours ---------------------------- */
 Usp.recouvrement.fichesPanel = function () {
@@ -74,9 +81,10 @@ Usp.recouvrement.fichesPanel = function () {
                   return '<span style="color:' + (n > 0 ? '#c62828' : '#2e7d32') + ';font-weight:bold">'
                       + Usp.recouvrement.money(v) + '</span>';
               } },
-            { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Actions', width: 320, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function () {
                   return '<span class="rec-mouv" title="Créances / paiements" style="cursor:pointer;color:#1976d2;margin-right:10px">📂 Créances</span>'
+                      + '<span class="rec-send" title="Envoyer une relance" style="cursor:pointer;color:#2e7d32;margin-right:10px">📨 Relancer</span>'
                       + '<span class="rec-edit" title="Modifier la fiche" style="cursor:pointer">✏️ Fiche</span>';
               } }
         ],
@@ -90,6 +98,10 @@ Usp.recouvrement.fichesPanel = function () {
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.rec-mouv')) { Usp.recouvrement.mouvementsWindow(rec, store); }
+                else if (e.getTarget('.rec-send')) {
+                    if (!Usp.can('recouvrement', 'ENVOYER')) { Usp.refusPermission(); return; }
+                    Usp.recouvrement.relanceForm(rec);
+                }
                 else if (e.getTarget('.rec-edit')) { Usp.recouvrement.ficheForm(store, rec); }
             },
             itemdblclick: function (g, rec) { Usp.recouvrement.mouvementsWindow(rec, store); }
@@ -391,5 +403,164 @@ Usp.recouvrement.referentielsPanel = function () {
             Usp.recouvrement.refGrid('PROFIL_PAIEMENT', 'Profils de paiement'),
             Usp.recouvrement.refGrid('STATUT_RECOUVREMENT', 'Statuts de recouvrement')
         ] }]
+    };
+};
+
+/* ---------------------------- Envoyer une relance ---------------------------- */
+Usp.recouvrement.relanceForm = function (rec) {
+    var modeleStore = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'type', 'canal'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/modeles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Relancer — ' + rec.get('nomCompte'), width: 480, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 120 }, items: [
+            { xtype: 'displayfield', fieldLabel: 'Solde', value: Usp.recouvrement.money(rec.get('solde')) },
+            { xtype: 'combobox', name: 'modeleId', fieldLabel: 'Modèle', allowBlank: false, store: modeleStore,
+              valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false, emptyText: 'Choisir un modèle…' },
+            { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
+              store: Usp.recouvrement.CANAUX, value: rec.get('canalPrefere') || 'WHATSAPP' }
+        ] }],
+        buttons: [{ text: '📨 Envoyer', formBind: true, handler: function (b) {
+            var f = b.up('window').down('form').getForm();
+            if (!f.isValid()) { return; }
+            var v = f.getValues();
+            v.clientId = rec.get('clientId');
+            Usp.ajax({ url: '/recouvrement/envois', method: 'POST', jsonData: v,
+                success: function (resp) {
+                    var e = Ext.decode(resp.responseText) || {};
+                    win.close();
+                    if (e.statut === 'ENVOYE') { Usp.toast('Relance envoyée (' + e.canal + ').'); }
+                    else { Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
+                },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        } }]
+    });
+    win.show();
+};
+
+/* ---------------------------- Modèles de relance ---------------------------- */
+Usp.recouvrement.modelesPanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'nom', 'type', 'canal', 'sujet', 'corps', 'nomModeleWhatsapp', 'paramsCorps', 'actif'],
+        autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/modeles',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var typeLib = function (v) {
+        var m = Ext.Array.findBy(Usp.recouvrement.TYPES_MODELE, function (a) { return a[0] === v; });
+        return m ? m[1] : (v || '');
+    };
+    return {
+        xtype: 'grid', title: '✉️ Modèles', store: store,
+        columns: [
+            { text: 'Code', dataIndex: 'code', width: 130 },
+            { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Type', dataIndex: 'type', width: 150, renderer: typeLib },
+            { text: 'Canal', dataIndex: 'canal', width: 90 },
+            { text: 'Actif', dataIndex: 'actif', width: 60, align: 'center', renderer: function (v) { return v ? '✔' : '✖'; } }
+        ],
+        tbar: [
+            Usp.permBtn('recouvrement', 'CREER', { text: '➕ Nouveau modèle', handler: function () { Usp.recouvrement.modeleForm(store, null); } }),
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
+        ],
+        listeners: { itemdblclick: function (g, rec) { Usp.recouvrement.modeleForm(store, rec); } }
+    };
+};
+
+Usp.recouvrement.modeleForm = function (store, rec) {
+    var win = Ext.create('Ext.window.Window', {
+        title: rec ? 'Modifier le modèle' : 'Nouveau modèle de relance', width: 640, modal: true, bodyPadding: 12, autoScroll: true,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 150 }, items: [
+            { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
+            { xtype: 'combobox', name: 'type', fieldLabel: 'Type', queryMode: 'local', editable: false,
+              store: Usp.recouvrement.TYPES_MODELE, value: 'DIVERS' },
+            { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', queryMode: 'local', editable: false,
+              store: [['TOUS', 'Tous'], ['WHATSAPP', 'WhatsApp'], ['EMAIL', 'Email']], value: 'TOUS' },
+            { xtype: 'textfield', name: 'sujet', fieldLabel: 'Sujet (Email)' },
+            { xtype: 'textareafield', name: 'corps', fieldLabel: 'Corps du message', height: 140, allowBlank: false },
+            { xtype: 'textfield', name: 'nomModeleWhatsapp', fieldLabel: 'Nom modèle Meta', emptyText: 'pour le canal WhatsApp API (hors fenêtre 24h)' },
+            { xtype: 'textfield', name: 'paramsCorps', fieldLabel: 'Paramètres {{1}},{{2}}', emptyText: 'ex. nom_client,montant_du,date_echeance' },
+            { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: true },
+            { xtype: 'displayfield', value: '<span style="color:#666">Variables : {nom_client}, {nom_societe}, ' +
+                '{solde}, {montant_du}, {jours_retard}, {numero_facture}, {date_echeance}.</span>' }
+        ] }],
+        buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+            var f = b.up('window').down('form').getForm();
+            if (!f.isValid()) { return; }
+            var v = f.getValues();
+            v.actif = f.findField('actif').getValue();
+            Usp.ajax({ url: rec ? '/recouvrement/modeles/' + rec.get('id') : '/recouvrement/modeles',
+                method: rec ? 'PUT' : 'POST', jsonData: v,
+                success: function () { win.close(); store.load(); Usp.toastEnregistre('Modèle', !!rec); },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        } }]
+    });
+    win.show();
+    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+};
+
+/* ---------------------------- Historique des envois ---------------------------- */
+Usp.recouvrement.historiquePanel = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'clientId', 'canal', 'destinataire', 'sujet', 'message', 'statut', 'erreur', 'creePar', 'createdAt'],
+        autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/envois',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    return {
+        xtype: 'grid', title: '🗂️ Historique', store: store,
+        columns: [
+            { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; } },
+            { text: 'Canal', dataIndex: 'canal', width: 90 },
+            { text: 'Destinataire', dataIndex: 'destinataire', width: 160 },
+            { text: 'Message', dataIndex: 'message', flex: 1, renderer: function (v) { return Ext.String.htmlEncode((v || '').substring(0, 120)); } },
+            { text: 'Statut', dataIndex: 'statut', width: 90, renderer: function (v) {
+                return '<span style="color:' + (v === 'ENVOYE' ? '#2e7d32' : '#c62828') + ';font-weight:bold">' + (v || '') + '</span>'; } },
+            { text: 'Erreur', dataIndex: 'erreur', width: 200 },
+            { text: 'Par', dataIndex: 'creePar', width: 110 }
+        ],
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
+            .concat(Usp.export.boutons('Recouvrement - historique'))
+    };
+};
+
+/* ---------------------------- Import CSV ---------------------------- */
+Usp.recouvrement.importPanel = function () {
+    var bloc = function (titre, type, exemple) {
+        return {
+            xtype: 'fieldset', title: titre, margin: '0 0 10 0', defaults: { anchor: '100%' }, items: [
+                { xtype: 'textareafield', itemId: 'ta_' + type, height: 110, emptyText: exemple },
+                { xtype: 'fieldcontainer', layout: 'hbox', items: [
+                    { xtype: 'filefield', flex: 1, buttonText: 'Fichier .csv…', buttonOnly: false, msgTarget: 'side',
+                      listeners: { change: function (f) {
+                          var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                          var reader = new FileReader();
+                          reader.onload = function (e) { f.up('fieldset').down('#ta_' + type).setValue(e.target.result); };
+                          reader.readAsText(file);
+                      } } },
+                    Usp.permBtn('recouvrement', 'IMPORTER', { xtype: 'button', text: '📥 Importer', margin: '0 0 0 8',
+                      handler: function (b) {
+                          var contenu = b.up('fieldset').down('#ta_' + type).getValue();
+                          if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée.'); return; }
+                          Usp.ajax({ url: '/recouvrement/import/' + type, method: 'POST', jsonData: { contenu: contenu },
+                              success: function (resp) {
+                                  var r = Ext.decode(resp.responseText) || {};
+                                  Ext.Msg.alert('Import terminé', (r.crees || 0) + ' créé(s), ' + (r.misAJour || 0)
+                                      + ' mis à jour, ' + (r.ignores || 0) + ' ignoré(s) (client introuvable).');
+                              },
+                              failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                      } })
+                ] }
+            ]
+        };
+    };
+    return {
+        title: '📥 Import', xtype: 'panel', autoScroll: true, bodyPadding: 12,
+        items: [
+            { xtype: 'displayfield', value: '<span style="color:#666">Séparateur <b>;</b> (point-virgule) ou tabulation. ' +
+                '1ʳᵉ ligne = en-tête (noms de colonnes). Rattachement par <b>numero_client</b>.</span>' },
+            bloc('Fiches (initialisation)', 'fiches', 'numero_client;encours_initial;segment;profil;responsable;statut\nC001;150000;Diamond;Paiement 30 jours;Awa;Sous surveillance'),
+            bloc('Créances (factures / avoirs)', 'creances', 'numero_client;type;numero;date_emission;date_echeance;montant;statut\nC001;FACTURE;FA-2026-001;2026-06-01;2026-07-01;250000;ECHUE'),
+            bloc('Règlements', 'paiements', 'numero_client;date_paiement;montant;mode;reference\nC001;2026-06-15;100000;Virement;VIR-123')
+        ]
     };
 };
