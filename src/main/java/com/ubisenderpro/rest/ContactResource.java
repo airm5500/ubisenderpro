@@ -40,14 +40,14 @@ public class ContactResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
+    @Secured(menu = "clients")
     public Response creer(ClientContact contact) {
         return Response.status(Response.Status.CREATED).entity(contactService.creer(contact)).build();
     }
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
+    @Secured(menu = "clients")
     public Response modifier(@PathParam("id") Long id, ClientContact contact) {
         if (!contactService.parId(id).isPresent()) {
             return Response.status(Response.Status.NOT_FOUND).build();
@@ -58,7 +58,7 @@ public class ContactResource {
 
     @POST
     @Path("/{id}/unsubscribe")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
+    @Secured(menu = "clients")
     public Response desabonner(@PathParam("id") Long id) {
         contactService.definirDesabonnement(id, true);
         return Response.ok().build();
@@ -66,7 +66,7 @@ public class ContactResource {
 
     @POST
     @Path("/{id}/subscribe")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "clients")
     public Response reabonner(@PathParam("id") Long id) {
         contactService.definirDesabonnement(id, false);
         return Response.ok().build();

@@ -42,14 +42,14 @@ public class InfoEvenementResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response creer(InfoEvenement i) {
         return Response.status(Response.Status.CREATED).entity(service.creer(i)).build();
     }
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response modifier(@PathParam("id") Long id, InfoEvenement i) {
         i.setId(id);
         return Response.ok(service.modifier(i)).build();
@@ -57,7 +57,7 @@ public class InfoEvenementResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response supprimer(@PathParam("id") Long id) {
         service.supprimer(id);
         return Response.noContent().build();
@@ -65,7 +65,7 @@ public class InfoEvenementResource {
 
     @POST
     @Path("/{id}/dupliquer")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response dupliquer(@PathParam("id") Long id) {
         InfoEvenement c = service.dupliquer(id);
         return c == null ? Response.status(Response.Status.NOT_FOUND).build()
@@ -74,7 +74,7 @@ public class InfoEvenementResource {
 
     @POST
     @Path("/{id}/programmer")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response programmer(@PathParam("id") Long id) {
         InfoEvenement i = service.programmer(id);
         return i == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(i).build();
@@ -82,7 +82,7 @@ public class InfoEvenementResource {
 
     @POST
     @Path("/{id}/annuler")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response annuler(@PathParam("id") Long id) {
         InfoEvenement i = service.annuler(id);
         return i == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(i).build();
@@ -90,7 +90,7 @@ public class InfoEvenementResource {
 
     @POST
     @Path("/{id}/archiver")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "infos")
     public Response archiver(@PathParam("id") Long id) {
         InfoEvenement i = service.archiver(id);
         return i == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(i).build();

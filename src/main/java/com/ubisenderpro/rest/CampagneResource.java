@@ -59,7 +59,7 @@ public class CampagneResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response creer(Campagne c, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         c.setCreePar(utilisateurId(authHeader));
         Campagne cree = campagneService.creer(c);
@@ -75,7 +75,7 @@ public class CampagneResource {
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response modifier(@PathParam("id") Long id, Campagne c) {
         c.setId(id);
         return Response.ok(campagneService.modifier(c)).build();
@@ -83,7 +83,7 @@ public class CampagneResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response supprimer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         campagneService.supprimer(id);
         auditService.tracer(auth, "SUPPRESSION", "Campagne", id, null);
@@ -92,7 +92,7 @@ public class CampagneResource {
 
     @POST
     @Path("/{id}/recipients")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response construire(@PathParam("id") Long id) {
         int total = campagneService.construireDestinataires(id);
         return Response.ok(Map.of("nbDestinataires", total)).build();
@@ -112,7 +112,7 @@ public class CampagneResource {
      */
     @POST
     @Path("/{id}/relancer")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response relancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         int reinities = campagneService.reinitialiserEchecs(id);
         if (reinities == 0) {
@@ -131,7 +131,7 @@ public class CampagneResource {
      */
     @POST
     @Path("/{id}/launch")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response lancer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         campagneService.verifierLancable(id);
         campagneSenderAsync.lancer(id);
@@ -142,7 +142,7 @@ public class CampagneResource {
 
     @POST
     @Path("/{id}/resume")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response reprendre(@PathParam("id") Long id) {
         campagneService.verifierLancable(id);
         campagneSenderAsync.lancer(id);
@@ -166,7 +166,7 @@ public class CampagneResource {
 
     @POST
     @Path("/{id}/pause")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response suspendre(@PathParam("id") Long id) {
         campagneService.changerStatut(id, "SUSPENDUE");
         return Response.ok().build();
@@ -174,7 +174,7 @@ public class CampagneResource {
 
     @POST
     @Path("/{id}/cancel")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "campaigns")
     public Response annuler(@PathParam("id") Long id) {
         campagneService.changerStatut(id, "ANNULEE");
         return Response.ok().build();

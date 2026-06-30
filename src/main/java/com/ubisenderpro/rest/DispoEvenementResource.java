@@ -43,14 +43,14 @@ public class DispoEvenementResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response creer(DispoEvenement e) {
         return Response.status(Response.Status.CREATED).entity(service.creer(e)).build();
     }
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response modifier(@PathParam("id") Long id, DispoEvenement e) {
         e.setId(id);
         return Response.ok(service.modifier(e)).build();
@@ -58,7 +58,7 @@ public class DispoEvenementResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response supprimer(@PathParam("id") Long id) {
         service.supprimer(id);
         return Response.noContent().build();
@@ -68,7 +68,7 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/dupliquer")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response dupliquer(@PathParam("id") Long id) {
         DispoEvenement c = service.dupliquer(id);
         return c == null ? Response.status(Response.Status.NOT_FOUND).build()
@@ -77,7 +77,7 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/programmer")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response programmer(@PathParam("id") Long id) {
         DispoEvenement e = service.programmer(id);
         return e == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(e).build();
@@ -85,7 +85,7 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/annuler")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response annuler(@PathParam("id") Long id) {
         DispoEvenement e = service.annuler(id);
         return e == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(e).build();
@@ -93,7 +93,7 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/archiver")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response archiver(@PathParam("id") Long id) {
         DispoEvenement e = service.archiver(id);
         return e == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(e).build();
@@ -109,14 +109,14 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/produits")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response ajouterProduit(@PathParam("id") Long id, DispoProduit p) {
         return Response.status(Response.Status.CREATED).entity(produitService.creer(id, p)).build();
     }
 
     @PUT
     @Path("/{id}/produits/{pid}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response modifierProduit(@PathParam("pid") Long pid, DispoProduit p) {
         DispoProduit r = produitService.modifier(pid, p);
         return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
@@ -124,7 +124,7 @@ public class DispoEvenementResource {
 
     @DELETE
     @Path("/{id}/produits/{pid}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response supprimerProduit(@PathParam("pid") Long pid) {
         produitService.supprimer(pid);
         return Response.noContent().build();
@@ -132,7 +132,7 @@ public class DispoEvenementResource {
 
     @POST
     @Path("/{id}/produits/import")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response importerProduits(@PathParam("id") Long id, Map<String, Object> body) throws Exception {
         String b64 = body == null ? null : (String) body.get("fichierBase64");
         if (b64 == null || b64.isEmpty()) {

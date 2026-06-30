@@ -39,7 +39,7 @@ public class ModeleResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "marketing")
     public Response creer(ModeleMessage m, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         ModeleMessage cree = modeleService.creer(m);
         auditService.tracer(auth, "CREATION", "Modele", cree.getId(), cree.getNom());
@@ -48,7 +48,7 @@ public class ModeleResource {
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "marketing")
     public Response modifier(@PathParam("id") Long id, ModeleMessage m,
                              @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         m.setId(id);
@@ -59,7 +59,7 @@ public class ModeleResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "marketing")
     public Response supprimer(@PathParam("id") Long id,
                               @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         modeleService.supprimer(id);
@@ -83,7 +83,7 @@ public class ModeleResource {
     /** Import d'un modèle depuis un .docx exporté (contenu base64). Crée un nouveau modèle. */
     @POST
     @Path("/import-docx")
-    @Secured(roles = {"ADMIN", "MARKETING"})
+    @Secured(menu = "marketing")
     public Response importerDocx(Map<String, Object> body,
                                  @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) throws Exception {
         String b64 = body == null ? null : (String) body.get("fichierBase64");

@@ -23,14 +23,14 @@ public class DispoRegleResource {
     public List<DispoRegle> lister() { return service.lister(); }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response creer(DispoRegle r) {
         return Response.status(Response.Status.CREATED).entity(service.creer(r)).build();
     }
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response modifier(@PathParam("id") Long id, DispoRegle r) {
         r.setId(id);
         return Response.ok(service.modifier(r)).build();
@@ -38,7 +38,7 @@ public class DispoRegleResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "dispo")
     public Response supprimer(@PathParam("id") Long id) {
         service.supprimer(id);
         return Response.noContent().build();

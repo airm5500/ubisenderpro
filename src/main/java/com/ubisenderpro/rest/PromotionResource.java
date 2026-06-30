@@ -38,7 +38,7 @@ public class PromotionResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response creer(Promotion p) {
         try {
             return Response.status(Response.Status.CREATED).entity(promotionService.creer(p)).build();
@@ -49,7 +49,7 @@ public class PromotionResource {
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response modifier(@PathParam("id") Long id, Promotion p) {
         try {
             p.setId(id);
@@ -61,7 +61,7 @@ public class PromotionResource {
 
     @DELETE
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response supprimer(@PathParam("id") Long id) {
         promotionService.supprimer(id);
         return Response.noContent().build();
@@ -71,7 +71,7 @@ public class PromotionResource {
 
     @POST
     @Path("/{id}/dupliquer")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response dupliquer(@PathParam("id") Long id) {
         Promotion c = promotionService.dupliquer(id);
         return c == null ? Response.status(Response.Status.NOT_FOUND).build()
@@ -80,7 +80,7 @@ public class PromotionResource {
 
     @POST
     @Path("/{id}/annuler")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response annuler(@PathParam("id") Long id) {
         Promotion p = promotionService.annuler(id);
         return p == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(p).build();
@@ -88,7 +88,7 @@ public class PromotionResource {
 
     @POST
     @Path("/{id}/archiver")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response archiver(@PathParam("id") Long id) {
         Promotion p = promotionService.archiver(id);
         return p == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(p).build();
@@ -104,14 +104,14 @@ public class PromotionResource {
 
     @POST
     @Path("/{id}/produits")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response ajouterProduit(@PathParam("id") Long id, PromotionProduit p) {
         return Response.status(Response.Status.CREATED).entity(produitService.creer(id, p)).build();
     }
 
     @PUT
     @Path("/{id}/produits/{pid}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response modifierProduit(@PathParam("pid") Long pid, PromotionProduit p) {
         PromotionProduit r = produitService.modifier(pid, p);
         return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
@@ -119,7 +119,7 @@ public class PromotionResource {
 
     @DELETE
     @Path("/{id}/produits/{pid}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response supprimerProduit(@PathParam("pid") Long pid) {
         produitService.supprimer(pid);
         return Response.noContent().build();
@@ -127,7 +127,7 @@ public class PromotionResource {
 
     @POST
     @Path("/{id}/produits/import")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "promotions")
     public Response importerProduits(@PathParam("id") Long id, Map<String, Object> body) throws Exception {
         String b64 = body == null ? null : (String) body.get("fichierBase64");
         if (b64 == null || b64.isEmpty()) {

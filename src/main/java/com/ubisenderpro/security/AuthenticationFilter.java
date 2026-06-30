@@ -64,12 +64,16 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
 
         // Contrôle fin par permission (menu, action) lorsqu'il est déclaré sur la ressource.
         Secured perm = permissionRequise();
-        if (perm != null && !perm.menu().isEmpty()
-                && !permissionService.autorise(user.getRoles(), perm.menu(), perm.action())) {
-            requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
-                    .entity("{\"erreur\":\"Action non autorisée : " + perm.action()
-                            + " sur " + perm.menu() + "\"}").build());
-            return;
+        if (perm != null && !perm.menu().isEmpty()) {
+            String action = perm.action().isEmpty()
+                    ? actionDeduite(requestContext.getMethod(), requestContext.getUriInfo().getPath())
+                    : perm.action();
+            if (!permissionService.autorise(user.getRoles(), perm.menu(), action)) {
+                requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
+                        .entity("{\"erreur\":\"Action non autorisée : " + action
+                                + " sur " + perm.menu() + "\"}").build());
+                return;
+            }
         }
 
         capturerContexte();
@@ -106,6 +110,19 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
             return clazz.getAnnotation(Secured.class).roles();
         }
         return new String[0];
+    }
+
+    /** Déduit l'action d'après la méthode HTTP et le chemin (quand non précisée). */
+    private String actionDeduite(String httpMethod, String path) {
+        String p = path == null ? "" : path.toLowerCase();
+        if (p.contains("activate") || p.contains("deactivate") || p.contains("annul")
+                || p.contains("archiv") || p.contains("desactiv")) { return "DESACTIVER"; }
+        if (p.contains("dupliquer") || p.contains("duplicate") || p.contains("import")) { return "CREER"; }
+        if ("GET".equalsIgnoreCase(httpMethod)) { return "VOIR"; }
+        if ("POST".equalsIgnoreCase(httpMethod)) { return "CREER"; }
+        if ("PUT".equalsIgnoreCase(httpMethod) || "PATCH".equalsIgnoreCase(httpMethod)) { return "MODIFIER"; }
+        if ("DELETE".equalsIgnoreCase(httpMethod)) { return "SUPPRIMER"; }
+        return "VOIR";
     }
 
     /** @Secured portant un menu/action (méthode prioritaire sur la classe). */

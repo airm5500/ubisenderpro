@@ -35,7 +35,7 @@ public class EnvoiProposeResource {
 
     @POST
     @Path("/generer")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "marketing")
     public Response generer() {
         int crees = service.genererPropositions();
         int expirees = service.expirerDepassees();
@@ -44,7 +44,7 @@ public class EnvoiProposeResource {
 
     @POST
     @Path("/{id}/valider")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "marketing")
     public Response valider(@PathParam("id") Long id, Map<String, Object> body, @Context UriInfo uriInfo) {
         try {
             Long listeId = nombre(body, "listeId");
@@ -58,7 +58,7 @@ public class EnvoiProposeResource {
 
     @POST
     @Path("/{id}/rejeter")
-    @Secured(roles = {"ADMIN", "MARKETING", "CATALOGUE"})
+    @Secured(menu = "marketing")
     public Response rejeter(@PathParam("id") Long id, Map<String, Object> body) {
         try {
             String motif = body == null ? null : (String) body.get("motif");
