@@ -36,6 +36,10 @@ public class Conversation {
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "OUVERTE";
 
+    /** Le bot répond tant qu'aucun humain n'a repris la main sur cette conversation. */
+    @Column(name = "bot_actif", nullable = false)
+    private boolean botActif = true;
+
     @Column(name = "agent_id")
     private Long agentId;
 
@@ -81,6 +85,8 @@ public class Conversation {
     public void setNomAffiche(String nomAffiche) { this.nomAffiche = nomAffiche; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
+    public boolean isBotActif() { return botActif; }
+    public void setBotActif(boolean botActif) { this.botActif = botActif; }
     public Long getAgentId() { return agentId; }
     public void setAgentId(Long agentId) { this.agentId = agentId; }
     public int getNonLu() { return nonLu; }

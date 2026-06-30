@@ -6,6 +6,8 @@ import com.ubisenderpro.entity.ModeleMessage;
 import com.ubisenderpro.entity.WhatsappAccount;
 import com.ubisenderpro.whatsapp.WaWebClient;
 import com.ubisenderpro.whatsapp.WhatsappCloudClient;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
@@ -26,6 +28,12 @@ public class CampagneSenderTx {
 
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
+
+    @javax.ejb.EJB
+    private VariablesContactService variablesContactService;
+
+    /** Lecture des variables de contexte figées sur le modèle (JSON). */
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
     public void marquerStatut(Long campagneId, String statut) {
@@ -61,13 +69,24 @@ public class CampagneSenderTx {
         String erreur;
 
         if (c != null && "WEB".equalsIgnoreCase(c.getCanal())) {
-            // Canal non officiel : envoi du corps du modèle (placeholder {{1}} = nom du contact).
+            // Canal non officiel : texte libre + variables ({{1}} / {{nom_contact}}).
+            // Une pièce jointe (en-tête média : document/image…) est envoyée avec
+            // le message en légende.
             if (c.getWaWebSessionId() == null || c.getWaWebSessionId().isEmpty()) {
                 success = false; erreur = "Session WhatsApp Web non définie pour la campagne";
             } else {
                 WaWebClient web = new WaWebClient();
-                WaWebClient.SendResult res = web.sendText(
-                        c.getWaWebSessionId(), d.getNumeroWhatsapp(), corpsPersonnalise(modele, d));
+                String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
+                String texte = variablesContactService.personnaliser(corps, d.getNumeroWhatsapp(), d.getNomContact());
+                String mediaType = nz(modele.getEnteteMediaType());
+                String mediaUrl = nz(modele.getEnteteMediaUrl());
+                WaWebClient.SendResult res;
+                if (!mediaType.isEmpty() && !mediaUrl.isEmpty()) {
+                    res = web.sendMedia(c.getWaWebSessionId(), d.getNumeroWhatsapp(),
+                            mediaType.toLowerCase(), mediaUrl, texte, null, nomMedia(mediaType));
+                } else {
+                    res = web.sendText(c.getWaWebSessionId(), d.getNumeroWhatsapp(), texte);
+                }
                 success = res.success; waMessageId = res.id; erreur = res.erreur;
             }
         } else {
@@ -80,7 +99,7 @@ public class CampagneSenderTx {
                         d.getNumeroWhatsapp(),
                         modele.getNomModeleWhatsapp() != null ? modele.getNomModeleWhatsapp() : modele.getNom(),
                         modele.getLangue(),
-                        Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact()),
+                        parametresCorps(modele, d),
                         modele.getEnteteMediaType(), modele.getEnteteMediaUrl());
                 success = res.success; waMessageId = res.waMessageId; erreur = res.erreur;
             }
@@ -101,10 +120,49 @@ public class CampagneSenderTx {
         if (c != null) em.merge(c);
     }
 
-    /** Corps du modèle avec le placeholder {{1}} remplacé par le nom du contact (canal WEB). */
-    private String corpsPersonnalise(ModeleMessage modele, CampagneDestinataire d) {
-        String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
-        String nom = d.getNomContact() == null ? "" : d.getNomContact();
-        return corps.replace("{{1}}", nom);
+    /**
+     * Paramètres du corps d'un template Meta ({{1}},{{2}}…), résolus par destinataire.
+     * Si {@code paramsCorps} est défini (CSV de variables), chaque variable est résolue
+     * dans l'ordre ; vide => aucun paramètre (template sans variable) ; non défini =>
+     * nom du contact par défaut ({{1}}).
+     */
+    private java.util.List<String> parametresCorps(ModeleMessage modele, CampagneDestinataire d) {
+        String spec = modele.getParamsCorps();
+        if (spec == null) {
+            return Collections.singletonList(d.getNomContact() == null ? "" : d.getNomContact());
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (spec.trim().isEmpty()) { return out; }
+        // Variables par contact (NOM_CONTACT, NOM_COMPTE, SEGMENTATION…) — clés en MAJUSCULES.
+        java.util.Map<String, String> vars =
+                variablesContactService.resoudre(d.getNumeroWhatsapp(), d.getNomContact());
+        // Variables de contexte figées sur le modèle (mois_promotion, date_fin…) — clés en minuscules.
+        java.util.Map<String, String> contexte = contexteModele(modele);
+        for (String token : spec.split(",")) {
+            String raw = token.trim();
+            if (raw.isEmpty()) { continue; }
+            String val = vars.get(raw.toUpperCase());
+            if (val == null) { val = contexte.get(raw.toLowerCase()); }
+            out.add(val == null ? "" : val);
+        }
+        return out;
+    }
+
+    /** Désérialise les variables de contexte du modèle (JSON), map vide si absent/illisible. */
+    private java.util.Map<String, String> contexteModele(ModeleMessage modele) {
+        String json = modele.getVariablesContexte();
+        if (json == null || json.trim().isEmpty()) { return Collections.emptyMap(); }
+        try {
+            return JSON.readValue(json, new TypeReference<java.util.Map<String, String>>() {});
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private String nz(String s) { return s == null ? "" : s; }
+
+    /** Nom de fichier affiché pour une pièce jointe (document promo = .xlsx). */
+    private String nomMedia(String mediaType) {
+        return "document".equalsIgnoreCase(mediaType) ? "Promotion.xlsx" : null;
     }
 }

@@ -96,6 +96,22 @@ public class ConversationResource {
         return Response.ok().build();
     }
 
+    /** Un humain reprend la main : le bot se tait sur cette discussion. */
+    @POST
+    @Path("/{id}/bot-off")
+    public Response botOff(@PathParam("id") Long id) {
+        conversationService.definirBot(id, false);
+        return Response.ok().build();
+    }
+
+    /** Redonne la main au bot sur cette discussion. */
+    @POST
+    @Path("/{id}/bot-on")
+    public Response botOn(@PathParam("id") Long id) {
+        conversationService.definirBot(id, true);
+        return Response.ok().build();
+    }
+
     @POST
     @Path("/{id}/notes")
     public Response ajouterNote(@PathParam("id") Long id, Map<String, Object> body) {

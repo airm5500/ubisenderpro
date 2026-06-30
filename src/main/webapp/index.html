@@ -44,6 +44,17 @@
         .usp-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .usp-avatar--empty { background: rgba(255,255,255,.25); }
 
+        /* Badge « à reprendre » (escalade du bot) dans le header. */
+        .usp-escalade-badge, .usp-escalade-badge.x-btn-default-small {
+            background: #ef6c00 !important; background-image: none !important;
+            border: 1px solid #e65100 !important; border-radius: 12px !important;
+        }
+        .usp-escalade-badge .x-btn-inner {
+            color: #fff !important; font-weight: bold;
+        }
+        @keyframes usp-escalade-pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+        .usp-escalade-badge { animation: usp-escalade-pulse 1.6s ease-in-out infinite; }
+
         /* ===== Palette ubipharm (teal) — à valider ===== */
         .usp-header, .usp-header.x-toolbar-default {
             background: #0a8f86 !important;
@@ -81,6 +92,9 @@
     <script src="app/inbox.js"></script>
     <script src="app/campaign.js"></script>
     <script src="app/catalogue.js"></script>
+    <script src="app/marketing.js"></script>
+    <script src="app/dispo.js"></script>
+    <script src="app/info.js"></script>
     <script src="app/crm.js"></script>
     <script src="app/settings.js"></script>
     <script src="app/users.js"></script>

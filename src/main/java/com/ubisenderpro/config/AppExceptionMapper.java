@@ -73,14 +73,108 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
                     .type(MediaType.APPLICATION_JSON).entity(body).build();
         }
 
-        // Erreur inattendue : trace complète côté serveur, message générique côté client.
-        LOG.log(Level.SEVERE, "ERREUR_SERVEUR chemin=/" + chemin + " : " + ex.getMessage(), ex);
-        auditService.tracer(auth, "ERREUR_SERVEUR", "Système", null,
+        // Violation de contrainte BDD (NOT NULL, doublon, clé étrangère) : message clair
+        // adapté au menu + log précis, plutôt qu'un message technique opaque.
+        String sql = messageSql(ex);
+        if (sql != null) {
+            String menu = libelleMenu(chemin);
+            String message = traduireSql(sql, menu);
+            LOG.warning("CONTRAINTE_BDD chemin=/" + chemin + " menu=\"" + menu + "\" : " + sql);
+            auditService.tracer(auth, "ERREUR_SAISIE", menu, null, message);
+            Map<String, Object> corps = new LinkedHashMap<>();
+            corps.put("erreur", message);
+            Response.Status statut = sql.contains("Duplicate entry")
+                    ? Response.Status.CONFLICT : Response.Status.BAD_REQUEST;
+            return Response.status(statut).type(MediaType.APPLICATION_JSON).entity(corps).build();
+        }
+
+        // Erreur inattendue : trace complète côté serveur, message clair côté client.
+        String menu = libelleMenu(chemin);
+        LOG.log(Level.SEVERE, "ERREUR_SERVEUR chemin=/" + chemin + " menu=\"" + menu + "\" : " + ex.getMessage(), ex);
+        auditService.tracer(auth, "ERREUR_SERVEUR", menu, null,
                 "Erreur technique : " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("erreur", "Une erreur technique est survenue. Le détail a été consigné dans le journal.");
+        body.put("erreur", "L'opération sur « " + menu + " » a échoué pour une raison technique. "
+                + "Réessayez ; si le problème persiste, contactez l'administrateur (le détail est dans le journal).");
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.APPLICATION_JSON).entity(body).build();
+    }
+
+    /** Recherche dans la chaîne des causes un message de violation de contrainte SQL. */
+    private String messageSql(Throwable ex) {
+        Throwable c = ex;
+        int garde = 0;
+        while (c != null && garde++ < 15) {
+            String m = c.getMessage();
+            if (m != null && (m.contains("cannot be null") || m.contains("Duplicate entry")
+                    || m.contains("foreign key constraint fails")
+                    || m.contains("Data too long") || m.contains("Incorrect"))) {
+                return m;
+            }
+            c = c.getCause();
+        }
+        return null;
+    }
+
+    /** Traduit un message SQL technique en message utilisateur explicite. */
+    private String traduireSql(String sql, String menu) {
+        if (sql.contains("cannot be null")) {
+            String col = entreApostrophes(sql);
+            return "Le champ « " + libelleColonne(col) + " » est obligatoire (" + menu + ").";
+        }
+        if (sql.contains("Duplicate entry")) {
+            return "Cette valeur existe déjà (" + menu + "). Vérifiez les champs uniques (code, numéro…).";
+        }
+        if (sql.contains("foreign key constraint fails")) {
+            return "Opération impossible sur « " + menu + " » : un élément lié est manquant "
+                    + "ou cet enregistrement est déjà utilisé ailleurs.";
+        }
+        if (sql.contains("Data too long")) {
+            return "Une valeur saisie est trop longue (" + menu + "). Raccourcissez le champ concerné.";
+        }
+        return "Saisie invalide (" + menu + "). Vérifiez les champs renseignés.";
+    }
+
+    /** Premier texte entre apostrophes simples (ex. nom de colonne dans le message SQL). */
+    private String entreApostrophes(String s) {
+        int a = s.indexOf('\'');
+        int b = a >= 0 ? s.indexOf('\'', a + 1) : -1;
+        return (a >= 0 && b > a) ? s.substring(a + 1, b) : "?";
+    }
+
+    /** Libellé lisible d'une colonne (sinon underscores -> espaces). */
+    private String libelleColonne(String col) {
+        switch (col) {
+            case "numero_client": return "Numéro client";
+            case "nom_compte": return "Nom du compte";
+            case "nom_complet": return "Nom complet";
+            case "login": return "Login";
+            case "libelle": return "Libellé";
+            case "titre": return "Titre";
+            case "code": return "Code";
+            case "type": return "Type";
+            default: return col == null ? "?" : col.replace('_', ' ');
+        }
+    }
+
+    /** Libellé du menu déduit du chemin REST (pour un message adapté). */
+    private String libelleMenu(String chemin) {
+        String p = chemin == null ? "" : chemin.toLowerCase();
+        if (p.startsWith("clients") || p.startsWith("contacts")) { return "Comptes clients"; }
+        if (p.startsWith("catalogue") || p.startsWith("articles")) { return "Catalogue"; }
+        if (p.startsWith("promotions")) { return "Promotions"; }
+        if (p.startsWith("templates") || p.startsWith("propositions")) { return "Marketing"; }
+        if (p.startsWith("dispo")) { return "Disponibilités & Ruptures"; }
+        if (p.startsWith("infos")) { return "Informations Clients"; }
+        if (p.startsWith("campaigns")) { return "Campagnes"; }
+        if (p.startsWith("users") || p.startsWith("permissions")) { return "Utilisateurs"; }
+        if (p.startsWith("referentiels")) { return "Référentiels"; }
+        if (p.startsWith("segmentations") || p.startsWith("segments")) { return "Segmentations"; }
+        if (p.startsWith("lists")) { return "Listes de diffusion"; }
+        if (p.startsWith("parametres")) { return "Paramètres"; }
+        if (p.startsWith("wa-web") || p.startsWith("whatsapp")) { return "WhatsApp"; }
+        if (p.startsWith("orders") || p.startsWith("opportunities")) { return "CRM"; }
+        return "l'application";
     }
 
     /** Remonte la chaîne des causes pour retrouver une exception du type voulu (déballe EJBException). */

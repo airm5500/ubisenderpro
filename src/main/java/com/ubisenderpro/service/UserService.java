@@ -8,6 +8,7 @@ import com.ubisenderpro.security.PasswordHasher;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +29,59 @@ public class UserService {
     public List<Role> listerRoles() {
         return em.createQuery("SELECT r FROM Role r WHERE r.actif = true ORDER BY r.libelle", Role.class)
                 .getResultList();
+    }
+
+    /** Tous les rôles (actifs et inactifs) pour l'écran de gestion. */
+    public List<Role> listerTousRoles() {
+        return em.createQuery("SELECT r FROM Role r ORDER BY r.libelle", Role.class).getResultList();
+    }
+
+    /** Modifie le libellé / la description d'un rôle (le code reste l'identifiant). */
+    public Role modifierRole(Long id, Role data) {
+        Role ex = em.find(Role.class, id);
+        if (ex == null) { throw new IllegalArgumentException("Rôle introuvable"); }
+        if (data.getLibelle() != null && !data.getLibelle().trim().isEmpty()) {
+            ex.setLibelle(data.getLibelle().trim());
+        }
+        ex.setDescription(data.getDescription());
+        ex.setUpdatedAt(LocalDateTime.now());
+        return em.merge(ex);
+    }
+
+    /** Active / désactive un rôle (le rôle ADMIN ne peut pas être désactivé). */
+    public void definirActifRole(Long id, boolean actif) {
+        Role ex = em.find(Role.class, id);
+        if (ex == null) { return; }
+        if (!actif && "ADMIN".equals(ex.getCode())) {
+            throw new ValidationException("actif", "Le rôle ADMIN ne peut pas être désactivé.");
+        }
+        ex.setActif(actif);
+        ex.setUpdatedAt(LocalDateTime.now());
+        em.merge(ex);
+    }
+
+    /** Crée un rôle (code normalisé, unique). Le code sert d'identifiant de permission. */
+    public Role creerRole(Role r) {
+        if (r == null || r.getLibelle() == null || r.getLibelle().trim().isEmpty()) {
+            throw new ValidationException("libelle", "Le libellé du rôle est obligatoire.");
+        }
+        String code = (r.getCode() == null || r.getCode().trim().isEmpty())
+                ? r.getLibelle() : r.getCode();
+        code = code.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("(^_+|_+$)", "");
+        if (code.isEmpty()) {
+            throw new ValidationException("code", "Le code du rôle est invalide.");
+        }
+        if (!em.createQuery("SELECT r FROM Role r WHERE r.code = :c", Role.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty()) {
+            throw new ValidationException("code", "Un rôle avec le code « " + code + " » existe déjà.");
+        }
+        Role n = new Role();
+        n.setCode(code);
+        n.setLibelle(r.getLibelle().trim());
+        n.setDescription(r.getDescription());
+        n.setActif(true);
+        em.persist(n);
+        return n;
     }
 
     /** Liste des utilisateurs sans exposer le hash du mot de passe. */
@@ -51,6 +105,15 @@ public class UserService {
     }
 
     public Optional<Utilisateur> parId(Long id) { return Optional.ofNullable(em.find(Utilisateur.class, id)); }
+
+    /** E-mails des superviseurs et administrateurs actifs (notifications d'escalade). */
+    public List<String> listerEmailsSuperviseurs() {
+        return em.createQuery(
+                "SELECT DISTINCT u.email FROM Utilisateur u JOIN u.roles r " +
+                "WHERE u.actif = true AND r.code IN ('SUPERVISEUR','ADMIN') " +
+                "AND u.email IS NOT NULL AND u.email <> ''", String.class)
+                .getResultList();
+    }
 
     /** Liste légère des utilisateurs actifs (id + nom) pour l'affectation de discussions (#5). */
     public List<Map<String, Object>> listerAffectables() {

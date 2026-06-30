@@ -53,6 +53,39 @@ Usp.LOGO = '<img src="data:image/svg+xml,' +
     "%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2z'/%3E%3C/svg%3E" +
     '" style="width:20px;height:20px;vertical-align:middle"/>';
 
+/* Déclenche le téléchargement d'un contenu base64 (ex. .docx exporté). */
+Usp.telechargerBase64 = function (nomFichier, base64, mime) {
+    var bin = atob(base64), len = bin.length, arr = new Uint8Array(len);
+    for (var i = 0; i < len; i++) { arr[i] = bin.charCodeAt(i); }
+    var blob = new Blob([arr], { type: mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = nomFichier || 'fichier';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+};
+
+/* Bip d'alerte (Web Audio) — utilisé à l'arrivée d'une escalade du bot. */
+Usp.beep = function () {
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) { return; }
+        if (!Usp._audioCtx) { Usp._audioCtx = new AC(); }
+        var ctx = Usp._audioCtx;
+        var jouer = function (freq, debut, duree) {
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = freq;
+            o.connect(g); g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.001, ctx.currentTime + debut);
+            g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + debut + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + debut + duree);
+            o.start(ctx.currentTime + debut); o.stop(ctx.currentTime + debut + duree);
+        };
+        jouer(880, 0, 0.18);
+        jouer(1175, 0.2, 0.22); // deux notes : « ding-dong »
+    } catch (e) { /* audio indisponible : on ignore */ }
+};
+
 /* Notification éphémère (toast) en bas à droite — confirmation d'action (#8).
    type : 'success' (vert, défaut) | 'error' (rouge) | 'info' (bleu). */
 Usp.toast = function (message, type) {
@@ -326,6 +359,7 @@ Usp.showLogin = function () {
                     Usp.showMain();
                 };
                 // Charge les paramètres globaux (mode + préfixe + favicon) puis ouvre l'application.
+                var chargerParams = function () {
                 Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
                     success: function (r) {
                         Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
@@ -339,6 +373,13 @@ Usp.showLogin = function () {
                                     }, failure: ouvrir });
                             }, failure: ouvrir });
                     }, failure: ouvrir });
+                };
+                // Permissions effectives (menus + actions) -> pilotent menus et boutons.
+                Usp.ajax({ url: '/permissions/me', method: 'GET',
+                    success: function (rp) {
+                        Usp.perms = Ext.decode(rp.responseText) || {};
+                        chargerParams();
+                    }, failure: function () { Usp.perms = null; chargerParams(); } });
             },
             failure: function () {
                 loader.style.display = 'none';
@@ -362,7 +403,7 @@ Usp._clientStores = [];
 
 Usp.createClientStore = function (actif) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'commune',
+        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'tournee', 'commune',
                  'emailPrincipal', 'statut', 'segmentationId', 'actif'],
         pageSize: 25,
         proxy: {
@@ -469,9 +510,11 @@ Usp.clientsGrid = function (actif) {
     ];
     if (actif) {
         tbar.push('->',
-            { text: '➕ Nouveau client', tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } },
+            Usp.permBtn('clients', 'CREER', { text: '➕ Nouveau client',
+              tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } }),
             { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            { text: '📥 Importer Excel/CSV', tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport });
+            Usp.permBtn('clients', 'CREER', { text: '📥 Importer Excel/CSV',
+              tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport }));
     }
 
     return {
@@ -517,7 +560,7 @@ Usp.clientActif = function (rec, actif) {
                 Usp.reloadClients();
                 Usp.toast('Compte « ' + nom + ' » ' + (actif ? 'réactivé' : 'désactivé') + ' avec succès.');
             },
-            failure: function () { Ext.Msg.alert('Erreur', 'Opération impossible.'); } });
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
     };
     if (actif) { faire(); return; }
     Ext.Msg.confirm('Désactiver', 'Désactiver le compte « ' + Ext.String.htmlEncode(nom) +
@@ -578,12 +621,18 @@ Usp.segmentationsManager = function () {
                   renderer: function () { return '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
             ],
             tbar: [
-                { text: 'Nouvelle segmentation', handler: function () { form(null); } },
+                Usp.permBtn('clients', 'CREER', { text: 'Nouvelle segmentation', handler: function () { form(null); } }),
+                Usp.permBtn('clients', 'MODIFIER', { text: '✏️ Modifier', handler: function (b) {
+                    var rec = b.up('grid').getSelectionModel().getSelection()[0];
+                    if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une segmentation.'); return; }
+                    form(rec);
+                } }),
                 { text: 'Rafraîchir', handler: function () { store.load(); } }
             ],
             listeners: {
                 cellclick: function (g, td, ci, rec, tr, ri, e) {
                     if (e.getTarget('.seg-del')) {
+                        if (!Usp.can('clients', 'SUPPRIMER')) { Usp.refusPermission(); return; }
                         // Désactive une segmentation utilisée par des clients (au lieu de la supprimer).
                         var desactiver = function () {
                             var data = rec.getData();
@@ -636,25 +685,49 @@ Usp.segmentationCombo = function (cfg) {
         queryMode: 'local', editable: false, anchor: '100%' }, cfg || {});
 };
 
+/* Combo d'un référentiel géographique (PAYS/REGION/VILLE/COMMUNE/AGENCE).
+ * La valeur stockée est le libellé ; saisie libre autorisée (forceSelection:false) :
+ * une valeur nouvelle est enregistrée automatiquement dans le référentiel au save. */
+Usp.referentielCombo = function (type, cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'libelle', displayField: 'libelle',
+        queryMode: 'local', forceSelection: false, anchor: '100%',
+        emptyText: 'Sélectionner ou saisir…' }, cfg || {});
+};
+
 Usp.clientForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le client' : 'Nouveau client',
-        width: 520, modal: true, bodyPadding: 12, autoScroll: true,
+        width: 700, modal: true, bodyPadding: 12, autoScroll: false,
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, layout: 'column',
+            defaults: { columnWidth: 0.5, xtype: 'container', layout: 'anchor', border: false,
+                        defaults: { anchor: '96%', labelWidth: 95 } },
             items: [
-                { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
-                { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
-                { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
-                { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
-                { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
-                Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
-                { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
-                { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
-                { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
-                { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
-                  store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
-                { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
+                { items: [
+                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
+                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
+                    Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
+                    Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
+                    { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
+                    { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' }
+                ] },
+                { items: [
+                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
+                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville',
+                        value: rec ? undefined : 'Abidjan' }),
+                    Usp.referentielCombo('COMMUNE', { name: 'commune', fieldLabel: 'Commune' }),
+                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays',
+                        value: rec ? undefined : 'Côte d\'Ivoire' }),
+                    { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
+                      store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
+                    { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
+                ] }
             ]
         }],
         buttons: [{
@@ -698,8 +771,9 @@ Usp.clientForm = function (store, rec) {
 /* ---------- Contacts d'un client ---------- */
 Usp.contactsWindow = function (clientId, nomCompte) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nomComplet', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
-                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne'],
+        fields: ['id', 'nomComplet', 'civilite', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
+                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne',
+                 'jourNaissance', 'moisNaissance', 'anneeNaissance', 'consentRelationnel'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
             reader: { type: 'json', root: 'data', totalProperty: 'total' } },
@@ -730,13 +804,27 @@ Usp.contactForm = function (clientId, store, rec) {
             xtype: 'form', border: false, defaults: { anchor: '100%' },
             items: [
                 { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
+                { xtype: 'combobox', name: 'civilite', fieldLabel: 'Civilité', queryMode: 'local',
+                  emptyText: 'Aucune (formule générique)', store: ['Dr', 'Pr', 'M.', 'Mme', 'Mlle'] },
                 { xtype: 'textfield', name: 'fonction', fieldLabel: 'Fonction' },
                 { xtype: 'textfield', name: 'telephonePrincipal', fieldLabel: 'Téléphone' },
                 { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',
                   emptyText: 'Format international, ex. 2250700000000' },
                 { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
+                { xtype: 'fieldcontainer', fieldLabel: 'Anniversaire', layout: 'hbox',
+                  items: [
+                    { xtype: 'numberfield', name: 'jourNaissance', emptyText: 'Jour', width: 70, minValue: 1, maxValue: 31 },
+                    { xtype: 'combobox', name: 'moisNaissance', emptyText: 'Mois', width: 120, margin: '0 0 0 6',
+                      editable: false, queryMode: 'local', valueField: 'v', displayField: 't',
+                      store: { fields: ['v', 't'], data: [
+                        { v: 1, t: 'Janvier' }, { v: 2, t: 'Février' }, { v: 3, t: 'Mars' }, { v: 4, t: 'Avril' },
+                        { v: 5, t: 'Mai' }, { v: 6, t: 'Juin' }, { v: 7, t: 'Juillet' }, { v: 8, t: 'Août' },
+                        { v: 9, t: 'Septembre' }, { v: 10, t: 'Octobre' }, { v: 11, t: 'Novembre' }, { v: 12, t: 'Décembre' }] } },
+                    { xtype: 'numberfield', name: 'anneeNaissance', emptyText: 'Année', width: 80, margin: '0 0 0 6', hideTrigger: true }
+                  ] },
                 { xtype: 'checkbox', name: 'contactPrincipal', boxLabel: 'Contact principal' },
-                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' }
+                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' },
+                { xtype: 'checkbox', name: 'consentRelationnel', boxLabel: 'Autorise les messages relationnels (anniversaire…)' }
             ]
         }],
         buttons: [{
@@ -748,6 +836,11 @@ Usp.contactForm = function (clientId, store, rec) {
                 data.clientId = clientId;
                 data.contactPrincipal = form.findField('contactPrincipal').getValue();
                 data.consentementWhatsapp = form.findField('consentementWhatsapp').getValue();
+                data.consentRelationnel = form.findField('consentRelationnel').getValue();
+                // Nombres : null si vide (évite l'échec de désérialisation Integer).
+                ['jourNaissance', 'moisNaissance', 'anneeNaissance'].forEach(function (n) {
+                    data[n] = form.findField(n).getValue();
+                });
                 Usp.ajax({
                     url: rec ? '/contacts/' + rec.get('id') : '/contacts',
                     method: rec ? 'PUT' : 'POST', jsonData: data,
@@ -930,7 +1023,10 @@ Usp.MENU = [
     { text: 'Discussions',         view: 'inbox',      icon: '💬', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Comptes clients',     view: 'clients',    icon: '🏢', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR', 'AGENT', 'LECTURE'] },
     { text: 'Catalogue',           view: 'catalogue',  icon: '📦', roles: ['ADMIN', 'CATALOGUE', 'LECTURE'] },
-    { text: 'Promotions',          view: 'promotions', icon: '🏷️', roles: ['ADMIN', 'CATALOGUE'] },
+    { text: 'Promotions',          view: 'promotions', icon: '🏷️', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
+    { text: 'Marketing',           view: 'marketing',  icon: '📣', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
+    { text: 'Disponibilités & Ruptures', view: 'dispo', icon: '📦', roles: ['ADMIN', 'MARKETING', 'CATALOGUE'] },
+    { text: 'Informations Clients', view: 'infos', icon: '📨', roles: ['ADMIN', 'MARKETING', 'SUPERVISEUR'] },
     { text: 'Campagnes',           view: 'campaigns',  icon: '🚀', roles: ['ADMIN', 'MARKETING'] },
     { text: 'WhatsApp Web',        view: 'waweb',      iconHtml: Usp.ICON_WA, roles: ['ADMIN', 'MARKETING'] },
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
@@ -944,6 +1040,58 @@ Usp.canSee = function (roles) {
     var mine = (Usp.user && Usp.user.roles) || [];
     if (mine.indexOf('ADMIN') !== -1) { return true; }
     return roles.some(function (r) { return mine.indexOf(r) !== -1; });
+};
+
+/* Droit fin : l'utilisateur peut-il l'action sur le menu ? ADMIN = tout.
+ * Repli permissif si les permissions n'ont pas pu être chargées (ne rien bloquer). */
+Usp.can = function (menu, action) {
+    var mine = (Usp.user && Usp.user.roles) || [];
+    if (mine.indexOf('ADMIN') !== -1) { return true; }
+    if (!Usp.perms) { return true; }
+    var acts = Usp.perms[menu];
+    return !!acts && acts.indexOf(action) !== -1;
+};
+
+/* Pastille « droit non accordé » (HTML) à accoler au libellé d'un bouton.
+ * Vide si l'action est autorisée. */
+Usp.permBadge = function (menu, action) {
+    if (Usp.can(menu, action)) { return ''; }
+    return ' <span style="color:#e74c3c;font-size:11px;vertical-align:middle"' +
+           ' title="Droit non accordé : ' + action + ' sur ' + menu + '">●</span>';
+};
+
+/* Prépare une config de bouton : si l'action n'est pas autorisée, ajoute une
+ * pastille au libellé et un libellé d'aide, SANS toucher au handler (le clic
+ * conserve son comportement habituel, qui aboutira au refus serveur clair). */
+Usp.permBtn = function (menu, action, cfg) {
+    cfg = cfg || {};
+    if (!Usp.can(menu, action)) {
+        cfg.text = (cfg.text || '') + Usp.permBadge(menu, action);
+        cfg.tooltip = (cfg.tooltip ? cfg.tooltip + ' — ' : '') + 'Droit non accordé (' + action + ')';
+        // Bloque l'action au clic et informe l'utilisateur (il ne peut pas poursuivre).
+        cfg.handler = function () { Usp.refusPermission(); };
+    }
+    return cfg;
+};
+
+/* Extrait le message d'erreur explicite renvoyé par le serveur ({erreur:...}),
+ * avec repli si la réponse n'est pas exploitable. */
+Usp.erreurServeur = function (resp, repli) {
+    try {
+        var r = Ext.decode(resp.responseText);
+        if (r && r.erreur) { return r.erreur; }
+    } catch (e) { /* réponse non JSON */ }
+    return repli || 'Opération impossible.';
+};
+
+/* Message standard de refus de permission (clic sur une action non autorisée). */
+Usp.refusPermission = function () {
+    Ext.Msg.show({
+        title: 'Action non autorisée',
+        msg: 'Vous n\'avez pas la permission pour cette action.<br>' +
+             'Merci de contacter l\'administrateur de votre système.',
+        buttons: Ext.Msg.OK, icon: Ext.Msg.WARNING
+    });
 };
 
 /* Pastille sur l'onglet actif d'un tabpanel. */
@@ -960,7 +1108,10 @@ Usp.tabListeners = {
 };
 
 Usp.menuChildren = function () {
-    return Usp.MENU.filter(function (m) { return Usp.canSee(m.roles); })
+    return Usp.MENU.filter(function (m) {
+            // Permissions chargées : visibilité par droit « VOIR » ; sinon repli par rôle.
+            return Usp.perms ? Usp.can(m.view, 'VOIR') : Usp.canSee(m.roles);
+        })
         .map(function (m) {
             var pre = m.iconHtml ? m.iconHtml + ' ' : (m.icon ? m.icon + '  ' : '');
             var t = pre + m.text;
@@ -981,7 +1132,10 @@ Usp.ouvrirVue = function (vue) {
     switch (vue) {
         case 'inbox': Usp.loadCenter(Usp.inbox.panel()); break;
         case 'catalogue': Usp.loadCenter(Usp.catalogue.panel()); break;
-        case 'promotions': Usp.loadCenter(Usp.catalogue.promotionsPanel()); break;
+        case 'promotions': Usp.loadCenter(Usp.marketing.promotionsPanel()); break;
+        case 'marketing': Usp.loadCenter(Usp.marketing.panel()); break;
+        case 'dispo': Usp.loadCenter(Usp.dispo.panel()); break;
+        case 'infos': Usp.loadCenter(Usp.info.panel()); break;
         case 'campaigns': Usp.loadCenter(Usp.campaign.listPanel()); break;
         case 'waweb': Usp.loadCenter(Usp.waweb.tabs()); break;
         case 'historique': Usp.loadCenter(Usp.history.panel()); break;
@@ -1024,6 +1178,10 @@ Usp.showMain = function () {
                           if (el) { Usp.renderAnimatedLetters(el, el.textContent, 'pl-animated-text--brand'); }
                       } } },
                     '->',
+                    { xtype: 'button', itemId: 'uspEscaladeBadge', hidden: true, cls: 'usp-escalade-badge',
+                      margin: '0 10 0 0',
+                      tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
+                      handler: function () { Usp.escalades.ouvrir(); } },
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
@@ -1080,6 +1238,64 @@ Usp.showMain = function () {
             }
         ]
     });
+    // Surveillance des escalades du bot (notification aux agents).
+    Usp.escalades.demarrer();
+};
+
+/* ------------------------------------------------------------------
+ * Notification d'escalade du bot : badge header + toast lorsqu'une
+ * discussion passe en « À reprendre » (le bot a passé la main).
+ * ------------------------------------------------------------------ */
+Usp.escalades = {
+    _task: null,
+    _dernierTotal: 0,
+    _init: false,
+    demarrer: function () {
+        if (this._task) { return; }
+        if (!Usp.canSee(['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'])) { return; }
+        var self = this;
+        this._task = Ext.TaskManager.start({ interval: 20000, run: function () { self.verifier(); } });
+        this.verifier();
+    },
+    arreter: function () {
+        if (this._task) { Ext.TaskManager.stop(this._task); this._task = null; }
+    },
+    verifier: function () {
+        if (!Usp.token) { return; }
+        var self = this;
+        Usp.ajax({ url: '/conversations?statut=A_REPRENDRE&limit=5', method: 'GET',
+            success: function (resp) {
+                var r = Ext.decode(resp.responseText) || {};
+                var total = r.total || 0;
+                self.majBadge(total);
+                if (self._init && total > self._dernierTotal) {
+                    var data = r.data || [];
+                    var nom = data.length ? (data[0].nomAffiche || data[0].numeroWhatsapp || '') : '';
+                    Usp.toast('🙋 Le bot a passé la main' + (nom ? ' : ' + nom : '') + ' — discussion à reprendre.', 'info');
+                    Usp.beep();
+                }
+                self._dernierTotal = total;
+                self._init = true;
+            }
+        });
+    },
+    majBadge: function (total) {
+        var b = Ext.ComponentQuery.query('#uspEscaladeBadge')[0];
+        if (!b) { return; }
+        if (total > 0) { b.setText('🙋 ' + total + ' à reprendre'); b.show(); }
+        else { b.hide(); }
+    },
+    ouvrir: function () {
+        Usp.ouvrirVue('inbox');
+        // Filtre la liste sur les discussions à reprendre.
+        Ext.defer(function () {
+            var grid = Ext.ComponentQuery.query('#convGrid')[0];
+            if (grid && grid.getStore()) {
+                grid.getStore().getProxy().extraParams = { statut: 'A_REPRENDRE' };
+                grid.getStore().load();
+            }
+        }, 300);
+    }
 };
 
 Usp.loadCenter = function (cmp) {

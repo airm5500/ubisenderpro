@@ -1,6 +1,8 @@
 package com.ubisenderpro.rest;
 
 import com.ubisenderpro.config.WaWebConfig;
+import com.ubisenderpro.entity.Conversation;
+import com.ubisenderpro.service.BotService;
 import com.ubisenderpro.service.WaWebJournalService;
 import com.ubisenderpro.service.WaWebSessionService;
 
@@ -25,6 +27,8 @@ public class WaWebEventResource {
     private WaWebJournalService journal;
     @EJB
     private WaWebSessionService sessionService;
+    @EJB
+    private BotService botService;
 
     @POST
     @Path("/message")
@@ -37,7 +41,11 @@ public class WaWebEventResource {
         String type = body.get("type") == null ? "TEXTE" : str(body.get("type"));
         String text = str(body.get("text"));
         String id = str(body.get("id"));
-        journal.enregistrerEntrant(sid, from, name, type, text, id);
+        Conversation conv = journal.enregistrerEntrant(sid, from, name, type, text, id);
+        // Réponse automatique du bot (messages texte uniquement, hors doublons).
+        if (conv != null && ("TEXTE".equalsIgnoreCase(type) || type == null) && !text.trim().isEmpty()) {
+            botService.traiterEntrant(conv.getId(), text);
+        }
         return Response.ok().build();
     }
 

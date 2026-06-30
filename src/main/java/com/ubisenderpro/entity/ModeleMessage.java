@@ -60,6 +60,22 @@ public class ModeleMessage {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Rôle système d'un modèle prédéfini (ex. PROMO_LANCEMENT), null sinon. */
+    @Column(name = "cle_systeme", length = 40)
+    private String cleSysteme;
+
+    /** Variables (CSV ordonné) injectées dans les paramètres {{1}},{{2}}… d'un template Meta. */
+    @Column(name = "params_corps", length = 500)
+    private String paramsCorps;
+
+    /**
+     * Variables de contexte de la campagne (JSON clé→valeur) figées à la validation :
+     * mois_promotion, date_debut, date_fin, avantage_ug… Utilisées pour remplir les
+     * paramètres d'un template Meta (canal API) qui ne sont pas résolus par contact.
+     */
+    @Column(name = "variables_contexte", columnDefinition = "TEXT")
+    private String variablesContexte;
+
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
@@ -97,4 +113,10 @@ public class ModeleMessage {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getCleSysteme() { return cleSysteme; }
+    public void setCleSysteme(String cleSysteme) { this.cleSysteme = cleSysteme; }
+    public String getParamsCorps() { return paramsCorps; }
+    public void setParamsCorps(String paramsCorps) { this.paramsCorps = paramsCorps; }
+    public String getVariablesContexte() { return variablesContexte; }
+    public void setVariablesContexte(String variablesContexte) { this.variablesContexte = variablesContexte; }
 }

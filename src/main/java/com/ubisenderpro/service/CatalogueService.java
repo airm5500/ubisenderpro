@@ -28,10 +28,102 @@ public class CatalogueService {
         return em.createQuery("SELECT m FROM Marque m ORDER BY m.nom", Marque.class).getResultList();
     }
 
-    public CategorieArticle creerCategorie(CategorieArticle c) { em.persist(c); return c; }
-    public CategorieArticle modifierCategorie(CategorieArticle c) { return em.merge(c); }
-    public Marque creerMarque(Marque m) { em.persist(m); return m; }
-    public Marque modifierMarque(Marque m) { return em.merge(m); }
+    public CategorieArticle creerCategorie(CategorieArticle c) {
+        if (c.getCode() == null || c.getCode().trim().isEmpty()) {
+            c.setCode(Codes.generer("CAT", this::codeCategorieExiste));
+        }
+        em.persist(c);
+        return c;
+    }
+    public CategorieArticle modifierCategorie(CategorieArticle c) {
+        CategorieArticle ex = em.find(CategorieArticle.class, c.getId());
+        if (ex == null) { return null; }
+        if (c.getCode() != null) { ex.setCode(c.getCode()); }
+        if (c.getLibelle() != null) { ex.setLibelle(c.getLibelle()); }
+        ex.setDescription(c.getDescription());
+        return em.merge(ex);
+    }
+    public Marque creerMarque(Marque m) {
+        if (m.getCode() == null || m.getCode().trim().isEmpty()) {
+            m.setCode(Codes.generer("MARQ", this::codeMarqueExiste));
+        }
+        em.persist(m);
+        return m;
+    }
+
+    private boolean codeCategorieExiste(String code) {
+        return !em.createQuery("SELECT c FROM CategorieArticle c WHERE c.code = :c", CategorieArticle.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty();
+    }
+
+    private boolean codeMarqueExiste(String code) {
+        return !em.createQuery("SELECT m FROM Marque m WHERE m.code = :c", Marque.class)
+                .setParameter("c", code).setMaxResults(1).getResultList().isEmpty();
+    }
+    public Marque modifierMarque(Marque m) {
+        Marque ex = em.find(Marque.class, m.getId());
+        if (ex == null) { return null; }
+        if (m.getCode() != null) { ex.setCode(m.getCode()); }
+        if (m.getNom() != null) { ex.setNom(m.getNom()); }
+        ex.setDescription(m.getDescription());
+        return em.merge(ex);
+    }
+
+    /** Supprime une catégorie ; les articles liés sont réaffectés à la catégorie « Standard ». */
+    public void supprimerCategorie(Long id) {
+        CategorieArticle c = em.find(CategorieArticle.class, id);
+        if (c == null) { return; }
+        CategorieArticle defaut = categorieStandard();
+        if (defaut.getId().equals(id)) {
+            throw new ValidationException("categorie", "La catégorie « Standard » ne peut pas être supprimée.");
+        }
+        em.createQuery("UPDATE Article a SET a.categorieId = :def WHERE a.categorieId = :id")
+                .setParameter("def", defaut.getId()).setParameter("id", id).executeUpdate();
+        em.remove(c);
+    }
+
+    /** Supprime une marque ; les articles liés sont réaffectés à la marque « Standard ». */
+    public void supprimerMarque(Long id) {
+        Marque m = em.find(Marque.class, id);
+        if (m == null) { return; }
+        Marque defaut = marqueStandard();
+        if (defaut.getId().equals(id)) {
+            throw new ValidationException("marque", "La marque « Standard » ne peut pas être supprimée.");
+        }
+        em.createQuery("UPDATE Article a SET a.marqueId = :def WHERE a.marqueId = :id")
+                .setParameter("def", defaut.getId()).setParameter("id", id).executeUpdate();
+        em.remove(m);
+    }
+
+    /** Catégorie « Standard » d'affectation par défaut (créée si absente). */
+    public CategorieArticle categorieStandard() {
+        List<CategorieArticle> l = em.createQuery(
+                "SELECT c FROM CategorieArticle c WHERE c.code = :code", CategorieArticle.class)
+                .setParameter("code", "STANDARD").setMaxResults(1).getResultList();
+        if (!l.isEmpty()) { return l.get(0); }
+        CategorieArticle c = new CategorieArticle();
+        c.setCode("STANDARD");
+        c.setLibelle("Standard");
+        c.setActif(true);
+        em.persist(c);
+        em.flush();
+        return c;
+    }
+
+    /** Marque « Standard » d'affectation par défaut (créée si absente). */
+    public Marque marqueStandard() {
+        List<Marque> l = em.createQuery(
+                "SELECT m FROM Marque m WHERE m.code = :code", Marque.class)
+                .setParameter("code", "STANDARD").setMaxResults(1).getResultList();
+        if (!l.isEmpty()) { return l.get(0); }
+        Marque m = new Marque();
+        m.setCode("STANDARD");
+        m.setNom("Standard");
+        m.setActif(true);
+        em.persist(m);
+        em.flush();
+        return m;
+    }
 
     public Optional<CategorieArticle> resoudreCategorie(String libelle, boolean creer) {
         if (libelle == null || libelle.trim().isEmpty()) return Optional.empty();

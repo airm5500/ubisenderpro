@@ -17,6 +17,22 @@ public class ClientContact {
     @Column(name = "nom_complet", nullable = false)
     private String nomComplet;
 
+    /** Civilité / titre (Dr, Pr, M., Mme…) pour les formules de politesse. */
+    @Column(name = "civilite", length = 40)
+    private String civilite;
+
+    /** Anniversaire (§10) : jour, mois (1-12) et année facultative. */
+    @Column(name = "jour_naissance")
+    private Integer jourNaissance;
+    @Column(name = "mois_naissance")
+    private Integer moisNaissance;
+    @Column(name = "annee_naissance")
+    private Integer anneeNaissance;
+
+    /** Autorisation de recevoir les messages relationnels (anniversaire…). */
+    @Column(name = "consent_relationnel", nullable = false)
+    private boolean consentRelationnel = false;
+
     @Column(name = "fonction", length = 150)
     private String fonction;
 
@@ -81,6 +97,16 @@ public class ClientContact {
     public void setClientId(Long clientId) { this.clientId = clientId; }
     public String getNomComplet() { return nomComplet; }
     public void setNomComplet(String nomComplet) { this.nomComplet = nomComplet; }
+    public String getCivilite() { return civilite; }
+    public void setCivilite(String civilite) { this.civilite = civilite; }
+    public Integer getJourNaissance() { return jourNaissance; }
+    public void setJourNaissance(Integer jourNaissance) { this.jourNaissance = jourNaissance; }
+    public Integer getMoisNaissance() { return moisNaissance; }
+    public void setMoisNaissance(Integer moisNaissance) { this.moisNaissance = moisNaissance; }
+    public Integer getAnneeNaissance() { return anneeNaissance; }
+    public void setAnneeNaissance(Integer anneeNaissance) { this.anneeNaissance = anneeNaissance; }
+    public boolean isConsentRelationnel() { return consentRelationnel; }
+    public void setConsentRelationnel(boolean consentRelationnel) { this.consentRelationnel = consentRelationnel; }
     public String getFonction() { return fonction; }
     public void setFonction(String fonction) { this.fonction = fonction; }
     public String getTelephonePrincipal() { return telephonePrincipal; }

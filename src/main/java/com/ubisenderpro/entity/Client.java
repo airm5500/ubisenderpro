@@ -23,6 +23,9 @@ public class Client {
     @Column(name = "region", length = 150)
     private String region;
 
+    @Column(name = "tournee", length = 150)
+    private String tournee;
+
     @Column(name = "email_principal", length = 150)
     private String emailPrincipal;
 
@@ -76,6 +79,8 @@ public class Client {
     public void setAgence(String agence) { this.agence = agence; }
     public String getRegion() { return region; }
     public void setRegion(String region) { this.region = region; }
+    public String getTournee() { return tournee; }
+    public void setTournee(String tournee) { this.tournee = tournee; }
     public String getEmailPrincipal() { return emailPrincipal; }
     public void setEmailPrincipal(String emailPrincipal) { this.emailPrincipal = emailPrincipal; }
     public Long getSegmentationId() { return segmentationId; }

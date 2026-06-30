@@ -1,10 +1,13 @@
 package com.ubisenderpro.config;
 
 import com.ubisenderpro.security.PasswordHasher;
+import com.ubisenderpro.service.ModeleService;
+import com.ubisenderpro.service.PermissionService;
 import org.flywaydb.core.Flyway;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import javax.ejb.EJB;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import javax.ejb.TransactionAttribute;
@@ -31,10 +34,29 @@ public class Bootstrap {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @EJB
+    private ModeleService modeleService;
+
+    @EJB
+    private PermissionService permissionService;
+
     @PostConstruct
     public void init() {
         runMigrations();
         initAdminPassword();
+        // Appel via le proxy EJB -> vraie transaction (REQUIRED) pour la persistance.
+        try {
+            int crees = modeleService.initModelesMarketing();
+            if (crees > 0) { LOG.info("UbiSenderPro : " + crees + " modèle(s) marketing créé(s)."); }
+        } catch (Exception e) {
+            LOG.warning("Initialisation des modèles marketing ignorée : " + e.getMessage());
+        }
+        try {
+            int menus = permissionService.initPermissions();
+            if (menus > 0) { LOG.info("UbiSenderPro : " + menus + " menu(s) et permissions par défaut initialisés."); }
+        } catch (Exception e) {
+            LOG.warning("Initialisation des permissions ignorée : " + e.getMessage());
+        }
     }
 
     private void runMigrations() {
@@ -51,6 +73,10 @@ public class Bootstrap {
                     .locations("classpath:db/migration")
                     .baselineOnMigrate(true)
                     .load();
+            // Auto-réparation : supprime les entrées de migration en échec (DDL MySQL
+            // auto-commit -> application partielle possible) et réaligne les checksums,
+            // avant de relancer la migration. Sans effet lorsque l'historique est sain.
+            flyway.repair();
             flyway.migrate();
             LOG.info("UbiSenderPro : migrations Flyway appliquées.");
         } catch (Exception e) {

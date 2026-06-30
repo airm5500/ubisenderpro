@@ -26,17 +26,26 @@ public class CatalogueResource {
 
     @POST
     @Path("/categories")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "catalogue")
     public Response creerCategorie(CategorieArticle c) {
         return Response.status(Response.Status.CREATED).entity(catalogueService.creerCategorie(c)).build();
     }
 
     @PUT
     @Path("/categories/{id}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "catalogue")
     public Response modifierCategorie(@PathParam("id") Long id, CategorieArticle c) {
         c.setId(id);
-        return Response.ok(catalogueService.modifierCategorie(c)).build();
+        CategorieArticle r = catalogueService.modifierCategorie(c);
+        return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
+    }
+
+    @DELETE
+    @Path("/categories/{id}")
+    @Secured(menu = "catalogue")
+    public Response supprimerCategorie(@PathParam("id") Long id) {
+        catalogueService.supprimerCategorie(id);
+        return Response.noContent().build();
     }
 
     @GET
@@ -45,16 +54,25 @@ public class CatalogueResource {
 
     @POST
     @Path("/marques")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "catalogue")
     public Response creerMarque(Marque m) {
         return Response.status(Response.Status.CREATED).entity(catalogueService.creerMarque(m)).build();
     }
 
     @PUT
     @Path("/marques/{id}")
-    @Secured(roles = {"ADMIN", "CATALOGUE"})
+    @Secured(menu = "catalogue")
     public Response modifierMarque(@PathParam("id") Long id, Marque m) {
         m.setId(id);
-        return Response.ok(catalogueService.modifierMarque(m)).build();
+        Marque r = catalogueService.modifierMarque(m);
+        return r == null ? Response.status(Response.Status.NOT_FOUND).build() : Response.ok(r).build();
+    }
+
+    @DELETE
+    @Path("/marques/{id}")
+    @Secured(menu = "catalogue")
+    public Response supprimerMarque(@PathParam("id") Long id) {
+        catalogueService.supprimerMarque(id);
+        return Response.noContent().build();
     }
 }

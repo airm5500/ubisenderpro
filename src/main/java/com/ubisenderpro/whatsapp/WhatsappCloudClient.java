@@ -234,6 +234,69 @@ public class WhatsappCloudClient {
         return body;
     }
 
+    /** Liste les modèles (templates) du compte Meta : nom, langue, statut, catégorie. */
+    public java.util.List<Map<String, Object>> listerTemplates() {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        if (account.getBusinessAccountId() == null || account.getBusinessAccountId().trim().isEmpty()) {
+            throw new RuntimeException("Le compte n'a pas de « WhatsApp Business Account ID » renseigné.");
+        }
+        HttpURLConnection conn = null;
+        try {
+            String endpoint = String.format(
+                    "https://graph.facebook.com/%s/%s/message_templates?limit=200&fields=name,language,status,category,components",
+                    account.getApiVersion(), account.getBusinessAccountId());
+            conn = (HttpURLConnection) new URL(endpoint).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(20000);
+            conn.setRequestProperty("Authorization", "Bearer " + account.getAccessToken());
+
+            int code = conn.getResponseCode();
+            String reponse = lire(code >= 400 ? conn.getErrorStream() : conn.getInputStream());
+            if (code >= 200 && code < 300) {
+                JsonNode data = MAPPER.readTree(reponse).path("data");
+                for (JsonNode n : data) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("name", n.path("name").asText(""));
+                    m.put("language", n.path("language").asText(""));
+                    m.put("status", n.path("status").asText(""));
+                    m.put("category", n.path("category").asText(""));
+                    // Corps + nombre de paramètres + format d'en-tête (depuis components).
+                    String bodyText = "";
+                    String headerFormat = "";
+                    for (JsonNode comp : n.path("components")) {
+                        String t = comp.path("type").asText("");
+                        if ("BODY".equalsIgnoreCase(t)) { bodyText = comp.path("text").asText(""); }
+                        else if ("HEADER".equalsIgnoreCase(t)) { headerFormat = comp.path("format").asText(""); }
+                    }
+                    m.put("bodyText", bodyText);
+                    m.put("headerFormat", headerFormat);
+                    m.put("nbParams", compterParams(bodyText));
+                    out.add(m);
+                }
+                return out;
+            }
+            throw new RuntimeException(messageErreur(code, reponse));
+        } catch (RuntimeException re) {
+            throw re;
+        } catch (Exception e) {
+            throw new RuntimeException("Récupération des modèles Meta impossible : " + e.getMessage(), e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** Nombre de paramètres positionnels {{1}},{{2}}… d'un corps de template. */
+    private int compterParams(String texte) {
+        if (texte == null || texte.isEmpty()) { return 0; }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{\\{\\s*(\\d+)\\s*\\}\\}").matcher(texte);
+        int max = 0;
+        while (m.find()) {
+            try { max = Math.max(max, Integer.parseInt(m.group(1))); } catch (NumberFormatException ignore) { }
+        }
+        return max;
+    }
+
     private SendResult envoyer(Map<String, Object> body) {
         if (account.isModeTest()) {
             // Mode test : aucun appel à Meta, on simule un envoi réussi.
@@ -264,12 +327,30 @@ public class WhatsappCloudClient {
                 String id = node.path("messages").path(0).path("id").asText(null);
                 return new SendResult(true, id, null);
             }
-            return new SendResult(false, null, "HTTP " + code + " : " + reponse);
+            return new SendResult(false, null, messageErreur(code, reponse));
         } catch (Exception e) {
             return new SendResult(false, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    /** Extrait un message lisible de l'erreur Meta (code + libellé + détails). */
+    private String messageErreur(int code, String reponse) {
+        try {
+            JsonNode err = MAPPER.readTree(reponse).path("error");
+            if (!err.isMissingNode() && !err.isNull()) {
+                int c = err.path("code").asInt(0);
+                String msg = err.path("message").asText("");
+                String details = err.path("error_data").path("details").asText("");
+                StringBuilder sb = new StringBuilder();
+                if (c > 0) { sb.append("Meta ").append(c).append(" : "); }
+                sb.append(msg.isEmpty() ? ("HTTP " + code) : msg);
+                if (!details.isEmpty()) { sb.append(" — ").append(details); }
+                return sb.toString();
+            }
+        } catch (Exception ignore) { /* réponse non-JSON : on retombe sur le brut */ }
+        return "HTTP " + code + " : " + reponse;
     }
 
     private String lire(java.io.InputStream is) {

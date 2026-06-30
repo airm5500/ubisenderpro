@@ -17,7 +17,7 @@ import java.util.List;
  * campagnes, envois de masse WhatsApp Web).
  */
 @Path("/historique")
-@Secured(roles = {"ADMIN", "MARKETING"})
+@Secured(menu = "historique")
 @Produces(MediaType.APPLICATION_JSON)
 public class HistoriqueResource {
 

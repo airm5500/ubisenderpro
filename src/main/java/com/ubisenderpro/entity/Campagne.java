@@ -41,6 +41,30 @@ public class Campagne {
     @Column(name = "segmentation_id")
     private Long segmentationId;
 
+    /** Audience logique (§16) : TOUS_LES_SEGMENTS | DIAMOND | PLATINIUM | ... */
+    @Column(name = "audience", length = 40)
+    private String audience;
+
+    /** Segmentations résolues à cibler (liste d'IDs séparés par des virgules). */
+    @Column(name = "segmentation_ids", length = 255)
+    private String segmentationIds;
+
+    /** Ciblage par agence (audience AGENCE). */
+    @Column(name = "agence_cible", length = 150)
+    private String agenceCible;
+
+    /** Ciblage par région (audience REGION). */
+    @Column(name = "region_cible", length = 150)
+    private String regionCible;
+
+    /** Ciblage par tournée (audience TOURNEE). */
+    @Column(name = "tournee_cible", length = 150)
+    private String tourneeCible;
+
+    /** Sélection manuelle de contacts (IDs séparés par des virgules). */
+    @Column(name = "contact_ids", length = 2000)
+    private String contactIds;
+
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "BROUILLON";
 
@@ -113,6 +137,18 @@ public class Campagne {
     public void setSegmentId(Long segmentId) { this.segmentId = segmentId; }
     public Long getSegmentationId() { return segmentationId; }
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
+    public String getAudience() { return audience; }
+    public void setAudience(String audience) { this.audience = audience; }
+    public String getSegmentationIds() { return segmentationIds; }
+    public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
+    public String getAgenceCible() { return agenceCible; }
+    public void setAgenceCible(String agenceCible) { this.agenceCible = agenceCible; }
+    public String getRegionCible() { return regionCible; }
+    public void setRegionCible(String regionCible) { this.regionCible = regionCible; }
+    public String getTourneeCible() { return tourneeCible; }
+    public void setTourneeCible(String tourneeCible) { this.tourneeCible = tourneeCible; }
+    public String getContactIds() { return contactIds; }
+    public void setContactIds(String contactIds) { this.contactIds = contactIds; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
     public String getCanal() { return canal; }

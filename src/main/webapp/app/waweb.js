@@ -318,7 +318,8 @@ Usp.waweb.bulkPanel = function () {
               emptyText: 'Une ligne par contact : numero;nom\nEx. 2250700000000;Awa' }
         ],
         bbar: ['->',
-            { text: 'Créer / lancer', formBind: true, handler: function (b) {
+            { text: 'Créer / lancer' + Usp.permBadge('waweb', 'ENVOI_MASSE'), formBind: true, handler: function (b) {
+                if (!Usp.can('waweb', 'ENVOI_MASSE')) { Usp.refusPermission(); return; }
                 var formPanel = b.up('form');
                 var f = formPanel.getForm();
                 if (!f.isValid()) { return; }
@@ -434,7 +435,10 @@ Usp.waweb.historyPanel = function () {
         ],
         listeners: {
             cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
-                if (e.getTarget('.wa-relancer')) { Usp.waweb.relancerEchecs(rec.get('id'), store); return; }
+                if (e.getTarget('.wa-relancer')) {
+                    if (!Usp.can('waweb', 'RENVOI_ECHECS')) { Usp.refusPermission(); return; }
+                    Usp.waweb.relancerEchecs(rec.get('id'), store); return;
+                }
                 if (e.getTarget('.wa-det')) { Usp.waweb.detailEnvoi(rec.get('id')); }
             },
             itemdblclick: function (g, rec) { Usp.waweb.detailEnvoi(rec.get('id')); },

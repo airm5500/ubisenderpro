@@ -26,7 +26,7 @@ public class ContactService {
      */
     public List<Map<String, Object>> pourSelection(Long segmentationId, String q, int offset, int limit) {
         StringBuilder jpql = new StringBuilder(
-                "SELECT ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte FROM ClientContact ct, Client cl " +
+                "SELECT ct.id, ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte FROM ClientContact ct, Client cl " +
                 "WHERE ct.clientId = cl.id AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
                 "AND ct.desabonne = false ");
         boolean hasSeg = segmentationId != null;
@@ -44,9 +44,10 @@ public class ContactService {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Object[] r : rows) {
             Map<String, Object> m = new HashMap<>();
-            m.put("numero", r[0]);
-            m.put("nom", r[1]);
-            m.put("client", r[2]);
+            m.put("id", r[0]);
+            m.put("numero", r[1]);
+            m.put("nom", r[2]);
+            m.put("client", r[3]);
             out.add(m);
         }
         return out;

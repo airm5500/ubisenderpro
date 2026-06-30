@@ -15,4 +15,10 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface Secured {
     String[] roles() default {};
+
+    /** Menu requis (RBAC fin). Vide = pas de contrôle par permission. */
+    String menu() default "";
+
+    /** Action requise sur le menu (VOIR, CREER, MODIFIER, SUPPRIMER, DESACTIVER…). */
+    String action() default "";
 }

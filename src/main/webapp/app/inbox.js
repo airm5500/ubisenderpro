@@ -10,7 +10,7 @@ Usp.inbox.msgStore = null;
 
 Usp.inbox.conversationStore = function () {
     return Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroWhatsapp', 'nomAffiche', 'statut', 'agentId', 'canal', 'waWebSessionId',
+        fields: ['id', 'numeroWhatsapp', 'nomAffiche', 'statut', 'botActif', 'agentId', 'canal', 'waWebSessionId',
                  'nonLu', 'dernierMessage', 'dateDernierMessage', 'whatsappAccountId', 'contactId'],
         proxy: {
             type: 'ajax',
@@ -62,7 +62,10 @@ Usp.inbox.panel = function () {
         tbar: [
             { text: '👤 Affecter', tooltip: 'Affecter cette discussion à un agent', handler: function () { Usp.inbox.action('assign'); } },
             { text: '✅ Clôturer', tooltip: 'Marquer la discussion comme traitée (fermée)', handler: function () { Usp.inbox.action('close'); } },
-            { text: '↩️ Rouvrir', tooltip: 'Rouvrir une discussion clôturée', handler: function () { Usp.inbox.action('reopen'); } }
+            { text: '↩️ Rouvrir', tooltip: 'Rouvrir une discussion clôturée', handler: function () { Usp.inbox.action('reopen'); } },
+            '-',
+            { text: '🙋 Reprendre', tooltip: 'Reprendre la main (le bot cesse de répondre sur cette discussion)', handler: function () { Usp.inbox.bot(false); } },
+            { text: '🤖 Rendre au bot', tooltip: 'Réactiver les réponses automatiques du bot sur cette discussion', handler: function () { Usp.inbox.bot(true); } }
         ],
         bbar: [
             { xtype: 'textfield', itemId: 'msgInput', flex: 1, emptyText: 'Écrire un message...',
@@ -102,15 +105,26 @@ Usp.inbox.panel = function () {
 
     var loadConversation = function (rec) {
         Usp.inbox.currentConv = rec;
+        // Privilège « Voir le contenu des discussions » (point 5).
+        if (!Usp.can('inbox', 'VOIR_CONTENU')) {
+            msgStore.removeAll();
+            contactPanel.update('<div style="padding:14px;color:#c62828">🔒 Vous n\'avez pas le droit de voir le ' +
+                'contenu des discussions.<br>Contactez l\'administrateur de votre système.</div>');
+            return;
+        }
         Usp.inbox._msgSig = null; // force le rafraîchissement à l'ouverture
         msgStore.getProxy().url = Usp.apiBase + '/conversations/' + rec.get('id') + '/messages';
         msgStore.load();
         Usp.ajax({ url: '/conversations/' + rec.get('id') + '/read', method: 'POST' });
         if (rec.get('nonLu')) { rec.set('nonLu', 0); } // retire le badge tout de suite
+        var botEtat = rec.get('botActif')
+            ? '<span style="color:#2e7d32">🤖 actif</span>'
+            : '<span style="color:#e65100">🙋 humain (bot en pause)</span>';
         contactPanel.update(
             '<b>' + Ext.String.htmlEncode(rec.get('nomAffiche') || rec.get('numeroWhatsapp')) + '</b><hr/>' +
             '<div><b>Numéro WhatsApp :</b><br/>' + Ext.String.htmlEncode(rec.get('numeroWhatsapp') || '') + '</div><br/>' +
-            '<div><b>Statut :</b> ' + Ext.String.htmlEncode(rec.get('statut') || '') + '</div>');
+            '<div><b>Statut :</b> ' + Ext.String.htmlEncode(rec.get('statut') || '') + '</div>' +
+            '<div><b>Bot :</b> ' + botEtat + '</div>');
     };
 
     return {
@@ -134,12 +148,14 @@ Usp.inbox.panel = function () {
                             'style="float:right;cursor:pointer;color:#c62828;margin-left:6px">🗑️</span>';
                         var badge = rec.get('nonLu') > 0
                             ? '<span style="float:right;background:#25d366;color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-left:6px">' + rec.get('nonLu') + '</span>' : '';
-                        return '<div>' + canal + '<b>' + titre + '</b>' + del + badge + '</div>' +
+                        var repr = rec.get('statut') === 'A_REPRENDRE'
+                            ? '<span title="Le bot a passé la main : à reprendre par un humain" style="background:#ffe0b2;color:#e65100;border-radius:3px;padding:0 4px;font-size:10px;margin-right:4px">🙋 À reprendre</span>' : '';
+                        return '<div>' + repr + canal + '<b>' + titre + '</b>' + del + badge + '</div>' +
                             '<div style="color:#888;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + apercu + '</div>';
                     }
                 }],
                 tbar: [
-                    { xtype: 'button', text: '➕ Nouveau', tooltip: 'Créer un nouveau chat (message texte/image hors modèle)', handler: function () { Usp.inbox.nouveauMessage(); } },
+                    Usp.permBtn('inbox', 'CREER', { xtype: 'button', text: '➕ Nouveau', tooltip: 'Créer un nouveau chat (message texte/image hors modèle)', handler: function () { Usp.inbox.nouveauMessage(); } }),
                     { xtype: 'button', text: '📋 Toutes', tooltip: 'Afficher toutes les discussions', handler: function () { convStore.getProxy().extraParams = {}; convStore.load(); } },
                     { xtype: 'button', text: '🔔 Non lues', tooltip: 'N\'afficher que les discussions ayant des messages non lus', handler: function () { convStore.getProxy().extraParams = { nonLu: true }; convStore.load(); } },
                     '->',
@@ -580,7 +596,22 @@ Usp.inbox.action = function (action) {
     Usp.ajax({ url: '/conversations/' + conv.get('id') + '/' + action, method: 'POST' });
 };
 
+/* Active/désactive le bot sur la conversation courante (#5 bot). */
+Usp.inbox.bot = function (actif) {
+    var conv = Usp.inbox.currentConv;
+    if (!conv) { return; }
+    Usp.ajax({ url: '/conversations/' + conv.get('id') + (actif ? '/bot-on' : '/bot-off'), method: 'POST',
+        success: function () {
+            conv.set('botActif', actif);
+            if (actif && conv.get('statut') === 'A_REPRENDRE') { conv.set('statut', 'OUVERTE'); }
+            Usp.toast(actif ? 'Le bot répondra de nouveau sur cette discussion.'
+                            : 'Vous avez repris la main ; le bot ne répondra plus ici.');
+        },
+        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+};
+
 Usp.inbox.reloadMessages = function () {
+    if (!Usp.can('inbox', 'VOIR_CONTENU')) { return; }
     if (Usp.inbox.msgStore && Usp.inbox.currentConv) {
         Usp.inbox.msgStore.getProxy().url = Usp.apiBase + '/conversations/' + Usp.inbox.currentConv.get('id') + '/messages';
         Usp.inbox.msgStore.load();

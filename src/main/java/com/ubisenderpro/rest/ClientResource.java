@@ -63,7 +63,7 @@ public class ClientResource {
     }
 
     @POST
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "clients")
     public Response creer(Client client, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         Client c = clientService.creer(client);
         auditService.tracer(auth, "CREATION", "Client", c.getId(), c.getNomCompte());
@@ -72,7 +72,7 @@ public class ClientResource {
 
     @PUT
     @Path("/{id}")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "clients")
     public Response modifier(@PathParam("id") Long id, Client client,
                              @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         if (!clientService.parId(id).isPresent()) {
@@ -96,7 +96,7 @@ public class ClientResource {
 
     @POST
     @Path("/{id}/activate")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "clients")
     public Response activer(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         Client c = clientService.definirActif(id, true);
         if (c == null) { return Response.status(Response.Status.NOT_FOUND).build(); }
@@ -106,7 +106,7 @@ public class ClientResource {
 
     @POST
     @Path("/{id}/deactivate")
-    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR"})
+    @Secured(menu = "clients")
     public Response desactiver(@PathParam("id") Long id, @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         Client c = clientService.definirActif(id, false);
         if (c == null) { return Response.status(Response.Status.NOT_FOUND).build(); }
