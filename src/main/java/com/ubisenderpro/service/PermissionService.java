@@ -63,6 +63,12 @@ public class PermissionService {
         LIB_ACTION.put("DESACTIVER", "Activer / Désactiver");
         LIB_ACTION.put("ENVOYER", "Envoyer");
         LIB_ACTION.put("EXPORTER", "Exporter");
+        LIB_ACTION.put("AJUSTER_STOCK", "Ajuster le stock");
+        LIB_ACTION.put("MAJ_PROMO", "Mettre à jour une promo");
+        LIB_ACTION.put("VOIR_CONTENU", "Voir le contenu des discussions");
+        LIB_ACTION.put("VOIR_DETAILS", "Voir les détails");
+        LIB_ACTION.put("ENVOI_MASSE", "Envoyer en masse");
+        LIB_ACTION.put("RENVOI_ECHECS", "Renvoyer après échec");
     }
 
     private static final List<String> ROLES =
@@ -79,6 +85,10 @@ public class PermissionService {
         if (Arrays.asList("campaigns", "marketing", "waweb").contains(code)) { a.add("ENVOYER"); }
         if (Arrays.asList("clients", "historique").contains(code)) { a.add("EXPORTER"); }
         if ("settings".equals(code) && !a.contains("MODIFIER")) { a.add("MODIFIER"); }
+        // Actions spécifiques (point 11 / 5).
+        if ("catalogue".equals(code)) { a.add("AJUSTER_STOCK"); a.add("MAJ_PROMO"); }
+        if ("inbox".equals(code)) { a.add("VOIR_CONTENU"); }
+        if (Arrays.asList("campaigns", "waweb").contains(code)) { a.add("ENVOI_MASSE"); a.add("RENVOI_ECHECS"); }
         return a;
     }
 
@@ -105,43 +115,83 @@ public class PermissionService {
 
     /* ------------------------- Initialisation (Bootstrap) ------------------------- */
 
-    /** Sème menus, actions et permissions par défaut si absents. Idempotent. */
+    /**
+     * Sème/complète menus, actions et permissions, de façon <b>incrémentale et
+     * idempotente</b> : les menus et actions manquants sont ajoutés (ce qui permet
+     * d'introduire de nouvelles actions sans migration), ADMIN reçoit toujours tous
+     * les droits, et les rôles existants ne sont initialisés que la première fois
+     * (pour ne pas écraser les réglages faits dans l'écran « Rôles & permissions »).
+     */
     @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
     public int initPermissions() {
         int crees = 0;
-        Long nbMenus = em.createQuery("SELECT COUNT(m) FROM Menu m", Long.class).getSingleResult();
-        if (nbMenus == 0) {
-            int ordre = 1;
-            for (String[] mc : MENUS) {
+        int ordre = 1;
+        java.util.List<String[]> nouvellesActions = new java.util.ArrayList<>();
+        for (String[] mc : MENUS) {
+            String code = mc[0];
+            // Menu manquant -> créé.
+            if (em.createQuery("SELECT COUNT(m) FROM Menu m WHERE m.code = :c", Long.class)
+                    .setParameter("c", code).getSingleResult() == 0) {
                 Menu m = new Menu();
-                m.setCode(mc[0]); m.setLibelle(mc[1]); m.setOrdre(ordre++); m.setActif(true);
+                m.setCode(code); m.setLibelle(mc[1]); m.setOrdre(ordre); m.setActif(true);
                 em.persist(m);
-                int oa = 1;
-                for (String act : actionsDuMenu(mc[0])) {
-                    MenuAction ma = new MenuAction();
-                    ma.setMenuCode(mc[0]); ma.setActionCode(act);
-                    ma.setLibelle(LIB_ACTION.getOrDefault(act, act)); ma.setOrdre(oa++);
-                    em.persist(ma);
-                }
                 crees++;
             }
+            ordre++;
+            // Actions manquantes -> créées (mémorisées pour l'octroi aux rôles « writers »).
+            int oa = 1;
+            for (String act : actionsDuMenu(code)) {
+                if (em.createQuery("SELECT COUNT(a) FROM MenuAction a WHERE a.menuCode = :m AND a.actionCode = :a", Long.class)
+                        .setParameter("m", code).setParameter("a", act).getSingleResult() == 0) {
+                    MenuAction ma = new MenuAction();
+                    ma.setMenuCode(code); ma.setActionCode(act);
+                    ma.setLibelle(LIB_ACTION.getOrDefault(act, act)); ma.setOrdre(oa);
+                    em.persist(ma);
+                    nouvellesActions.add(new String[]{code, act});
+                }
+                oa++;
+            }
+            // ADMIN : toujours toutes les permissions (y compris les nouvelles).
+            for (String act : actionsDuMenu(code)) {
+                if (!permExiste(ADMIN, code, act)) { em.persist(new RolePermission(ADMIN, code, act)); }
+            }
         }
-        Long nbPerms = em.createQuery("SELECT COUNT(p) FROM RolePermission p", Long.class).getSingleResult();
-        if (nbPerms == 0) {
-            for (String role : ROLES) {
-                for (String[] mc : MENUS) {
-                    String code = mc[0];
-                    if (ADMIN.equals(role) || rolesDuMenu(code).contains(role)) {
-                        for (String act : actionsDuMenu(code)) {
-                            // Lecture seule : uniquement VOIR.
-                            if ("LECTURE".equals(role) && !"VOIR".equals(act)) { continue; }
-                            em.persist(new RolePermission(role, code, act));
-                        }
-                    }
+        // Nouvelle action sur un menu déjà en service : l'accorder aux rôles qui peuvent
+        // déjà y créer (writers), une seule fois, pour ne pas régresser leurs droits.
+        for (String[] na : nouvellesActions) {
+            if ("VOIR".equals(na[1])) { continue; }
+            List<String> writers = em.createQuery(
+                    "SELECT DISTINCT p.roleCode FROM RolePermission p WHERE p.menuCode = :m AND p.actionCode = 'CREER'",
+                    String.class).setParameter("m", na[0]).getResultList();
+            for (String r : writers) {
+                if (!ADMIN.equals(r) && !permExiste(r, na[0], na[1])) {
+                    em.persist(new RolePermission(r, na[0], na[1]));
+                }
+            }
+        }
+        // Rôles non-admin : initialisation par défaut uniquement à la première fois.
+        for (String role : ROLES) {
+            if (ADMIN.equals(role)) { continue; }
+            Long nb = em.createQuery("SELECT COUNT(p) FROM RolePermission p WHERE p.roleCode = :r", Long.class)
+                    .setParameter("r", role).getSingleResult();
+            if (nb > 0) { continue; }
+            for (String[] mc : MENUS) {
+                String code = mc[0];
+                if (!rolesDuMenu(code).contains(role)) { continue; }
+                for (String act : actionsDuMenu(code)) {
+                    if ("LECTURE".equals(role) && !"VOIR".equals(act)) { continue; }
+                    em.persist(new RolePermission(role, code, act));
                 }
             }
         }
         return crees;
+    }
+
+    private boolean permExiste(String role, String menu, String action) {
+        return em.createQuery("SELECT COUNT(p) FROM RolePermission p WHERE p.roleCode = :r " +
+                "AND p.menuCode = :m AND p.actionCode = :a", Long.class)
+                .setParameter("r", role).setParameter("m", menu).setParameter("a", action)
+                .getSingleResult() > 0;
     }
 
     /* ------------------------- Lecture (UI) ------------------------- */

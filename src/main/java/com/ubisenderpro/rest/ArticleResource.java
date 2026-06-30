@@ -59,7 +59,7 @@ public class ArticleResource {
 
     @POST
     @Path("/{id}/stock")
-    @Secured(menu = "catalogue")
+    @Secured(menu = "catalogue", action = "AJUSTER_STOCK")
     public Response ajusterStock(@PathParam("id") Long id, Map<String, Object> body) {
         BigDecimal qte = new BigDecimal(String.valueOf(body.getOrDefault("quantite", "0")));
         String type = (String) body.getOrDefault("type", "AJUSTEMENT_POSITIF");
@@ -86,7 +86,7 @@ public class ArticleResource {
     /** Mise à jour sélective des dates d'une promotion (tous les articles du code promo). */
     @POST
     @Path("/promo")
-    @Secured(menu = "catalogue")
+    @Secured(menu = "catalogue", action = "MAJ_PROMO")
     public Response majPromo(Map<String, Object> body) {
         try {
             String code = body == null ? null : (String) body.get("codePromo");

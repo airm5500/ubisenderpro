@@ -55,12 +55,12 @@ Usp.catalogue.articlesPanel = function () {
                 change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
             '->',
             Usp.permBtn('catalogue', 'CREER', { text: '➕ Nouvel article', tooltip: 'Créer un nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } }),
-            Usp.permBtn('catalogue', 'CREER', { text: 'Ajuster stock', handler: function (b) {
+            Usp.permBtn('catalogue', 'AJUSTER_STOCK', { text: 'Ajuster stock', handler: function (b) {
                 var rec = b.up('grid').getSelectionModel().getSelection()[0];
                 if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un article.'); return; }
                 Usp.catalogue.stockForm(store, rec);
             } }),
-            Usp.permBtn('catalogue', 'CREER', { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } }),
+            Usp.permBtn('catalogue', 'MAJ_PROMO', { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } }),
             Usp.permBtn('catalogue', 'CREER', { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } })
         ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
