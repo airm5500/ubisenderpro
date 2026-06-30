@@ -18,6 +18,9 @@ public class ClientService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @javax.ejb.EJB
+    private ReferentielGeoService referentielGeoService;
+
     public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
                                          Long segmentationId, Boolean actif, int offset, int limit) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
@@ -76,14 +79,29 @@ public class ClientService {
 
     public Client creer(Client client) {
         valider(client, true);
+        canonicaliserGeo(client);
         em.persist(client);
         return client;
     }
 
     public Client modifier(Client client) {
         valider(client, false);
+        canonicaliserGeo(client);
         client.setUpdatedAt(LocalDateTime.now());
         return em.merge(client);
+    }
+
+    /**
+     * Aligne les champs géographiques sur les référentiels : valeur canonique
+     * réutilisée si elle existe (insensible à la casse), sinon créée. Couvre à la
+     * fois la saisie formulaire et l'import (qui passent par creer/modifier).
+     */
+    private void canonicaliserGeo(Client c) {
+        c.setAgence(referentielGeoService.assurer("AGENCE", c.getAgence()));
+        c.setRegion(referentielGeoService.assurer("REGION", c.getRegion()));
+        c.setVille(referentielGeoService.assurer("VILLE", c.getVille()));
+        c.setCommune(referentielGeoService.assurer("COMMUNE", c.getCommune()));
+        c.setPays(referentielGeoService.assurer("PAYS", c.getPays()));
     }
 
     /** Contrôle des champs obligatoires/format du compte client, messages clairs (#6). */

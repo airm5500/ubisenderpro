@@ -669,6 +669,21 @@ Usp.segmentationCombo = function (cfg) {
         queryMode: 'local', editable: false, anchor: '100%' }, cfg || {});
 };
 
+/* Combo d'un référentiel géographique (PAYS/REGION/VILLE/COMMUNE/AGENCE).
+ * La valeur stockée est le libellé ; saisie libre autorisée (forceSelection:false) :
+ * une valeur nouvelle est enregistrée automatiquement dans le référentiel au save. */
+Usp.referentielCombo = function (type, cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'code', 'libelle'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'libelle', displayField: 'libelle',
+        queryMode: 'local', forceSelection: false, anchor: '100%',
+        emptyText: 'Sélectionner ou saisir…' }, cfg || {});
+};
+
 Usp.clientForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le client' : 'Nouveau client',
@@ -681,16 +696,18 @@ Usp.clientForm = function (store, rec) {
                 { items: [
                     { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
                     { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
-                    { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence' },
-                    { xtype: 'textfield', name: 'region', fieldLabel: 'Région' },
+                    Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
+                    Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
                     { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
                     { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' }
                 ] },
                 { items: [
                     Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
-                    { xtype: 'textfield', name: 'ville', fieldLabel: 'Ville' },
-                    { xtype: 'textfield', name: 'commune', fieldLabel: 'Commune' },
-                    { xtype: 'textfield', name: 'pays', fieldLabel: 'Pays' },
+                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville',
+                        value: rec ? undefined : 'Abidjan' }),
+                    Usp.referentielCombo('COMMUNE', { name: 'commune', fieldLabel: 'Commune' }),
+                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays',
+                        value: rec ? undefined : 'Côte d\'Ivoire' }),
                     { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
                       store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
                     { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
