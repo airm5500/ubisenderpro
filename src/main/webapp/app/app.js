@@ -1403,11 +1403,21 @@ Usp.dashboardPanel = function () {
         var ordre = p.ordre || [];
         var caches = p.caches || {};
         var cachesItems = p.cachesItems || {};
+        var ordreItems = p.ordreItems || {};
         var parTitre = {}; SECTIONS.forEach(function (s) { parTitre[s.titre] = s; });
         var out = [];
         ordre.forEach(function (t) { if (parTitre[t]) { out.push(parTitre[t]); delete parTitre[t]; } });
         SECTIONS.forEach(function (s) { if (parTitre[s.titre]) { out.push(s); } });
-        return { liste: out, caches: caches, cachesItems: cachesItems };
+        return { liste: out, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems };
+    }
+    // Indicateurs d'une section, ordonnés selon les préférences (nouveaux à la fin).
+    function itemsOrdonnes(sec, ordreItems) {
+        var ord = ordreItems[sec.titre] || [];
+        var parCle = {}; sec.items.forEach(function (it) { parCle[it.k] = it; });
+        var liste = [];
+        ord.forEach(function (k) { if (parCle[k]) { liste.push(parCle[k]); delete parCle[k]; } });
+        sec.items.forEach(function (it) { if (parCle[it.k]) { liste.push(it); } });
+        return liste;
     }
     var _dernier = {};
     function rendre(d) {
@@ -1416,8 +1426,8 @@ Usp.dashboardPanel = function () {
         var html = '';
         conf.liste.forEach(function (sec) {
             if (conf.caches[sec.titre]) { return; } // section masquée
-            // Indicateurs visibles de la section (hors ceux décochés).
-            var visibles = sec.items.filter(function (it) { return !conf.cachesItems[it.k]; });
+            // Indicateurs de la section, ordonnés puis filtrés (hors ceux décochés).
+            var visibles = itemsOrdonnes(sec, conf.ordreItems).filter(function (it) { return !conf.cachesItems[it.k]; });
             if (!visibles.length) { return; } // section vide -> masquée
             html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
                 'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
@@ -1437,7 +1447,7 @@ Usp.dashboardPanel = function () {
             return {
                 titre: s.titre, text: s.titre, checked: !conf.caches[s.titre],
                 expanded: true, iconCls: 'x-tree-noicon',
-                children: s.items.map(function (it) {
+                children: itemsOrdonnes(s, conf.ordreItems).map(function (it) {
                     return { cle: it.k, text: it.icon + ' ' + it.lib, checked: !conf.cachesItems[it.k],
                         leaf: true, iconCls: 'x-tree-noicon' };
                 })
@@ -1447,21 +1457,24 @@ Usp.dashboardPanel = function () {
             itemId: 'tree', rootVisible: false, useArrows: true, border: false,
             store: Ext.create('Ext.data.TreeStore', { fields: ['text', 'titre', 'cle', 'checked'], root: racine }),
             tbar: [
-                { text: '▲ Monter la section', handler: function (b) { deplacer(b.up('treepanel'), -1); } },
-                { text: '▼ Descendre la section', handler: function (b) { deplacer(b.up('treepanel'), 1); } },
+                { text: '▲ Monter', tooltip: 'Monter la section ou l\'indicateur sélectionné',
+                  handler: function (b) { deplacer(b.up('treepanel'), -1); } },
+                { text: '▼ Descendre', tooltip: 'Descendre la section ou l\'indicateur sélectionné',
+                  handler: function (b) { deplacer(b.up('treepanel'), 1); } },
                 '->',
                 { text: 'Tout cocher', handler: function (b) { basculerTout(b.up('treepanel'), true); } },
                 { text: 'Tout décocher', handler: function (b) { basculerTout(b.up('treepanel'), false); } }
             ]
         });
+        // Déplace la ligne sélectionnée (section OU indicateur) parmi ses voisins de même niveau.
         var deplacer = function (tp, sens) {
             var sel = tp.getSelectionModel().getSelection()[0];
-            var root = tp.getStore().getRootNode();
-            if (!sel || sel.parentNode !== root) { Ext.Msg.alert('Info', 'Sélectionnez une section (ligne de titre).'); return; }
-            if (sens < 0 && sel.previousSibling) { root.insertBefore(sel, sel.previousSibling); }
+            if (!sel) { Ext.Msg.alert('Info', 'Sélectionnez une section ou un indicateur.'); return; }
+            var parent = sel.parentNode;
+            if (sens < 0 && sel.previousSibling) { parent.insertBefore(sel, sel.previousSibling); }
             else if (sens > 0 && sel.nextSibling) {
                 var apres = sel.nextSibling.nextSibling;
-                if (apres) { root.insertBefore(sel, apres); } else { root.appendChild(sel); }
+                if (apres) { parent.insertBefore(sel, apres); } else { parent.appendChild(sel); }
             }
             tp.getSelectionModel().select(sel);
         };
@@ -1477,13 +1490,19 @@ Usp.dashboardPanel = function () {
                     Usp.ecrireDashPrefs({}); b.up('window').close(); rendre(_dernier); } },
                 '->',
                 { text: 'Enregistrer', handler: function (b) {
-                    var ordre = [], caches = {}, cachesItems = {};
+                    var ordre = [], caches = {}, cachesItems = {}, ordreItems = {};
                     tree.getStore().getRootNode().eachChild(function (sec) {
-                        ordre.push(sec.get('titre'));
-                        if (!sec.get('checked')) { caches[sec.get('titre')] = true; }
-                        sec.eachChild(function (it) { if (!it.get('checked')) { cachesItems[it.get('cle')] = true; } });
+                        var titre = sec.get('titre');
+                        ordre.push(titre);
+                        if (!sec.get('checked')) { caches[titre] = true; }
+                        var cles = [];
+                        sec.eachChild(function (it) {
+                            cles.push(it.get('cle'));
+                            if (!it.get('checked')) { cachesItems[it.get('cle')] = true; }
+                        });
+                        ordreItems[titre] = cles;
                     });
-                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches, cachesItems: cachesItems });
+                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems });
                     b.up('window').close(); rendre(_dernier);
                 } }
             ]
