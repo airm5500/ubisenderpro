@@ -61,7 +61,32 @@ public class ClientService {
 
         List<Client> data = q.setFirstResult(offset).setMaxResults(limit).getResultList();
         long total = qc.getSingleResult();
+        renseignerTelephonePrincipal(data);
         return new PageResult<>(data, total);
+    }
+
+    /**
+     * Renseigne le téléphone du contact principal pour chaque client de la page
+     * (une seule requête sur les contacts, contact principal prioritaire, repli
+     * sur le numéro WhatsApp). Champ transient, affiché en liste.
+     */
+    private void renseignerTelephonePrincipal(List<Client> clients) {
+        if (clients == null || clients.isEmpty()) { return; }
+        List<Long> ids = new ArrayList<>();
+        for (Client c : clients) { if (c.getId() != null) { ids.add(c.getId()); } }
+        if (ids.isEmpty()) { return; }
+        List<com.ubisenderpro.entity.ClientContact> contacts = em.createQuery(
+                "SELECT cc FROM ClientContact cc WHERE cc.clientId IN :ids " +
+                "ORDER BY cc.contactPrincipal DESC, cc.id ASC", com.ubisenderpro.entity.ClientContact.class)
+                .setParameter("ids", ids).getResultList();
+        java.util.Map<Long, String> parClient = new java.util.HashMap<>();
+        for (com.ubisenderpro.entity.ClientContact cc : contacts) {
+            if (parClient.containsKey(cc.getClientId())) { continue; } // 1er = principal (tri)
+            String tel = cc.getTelephonePrincipal();
+            if (tel == null || tel.trim().isEmpty()) { tel = cc.getNumeroWhatsapp(); }
+            if (tel != null && !tel.trim().isEmpty()) { parClient.put(cc.getClientId(), tel.trim()); }
+        }
+        for (Client c : clients) { c.setTelephonePrincipal(parClient.get(c.getId())); }
     }
 
     public Optional<Client> parId(Long id) {

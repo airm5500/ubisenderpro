@@ -111,9 +111,9 @@ public class RecReferentielService {
                 }
                 if (entete) { continue; }
             }
+            // Format attendu : code;libellé (sans id). 1 seule colonne = libellé seul.
             String code = null, nom;
-            if (cols.length >= 3) { code = cols[1]; nom = cols[2]; }
-            else if (cols.length == 2) { code = cols[0]; nom = cols[1]; }
+            if (cols.length >= 2) { code = cols[0]; nom = cols[1]; }
             else { nom = cols[0]; }
             if (nom == null || nom.isEmpty() || libelleExiste(t, nom)) { continue; }
             RecReferentiel r = new RecReferentiel();

@@ -226,7 +226,8 @@ Usp.dispo.action = function (rec, action, message) {
 /* Fiche d'un événement : informations + produits (si existant). */
 Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
     var items = [
-        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: rec ? rec.get('code') : '' },
+        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false,
+          value: rec ? rec.get('code') : Usp.codeAuto(), emptyText: 'Généré — modifiable' },
         { xtype: 'combobox', name: 'type', fieldLabel: 'Type', editable: false, queryMode: 'local', allowBlank: false,
           store: Usp.dispo.TYPES, value: rec ? rec.get('type') : (typeParDefaut || 'ANNONCE_DISPONIBILITE') },
         { xtype: 'textfield', name: 'titre', fieldLabel: 'Titre', allowBlank: false, value: rec ? rec.get('titre') : '' },
@@ -235,8 +236,9 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
           value: rec && rec.get('dateDebut') ? Ext.Date.parse(String(rec.get('dateDebut')).substring(0, 10), 'Y-m-d') : null },
         { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateFin') ? Ext.Date.parse(String(rec.get('dateFin')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: rec ? rec.get('agence') : '' },
-        { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: rec ? rec.get('societe') : '' },
+        Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence', value: rec ? rec.get('agence') : '' }),
+        { xtype: 'textfield', name: 'societe', fieldLabel: 'Société',
+          value: rec ? rec.get('societe') : (Usp.societeParDefaut || '') },
         { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
           store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'TOUS_LES_SEGMENTS' },
         { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal d\'envoi', editable: false, queryMode: 'local',
@@ -255,7 +257,7 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
 
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Événement — ' + Ext.String.htmlEncode(rec.get('titre')) : 'Nouvel événement',
-        width: 860, height: rec ? 620 : 360, modal: true,
+        width: 880, height: rec ? 640 : 560, modal: true,
         layout: { type: 'vbox', align: 'stretch' }, bodyPadding: 12,
         maxHeight: Ext.getBody().getViewSize().height - 20,
         items: formItems,
@@ -303,9 +305,8 @@ Usp.dispo.produitsGrid = function (evenementId) {
             { text: 'CIP7', dataIndex: 'cip7', width: 90 },
             { text: 'CIP13', dataIndex: 'cip13', width: 120 },
             { text: 'Produit', dataIndex: 'nomProduit', flex: 1 },
-            { text: 'Qté dispo', dataIndex: 'quantiteDisponible', width: 80, align: 'right' },
-            { text: 'Seuil', dataIndex: 'seuilRupture', width: 70, align: 'right' },
-            { text: 'Statut', dataIndex: 'statut', width: 120, renderer: Usp.dispo.prodStatutRenderer },
+            { text: 'Agence', dataIndex: 'agence', width: 120 },
+            { text: 'Disponibilité', dataIndex: 'statut', width: 130, renderer: Usp.dispo.prodStatutRenderer },
             { text: 'Catalogue', dataIndex: 'articleId', width: 75, align: 'center',
               renderer: function (v) { return v ? '✅' : '—'; } },
             { text: 'Actions', width: 80, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
@@ -365,17 +366,15 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
             { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
             { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
-            { xtype: 'numberfield', name: 'quantiteDisponible', fieldLabel: 'Quantité disponible', minValue: 0, value: rec ? rec.get('quantiteDisponible') : null },
-            { xtype: 'numberfield', name: 'seuilRupture', fieldLabel: 'Seuil de rupture', minValue: 0, value: rec ? rec.get('seuilRupture') : null },
-            { xtype: 'numberfield', name: 'couvertureJours', fieldLabel: 'Couverture estimée (jours)', minValue: 0, value: rec ? rec.get('couvertureJours') : null },
+            // On informe simplement le client : Disponible ou Stock limité (pas de quantité/seuil).
+            { xtype: 'combobox', name: 'dispoStatut', fieldLabel: 'Disponibilité', editable: false, queryMode: 'local',
+              store: [['DISPONIBLE', 'Disponible'], ['STOCK_LIMITE', 'Stock limité']],
+              value: rec && rec.get('stockLimite') ? 'STOCK_LIMITE' : 'DISPONIBLE' },
+            Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence de disponibilité',
+              value: rec ? rec.get('agence') : '', emptyText: 'Toutes les agences (laisser vide)' }),
             { xtype: 'datefield', name: 'datePeremption', fieldLabel: 'Date de péremption', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false,
               value: rec && rec.get('datePeremption') ? Ext.Date.parse(String(rec.get('datePeremption')).substring(0, 10), 'Y-m-d') : null },
             { xtype: 'textfield', name: 'numeroLot', fieldLabel: 'Numéro de lot', value: rec ? rec.get('numeroLot') : '' },
-            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence de disponibilité', value: rec ? rec.get('agence') : '' },
-            { xtype: 'textfield', name: 'lienReservation', fieldLabel: 'Lien de réservation', value: rec ? rec.get('lienReservation') : '' },
-            { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut produit', editable: false, queryMode: 'local',
-              store: Usp.dispo.STATUTS_PROD, value: rec ? rec.get('statut') : '', emptyText: 'Auto (selon type / quantités)' },
-            { xtype: 'checkbox', name: 'stockLimite', fieldLabel: 'Stock limité', checked: rec ? rec.get('stockLimite') : false },
             { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: rec ? rec.get('actif') : true }
         ] }],
         buttons: [
@@ -384,20 +383,17 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var aid = form.findField('articleId').getValue();
+                var dispoStatut = form.findField('dispoStatut').getValue();
                 var payload = {
                     articleId: aid ? Number(aid) : null,
                     cip7: form.findField('cip7').getValue() || null,
                     cip13: form.findField('cip13').getValue() || null,
                     nomProduit: form.findField('nomProduit').getValue() || null,
-                    quantiteDisponible: form.findField('quantiteDisponible').getValue(),
-                    seuilRupture: form.findField('seuilRupture').getValue(),
-                    couvertureJours: form.findField('couvertureJours').getValue(),
                     datePeremption: form.findField('datePeremption').getSubmitValue() || null,
                     numeroLot: form.findField('numeroLot').getValue() || null,
                     agence: form.findField('agence').getValue() || null,
-                    lienReservation: form.findField('lienReservation').getValue() || null,
-                    statut: form.findField('statut').getValue() || null,
-                    stockLimite: form.findField('stockLimite').getValue(),
+                    // Statut calculé côté serveur à partir de « stock limité ».
+                    stockLimite: dispoStatut === 'STOCK_LIMITE',
                     actif: form.findField('actif').getValue()
                 };
                 Usp.ajax({ url: rec ? '/dispo-evenements/' + evenementId + '/produits/' + rec.get('id') : '/dispo-evenements/' + evenementId + '/produits',

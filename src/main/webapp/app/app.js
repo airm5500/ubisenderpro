@@ -369,7 +369,13 @@ Usp.showLogin = function () {
                                 Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
                                     success: function (r3) {
                                         Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
-                                        ouvrir();
+                                        // Société émettrice (Paramètres) : sert de valeur par défaut
+                                        // pré-remplie et modifiable dans les écrans de création.
+                                        Usp.ajax({ url: '/parametres/app.societe', method: 'GET',
+                                            success: function (r4) {
+                                                Usp.societeParDefaut = (Ext.decode(r4.responseText) || {}).valeur || '';
+                                                ouvrir();
+                                            }, failure: ouvrir });
                                     }, failure: ouvrir });
                             }, failure: ouvrir });
                     }, failure: ouvrir });
@@ -404,7 +410,7 @@ Usp._clientStores = [];
 Usp.createClientStore = function (actif) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'tournee', 'commune',
-                 'emailPrincipal', 'statut', 'segmentationId', 'actif'],
+                 'telephonePrincipal', 'emailPrincipal', 'statut', 'segmentationId', 'actif'],
         pageSize: 25,
         proxy: {
             type: 'ajax',
@@ -447,6 +453,8 @@ Usp.clientsPanel = function () {
             Usp.clientsGrid(true),
             // Onglet des comptes désactivés (#10) : réactivation possible d'ici.
             Usp.clientsGrid(false),
+            // Gestion des segmentations désormais en onglet (plus un bouton).
+            Usp.segmentationsGrid(),
             // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
             // numéros vit désormais à côté de la liste des comptes clients.
             Usp.waweb.filterPanel()
@@ -496,7 +504,17 @@ Usp.clientsGrid = function (actif) {
                 return '<span class="cli-on" title="Réactiver ce compte" style="cursor:pointer;color:#2e7d32">✅ Activer</span>';
             } };
 
-    var tbar = [
+    var tbar = [];
+    if (actif) {
+        // « Nouveau client » placé avant la zone de recherche (demande client).
+        tbar.push(
+            Usp.permBtn('clients', 'CREER', { text: '➕ Nouveau client',
+              tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } }),
+            Usp.permBtn('clients', 'CREER', { text: '📥 Importer Excel/CSV',
+              tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport }),
+            '-');
+    }
+    tbar.push(
         { xtype: 'textfield', itemId: 'fQ', emptyText: 'Rechercher...', width: 180,
           listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
         comboSeg, comboAgence, comboCommune,
@@ -506,26 +524,17 @@ Usp.clientsGrid = function (actif) {
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
             tb.down('#fAgence').setValue(null); tb.down('#fCommune').setValue(null);
             store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
-        } }
-    ];
-    if (actif) {
-        tbar.push('->',
-            Usp.permBtn('clients', 'CREER', { text: '➕ Nouveau client',
-              tooltip: 'Créer un nouveau compte client', handler: function () { Usp.clientForm(store, null); } }),
-            { text: '🏷️ Gérer les segmentations', tooltip: 'Ajouter / modifier / supprimer les segmentations', handler: function () { Usp.segmentationsManager(); } },
-            Usp.permBtn('clients', 'CREER', { text: '📥 Importer Excel/CSV',
-              tooltip: 'Importer des comptes clients depuis un fichier', handler: Usp.showImport }));
-    }
+        } });
 
     return {
         xtype: 'grid',
         title: actif ? '🏢 Liste des comptes' : '🚫 Clients désactivés',
         store: store,
         columns: [
-            { text: 'N° client', dataIndex: 'numeroClient', width: 110 },
+            { text: 'Code client', dataIndex: 'numeroClient', width: 110 },
             { text: 'Nom du compte', dataIndex: 'nomCompte', flex: 1 },
+            { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 130 },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
-            { text: 'Commune', dataIndex: 'commune', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
             { text: 'E-mail', dataIndex: 'emailPrincipal', width: 180 },
             { text: 'Statut', dataIndex: 'statut', width: 80 },
@@ -568,7 +577,8 @@ Usp.clientActif = function (rec, actif) {
 };
 
 /* ---------- Gestion des segmentations (CRUD) ---------- */
-Usp.segmentationsManager = function () {
+/* Grille de gestion des segmentations (réutilisée en fenêtre ET en onglet des Comptes clients). */
+Usp.segmentationsGrid = function () {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'libelle', 'description', 'ordreAffichage', 'actif'], autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
@@ -605,12 +615,13 @@ Usp.segmentationsManager = function () {
             } }]
         });
         win.show();
-        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+        if (rec) {
+            var frais = store.getById(rec.get('id')) || rec;
+            win.down('form').getForm().setValues(frais.getData());
+        }
     };
-    Ext.create('Ext.window.Window', {
-        title: 'Segmentations clients', width: 640, height: 440, modal: true, layout: 'fit',
-        items: [{
-            xtype: 'grid', store: store,
+    return {
+            xtype: 'grid', title: '🏷️ Segmentations', store: store,
             columns: [
                 { text: 'Code', dataIndex: 'code', width: 120 },
                 { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
@@ -669,7 +680,14 @@ Usp.segmentationsManager = function () {
                 },
                 itemdblclick: function (g, rec) { form(rec); }
             }
-        }]
+    };
+};
+
+/* Fenêtre de gestion des segmentations (conservée pour compatibilité). */
+Usp.segmentationsManager = function () {
+    Ext.create('Ext.window.Window', {
+        title: 'Segmentations clients', width: 640, height: 440, modal: true, layout: 'fit',
+        items: [Usp.segmentationsGrid()]
     }).show();
 };
 
@@ -710,11 +728,11 @@ Usp.clientForm = function (store, rec) {
                         defaults: { anchor: '96%', labelWidth: 95 } },
             items: [
                 { items: [
-                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Numéro client', allowBlank: false },
+                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client', allowBlank: false },
                     { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
                     Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
                     Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
-                    { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée' },
+                    Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée' }),
                     { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' }
                 ] },
                 { items: [
@@ -1130,6 +1148,12 @@ Usp.periodeValide = function (debut, fin) {
         return false;
     }
     return true;
+};
+
+/* Code par défaut : 4 chiffres aléatoires (modifiable). Préfixe optionnel. */
+Usp.codeAuto = function (prefixe) {
+    var n = Math.floor(1000 + Math.random() * 9000);
+    return prefixe ? (prefixe + '-' + n) : String(n);
 };
 
 /* Pastille sur l'onglet actif d'un tabpanel. */

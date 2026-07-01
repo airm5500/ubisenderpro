@@ -41,6 +41,17 @@ Usp.recouvrement.ouvrirReleve = function (clientId) {
     xhr.send();
 };
 
+/* Combo des segmentations clients existantes (réutilise la même liste que Comptes clients).
+ * La valeur stockée est le libellé, cohérent avec le champ segmentCommercial. */
+Usp.recouvrement.segmentationCombo = function (cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'libelle', displayField: 'libelle',
+        queryMode: 'local', forceSelection: false, editable: false, anchor: '100%' }, cfg || {});
+};
+
 /* Combo de sélection d'un client (recherche distante sur /clients). */
 Usp.recouvrement.clientCombo = function (cfg) {
     var store = Ext.create('Ext.data.Store', {
@@ -187,7 +198,7 @@ Usp.recouvrement.ficheForm = function (store, rec) {
         items.push(Usp.recouvrement.clientCombo({ name: 'clientId', fieldLabel: 'Client', allowBlank: false }));
     }
     items.push(
-        Usp.recouvrement.refCombo('SEGMENT_COMMERCIAL', { name: 'segmentCommercial', fieldLabel: 'Segment commercial' }),
+        Usp.recouvrement.segmentationCombo({ name: 'segmentCommercial', fieldLabel: 'Segment (segmentation client)' }),
         Usp.recouvrement.refCombo('PROFIL_PAIEMENT', { name: 'profilPaiement', fieldLabel: 'Profil de paiement' }),
         Usp.recouvrement.refCombo('STATUT_RECOUVREMENT', { name: 'statut', fieldLabel: 'Statut de recouvrement' }),
         { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable recouvrement' },
@@ -419,24 +430,44 @@ Usp.recouvrement.refGrid = function (type, titre) {
             win.down('form').getForm().setValues(frais.getData());
         }
     };
+    var basculerActif = function (rec) {
+        Usp.ajax({ url: '/recouvrement/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
+            method: 'PUT', success: function () { store.load(); },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
     return {
         xtype: 'grid', title: titre, store: store, flex: 1,
         columns: [
             { text: 'Code', dataIndex: 'code', width: 160 },
-            { text: 'Libellé', dataIndex: 'libelle', flex: 1 }
+            { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+            { text: 'Actif', dataIndex: 'actif', width: 70, align: 'center',
+              renderer: function (v) { return v ? '✅' : '—'; } },
+            { text: 'Actions', width: 200, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  return '<span class="rr-edit" title="Modifier" style="cursor:pointer;margin-right:12px">✏️ Modifier</span>' +
+                      '<span class="rr-act" title="Activer / Désactiver" style="cursor:pointer;color:' +
+                      (rec.get('actif') ? '#c62828' : '#2e7d32') + '">' +
+                      (rec.get('actif') ? '⛔ Désactiver' : '✅ Activer') + '</span>';
+              } }
         ],
         tbar: [
             Usp.permBtn('recouvrement', 'GERER_REFERENTIELS', { text: '➕ Ajouter', handler: function () { form(null); } }),
-            Usp.permBtn('recouvrement', 'GERER_REFERENTIELS', { text: '✏️ Modifier', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
-                form(rec);
-            } }),
             '->',
-            Usp.permBtn('recouvrement', 'IMPORTER', { text: '📥 Importer (CSV id,code,nom)',
+            Usp.permBtn('recouvrement', 'IMPORTER', { text: '📥 Importer (CSV code;libellé)',
                 handler: function () { Usp.recouvrement.importRef(type, store); } }),
             { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
-        ]
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.rr-edit')) {
+                    if (!Usp.can('recouvrement', 'GERER_REFERENTIELS')) { Usp.refusPermission(); return; }
+                    form(rec);
+                } else if (e.getTarget('.rr-act')) {
+                    if (!Usp.can('recouvrement', 'GERER_REFERENTIELS')) { Usp.refusPermission(); return; }
+                    basculerActif(rec);
+                }
+            }
+        }
     };
 };
 
@@ -444,9 +475,9 @@ Usp.recouvrement.importRef = function (type, store) {
     var win = Ext.create('Ext.window.Window', {
         title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Une valeur par ligne : ' +
-                '<b>id,code,nom</b> ou <b>code,nom</b> ou <b>nom</b>. En-tête ignoré.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 170, emptyText: 'DIAMOND,Diamond\nGOLD,Gold' },
+            { xtype: 'displayfield', value: '<span style="color:#888">Une valeur par ligne, format ' +
+                '<b>code;libellé</b> (séparateur <b>;</b>, sans id). Ex. <code>30J;Paiement 30 jours</code>. En-tête ignoré.</span>' },
+            { xtype: 'textareafield', name: 'contenu', height: 170, emptyText: '30J;Paiement 30 jours\nCPT;Comptant' },
             { xtype: 'filefield', fieldLabel: 'ou fichier .csv', msgTarget: 'side',
               listeners: { change: function (f) {
                   var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
@@ -471,7 +502,8 @@ Usp.recouvrement.referentielsPanel = function () {
     return {
         title: '⚙️ Référentiels', xtype: 'panel', layout: 'fit', bodyPadding: 6,
         items: [{ xtype: 'tabpanel', items: [
-            Usp.recouvrement.refGrid('SEGMENT_COMMERCIAL', 'Segments commerciaux'),
+            // Les segments commerciaux réutilisent la segmentation clients existante
+            // (plus de référentiel dédié). On ne paramètre ici que profils et statuts.
             Usp.recouvrement.refGrid('PROFIL_PAIEMENT', 'Profils de paiement'),
             Usp.recouvrement.refGrid('STATUT_RECOUVREMENT', 'Statuts de recouvrement')
         ] }]
@@ -668,7 +700,7 @@ Usp.recouvrement.campagnesPanel = function () {
             { xtype: 'displayfield', value: '<b>Cibler les clients à relancer</b> selon les critères, puis envoyer un modèle.' },
             Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable recouvrement' },
-            Usp.recouvrement.refCombo('SEGMENT_COMMERCIAL', { name: 'segment', fieldLabel: 'Segment commercial' }),
+            Usp.recouvrement.segmentationCombo({ name: 'segment', fieldLabel: 'Segment (segmentation client)' }),
             Usp.recouvrement.refCombo('PROFIL_PAIEMENT', { name: 'profil', fieldLabel: 'Profil de paiement' }),
             { xtype: 'numberfield', name: 'montantMin', fieldLabel: 'Montant dû minimum', hideTrigger: true, minValue: 0 },
             { xtype: 'numberfield', name: 'joursMin', fieldLabel: 'Ancienneté min. (jours retard)', hideTrigger: true, minValue: 0 },

@@ -59,6 +59,10 @@ public class Client {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Téléphone du contact principal (non persisté) : renseigné pour l'affichage en liste. */
+    @javax.persistence.Transient
+    private String telephonePrincipal;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
@@ -91,6 +95,8 @@ public class Client {
     public void setVille(String ville) { this.ville = ville; }
     public String getCommune() { return commune; }
     public void setCommune(String commune) { this.commune = commune; }
+    public String getTelephonePrincipal() { return telephonePrincipal; }
+    public void setTelephonePrincipal(String telephonePrincipal) { this.telephonePrincipal = telephonePrincipal; }
     public String getPays() { return pays; }
     public void setPays(String pays) { this.pays = pays; }
     public String getStatut() { return statut; }

@@ -23,7 +23,7 @@ public class ReferentielGeoService {
 
     /** Types de référentiel autorisés. */
     public static final List<String> TYPES =
-            Arrays.asList("PAYS", "REGION", "VILLE", "COMMUNE", "AGENCE");
+            Arrays.asList("PAYS", "REGION", "VILLE", "COMMUNE", "AGENCE", "TOURNEE");
 
     /** Préfixe de code généré par type. */
     private static String prefixe(String type) {
@@ -33,6 +33,7 @@ public class ReferentielGeoService {
             case "VILLE": return "VILLE";
             case "COMMUNE": return "COM";
             case "AGENCE": return "AG";
+            case "TOURNEE": return "TOUR";
             default: return "GEO";
         }
     }
@@ -139,9 +140,9 @@ public class ReferentielGeoService {
                 premiere = false;
                 if (estEntete(cols)) { continue; }
             }
+            // Format attendu : code;libellé (sans id). 1 seule colonne = libellé seul.
             String code = null, nom;
-            if (cols.length >= 3) { code = cols[1]; nom = cols[2]; }
-            else if (cols.length == 2) { code = cols[0]; nom = cols[1]; }
+            if (cols.length >= 2) { code = cols[0]; nom = cols[1]; }
             else { nom = cols[0]; }
             if (nom == null || nom.isEmpty()) { continue; }
             if (importerUn(t, code, nom)) { crees++; }

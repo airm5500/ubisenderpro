@@ -611,32 +611,38 @@ Usp.settings.refGeoGrid = function (type, titre) {
             win.down('form').getForm().setValues(frais.getData());
         }
     };
+    var basculerActif = function (rec) {
+        Usp.ajax({ url: '/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
+            method: 'PUT', success: function () { store.load(); },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
     return {
         xtype: 'grid', title: titre, store: store, flex: 1,
         columns: [
             { text: 'Code', dataIndex: 'code', width: 160 },
             { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
             { text: 'Actif', dataIndex: 'actif', width: 70, align: 'center',
-              renderer: function (v) { return v ? '✅' : '—'; } }
+              renderer: function (v) { return v ? '✅' : '—'; } },
+            { text: 'Actions', width: 200, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  return '<span class="rg-edit" title="Modifier" style="cursor:pointer;margin-right:12px">✏️ Modifier</span>' +
+                      '<span class="rg-act" title="Activer / Désactiver" style="cursor:pointer;color:' +
+                      (rec.get('actif') ? '#c62828' : '#2e7d32') + '">' +
+                      (rec.get('actif') ? '⛔ Désactiver' : '✅ Activer') + '</span>';
+              } }
         ],
         tbar: [
             { text: '➕ Ajouter', handler: function () { form(null); } },
-            { text: '✏️ Modifier', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
-                form(rec);
-            } },
-            { text: '🗑️ Activer/Désactiver', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
-                Usp.ajax({ url: '/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
-                    method: 'PUT', success: function () { store.load(); },
-                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-            } },
             '->',
-            { text: '📥 Importer (CSV id,code,nom)', handler: function () { Usp.settings.importerRefGeo(type, store); } },
+            { text: '📥 Importer (CSV code;libellé)', handler: function () { Usp.settings.importerRefGeo(type, store); } },
             { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
-        ]
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.rg-edit')) { form(rec); }
+                else if (e.getTarget('.rg-act')) { basculerActif(rec); }
+            }
+        }
     };
 };
 
@@ -650,7 +656,8 @@ Usp.settings.referentielsPanel = function () {
                 Usp.settings.refGeoGrid('REGION', 'Régions'),
                 Usp.settings.refGeoGrid('VILLE', 'Villes'),
                 Usp.settings.refGeoGrid('COMMUNE', 'Communes'),
-                Usp.settings.refGeoGrid('AGENCE', 'Agences')
+                Usp.settings.refGeoGrid('AGENCE', 'Agences'),
+                Usp.settings.refGeoGrid('TOURNEE', 'Tournées')
             ]
         }]
     };
@@ -661,10 +668,10 @@ Usp.settings.importerRefGeo = function (type, store) {
     var win = Ext.create('Ext.window.Window', {
         title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Une ligne par valeur. Colonnes acceptées : ' +
-                '<b>id,code,nom</b> ou <b>code,nom</b> ou <b>nom</b> (séparateur , ou ;). ' +
-                'Une éventuelle ligne d\'en-tête est ignorée.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'CI,Côte d\'Ivoire\nABJ,Abidjan' },
+            { xtype: 'displayfield', value: '<span style="color:#888">Une ligne par valeur, format ' +
+                '<b>code;libellé</b> (séparateur <b>;</b>, <b>sans</b> la colonne id). ' +
+                'Ex. <code>CI;COTE D\'IVOIRE</code>. Une éventuelle ligne d\'en-tête est ignorée.</span>' },
+            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'CI;COTE D\'IVOIRE\nABJ;ABIDJAN' },
             { xtype: 'filefield', buttonOnly: false, fieldLabel: 'ou fichier .csv', msgTarget: 'side',
               listeners: { change: function (f) {
                   var file = f.fileInputEl.dom.files[0]; if (!file) { return; }

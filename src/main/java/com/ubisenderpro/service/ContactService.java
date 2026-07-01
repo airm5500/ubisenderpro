@@ -103,13 +103,38 @@ public class ContactService {
     }
 
     public ClientContact creer(ClientContact contact) {
+        normaliserPrincipal(contact, true);
         em.persist(contact);
         return contact;
     }
 
     public ClientContact modifier(ClientContact contact) {
         contact.setUpdatedAt(LocalDateTime.now());
+        normaliserPrincipal(contact, false);
         return em.merge(contact);
+    }
+
+    /**
+     * Garantit un seul contact principal par client :
+     * - à la création du 1er contact, il devient automatiquement principal ;
+     * - si un contact est marqué principal, les autres du même client sont dé-marqués.
+     */
+    private void normaliserPrincipal(ClientContact contact, boolean creation) {
+        Long clientId = contact.getClientId();
+        if (clientId == null) { return; }
+        if (creation) {
+            long total = em.createQuery(
+                    "SELECT COUNT(c) FROM ClientContact c WHERE c.clientId = :cid", Long.class)
+                    .setParameter("cid", clientId).getSingleResult();
+            if (total == 0) { contact.setContactPrincipal(true); }
+        }
+        if (contact.isContactPrincipal()) {
+            String jpql = "UPDATE ClientContact c SET c.contactPrincipal = false WHERE c.clientId = :cid";
+            if (!creation && contact.getId() != null) { jpql += " AND c.id <> :id"; }
+            javax.persistence.Query q = em.createQuery(jpql).setParameter("cid", clientId);
+            if (!creation && contact.getId() != null) { q.setParameter("id", contact.getId()); }
+            q.executeUpdate();
+        }
     }
 
     public void supprimer(Long id) {

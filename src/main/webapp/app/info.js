@@ -14,15 +14,17 @@ Usp.info.TYPES = [
     ['INFORMATION_GARDE', '🏥 Information de garde'], ['INFORMATION_JOUR_FERIE', '📅 Jour férié'],
     ['MODIFICATION_HORAIRES', '🕒 Modification des horaires'], ['FERMETURE_AGENCE', '🚪 Fermeture d\'agence'],
     ['INFORMATION_GENERALE', '📢 Information générale'], ['ALERTE_URGENTE', '🚨 Alerte urgente'],
+    ['RETRAIT_PRODUIT', '⚠️ Retrait de produit'],
     ['ANNIVERSAIRE_CLIENT', '🎂 Anniversaire client']
 ];
 Usp.info.PRIORITES = [['NORMALE', 'Normale'], ['IMPORTANTE', 'Importante'], ['URGENTE', 'Urgente'], ['CRITIQUE', 'Critique']];
+/* Une seule cible à la fois : chaque audience pilote l'affichage d'UN champ complémentaire. */
 Usp.info.AUDIENCES = [
-    ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
-    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'],
+    ['TOUS_LES_SEGMENTS', 'Tous les segments'],
+    ['SEGMENTS_SELECTIONNES', 'Un segment précis'],
     ['AGENCE', 'Clients de l\'agence'], ['REGION', 'Clients de la région'],
     ['TOURNEE', 'Clients de la tournée'], ['LISTE_DE_DIFFUSION', 'Liste de diffusion'],
-    ['CONTACTS_MANUELS', 'Contacts sélectionnés']
+    ['CONTACTS_MANUELS', 'Sélection manuelle de clients']
 ];
 Usp.info.COULEUR_STATUT = {
     BROUILLON: '#777', EN_ATTENTE: '#777', PROGRAMMEE: '#1976d2', EN_COURS: '#ef6c00',
@@ -130,6 +132,22 @@ Usp.info.action = function (rec, action, message) {
     });
 };
 
+/* Affiche le seul champ complémentaire correspondant à l'audience choisie. */
+Usp.info.majAudience = function (formPanel) {
+    if (!formPanel) { return; }
+    var aud = formPanel.down('[name=audience]');
+    var val = aud ? aud.getValue() : null;
+    var mapping = {
+        SEGMENTS_SELECTIONNES: 'aud_segment', AGENCE: 'aud_agence', REGION: 'aud_region',
+        TOURNEE: 'aud_tournee', LISTE_DE_DIFFUSION: 'aud_liste', CONTACTS_MANUELS: 'aud_contacts'
+    };
+    var visible = mapping[val];
+    ['aud_segment', 'aud_agence', 'aud_region', 'aud_tournee', 'aud_liste', 'aud_contacts'].forEach(function (id) {
+        var f = formPanel.down('#' + id);
+        if (f) { f.setVisible(id === visible); }
+    });
+};
+
 Usp.info.form = function (store, rec, typeParDefaut) {
     var g = function (n) { return rec ? rec.get(n) : null; };
     var dParse = function (n) {
@@ -140,7 +158,8 @@ Usp.info.form = function (store, rec, typeParDefaut) {
         title: rec ? 'Information — ' + Ext.String.htmlEncode(rec.get('titre')) : 'Nouvelle information',
         width: 720, height: Ext.getBody().getViewSize().height - 60, maxHeight: 760, modal: true, layout: 'fit',
         items: [{ xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%', labelWidth: 170 }, items: [
-            { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: g('code') || '' },
+            { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false,
+              value: g('code') || Usp.codeAuto(), emptyText: 'Généré — modifiable' },
             { xtype: 'combobox', name: 'type', fieldLabel: 'Type', editable: false, queryMode: 'local', allowBlank: false,
               store: Usp.info.TYPES, value: g('type') || typeParDefaut || 'INFORMATION_GENERALE' },
             { xtype: 'textfield', name: 'titre', fieldLabel: 'Titre', allowBlank: false, value: g('titre') || '' },
@@ -149,24 +168,28 @@ Usp.info.form = function (store, rec, typeParDefaut) {
             { xtype: 'combobox', name: 'priorite', fieldLabel: 'Priorité', editable: false, queryMode: 'local',
               store: Usp.info.PRIORITES, value: g('priorite') || 'NORMALE' },
             { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-              store: Usp.info.AUDIENCES, value: g('audience') || 'TOUS_LES_SEGMENTS' },
+              store: Usp.info.AUDIENCES, value: g('audience') || 'TOUS_LES_SEGMENTS',
+              listeners: { change: function (c) { Usp.info.majAudience(c.up('form')); } } },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', editable: false, queryMode: 'local',
               store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: g('canal') || 'WEB' },
-            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || '' },
-            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: g('agence') || '',
-              emptyText: 'Sert au texte et au ciblage « Clients de l\'agence »' },
-            { xtype: 'textfield', name: 'region', fieldLabel: 'Région', value: g('region') || '',
-              emptyText: 'Sert au ciblage « Clients de la région »' },
-            { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée', value: g('tournee') || '',
-              emptyText: 'Sert au ciblage « Clients de la tournée »' },
-            { xtype: 'combobox', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
-              valueField: 'id', displayField: 'nom', value: g('listeId'), emptyText: '(si audience = Liste de diffusion)',
+            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || Usp.societeParDefaut || '' },
+            // Champ complémentaire unique, affiché selon l'audience choisie (voir majAudience).
+            Usp.segmentationCombo({ itemId: 'aud_segment', name: 'segmentationId', fieldLabel: 'Segment ciblé',
+                value: g('segmentationId'), hidden: true }),
+            Usp.referentielCombo('AGENCE', { itemId: 'aud_agence', name: 'agence', fieldLabel: 'Agence ciblée',
+                value: g('agence') || '', hidden: true }),
+            Usp.referentielCombo('REGION', { itemId: 'aud_region', name: 'region', fieldLabel: 'Région ciblée',
+                value: g('region') || '', hidden: true }),
+            Usp.referentielCombo('TOURNEE', { itemId: 'aud_tournee', name: 'tournee', fieldLabel: 'Tournée ciblée',
+                value: g('tournee') || '', hidden: true }),
+            { xtype: 'combobox', itemId: 'aud_liste', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
+              valueField: 'id', displayField: 'nom', value: g('listeId'), hidden: true,
               store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
                   proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
                       headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
-            { xtype: 'combobox', multiSelect: true, name: 'contactIds', fieldLabel: 'Contacts sélectionnés',
-              queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom',
-              emptyText: '(si audience = Contacts sélectionnés) — tapez 2 lettres',
+            { xtype: 'combobox', multiSelect: true, itemId: 'aud_contacts', name: 'contactIds', fieldLabel: 'Clients / contacts',
+              queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom', hidden: true,
+              emptyText: 'Tapez 2 lettres pour rechercher…',
               value: g('contactIds') ? String(g('contactIds')).split(',') : [],
               listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } },
               store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero'],
@@ -199,8 +222,9 @@ Usp.info.form = function (store, rec, typeParDefaut) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var v = form.getValues();
-                // listeId : null si non choisi (évite l'échec de désérialisation Long).
+                // listeId / segmentationId : null si non choisi (évite l'échec de désérialisation Long).
                 if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
+                if (v.segmentationId === '' || v.segmentationId == null) { delete v.segmentationId; } else { v.segmentationId = Number(v.segmentationId); }
                 // contactIds (multi-sélection) -> CSV attendu par le serveur.
                 if (Ext.isArray(v.contactIds)) { v.contactIds = v.contactIds.join(','); }
                 Usp.ajax({ url: rec ? '/infos/' + rec.get('id') : '/infos', method: rec ? 'PUT' : 'POST', jsonData: v,
@@ -214,4 +238,5 @@ Usp.info.form = function (store, rec, typeParDefaut) {
         ]
     });
     win.show();
+    Usp.info.majAudience(win.down('form'));
 };
