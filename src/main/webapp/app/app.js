@@ -1095,6 +1095,43 @@ Usp.refusPermission = function () {
     });
 };
 
+/* Lie deux champs date « début » / « fin » d'un formulaire pour contrôler la période
+ * dès la sélection : la fin ne peut être avant le début, le début pas après la fin.
+ * - contraint dynamiquement les bornes des deux champs (feedback immédiat) ;
+ * - marque le champ fautif invalide avec un message clair.
+ * fieldDebut / fieldFin : instances de datefield (ou datetimefield). */
+Usp.lierPeriode = function (fieldDebut, fieldFin) {
+    if (!fieldDebut || !fieldFin) { return; }
+    var MSG = 'La date de fin ne peut pas être antérieure à la date de début.';
+    var verifier = function () {
+        var d = fieldDebut.getValue(), f = fieldFin.getValue();
+        // Bornes dynamiques pour empêcher une sélection incohérente.
+        fieldFin.setMinValue(d || null);
+        fieldDebut.setMaxValue(f || null);
+        if (d && f && f < d) {
+            fieldFin.markInvalid(MSG);
+            return false;
+        }
+        fieldFin.clearInvalid();
+        return true;
+    };
+    fieldDebut.on('change', verifier);
+    fieldFin.on('change', verifier);
+    fieldDebut.on('select', verifier);
+    fieldFin.on('select', verifier);
+    return verifier;
+};
+
+/* Contrôle ponctuel d'une période à l'enregistrement (renvoie true si valide,
+ * sinon affiche un message). Utilisé quand les champs ne sont pas liés en amont. */
+Usp.periodeValide = function (debut, fin) {
+    if (debut && fin && fin < debut) {
+        Ext.Msg.alert('Période invalide', 'La date de fin ne peut pas être antérieure à la date de début.');
+        return false;
+    }
+    return true;
+};
+
 /* Pastille sur l'onglet actif d'un tabpanel. */
 Usp.tabPastille = function (tp, active) {
     if (!tp || !tp.items) { return; }

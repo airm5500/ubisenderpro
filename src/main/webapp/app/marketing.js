@@ -150,6 +150,7 @@ Usp.marketing.promotionForm = function (store, rec) {
         buttons: [{ text: 'Enregistrer', formBind: false, handler: function (b) {
             var form = b.up('window').down('#promoForm').getForm();
             if (!form.isValid()) { return; }
+            if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
             var v = form.getValues();
             Usp.ajax({ url: rec ? '/promotions/' + rec.get('id') : '/promotions',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
@@ -172,6 +173,8 @@ Usp.marketing.promotionForm = function (store, rec) {
         } }]
     });
     win.show();
+    var pForm = win.down('#promoForm').getForm();
+    Usp.lierPeriode(pForm.findField('dateDebut'), pForm.findField('dateFin'));
 };
 
 /* Sous-grille des produits d'une promotion (ajout/modif/suppression + import). */
@@ -678,30 +681,29 @@ Usp.marketing.propositions = function () {
                   }
                   return '';
               } },
-            { text: 'Actions', xtype: 'actioncolumn', width: 150, align: 'center',
-              renderer: function (v, meta, rec) {
-                  if (rec.get('statut') !== 'PROPOSEE') { meta.style = 'color:#bbb'; }
-              },
-              items: [
-                { iconCls: 'x-fa fa-check', tooltip: 'Valider (créer la campagne brouillon)',
-                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
-                  handler: function (g, r, c, i, e, rec) { Usp.marketing.validerProposition(rec, store); } },
-                { iconCls: 'x-fa fa-times', tooltip: 'Rejeter',
-                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
-                  handler: function (g, r, c, i, e, rec) { Usp.marketing.rejeterProposition(rec, store); } },
-                { iconCls: 'x-fa fa-eye', tooltip: 'Voir le message proposé',
-                  handler: function (g, r, c, i, e, rec) {
-                      Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('titre')),
-                          message: '<pre style="white-space:pre-wrap;font-family:inherit">' +
-                                   Ext.String.htmlEncode(rec.get('message') || '') + '</pre>',
-                          buttons: Ext.Msg.OK, width: 460 });
-                  } }
-              ] }
+            { text: 'Actions', width: 200, align: 'left', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  var propose = rec.get('statut') === 'PROPOSEE';
+                  var act = propose
+                      ? '<span class="pm-ok" title="Valider (créer la campagne brouillon)" style="cursor:pointer;color:#2e7d32;margin-right:10px">✅ Valider</span>'
+                        + '<span class="pm-no" title="Rejeter" style="cursor:pointer;color:#c62828;margin-right:10px">✖ Rejeter</span>'
+                      : '';
+                  return act + '<span class="pm-see" title="Voir le message proposé" style="cursor:pointer;color:#1976d2">👁️ Voir</span>';
+              } }
         ],
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 var a = e.getTarget('.pm-gocamp');
-                if (a) { e.preventDefault(); Usp.ouvrirVue('campaigns'); }
+                if (a) { e.preventDefault(); Usp.ouvrirVue('campaigns'); return; }
+                if (e.getTarget('.pm-ok')) { Usp.marketing.validerProposition(rec, store); return; }
+                if (e.getTarget('.pm-no')) { Usp.marketing.rejeterProposition(rec, store); return; }
+                if (e.getTarget('.pm-see')) {
+                    Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('titre')),
+                        msg: '<pre style="white-space:pre-wrap;font-family:inherit">' +
+                             Ext.String.htmlEncode(rec.get('message') || '') + '</pre>',
+                        buttons: Ext.Msg.OK, width: 460 });
+                    return;
+                }
             }
         },
         tbar: [

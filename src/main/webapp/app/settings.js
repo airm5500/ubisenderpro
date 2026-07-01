@@ -604,7 +604,12 @@ Usp.settings.refGeoGrid = function (type, titre) {
             } }]
         });
         win.show();
-        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+        if (rec) {
+            // Toujours repartir de la donnée fraîche du store (évite d'afficher
+            // une valeur périmée après une modification précédente).
+            var frais = store.getById(rec.get('id')) || rec;
+            win.down('form').getForm().setValues(frais.getData());
+        }
     };
     return {
         xtype: 'grid', title: titre, store: store, flex: 1,

@@ -262,6 +262,7 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
         buttons: [{ text: 'Enregistrer', handler: function (b) {
             var form = b.up('window').down('#deForm').getForm();
             if (!form.isValid()) { return; }
+            if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
             var v = form.getValues();
             Usp.ajax({ url: rec ? '/dispo-evenements/' + rec.get('id') : '/dispo-evenements',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
@@ -283,6 +284,8 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
         } }]
     });
     win.show();
+    var dForm = win.down('#deForm').getForm();
+    Usp.lierPeriode(dForm.findField('dateDebut'), dForm.findField('dateFin'));
 };
 
 /* Sous-grille des produits d'un événement. */
