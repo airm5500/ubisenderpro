@@ -455,6 +455,8 @@ Usp.clientsPanel = function () {
             Usp.clientsGrid(false),
             // Gestion des segmentations désormais en onglet (plus un bouton).
             Usp.segmentationsGrid(),
+            // Gestion des listes de diffusion (création + membres).
+            Usp.listesGrid(),
             // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
             // numéros vit désormais à côté de la liste des comptes clients.
             Usp.waweb.filterPanel()
@@ -688,6 +690,100 @@ Usp.segmentationsGrid = function () {
                 itemdblclick: function (g, rec) { form(rec); }
             }
     };
+};
+
+/* Gestion des listes de diffusion (onglet des Comptes clients) : CRUD + membres. */
+Usp.listesGrid = function () {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'description', 'actif'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var form = function (rec) {
+        var win = Ext.create('Ext.window.Window', {
+            title: rec ? 'Modifier la liste' : 'Nouvelle liste de diffusion', width: 460, modal: true, bodyPadding: 12,
+            items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+                { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false },
+                { xtype: 'textfield', name: 'description', fieldLabel: 'Description' },
+                { xtype: 'checkbox', name: 'actif', fieldLabel: 'Active', checked: true }
+            ] }],
+            buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
+                var f = b.up('window').down('form').getForm();
+                if (!f.isValid()) { return; }
+                var v = f.getValues();
+                v.actif = f.findField('actif').getValue();
+                Usp.ajax({ url: rec ? '/lists/' + rec.get('id') : '/lists', method: rec ? 'PUT' : 'POST', jsonData: v,
+                    success: function () { win.close(); store.load(); Usp.toastEnregistre('Liste', !!rec); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }]
+        });
+        win.show();
+        if (rec) { var frais = store.getById(rec.get('id')) || rec; win.down('form').getForm().setValues(frais.getData()); }
+    };
+    return {
+        xtype: 'grid', title: '📇 Listes de diffusion', store: store,
+        columns: [
+            { text: 'Nom', dataIndex: 'nom', flex: 1 },
+            { text: 'Description', dataIndex: 'description', flex: 1 },
+            { text: 'Active', dataIndex: 'actif', width: 70, align: 'center', renderer: function (v) { return v ? '✅' : '—'; } },
+            { text: 'Actions', width: 220, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="ld-edit" title="Modifier" style="cursor:pointer;margin-right:10px">✏️ Modifier</span>' +
+                      '<span class="ld-membres" title="Gérer les membres" style="cursor:pointer;color:#1976d2">👥 Membres</span>';
+              } }
+        ],
+        tbar: [
+            Usp.permBtn('clients', 'CREER', { text: '➕ Nouvelle liste', handler: function () { form(null); } }),
+            { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.ld-edit')) { form(rec); }
+                else if (e.getTarget('.ld-membres')) { Usp.listeMembresWindow(rec); }
+            }
+        }
+    };
+};
+
+/* Fenêtre des membres d'une liste de diffusion : ajout (recherche) + retrait. */
+Usp.listeMembresWindow = function (rec) {
+    var listeId = rec.get('id');
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nomComplet', 'numeroWhatsapp', 'telephonePrincipal'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/lists/' + listeId + '/contacts',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var selCombo = { xtype: 'combobox', itemId: 'selContact', flex: 1, emptyText: 'Rechercher un contact (2 lettres)…',
+        valueField: 'id', displayField: 'nom', queryMode: 'remote', queryParam: 'q', minChars: 2,
+        listConfig: { getInnerTpl: function () { return '<b>{code}</b> {entreprise} <span style="color:#999">{nom}</span>'; } },
+        store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero', 'code', 'entreprise'],
+            proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) };
+    Ext.create('Ext.window.Window', {
+        title: 'Membres — ' + Ext.String.htmlEncode(rec.get('nom')), width: 640, height: 460, modal: true, layout: 'fit',
+        items: [{ xtype: 'grid', store: store,
+            columns: [
+                { text: 'Nom', dataIndex: 'nomComplet', flex: 1 },
+                { text: 'WhatsApp', dataIndex: 'numeroWhatsapp', width: 150 },
+                { text: '', width: 50, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+                  renderer: function () { return '<span class="ldm-del" title="Retirer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
+            ],
+            tbar: [selCombo, { text: '➕ Ajouter', handler: function (b) {
+                var cb = b.up('toolbar').down('#selContact'); var cid = cb.getValue();
+                if (!cid) { Ext.Msg.alert('Info', 'Choisissez un contact.'); return; }
+                Usp.ajax({ url: '/lists/' + listeId + '/contacts', method: 'POST', jsonData: { contactId: cid, source: 'MANUEL' },
+                    success: function () { cb.setValue(null); store.load(); },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }],
+            listeners: { cellclick: function (g, td, ci, r, tr, ri, e) {
+                if (e.getTarget('.ldm-del')) {
+                    Usp.ajax({ url: '/lists/' + listeId + '/contacts/' + r.get('id'), method: 'DELETE',
+                        success: function () { store.load(); },
+                        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                }
+            } }
+        }]
+    }).show();
 };
 
 /* Fenêtre de gestion des segmentations (conservée pour compatibilité). */

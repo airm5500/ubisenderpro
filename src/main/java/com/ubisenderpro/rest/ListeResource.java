@@ -53,4 +53,12 @@ public class ListeResource {
         listeService.ajouterContact(id, contactId, source);
         return Response.ok().build();
     }
+
+    @DELETE
+    @Path("/{id}/contacts/{contactId}")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response retirerContact(@PathParam("id") Long id, @PathParam("contactId") Long contactId) {
+        listeService.retirerContact(id, contactId);
+        return Response.noContent().build();
+    }
 }

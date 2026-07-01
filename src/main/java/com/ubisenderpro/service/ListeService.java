@@ -34,6 +34,12 @@ public class ListeService {
                 .executeUpdate();
     }
 
+    public void retirerContact(Long listeId, Long contactId) {
+        em.createNativeQuery(
+                "DELETE FROM usp_liste_diffusion_contact WHERE liste_id = ?1 AND contact_id = ?2")
+                .setParameter(1, listeId).setParameter(2, contactId).executeUpdate();
+    }
+
     @SuppressWarnings("unchecked")
     public List<ClientContact> contacts(Long listeId) {
         return em.createQuery(

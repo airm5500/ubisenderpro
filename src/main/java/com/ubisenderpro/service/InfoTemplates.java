@@ -120,6 +120,16 @@ public final class InfoTemplates {
                 + "Merci de votre attention.\n\n"
                 + "*{{direction_signataire}}*");
 
+        t("INFO_RETRAIT_PRODUIT", "Info — Retrait de produit", "RETRAIT_PRODUIT",
+                "⚠️ *UBI INFO — RETRAIT DE PRODUIT*\n\n"
+                + "Cher(e) client(e) *{{nom_contact}}*,\n\n"
+                + "Nous vous informons du *retrait* du produit suivant :\n"
+                + "*{{message}}*\n\n"
+                + "Par mesure de précaution, nous vous invitons à *cesser toute dispensation* de ce produit et à *isoler les unités* encore en votre possession.\n\n"
+                + "Nos équipes reviennent vers vous pour les modalités de retour ou d'échange.\n\n"
+                + "Merci pour votre vigilance et votre confiance.\n\n"
+                + "*{{direction_signataire}}*");
+
         t("INFO_ANNIVERSAIRE_CLIENT", "Info — Anniversaire client", "ANNIVERSAIRE_CLIENT",
                 "🎉 *Joyeux anniversaire !* 🎉\n\n"
                 + "*{{civilite_complete}}*,\n\n"
@@ -145,6 +155,7 @@ public final class InfoTemplates {
             case "FERMETURE_AGENCE": return "INFO_FERMETURE_AGENCE";
             case "INFORMATION_GENERALE": return "INFO_INFORMATION_GENERALE";
             case "ALERTE_URGENTE": return "INFO_ALERTE_URGENTE";
+            case "RETRAIT_PRODUIT": return "INFO_RETRAIT_PRODUIT";
             case "ANNIVERSAIRE_CLIENT": return "INFO_ANNIVERSAIRE_CLIENT";
             default: return null;
         }
