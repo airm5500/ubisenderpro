@@ -1483,6 +1483,14 @@ Usp.erreurServeur = function (resp, repli) {
     return repli || 'Opération impossible.';
 };
 
+/* Télécharge un contenu CSV (avec BOM UTF-8 pour Excel). */
+Usp.telechargerCsv = function (nomFichier, contenu) {
+    var uri = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(contenu);
+    var a = document.createElement('a');
+    a.href = uri; a.download = nomFichier;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+
 /* Nettoie un objet de valeurs de formulaire : les chaînes vides deviennent null.
  * Évite les erreurs techniques de désérialisation (dates/nombres vides « "" »)
  * et rend les messages d'erreur explicites plutôt qu'un échec « technique ». */

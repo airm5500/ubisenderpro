@@ -127,12 +127,28 @@ Usp.importer.show = function (type, url, onDone) {
             ]
         }],
         buttons: [
+            { text: '📄 Exporter un exemplaire', tooltip: 'Télécharger un modèle CSV avec les colonnes attendues',
+              handler: function (b) { Usp.importer.exempleCsv(type, champs, b.up('window').down('[name=separateur]').getValue()); } },
             { text: 'Enregistrer ce mapping', handler: function (b) { Usp.importer.saveMapping(b.up('window'), type, champs, mappingStore); } },
             '->',
             { text: 'Lancer l\'import', handler: function (b) { Usp.importer.run(b.up('window'), type, url, champs, fileData, onDone); } }
         ]
     });
     win.show();
+};
+
+/* Génère et télécharge un exemplaire CSV : en-tête = colonnes attendues
+ * (avec * sur les obligatoires) + une ligne d'exemple vide, pour guider la saisie. */
+Usp.importer.exempleCsv = function (type, champs, sep) {
+    sep = sep || ';';
+    var entetes = champs.map(function (c) { return c[0]; });
+    var libelles = champs.map(function (c) { return c[1]; });
+    // 1re ligne : noms de colonnes techniques ; 2e ligne (commentaire) : libellés.
+    var contenu = entetes.join(sep) + '\n' + libelles.join(sep) + '\n';
+    var uri = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(contenu);
+    var a = document.createElement('a');
+    a.href = uri; a.download = 'modele_import_' + String(type).toLowerCase() + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
 };
 
 Usp.importer.collecterMapping = function (win, champs) {

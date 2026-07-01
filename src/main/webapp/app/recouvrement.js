@@ -558,7 +558,10 @@ Usp.recouvrement.importRef = function (type, store) {
                   reader.readAsText(file);
               } } }
         ] }],
-        buttons: [{ text: 'Importer', handler: function (b) {
+        buttons: [{ text: '📄 Exporter un exemplaire', tooltip: 'Télécharger un modèle CSV',
+            handler: function () { Usp.telechargerCsv('modele_' + String(type).toLowerCase() + '.csv',
+                'code;libelle\n30J;Paiement 30 jours\nCPT;Comptant\n'); } },
+        { text: 'Importer', handler: function (b) {
             var contenu = b.up('window').down('[name=contenu]').getValue();
             if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée.'); return; }
             Usp.ajax({ url: '/recouvrement/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
@@ -1038,6 +1041,9 @@ Usp.recouvrement.importPanel = function () {
                 { xtype: 'component', itemId: 'ap_' + type, margin: '2 0 4 0',
                   html: '<span style="color:#888">Aucune donnée pour le moment.</span>' },
                 { xtype: 'fieldcontainer', layout: 'hbox', items: [
+                    { xtype: 'button', text: '📄 Exemplaire', margin: '0 8 0 0',
+                      tooltip: 'Télécharger un modèle CSV pour cette section',
+                      handler: function () { Usp.telechargerCsv('modele_' + type + '.csv', exemple + '\n'); } },
                     { xtype: 'filefield', flex: 1, buttonText: 'Fichier .csv…', buttonOnly: false, msgTarget: 'side',
                       listeners: { change: function (f) {
                           var file = f.fileInputEl.dom.files[0]; if (!file) { return; }

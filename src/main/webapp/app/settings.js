@@ -709,6 +709,9 @@ Usp.settings.importerRefGeo = function (type, store) {
               html: '<span style="color:#888">Aucune ligne à importer pour le moment.</span>' }
         ] }],
         buttons: [
+            { text: '📄 Exporter un exemplaire', tooltip: 'Télécharger un modèle CSV',
+              handler: function () { Usp.telechargerCsv('modele_' + String(type).toLowerCase() + '.csv',
+                  'code;libelle\nCI;COTE D\'IVOIRE\nABJ;ABIDJAN\n'); } },
             { text: 'Annuler', handler: function () { win.close(); } },
             { text: '📥 Importer', handler: function (b) {
                 var contenu = b.up('window').down('[name=contenu]').getValue();
