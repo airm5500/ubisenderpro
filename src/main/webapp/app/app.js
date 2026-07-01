@@ -1542,7 +1542,8 @@ Usp.dashboardPanel = function () {
         };
         var estAdmin = !!(Usp.user && (Usp.user.roles || []).indexOf('ADMIN') !== -1);
         Ext.create('Ext.window.Window', {
-            title: 'Personnaliser le tableau de bord', width: 460,
+            // Assez large pour que tous les boutons du bas soient visibles sans coupe.
+            title: 'Personnaliser le tableau de bord', width: 640,
             height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: true, layout: 'fit',
             items: [tree],
             buttons: [
@@ -1550,7 +1551,7 @@ Usp.dashboardPanel = function () {
                   handler: function (b) {
                     Usp.effacerDashPrefs(); b.up('window').close(); rendre(_dernier); } },
                 // ADMIN : enregistre cette configuration comme défaut pour TOUS (en base).
-                { text: '💾 Définir comme défaut (tous)', hidden: !estAdmin,
+                { text: '💾 Défaut (tous)', hidden: !estAdmin,
                   tooltip: 'Enregistre cette configuration en base : appliquée à tous les utilisateurs sans personnalisation',
                   handler: function (b) {
                     var prefs = collecter();
