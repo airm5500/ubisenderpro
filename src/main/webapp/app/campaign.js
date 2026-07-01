@@ -285,9 +285,12 @@ Usp.campaign._majSynthese = function (store) {
         t.echoues += (c.get('nbEchoues') || 0);
     });
     var tauxLecture = t.envoyes ? Math.round(t.lus / t.envoyes * 100) : 0;
+    // Chaque indicateur dans une carte encadrée (plus lisible).
     var b = function (l, v, couleur) {
-        return '<span style="display:inline-block;text-align:center;min-width:92px;margin:0 8px">' +
-            '<b style="font-size:16px;color:' + (couleur || '#333') + '">' + v + '</b><br>' +
+        return '<span style="display:inline-block;vertical-align:top;text-align:center;min-width:96px;margin:0 6px;' +
+            'padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;' +
+            'box-shadow:0 1px 2px rgba(0,0,0,.05)">' +
+            '<b style="font-size:17px;color:' + (couleur || '#333') + '">' + v + '</b><br>' +
             '<span style="color:#888;font-size:11px">' + l + '</span></span>';
     };
     cmp.update('<div style="font-family:sans-serif;white-space:nowrap;overflow-x:auto">' +

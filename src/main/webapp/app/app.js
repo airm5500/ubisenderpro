@@ -148,6 +148,27 @@ Usp.renderAnimatedLetters = function (target, text, modifier) {
 };
 
 /* ---------- Appels REST avec jeton de session ---------- */
+/* Couleur associée à une segmentation d'après son nom (Gold=or, Argent, etc.),
+ * avec repli déterministe (même nom -> même couleur). */
+Usp.segmentationCouleur = function (nom) {
+    var n = (nom || '').toLowerCase();
+    var map = { gold: '#c9a227', ' or': '#c9a227', 'or ': '#c9a227', platine: '#5f6f80', platinum: '#5f6f80',
+        argent: '#8c9aa3', silver: '#8c9aa3', bronze: '#a0672d', diamant: '#2f9fc4', diamond: '#2f9fc4',
+        vip: '#8e24aa', premium: '#8e24aa', standard: '#607d8b', prospect: '#1976d2',
+        nouveau: '#1976d2', 'fidèle': '#2e7d32', fidele: '#2e7d32', inactif: '#9e9e9e' };
+    if (n === 'or') { return '#c9a227'; }
+    for (var k in map) { if (map.hasOwnProperty(k) && n.indexOf(k.trim()) >= 0) { return map[k]; } }
+    var h = 0; for (var i = 0; i < n.length; i++) { h = (h * 31 + n.charCodeAt(i)) % 360; }
+    return 'hsl(' + h + ',55%,42%)';
+};
+
+/* Pastille colorée d'une segmentation (nom sur fond coloré). */
+Usp.segmentationBadge = function (nom) {
+    if (!nom) { return ''; }
+    return '<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:'
+        + Usp.segmentationCouleur(nom) + ';color:#fff;font-weight:bold">' + Ext.String.htmlEncode(nom) + '</span>';
+};
+
 Usp.ajax = function (options) {
     options.url = Usp.apiBase + options.url;
     options.headers = options.headers || {};
@@ -705,8 +726,8 @@ Usp.clientsGrid = function (actif) {
             { text: 'Nom client', dataIndex: 'nomCompte', flex: 1, renderer: tip },
             { text: 'Entreprise', dataIndex: 'entreprise', width: 160, renderer: tip },
             { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 130 },
-            { text: 'Segmentation', dataIndex: 'segmentationId', width: 120,
-              renderer: function (v) { return Ext.String.htmlEncode(segLib(v)); } },
+            { text: 'Segmentation', dataIndex: 'segmentationId', width: 130,
+              renderer: function (v) { return Usp.segmentationBadge(segLib(v)); } },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
             { text: 'Statut', dataIndex: 'statut', width: 90,
@@ -820,7 +841,8 @@ Usp.segmentationsGrid = function () {
             xtype: 'grid', title: '🏷️ Segmentations', store: store,
             columns: [
                 { text: 'Code', dataIndex: 'code', width: 120 },
-                { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
+                { text: 'Libellé', dataIndex: 'libelle', flex: 1,
+                  renderer: function (v) { return Usp.segmentationBadge(v); } },
                 { text: 'Description', dataIndex: 'description', flex: 1 },
                 { text: 'Ordre', dataIndex: 'ordreAffichage', width: 70 },
                 { text: 'Active', dataIndex: 'actif', width: 70, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
@@ -966,7 +988,11 @@ Usp.listeMembresWindow = function (rec) {
             ],
             tbar: [
                 { text: '➕ Choisir des clients', handler: function () {
-                    Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste', onValider: ajouterClients }); } },
+                    // Exclut les membres déjà présents dans la liste (contactId).
+                    var dejaPresents = [];
+                    store.each(function (r) { if (r.get('id')) { dejaPresents.push(r.get('id')); } });
+                    Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste',
+                        exclureContactIds: dejaPresents, onValider: ajouterClients }); } },
                 { text: '📥 Importer des clients', tooltip: 'Importer des codes clients (un par ligne / CSV)', handler: function () {
                     Usp.importerClientsListe(listeId, function () { store.load(); }); } }
             ],
@@ -1651,6 +1677,17 @@ Usp.clientPicker = function (cfg) {
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
     var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
     var etat = { q: '', agence: '', region: '', seg: '' };
+    // Clients déjà présents (à masquer du sélecteur) : par contactId et/ou clientId.
+    var exclusContact = {}, exclusClient = {};
+    (cfg.exclureContactIds || []).forEach(function (id) { exclusContact[String(id)] = true; });
+    (cfg.exclureClientIds || []).forEach(function (id) { exclusClient[String(id)] = true; });
+    var filtrerExclus = function () {
+        if (!cfg.exclureContactIds && !cfg.exclureClientIds) { return; }
+        store.filterBy(function (rec) {
+            return !exclusContact[String(rec.get('contactId'))] && !exclusClient[String(rec.get('clientId'))];
+        });
+    };
+    store.on('load', filtrerExclus);
     var charger = function () {
         store.getProxy().extraParams = { q: etat.q, agence: etat.agence, region: etat.region, segmentationId: etat.seg };
         store.load();
