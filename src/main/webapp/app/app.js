@@ -524,7 +524,10 @@ Usp.clientsGrid = function (actif) {
     }
     tbar.push(
         { xtype: 'textfield', itemId: 'fQ', emptyText: 'Rechercher...', width: 180,
-          listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
+          listeners: {
+              // Recherche pendant la saisie (anti-rebond) + Entrée conservée.
+              change: { buffer: 400, fn: function (f) { appliquer(f.up('toolbar')); } },
+              specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
         comboSeg, comboAgence, comboRegion,
         { text: '🔎 Filtrer', tooltip: 'Appliquer les filtres sélectionnés', handler: function (b) { appliquer(b.up('toolbar')); } },
         { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
