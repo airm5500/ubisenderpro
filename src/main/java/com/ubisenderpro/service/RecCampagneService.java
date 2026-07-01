@@ -36,12 +36,18 @@ public class RecCampagneService {
     /** Clients ciblés (avec solde et ancienneté) selon les critères. */
     public List<Map<String, Object>> cibler(String agence, String responsable, String segment,
                                             String profil, BigDecimal montantMin, Integer joursMin) {
+        // Le segment peut contenir plusieurs valeurs séparées par des virgules
+        // (composant Audience) : on cible alors avec un IN. 1 valeur => équivaut à =.
+        List<String> segments = new ArrayList<>();
+        if (notBlank(segment)) {
+            for (String s : segment.split(",")) { if (notBlank(s)) { segments.add(s.trim()); } }
+        }
         StringBuilder jpql = new StringBuilder("SELECT f FROM RecFiche f WHERE 1=1");
-        if (notBlank(segment)) { jpql.append(" AND f.segmentCommercial = :seg"); }
+        if (!segments.isEmpty()) { jpql.append(" AND f.segmentCommercial IN :segs"); }
         if (notBlank(profil)) { jpql.append(" AND f.profilPaiement = :prof"); }
         if (notBlank(responsable)) { jpql.append(" AND f.responsable = :resp"); }
         TypedQuery<RecFiche> q = em.createQuery(jpql.toString(), RecFiche.class);
-        if (notBlank(segment)) { q.setParameter("seg", segment); }
+        if (!segments.isEmpty()) { q.setParameter("segs", segments); }
         if (notBlank(profil)) { q.setParameter("prof", profil); }
         if (notBlank(responsable)) { q.setParameter("resp", responsable); }
 
