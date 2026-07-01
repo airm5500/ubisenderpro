@@ -90,7 +90,8 @@ Usp.catalogue.articleForm = function (store, rec) {
             xtype: 'form', border: false, defaults: { anchor: '100%' },
             items: [
                 { xtype: 'textfield', name: 'pscode', fieldLabel: 'PS Code', allowBlank: false },
-                { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false },
+                { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false,
+                  listeners: Usp.majListeners },
                 { xtype: 'textfield', name: 'cip', fieldLabel: 'CIP' },
                 { xtype: 'textfield', name: 'codeBarres', fieldLabel: 'Code-barres' },
                 { xtype: 'numberfield', name: 'prixVente', fieldLabel: 'Prix de vente', allowBlank: false,

@@ -736,9 +736,10 @@ Usp.clientForm = function (store, rec) {
             items: [
                 { items: [
                     { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client', allowBlank: false },
-                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client', allowBlank: false },
+                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client', allowBlank: false,
+                      listeners: Usp.majListeners },
                     { xtype: 'textfield', name: 'entreprise', fieldLabel: 'Entreprise',
-                      emptyText: 'Nom de l\'officine (ex. PHCIE POLAP)' },
+                      emptyText: 'Nom de l\'officine (ex. PHCIE POLAP)', listeners: Usp.majListeners },
                     Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
                     Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
                     Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée' }),
@@ -1159,6 +1160,26 @@ Usp.periodeValide = function (debut, fin) {
     return true;
 };
 
+/* Fenêtre « À propos » : version + développeur (lecture seule, non modifiable). */
+Usp.apropos = function () {
+    Usp.ajax({ url: '/about', method: 'GET', success: function (resp) {
+        var a = {};
+        try { a = Ext.decode(resp.responseText) || {}; } catch (e) {}
+        Ext.Msg.show({
+            title: 'À propos',
+            msg: '<div style="padding:6px 2px;line-height:1.7">' +
+                 '<b>' + Ext.String.htmlEncode(a.application || 'UbiSenderPro') + '</b><br>' +
+                 'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
+                 'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b>' +
+                 '</div>',
+            buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 360
+        });
+    }, failure: function () { Ext.Msg.alert('À propos', 'Informations indisponibles.'); } });
+};
+
+/* Listeners de mise en MAJUSCULES automatique d'un champ (noms clients / produits). */
+Usp.majListeners = { blur: function (f) { var v = f.getValue(); if (v) { f.setValue(String(v).toUpperCase()); } } };
+
 /* Code par défaut : 4 chiffres aléatoires (modifiable). Préfixe optionnel. */
 Usp.codeAuto = function (prefixe) {
     var n = Math.floor(1000 + Math.random() * 9000);
@@ -1273,6 +1294,8 @@ Usp.showMain = function () {
                       margin: '0 10 0 0',
                       tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
                       handler: function () { Usp.escalades.ouvrir(); } },
+                    { xtype: 'button', itemId: 'uspAbout', text: 'ℹ️ À propos', margin: '0 10 0 0',
+                      tooltip: 'Version de l\'application et développeur', handler: function () { Usp.apropos(); } },
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },

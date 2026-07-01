@@ -721,7 +721,7 @@ Usp.marketing.propositionsGrid = function (statut, titre) {
             }
         },
         tbar: ['->',
-            { text: '🔄 Générer maintenant', tooltip: 'Régénère les propositions à partir des promotions', handler: generer },
+            { text: '🔄 Générer les propositions', tooltip: 'Régénère les propositions à partir des promotions', handler: generer },
             { text: '↻ Rafraîchir', handler: function () { store.load(); } }
         ]
     };

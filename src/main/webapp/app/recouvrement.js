@@ -501,7 +501,7 @@ Usp.recouvrement.importRef = function (type, store) {
 
 Usp.recouvrement.referentielsPanel = function () {
     return {
-        title: '⚙️ Référentiels', xtype: 'panel', layout: 'fit', bodyPadding: 6,
+        title: '⚙️ Référentiels relances', xtype: 'panel', layout: 'fit', bodyPadding: 6,
         items: [{ xtype: 'tabpanel', items: [
             // Les segments commerciaux réutilisent la segmentation clients existante
             // (plus de référentiel dédié). On ne paramètre ici que profils et statuts.
