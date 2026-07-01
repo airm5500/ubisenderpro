@@ -245,12 +245,20 @@ public class CampagneService {
                 .setParameter("ids", ids).getResultList();
     }
 
-    /** Contacts joignables d'une agence, région ou tournée (audiences correspondantes). */
+    /**
+     * Contacts joignables d'une (ou plusieurs) agence(s), région(s) ou tournée(s).
+     * {@code valeur} peut contenir une seule valeur OU une liste CSV : dans les deux
+     * cas on utilise un filtre {@code IN} (une seule valeur = comportement identique
+     * à l'égalité — aucune régression).
+     */
     private List<ClientContact> contactsParChamp(String champ, String valeur) {
+        List<String> valeurs = new ArrayList<>();
+        for (String s : valeur.split(",")) { String t = s.trim(); if (!t.isEmpty()) { valeurs.add(t); } }
+        if (valeurs.isEmpty()) { return new ArrayList<>(); }
         return em.createQuery(
                 "SELECT ct FROM ClientContact ct, Client cl WHERE ct.clientId = cl.id " +
-                "AND cl." + champ + " = :v AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
-                ClientContact.class).setParameter("v", valeur).getResultList();
+                "AND cl." + champ + " IN :vals AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> ''",
+                ClientContact.class).setParameter("vals", valeurs).getResultList();
     }
 
     /**

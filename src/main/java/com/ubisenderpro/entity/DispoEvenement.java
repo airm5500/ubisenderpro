@@ -48,6 +48,10 @@ public class DispoEvenement {
     @Column(name = "segmentation_id")
     private Long segmentationId;
 
+    /** Sélection multiple de segments (IDs de segmentation séparés par des virgules). */
+    @Column(name = "segmentation_ids", length = 255)
+    private String segmentationIds;
+
     @Column(name = "canal", length = 10)
     private String canal;
 
@@ -101,6 +105,8 @@ public class DispoEvenement {
     public void setAudience(String audience) { this.audience = audience; }
     public Long getSegmentationId() { return segmentationId; }
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
+    public String getSegmentationIds() { return segmentationIds; }
+    public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
     public String getCanal() { return canal; }
     public void setCanal(String canal) { this.canal = canal; }
     public Long getModeleId() { return modeleId; }

@@ -55,9 +55,9 @@ Usp.campaign.show = function (store) {
         title: '2. Destinataires', bodyPadding: 12, border: false, layout: 'anchor', autoScroll: false,
         defaults: { anchor: '100%', labelWidth: 165 },
         items: [
-            { xtype: 'displayfield', value: 'Ciblez par segmentation client, et/ou liste statique, et/ou segment dynamique.' },
-            Usp.campaign.combo('/segmentations', '', 'id', 'libelle',
-                { name: 'segmentationId', fieldLabel: 'Segmentation client' }),
+            { xtype: 'displayfield', value: 'Ciblez par une ou plusieurs segmentations client, et/ou liste statique, et/ou segment dynamique.' },
+            Usp.multiPicker({ name: 'segmentationIds', fieldLabel: 'Segmentations (une ou plusieurs)',
+                url: '/segmentations', valueField: 'id', displayField: 'libelle' }),
             Usp.campaign.combo('/lists', '', 'id', 'nom',
                 { name: 'listeId', fieldLabel: 'Liste de diffusion' }),
             Usp.campaign.combo('/segments', '', 'id', 'nom',

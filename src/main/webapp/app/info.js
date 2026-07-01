@@ -63,7 +63,7 @@ Usp.info.panel = function () {
 Usp.info.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'region', 'tournee',
-                 'audience', 'segmentationId', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
+                 'audience', 'segmentationId', 'segmentationIds', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
                  'statut', 'responsable', 'creePar', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
                  'causeInterne', 'causeCommunicable', 'dateResolution', 'jourFerie', 'dateGarde',
                  'heureLimiteCommande', 'consignesLivraison', 'pharmacienGarde', 'telephonePharmacien'],
@@ -181,14 +181,16 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: g('canal') || 'WEB' },
             { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || Usp.societeParDefaut || '' },
             // Champ complémentaire unique, affiché selon l'audience choisie (voir majAudience).
-            Usp.segmentationCombo({ itemId: 'aud_segment', name: 'segmentationId', fieldLabel: 'Segment ciblé',
-                value: g('segmentationId'), hidden: true }),
-            Usp.referentielCombo('AGENCE', { itemId: 'aud_agence', name: 'agence', fieldLabel: 'Agence ciblée',
-                value: g('agence') || '', hidden: true }),
-            Usp.referentielCombo('REGION', { itemId: 'aud_region', name: 'region', fieldLabel: 'Région ciblée',
-                value: g('region') || '', hidden: true }),
-            Usp.referentielCombo('TOURNEE', { itemId: 'aud_tournee', name: 'tournee', fieldLabel: 'Tournée ciblée',
-                value: g('tournee') || '', hidden: true }),
+            // Sélection multiple possible (un ou plusieurs) pour chaque type de cible.
+            Usp.multiPicker({ itemId: 'aud_segment', name: 'segmentationIds', fieldLabel: 'Segments ciblés', hidden: true,
+                url: '/segmentations', valueField: 'id', displayField: 'libelle',
+                value: g('segmentationIds') || (g('segmentationId') ? String(g('segmentationId')) : '') }),
+            Usp.multiPicker({ itemId: 'aud_agence', name: 'agence', fieldLabel: 'Agences ciblées', hidden: true,
+                url: '/referentiels/AGENCE', valueField: 'libelle', displayField: 'libelle', value: g('agence') || '' }),
+            Usp.multiPicker({ itemId: 'aud_region', name: 'region', fieldLabel: 'Régions ciblées', hidden: true,
+                url: '/referentiels/REGION', valueField: 'libelle', displayField: 'libelle', value: g('region') || '' }),
+            Usp.multiPicker({ itemId: 'aud_tournee', name: 'tournee', fieldLabel: 'Tournées ciblées', hidden: true,
+                url: '/referentiels/TOURNEE', valueField: 'libelle', displayField: 'libelle', value: g('tournee') || '' }),
             { xtype: 'combobox', itemId: 'aud_liste', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
               valueField: 'id', displayField: 'nom', value: g('listeId'), hidden: true,
               store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,

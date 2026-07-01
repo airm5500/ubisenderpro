@@ -1300,6 +1300,67 @@ Usp.cip7Field = function (valeur) {
     ] };
 };
 
+/* Sélecteur multiple (segments / agences / régions / tournées) : champ résumé +
+ * bouton « ☑ Choisir » ouvrant une fenêtre à cocher (tout cocher / plusieurs).
+ * La valeur est stockée en CSV dans un hiddenfield (name = cfg.name).
+ * cfg : { name, fieldLabel, itemId, hidden, url (référentiel), valueField, displayField, value (CSV) } */
+Usp.multiPicker = function (cfg) {
+    cfg = cfg || {};
+    var current = cfg.value ? String(cfg.value).split(',').map(function (s) { return s.trim(); }).filter(function (x) { return x; }) : [];
+    var store = Ext.create('Ext.data.Store', {
+        fields: [{ name: 'v', mapping: cfg.valueField }, { name: 't', mapping: cfg.displayField }],
+        autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + cfg.url,
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
+    });
+    var container;
+    var resumeHtml = function () {
+        if (!current.length) { return '<span style="color:#999">Aucun sélectionné</span>'; }
+        var labels = current.map(function (v) { var i = store.findExact('v', v); return i >= 0 ? store.getAt(i).get('t') : v; });
+        return Ext.String.htmlEncode(labels.join(', '));
+    };
+    var majResume = function () { if (container) { container.down('#resume').update(resumeHtml()); } };
+    store.on('load', majResume);
+    var ouvrir = function () {
+        var win = Ext.create('Ext.window.Window', {
+            title: cfg.fieldLabel || 'Sélection', width: 380, height: 430, modal: true, layout: 'fit',
+            items: [{ xtype: 'grid', itemId: 'g', store: store, hideHeaders: true,
+                selModel: Ext.create('Ext.selection.CheckboxModel', { checkOnly: true, mode: 'SIMPLE' }),
+                columns: [{ text: '', dataIndex: 't', flex: 1 }] }],
+            tbar: [
+                { text: 'Tout cocher', handler: function (b) { b.up('window').down('#g').getSelectionModel().selectAll(); } },
+                { text: 'Tout décocher', handler: function (b) { b.up('window').down('#g').getSelectionModel().deselectAll(); } }
+            ],
+            buttons: [
+                { text: 'Valider', handler: function (b) {
+                    var sel = b.up('window').down('#g').getSelectionModel().getSelection();
+                    current = sel.map(function (r) { return String(r.get('v')); });
+                    container.down('[name=' + cfg.name + ']').setValue(current.join(','));
+                    majResume(); win.close();
+                } },
+                { text: 'Annuler', handler: function (b) { b.up('window').close(); } }
+            ]
+        });
+        win.show();
+        var g = win.down('#g');
+        var appliquerSel = function () {
+            var sm = g.getSelectionModel(); sm.deselectAll();
+            store.each(function (r) { if (current.indexOf(String(r.get('v'))) !== -1) { sm.select(r, true); } });
+        };
+        if (store.getCount() > 0) { appliquerSel(); }
+        else { store.on('load', appliquerSel, null, { single: true }); if (!store.isLoading()) { store.load(); } }
+    };
+    container = Ext.create('Ext.form.FieldContainer', {
+        fieldLabel: cfg.fieldLabel, layout: 'hbox', hidden: cfg.hidden, itemId: cfg.itemId,
+        items: [
+            { xtype: 'hiddenfield', name: cfg.name, value: current.join(',') },
+            { xtype: 'component', itemId: 'resume', flex: 1, style: 'padding-top:5px', html: resumeHtml() },
+            { xtype: 'button', text: '☑ Choisir', width: 95, margin: '0 0 0 8', handler: ouvrir }
+        ]
+    });
+    return container;
+};
+
 /* Durée lisible entre deux dates (ex. « 29 jours », « 1 mois 10 jours », « 4 mois »). */
 Usp.dureeLisible = function (debut, fin) {
     var d = debut ? new Date(String(debut).substring(0, 10)) : null;

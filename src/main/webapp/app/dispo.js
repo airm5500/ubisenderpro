@@ -22,8 +22,9 @@ Usp.dispo.COULEUR_PROD = {
 };
 
 Usp.dispo.AUDIENCES = [
-    ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
-    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'], ['SEGMENTS_SELECTIONNES', 'Segments sélectionnés'],
+    ['TOUS_LES_SEGMENTS', 'Tous les segments'],
+    ['SEGMENTS_SELECTIONNES', 'Un ou plusieurs segments'],
+    ['AGENCE', 'Clients de l\'agence'],
     ['LISTE_DE_DIFFUSION', 'Liste de diffusion'], ['CLIENTS_ACHETEURS_DU_PRODUIT', 'Clients acheteurs du produit'],
     ['CLIENTS_AYANT_DEMANDE_LE_PRODUIT', 'Clients ayant demandé le produit']
 ];
@@ -158,7 +159,7 @@ Usp.dispo.regleForm = function (store, rec) {
 Usp.dispo.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'description', 'dateDebut', 'dateFin', 'agence',
-                 'societe', 'audience', 'segmentationId', 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
+                 'societe', 'audience', 'segmentationId', 'segmentationIds', 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/dispo-evenements',
             extraParams: filtre,
@@ -246,7 +247,11 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
         { xtype: 'textfield', name: 'societe', fieldLabel: 'Société',
           value: rec ? rec.get('societe') : (Usp.societeParDefaut || '') },
         { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-          store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'TOUS_LES_SEGMENTS' },
+          store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'TOUS_LES_SEGMENTS',
+          listeners: { change: function (c) { Usp.dispo.majAudience(c.up('form')); } } },
+        Usp.multiPicker({ itemId: 'de_segment', name: 'segmentationIds', fieldLabel: 'Segments ciblés', hidden: true,
+            url: '/segmentations', valueField: 'id', displayField: 'libelle',
+            value: rec ? (rec.get('segmentationIds') || (rec.get('segmentationId') ? String(rec.get('segmentationId')) : '')) : '' }),
         { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal d\'envoi', editable: false, queryMode: 'local',
           store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp (officielle)']], value: rec ? (rec.get('canal') || 'WEB') : 'WEB' },
         { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
@@ -294,6 +299,15 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
     win.show();
     var dForm = win.down('#deForm').getForm();
     Usp.lierPeriode(dForm.findField('dateDebut'), dForm.findField('dateFin'));
+    Usp.dispo.majAudience(win.down('#deForm'));
+};
+
+/* Affiche le sélecteur de segments uniquement pour l'audience « Un ou plusieurs segments ». */
+Usp.dispo.majAudience = function (formPanel) {
+    if (!formPanel) { return; }
+    var aud = formPanel.down('[name=audience]');
+    var seg = formPanel.down('#de_segment');
+    if (seg) { seg.setVisible(aud && aud.getValue() === 'SEGMENTS_SELECTIONNES'); }
 };
 
 /* Sous-grille des produits d'un événement. */

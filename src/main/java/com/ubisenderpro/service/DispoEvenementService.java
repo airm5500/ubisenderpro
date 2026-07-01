@@ -95,6 +95,7 @@ public class DispoEvenementService {
         ex.setSociete(data.getSociete());
         ex.setAudience(data.getAudience());
         ex.setSegmentationId(data.getSegmentationId());
+        ex.setSegmentationIds(data.getSegmentationIds());
         ex.setCanal(data.getCanal());
         ex.setResponsable(data.getResponsable());
         ex.setUpdatedAt(LocalDateTime.now());
@@ -156,6 +157,7 @@ public class DispoEvenementService {
         c.setSociete(src.getSociete());
         c.setAudience(src.getAudience());
         c.setSegmentationId(src.getSegmentationId());
+        c.setSegmentationIds(src.getSegmentationIds());
         c.setCanal(src.getCanal());
         c.setResponsable(src.getResponsable());
         c.setStatut("BROUILLON");

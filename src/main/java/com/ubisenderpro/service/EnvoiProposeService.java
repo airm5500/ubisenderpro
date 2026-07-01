@@ -453,6 +453,7 @@ public class EnvoiProposeService {
         String audienceCampagne = null;
         Long cibleListeId = null;
         Long cibleSegmentationId = null;
+        String cibleSegmentationIds = null;   // sélection multiple de segments (CSV)
         String cibleAgence = null;
         String cibleRegion = null;
         String cibleTournee = null;
@@ -484,7 +485,10 @@ public class EnvoiProposeService {
             objectif = "Information";
             audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
             if ("LISTE_DE_DIFFUSION".equals(audienceCampagne)) { cibleListeId = info.getListeId(); }
-            else if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) { cibleSegmentationId = info.getSegmentationId(); }
+            else if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) {
+                if (!nz(info.getSegmentationIds()).isEmpty()) { cibleSegmentationIds = info.getSegmentationIds(); }
+                else { cibleSegmentationId = info.getSegmentationId(); }
+            }
             else if ("AGENCE".equals(audienceCampagne)) { cibleAgence = info.getAgence(); }
             else if ("REGION".equals(audienceCampagne)) { cibleRegion = info.getRegion(); }
             else if ("TOURNEE".equals(audienceCampagne)) { cibleTournee = info.getTournee(); }
@@ -493,6 +497,13 @@ public class EnvoiProposeService {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
             audienceCampagne = e.getAudience() != null ? e.getAudience() : evt.getAudience();
+            // Ciblage porté par l'événement de disponibilité (segments / agence).
+            if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) {
+                if (!nz(evt.getSegmentationIds()).isEmpty()) { cibleSegmentationIds = evt.getSegmentationIds(); }
+                else if (evt.getSegmentationId() != null) { cibleSegmentationId = evt.getSegmentationId(); }
+            } else if ("AGENCE".equals(audienceCampagne)) {
+                cibleAgence = evt.getAgence();
+            }
             List<String> manquants = elementsDispoManquants(evt);
             if (!manquants.isEmpty()) {
                 throw new ValidationException("variables",
@@ -567,9 +578,10 @@ public class EnvoiProposeService {
             c.setAudience(audienceCampagne);
             c.setSegmentationIds(audienceService.segmentationIdsCsv(audienceCampagne));
         }
-        // Ciblage explicite porté par l'information (liste / segmentation / agence / région).
+        // Ciblage explicite porté par l'information (liste / segmentation(s) / agence / région).
         if (cibleListeId != null) { c.setListeId(cibleListeId); }
         if (cibleSegmentationId != null) { c.setSegmentationId(cibleSegmentationId); }
+        if (cibleSegmentationIds != null && !cibleSegmentationIds.isEmpty()) { c.setSegmentationIds(cibleSegmentationIds); }
         if (cibleAgence != null && !cibleAgence.isEmpty()) { c.setAgenceCible(cibleAgence); }
         if (cibleRegion != null && !cibleRegion.isEmpty()) { c.setRegionCible(cibleRegion); }
         if (cibleTournee != null && !cibleTournee.isEmpty()) { c.setTourneeCible(cibleTournee); }
