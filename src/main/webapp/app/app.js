@@ -160,6 +160,108 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Session persistante (localStorage) + expiration par inactivité ----------
+ * Le jeton est conservé dans localStorage : il survit au rafraîchissement (F5) et est
+ * partagé entre onglets dupliqués. Une horloge d'inactivité déconnecte après
+ * « delai_deconnexion » minutes sans action (repli 60 min, aligné sur le serveur). */
+Usp.CLE_TOKEN = 'usp_token';
+Usp.CLE_USER = 'usp_user';
+Usp.CLE_ACTIVITE = 'usp_activite';
+Usp.delaiDeconnexion = 60; // minutes (surchargé par le paramètre au chargement)
+
+Usp.persistSession = function (token, user) {
+    Usp.token = token; Usp.user = user;
+    try {
+        localStorage.setItem(Usp.CLE_TOKEN, token);
+        if (user) { localStorage.setItem(Usp.CLE_USER, Ext.encode(user)); }
+    } catch (e) { /* stockage indisponible : session en mémoire seulement */ }
+    Usp.marquerActivite();
+};
+
+Usp.effacerSession = function () {
+    Usp.token = null;
+    try {
+        localStorage.removeItem(Usp.CLE_TOKEN);
+        localStorage.removeItem(Usp.CLE_USER);
+        localStorage.removeItem(Usp.CLE_ACTIVITE);
+    } catch (e) { /* ignore */ }
+};
+
+Usp.marquerActivite = function () {
+    try { localStorage.setItem(Usp.CLE_ACTIVITE, String(Date.now())); } catch (e) { /* ignore */ }
+};
+
+/* Vrai si la session a dépassé le délai d'inactivité configuré. */
+Usp.sessionExpiree = function () {
+    var t = 0;
+    try { t = parseInt(localStorage.getItem(Usp.CLE_ACTIVITE) || '0', 10); } catch (e) { t = 0; }
+    if (!t) { return false; }
+    return (Date.now() - t) > (Usp.delaiDeconnexion * 60000);
+};
+
+/* Charge permissions + paramètres globaux (dont delai_deconnexion), puis ouvre l'app. */
+Usp.chargerContexteEtOuvrir = function (ouvrir) {
+    var chargerParams = function () {
+        Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET', success: function (r) {
+            Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
+            Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET', success: function (r2) {
+                Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
+                Usp.ajax({ url: '/parametres/app.favicon', method: 'GET', success: function (r3) {
+                    Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
+                    Usp.ajax({ url: '/parametres/app.societe', method: 'GET', success: function (r4) {
+                        Usp.societeParDefaut = (Ext.decode(r4.responseText) || {}).valeur || '';
+                        Usp.ajax({ url: '/parametres/delai_deconnexion', method: 'GET', success: function (r5) {
+                            var v = parseInt((Ext.decode(r5.responseText) || {}).valeur, 10);
+                            if (v && v > 0) { Usp.delaiDeconnexion = v; }
+                            ouvrir();
+                        }, failure: ouvrir });
+                    }, failure: ouvrir });
+                }, failure: ouvrir });
+            }, failure: ouvrir });
+        }, failure: ouvrir });
+    };
+    Usp.ajax({ url: '/permissions/me', method: 'GET', success: function (rp) {
+        Usp.perms = Ext.decode(rp.responseText) || {};
+        chargerParams();
+    }, failure: function () { Usp.perms = null; chargerParams(); } });
+};
+
+/* Restaure une session existante (jeton en localStorage) au chargement de la page.
+ * Valide le jeton côté serveur (/auth/me) : si OK, ouvre directement l'application ;
+ * sinon nettoie et affiche l'écran de connexion. */
+Usp.restaurerSession = function () {
+    var token = null, user = null;
+    try {
+        token = localStorage.getItem(Usp.CLE_TOKEN);
+        var u = localStorage.getItem(Usp.CLE_USER);
+        if (u) { user = Ext.decode(u); }
+    } catch (e) { token = null; }
+    if (!token || Usp.sessionExpiree()) { Usp.effacerSession(); Usp.showLogin(); return; }
+    Usp.token = token; Usp.user = user;
+    Usp.ajax({ url: '/auth/me', method: 'GET',
+        success: function (resp) {
+            try { var d = Ext.decode(resp.responseText); if (d && d.user) { Usp.user = d.user; } } catch (e) {}
+            Usp.marquerActivite();
+            Usp.chargerContexteEtOuvrir(function () { Usp.showMain(); });
+        },
+        failure: function () { Usp.effacerSession(); Usp.showLogin(); } });
+};
+
+/* Expire la session (inactivité ou invalidation serveur) : nettoie et recharge
+ * vers l'écran de connexion avec un message d'information. */
+Usp.expirerSession = function () {
+    if (Usp._expiration) { return; }
+    Usp._expiration = true;
+    var token = Usp.token;
+    Usp.effacerSession();
+    // Clôture serveur (best effort) puis rechargement propre.
+    var fin = function () { location.reload(); };
+    if (token) {
+        Ext.Ajax.request({ url: Usp.apiBase + '/auth/logout', method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }, callback: fin });
+    } else { fin(); }
+};
+
 /* ---------- Personnalisations globales UI (exécutées au chargement) ---------- */
 (function () {
     // Pagination en français (toutes les grilles paginées).
@@ -392,40 +494,13 @@ Usp.showLogin = function () {
             jsonData: { login: login, motDePasse: motDePasse },
             success: function (resp) {
                 var data = Ext.decode(resp.responseText);
-                Usp.token = data.token;
-                Usp.user = data.user;
+                // Jeton persistant (survit au F5, partagé entre onglets).
+                Usp.persistSession(data.token, data.user);
                 var ouvrir = function () {
                     if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
                     Usp.showMain();
                 };
-                // Charge les paramètres globaux (mode + préfixe + favicon) puis ouvre l'application.
-                var chargerParams = function () {
-                Usp.ajax({ url: '/parametres/whatsapp.mode_envoi', method: 'GET',
-                    success: function (r) {
-                        Usp.mode = (Ext.decode(r.responseText) || {}).valeur || 'API';
-                        Usp.ajax({ url: '/parametres/whatsapp.prefixe_pays', method: 'GET',
-                            success: function (r2) {
-                                Usp.prefixe = (Ext.decode(r2.responseText) || {}).valeur || '225';
-                                Usp.ajax({ url: '/parametres/app.favicon', method: 'GET',
-                                    success: function (r3) {
-                                        Usp.appliquerFavicon((Ext.decode(r3.responseText) || {}).valeur);
-                                        // Société émettrice (Paramètres) : sert de valeur par défaut
-                                        // pré-remplie et modifiable dans les écrans de création.
-                                        Usp.ajax({ url: '/parametres/app.societe', method: 'GET',
-                                            success: function (r4) {
-                                                Usp.societeParDefaut = (Ext.decode(r4.responseText) || {}).valeur || '';
-                                                ouvrir();
-                                            }, failure: ouvrir });
-                                    }, failure: ouvrir });
-                            }, failure: ouvrir });
-                    }, failure: ouvrir });
-                };
-                // Permissions effectives (menus + actions) -> pilotent menus et boutons.
-                Usp.ajax({ url: '/permissions/me', method: 'GET',
-                    success: function (rp) {
-                        Usp.perms = Ext.decode(rp.responseText) || {};
-                        chargerParams();
-                    }, failure: function () { Usp.perms = null; chargerParams(); } });
+                Usp.chargerContexteEtOuvrir(ouvrir);
             },
             failure: function () {
                 loader.style.display = 'none';
@@ -1920,10 +1995,24 @@ Usp.showMain = function () {
     // Boutons des boîtes de dialogue en français (Oui / Non).
     Ext.MessageBox.buttonText.yes = 'Oui';
     Ext.MessageBox.buttonText.no = 'Non';
-    // Battement de cœur : maintient la session « active » tant que la page est ouverte.
+    // Suivi d'activité : toute action utilisateur repousse l'échéance d'inactivité
+    // (partagée entre onglets via localStorage).
+    if (!Usp._activiteLiee) {
+        Usp._activiteLiee = true;
+        ['mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) {
+            document.addEventListener(ev, function () { if (Usp.token) { Usp.marquerActivite(); } }, true);
+        });
+    }
+    // Horloge de session : ping serveur tant qu'on est actif ; déconnexion locale
+    // dès que le délai d'inactivité configuré est dépassé.
     if (!Usp._heartbeat) {
-        Usp._heartbeat = Ext.TaskManager.start({ interval: 60000, run: function () {
-            if (Usp.token) { Usp.ajax({ url: '/auth/me', method: 'GET' }); }
+        Usp._heartbeat = Ext.TaskManager.start({ interval: 30000, run: function () {
+            if (!Usp.token) { return; }
+            if (Usp.sessionExpiree()) { Usp.expirerSession(); return; }
+            Usp.ajax({ url: '/auth/me', method: 'GET', failure: function (resp) {
+                // 401 => session invalidée côté serveur : retour à l'écran de connexion.
+                if (resp && resp.status === 401) { Usp.expirerSession(); }
+            } });
         } });
     }
     Ext.create('Ext.container.Viewport', {
@@ -1969,7 +2058,7 @@ Usp.showMain = function () {
                       handler: function () {
                         // Recharge seulement APRÈS la déconnexion (sinon la session n'est pas clôturée).
                         Usp.ajax({ url: '/auth/logout', method: 'POST',
-                            callback: function () { location.reload(); } });
+                            callback: function () { Usp.effacerSession(); location.reload(); } });
                     } }
                 ]
             },
@@ -2123,5 +2212,7 @@ Ext.override(Ext.window.Window, {
 
 Ext.onReady(function () {
     Ext.QuickTips.init();
-    Usp.showLogin();
+    // Restaure la session si un jeton valide est en localStorage (survie au F5),
+    // sinon affiche l'écran de connexion.
+    Usp.restaurerSession();
 });

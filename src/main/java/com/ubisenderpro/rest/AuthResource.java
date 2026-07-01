@@ -38,6 +38,8 @@ public class AuthResource {
     private GeoIpService geoIpService;
     @EJB
     private UserService userService;
+    @EJB
+    private com.ubisenderpro.service.ParametreService parametreService;
     @Inject
     private SessionStore sessionStore;
 
@@ -50,6 +52,11 @@ public class AuthResource {
                     .entity(Map.of("erreur", "Identifiants invalides")).build();
         }
         AuthenticatedUser u = user.get();
+        // Aligne le délai d'inactivité serveur sur le paramètre « delai_deconnexion ».
+        try {
+            String d = parametreService.valeur("delai_deconnexion", "60");
+            sessionStore.setExpirationMinutes(Long.parseLong(d.trim()));
+        } catch (RuntimeException ignore) { /* valeur invalide : délai par défaut conservé */ }
         String token = sessionStore.create(u);
         String ip = ip(request);
         journalService.tracer(u.getId(), u.getLogin(), "CONNEXION", "Utilisateur", u.getId(), "Connexion réussie", ip);

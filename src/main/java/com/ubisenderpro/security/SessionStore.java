@@ -13,7 +13,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class SessionStore {
 
-    private static final Duration EXPIRATION = Duration.ofMinutes(60);
+    /** Délai d'inactivité (minutes) avant expiration, configurable via « delai_deconnexion ». */
+    private volatile long expirationMinutes = 60;
+
+    /** Ajuste le délai d'inactivité (repli 60 min si valeur invalide). */
+    public void setExpirationMinutes(long minutes) {
+        this.expirationMinutes = minutes > 0 ? minutes : 60;
+    }
+
+    private Duration expiration() { return Duration.ofMinutes(expirationMinutes); }
 
     private static class Session {
         AuthenticatedUser user;
@@ -36,7 +44,7 @@ public class SessionStore {
         if (token == null) return null;
         Session s = sessions.get(token);
         if (s == null) return null;
-        if (Duration.between(s.lastAccess, Instant.now()).compareTo(EXPIRATION) > 0) {
+        if (Duration.between(s.lastAccess, Instant.now()).compareTo(expiration()) > 0) {
             sessions.remove(token);
             return null;
         }
