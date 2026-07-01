@@ -665,13 +665,23 @@ Usp.marketing.propositionsGrid = function (statut, titre) {
     Usp.marketing._stores.push(store);
 
     var generer = function () {
-        Usp.ajax({ url: '/propositions/generer', method: 'POST',
-            success: function (resp) {
-                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
-                Usp.marketing.reloadAll();
-                Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' + (r.expirees || 0) + ' expirée(s).');
-            },
-            failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
+        Ext.Msg.show({
+            title: 'Générer les propositions',
+            msg: 'Les propositions sont calculées à partir des promotions, disponibilités et anniversaires.<br><br>' +
+                 'Elles apparaîtront en statut <b>Proposées</b> : vous pourrez ensuite <b>Valider</b> ou <b>Rejeter</b> ' +
+                 'chacune individuellement avant tout envoi.<br><br>Lancer la génération maintenant ?',
+            buttons: Ext.Msg.YESNO, buttonText: { yes: 'Générer', no: 'Annuler' }, icon: Ext.Msg.QUESTION,
+            fn: function (btn) {
+                if (btn !== 'yes') { return; }
+                Usp.ajax({ url: '/propositions/generer', method: 'POST',
+                    success: function (resp) {
+                        var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                        Usp.marketing.reloadAll();
+                        Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' + (r.expirees || 0) + ' expirée(s).');
+                    },
+                    failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
+            }
+        });
     };
 
     return {
