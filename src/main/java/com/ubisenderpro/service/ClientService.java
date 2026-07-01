@@ -159,6 +159,8 @@ public class ClientService {
         valider(client, true);
         canonicaliserGeo(client);
         em.persist(client);
+        em.flush();
+        appliquerNumerosEtNaissance(client, client.getNumeros(), client.getDateNaissance());
         return client;
     }
 
@@ -183,7 +185,75 @@ public class ClientService {
         ex.setPays(client.getPays());
         ex.setStatut(client.getStatut());
         ex.setNotes(client.getNotes());
-        return em.merge(ex);
+        Client saved = em.merge(ex);
+        appliquerNumerosEtNaissance(saved, client.getNumeros(), client.getDateNaissance());
+        return saved;
+    }
+
+    /**
+     * Applique une liste de numéros à un client existant (écran « Contacts » =
+     * numéros seuls). Réutilise la même logique additive que la fiche client.
+     */
+    public void enregistrerNumeros(Long clientId, List<java.util.Map<String, Object>> numeros) {
+        Client client = em.find(Client.class, clientId);
+        if (client == null) { throw new ValidationException("id", "Compte client introuvable."); }
+        appliquerNumerosEtNaissance(client, numeros, null);
+    }
+
+    /**
+     * Crée/met à jour les contacts d'un client à partir des numéros saisis dans la
+     * fiche (additif : rapproche par numéro, ne supprime jamais). Le 1er marqué
+     * « principal » devient le contact principal ; la date de naissance est portée
+     * par ce contact principal. Consentements cochés par défaut à la création.
+     */
+    private void appliquerNumerosEtNaissance(Client client, List<java.util.Map<String, Object>> numeros, String dateNaissance) {
+        if (numeros == null) { return; }
+        com.ubisenderpro.entity.ClientContact principal = null;
+        com.ubisenderpro.entity.ClientContact premier = null;
+        for (java.util.Map<String, Object> n : numeros) {
+            if (n == null) { continue; }
+            String num = n.get("numero") == null ? "" : String.valueOf(n.get("numero")).trim();
+            if (num.isEmpty()) { continue; }
+            boolean wa = !Boolean.FALSE.equals(n.get("whatsapp"));      // WhatsApp par défaut
+            boolean princ = Boolean.TRUE.equals(n.get("principal"));
+            List<com.ubisenderpro.entity.ClientContact> ex = em.createQuery(
+                    "SELECT c FROM ClientContact c WHERE c.clientId = :cid AND " +
+                    "(c.numeroWhatsapp = :n OR c.telephonePrincipal = :n)", com.ubisenderpro.entity.ClientContact.class)
+                    .setParameter("cid", client.getId()).setParameter("n", num).setMaxResults(1).getResultList();
+            com.ubisenderpro.entity.ClientContact ct = ex.isEmpty() ? new com.ubisenderpro.entity.ClientContact() : ex.get(0);
+            boolean creation = ct.getId() == null;
+            if (creation) {
+                ct.setClientId(client.getId());
+                ct.setConsentementWhatsapp(true);
+                ct.setConsentRelationnel(true);
+            }
+            if (ct.getNomComplet() == null || ct.getNomComplet().trim().isEmpty()) { ct.setNomComplet(client.getNomCompte()); }
+            ct.setTelephonePrincipal(num);
+            ct.setNumeroWhatsapp(wa ? num : ct.getNumeroWhatsapp());
+            if (creation) { em.persist(ct); } else { em.merge(ct); }
+            if (premier == null) { premier = ct; }
+            if (princ && principal == null) { principal = ct; }
+        }
+        if (principal == null) { principal = premier; }
+        if (principal != null) {
+            em.flush();
+            // Un seul contact principal pour ce client.
+            em.createQuery("UPDATE ClientContact c SET c.contactPrincipal = false WHERE c.clientId = :cid")
+                    .setParameter("cid", client.getId()).executeUpdate();
+            principal.setContactPrincipal(true);
+            appliquerNaissance(principal, dateNaissance);
+            em.merge(principal);
+        }
+    }
+
+    private void appliquerNaissance(com.ubisenderpro.entity.ClientContact ct, String dateNaissance) {
+        if (dateNaissance == null || dateNaissance.trim().isEmpty()) { return; }
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(dateNaissance.trim().substring(0, 10));
+            ct.setJourNaissance(d.getDayOfMonth());
+            ct.setMoisNaissance(d.getMonthValue());
+            ct.setAnneeNaissance(d.getYear());
+        } catch (RuntimeException ignore) { /* format invalide : ignoré */ }
     }
 
     /**

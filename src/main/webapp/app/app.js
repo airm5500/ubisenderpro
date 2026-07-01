@@ -944,37 +944,66 @@ Usp.referentielCombo = function (type, cfg) {
         emptyText: 'Sélectionner ou saisir…' }, cfg || {});
 };
 
+/* Grille éditable des numéros d'un client (numéro + WhatsApp + principal unique). */
+Usp.numerosGrid = function (store) {
+    return {
+        xtype: 'grid', columnWidth: 1, margin: '8 0 0 0', height: 160, store: store,
+        title: '📞 Numéros du client (le 1er = principal ; on peut en ajouter plusieurs)',
+        plugins: [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })],
+        columns: [
+            { text: 'Numéro (format international, ex. 2250700000000)', dataIndex: 'numero', flex: 1, editor: { xtype: 'textfield' } },
+            { xtype: 'checkcolumn', text: 'WhatsApp', dataIndex: 'whatsapp', width: 90 },
+            { xtype: 'checkcolumn', text: 'Principal', dataIndex: 'principal', width: 90,
+              listeners: { checkchange: function (col, idx, checked) {
+                  if (checked) { store.each(function (r, i) { if (i !== idx) { r.set('principal', false); } }); }
+              } } }
+        ],
+        tbar: [
+            { text: '➕ Ajouter un numéro', handler: function () {
+                store.add({ numero: '', whatsapp: true, principal: store.getCount() === 0 }); } },
+            { text: '🗑️ Retirer', handler: function (b) {
+                var s = b.up('grid').getSelectionModel().getSelection()[0]; if (s) { store.remove(s); } } }
+        ]
+    };
+};
+
 Usp.clientForm = function (store, rec) {
+    var numStore = Ext.create('Ext.data.Store', { fields: ['numero', 'whatsapp', 'principal'] });
+    if (!rec) { numStore.add({ numero: '', whatsapp: true, principal: true }); }
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le client' : 'Nouveau client',
-        width: 700, modal: true, bodyPadding: 12, autoScroll: false,
+        width: 780, modal: true, bodyPadding: 12, autoScroll: true,
+        maxHeight: Ext.getBody().getViewSize().height - 40,
         items: [{
             xtype: 'form', border: false, layout: 'column',
             defaults: { columnWidth: 0.5, xtype: 'container', layout: 'anchor', border: false,
-                        defaults: { anchor: '96%', labelWidth: 95 } },
+                        defaults: { anchor: '96%', labelWidth: 110 } },
             items: [
                 { items: [
-                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client', allowBlank: false },
-                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client', allowBlank: false,
+                    { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client *', allowBlank: false },
+                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client *', allowBlank: false,
                       listeners: Usp.majListeners },
                     { xtype: 'textfield', name: 'entreprise', fieldLabel: 'Entreprise',
                       emptyText: 'Nom de l\'officine (ex. PHCIE POLAP)', listeners: Usp.majListeners },
+                    { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
+                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
+                    { xtype: 'datefield', name: 'dateNaissance', fieldLabel: 'Date de naissance',
+                      format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false, maxValue: new Date() }
+                ] },
+                { items: [
                     Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
                     Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
                     Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée' }),
-                    { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' }
-                ] },
-                { items: [
-                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
-                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville',
-                        value: rec ? undefined : 'Abidjan' }),
+                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville', value: rec ? undefined : 'Abidjan' }),
                     Usp.referentielCombo('COMMUNE', { name: 'commune', fieldLabel: 'Commune' }),
-                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays',
-                        value: rec ? undefined : 'Côte d\'Ivoire' }),
-                    { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF',
+                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays', value: rec ? undefined : 'Côte d\'Ivoire' })
+                ] },
+                { columnWidth: 1, items: [
+                    { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF', anchor: '48%',
                       store: ['PROSPECT', 'ACTIF', 'INACTIF', 'SUSPENDU', 'ARCHIVE'], queryMode: 'local' },
-                    { xtype: 'textareafield', name: 'notes', fieldLabel: 'Notes', height: 50 }
-                ] }
+                    { xtype: 'textfield', name: 'notes', fieldLabel: 'Notes', anchor: '98%' }
+                ] },
+                Usp.numerosGrid(numStore)
             ]
         }],
         buttons: [{
@@ -983,6 +1012,12 @@ Usp.clientForm = function (store, rec) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var vals = form.getValues();
+                var numeros = [];
+                numStore.each(function (r) {
+                    var n = (r.get('numero') || '').trim();
+                    if (n) { numeros.push({ numero: n, whatsapp: !!r.get('whatsapp'), principal: !!r.get('principal') }); }
+                });
+                vals.numeros = numeros;
                 Usp.ajax({
                     url: rec ? '/clients/' + rec.get('id') : '/clients',
                     method: rec ? 'PUT' : 'POST', jsonData: vals,
@@ -991,16 +1026,9 @@ Usp.clientForm = function (store, rec) {
                         Usp.toastEnregistre('Client « ' + (vals.nomCompte || vals.numeroClient || '') + ' »', !!rec);
                     },
                     failure: function (resp) {
-                        // Message clair renvoyé par le serveur + surlignage du champ fautif (#3/#6).
                         var msg = 'Enregistrement impossible.', champ = null;
-                        try {
-                            var r = Ext.decode(resp.responseText);
-                            msg = r.erreur || msg; champ = r.champ || null;
-                        } catch (e) {}
-                        if (champ) {
-                            var f = form.findField(champ);
-                            if (f) { f.markInvalid(msg); f.focus(true, 50); }
-                        }
+                        try { var r = Ext.decode(resp.responseText); msg = r.erreur || msg; champ = r.champ || null; } catch (e) {}
+                        if (champ) { var f = form.findField(champ); if (f) { f.markInvalid(msg); f.focus(true, 50); } }
                         Ext.Msg.alert('Saisie à corriger', msg);
                     }
                 });
@@ -1012,93 +1040,67 @@ Usp.clientForm = function (store, rec) {
         Usp.ajax({ url: '/clients/' + rec.get('id'), method: 'GET', success: function (resp) {
             win.down('form').getForm().setValues(Ext.decode(resp.responseText));
         } });
+        // Numéros + date de naissance depuis les contacts existants.
+        Usp.ajax({ url: '/clients/' + rec.get('id') + '/contacts', method: 'GET', success: function (resp) {
+            var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+            var rows = d.data || (Ext.isArray(d) ? d : []);
+            numStore.removeAll();
+            rows.forEach(function (c) {
+                var num = c.numeroWhatsapp || c.telephonePrincipal;
+                if (num) { numStore.add({ numero: num, whatsapp: !!c.numeroWhatsapp, principal: !!c.contactPrincipal }); }
+            });
+            if (numStore.getCount() === 0) { numStore.add({ numero: '', whatsapp: true, principal: true }); }
+            var princ = rows.filter(function (c) { return c.contactPrincipal; })[0] || rows[0];
+            if (princ && princ.anneeNaissance && princ.moisNaissance && princ.jourNaissance) {
+                var f = win.down('[name=dateNaissance]');
+                if (f) { f.setValue(Ext.Date.parse(princ.anneeNaissance + '-'
+                    + ('0' + princ.moisNaissance).slice(-2) + '-' + ('0' + princ.jourNaissance).slice(-2), 'Y-m-d')); }
+            }
+        } });
     }
 };
 
-/* ---------- Contacts d'un client ---------- */
+/* ---------- Numéros d'un client (écran « Contacts » = numéros seuls) ---------- */
 Usp.contactsWindow = function (clientId, nomCompte) {
-    var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nomComplet', 'civilite', 'fonction', 'telephonePrincipal', 'numeroWhatsapp',
-                 'email', 'contactPrincipal', 'consentementWhatsapp', 'desabonne',
-                 'jourNaissance', 'moisNaissance', 'anneeNaissance', 'consentRelationnel'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/clients/' + clientId + '/contacts',
-            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
-            reader: { type: 'json', root: 'data', totalProperty: 'total' } },
-        autoLoad: true
-    });
-    Ext.create('Ext.window.Window', {
-        title: 'Contacts — ' + nomCompte, width: 720, height: 420, modal: true, layout: 'fit',
-        items: [{
-            xtype: 'grid', store: store,
-            columns: [
-                { text: 'Nom', dataIndex: 'nomComplet', flex: 1 },
-                { text: 'Fonction', dataIndex: 'fonction', width: 120 },
-                { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 120 },
-                { text: 'WhatsApp', dataIndex: 'numeroWhatsapp', width: 130 },
-                { text: 'Principal', dataIndex: 'contactPrincipal', width: 70, renderer: function (v) { return v ? 'Oui' : ''; } },
-                { text: 'Désab.', dataIndex: 'desabonne', width: 60, renderer: function (v) { return v ? 'Oui' : ''; } }
-            ],
-            tbar: [{ text: 'Nouveau contact', handler: function () { Usp.contactForm(clientId, store, null); } }],
-            listeners: { itemdblclick: function (g, rec) { Usp.contactForm(clientId, store, rec); } }
-        }]
-    }).show();
-};
-
-Usp.contactForm = function (clientId, store, rec) {
+    var numStore = Ext.create('Ext.data.Store', { fields: ['numero', 'whatsapp', 'principal'] });
     var win = Ext.create('Ext.window.Window', {
-        title: rec ? 'Modifier le contact' : 'Nouveau contact', width: 480, modal: true, bodyPadding: 12,
-        items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
-            items: [
-                { xtype: 'textfield', name: 'nomComplet', fieldLabel: 'Nom complet', allowBlank: false },
-                { xtype: 'combobox', name: 'civilite', fieldLabel: 'Civilité', queryMode: 'local',
-                  emptyText: 'Aucune (formule générique)', store: ['Dr', 'Pr', 'M.', 'Mme', 'Mlle'] },
-                { xtype: 'textfield', name: 'fonction', fieldLabel: 'Fonction' },
-                { xtype: 'textfield', name: 'telephonePrincipal', fieldLabel: 'Téléphone' },
-                { xtype: 'textfield', name: 'numeroWhatsapp', fieldLabel: 'Numéro WhatsApp',
-                  emptyText: 'Format international, ex. 2250700000000' },
-                { xtype: 'textfield', name: 'email', fieldLabel: 'E-mail', vtype: 'email' },
-                { xtype: 'fieldcontainer', fieldLabel: 'Anniversaire', layout: 'hbox',
-                  items: [
-                    { xtype: 'numberfield', name: 'jourNaissance', emptyText: 'Jour', width: 70, minValue: 1, maxValue: 31 },
-                    { xtype: 'combobox', name: 'moisNaissance', emptyText: 'Mois', width: 120, margin: '0 0 0 6',
-                      editable: false, queryMode: 'local', valueField: 'v', displayField: 't',
-                      store: { fields: ['v', 't'], data: [
-                        { v: 1, t: 'Janvier' }, { v: 2, t: 'Février' }, { v: 3, t: 'Mars' }, { v: 4, t: 'Avril' },
-                        { v: 5, t: 'Mai' }, { v: 6, t: 'Juin' }, { v: 7, t: 'Juillet' }, { v: 8, t: 'Août' },
-                        { v: 9, t: 'Septembre' }, { v: 10, t: 'Octobre' }, { v: 11, t: 'Novembre' }, { v: 12, t: 'Décembre' }] } },
-                    { xtype: 'numberfield', name: 'anneeNaissance', emptyText: 'Année', width: 80, margin: '0 0 0 6', hideTrigger: true }
-                  ] },
-                { xtype: 'checkbox', name: 'contactPrincipal', boxLabel: 'Contact principal' },
-                { xtype: 'checkbox', name: 'consentementWhatsapp', boxLabel: 'Consentement WhatsApp' },
-                { xtype: 'checkbox', name: 'consentRelationnel', boxLabel: 'Autorise les messages relationnels (anniversaire…)' }
-            ]
-        }],
+        title: 'Numéros — ' + nomCompte, width: 620, modal: true, bodyPadding: 12, layout: 'anchor',
+        items: [
+            { xtype: 'component', anchor: '100%', style: 'margin-bottom:8px;color:#555',
+              html: 'Ajoutez un ou plusieurs numéros. Le 1er est le <b>principal</b> ; ' +
+                    'les messages ne partent que sur les numéros cochés <b>WhatsApp</b>.' },
+            Ext.apply(Usp.numerosGrid(numStore), { anchor: '100%' })
+        ],
         buttons: [{
-            text: 'Enregistrer', formBind: true,
-            handler: function (b) {
-                var form = b.up('window').down('form').getForm();
-                if (!form.isValid()) { return; }
-                var data = form.getValues();
-                data.clientId = clientId;
-                data.contactPrincipal = form.findField('contactPrincipal').getValue();
-                data.consentementWhatsapp = form.findField('consentementWhatsapp').getValue();
-                data.consentRelationnel = form.findField('consentRelationnel').getValue();
-                // Nombres : null si vide (évite l'échec de désérialisation Integer).
-                ['jourNaissance', 'moisNaissance', 'anneeNaissance'].forEach(function (n) {
-                    data[n] = form.findField(n).getValue();
+            text: 'Enregistrer', handler: function () {
+                var numeros = [];
+                numStore.each(function (r) {
+                    var n = (r.get('numero') || '').trim();
+                    if (n) { numeros.push({ numero: n, whatsapp: !!r.get('whatsapp'), principal: !!r.get('principal') }); }
                 });
                 Usp.ajax({
-                    url: rec ? '/contacts/' + rec.get('id') : '/contacts',
-                    method: rec ? 'PUT' : 'POST', jsonData: data,
-                    success: function () { win.close(); store.load(); },
+                    url: '/clients/' + clientId + '/numeros', method: 'POST', jsonData: numeros,
+                    success: function () {
+                        win.close();
+                        Usp.toast('Numéros enregistrés.');
+                    },
                     failure: function () { Ext.Msg.alert('Erreur', 'Enregistrement impossible.'); }
                 });
             }
         }]
     });
     win.show();
-    if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+    // Pré-remplissage depuis les contacts existants (un numéro par contact).
+    Usp.ajax({ url: '/clients/' + clientId + '/contacts', method: 'GET', success: function (resp) {
+        var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+        var rows = d.data || (Ext.isArray(d) ? d : []);
+        numStore.removeAll();
+        rows.forEach(function (c) {
+            var num = c.numeroWhatsapp || c.telephonePrincipal;
+            if (num) { numStore.add({ numero: num, whatsapp: !!c.numeroWhatsapp, principal: !!c.contactPrincipal }); }
+        });
+        if (numStore.getCount() === 0) { numStore.add({ numero: '', whatsapp: true, principal: true }); }
+    } });
 };
 
 /* ---------- Assistant d'import (simplifié) ---------- */

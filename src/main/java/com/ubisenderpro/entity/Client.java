@@ -67,6 +67,15 @@ public class Client {
     @javax.persistence.Transient
     private String telephonePrincipal;
 
+    /** Numéros du client saisis dans la fiche (non persistés) : chaque élément
+     *  {numero, whatsapp, principal} crée/maj un contact au save. */
+    @javax.persistence.Transient
+    private java.util.List<java.util.Map<String, Object>> numeros;
+
+    /** Date de naissance (yyyy-MM-dd, non persistée) : appliquée au contact principal. */
+    @javax.persistence.Transient
+    private String dateNaissance;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
@@ -101,6 +110,10 @@ public class Client {
     public void setCommune(String commune) { this.commune = commune; }
     public String getTelephonePrincipal() { return telephonePrincipal; }
     public void setTelephonePrincipal(String telephonePrincipal) { this.telephonePrincipal = telephonePrincipal; }
+    public java.util.List<java.util.Map<String, Object>> getNumeros() { return numeros; }
+    public void setNumeros(java.util.List<java.util.Map<String, Object>> numeros) { this.numeros = numeros; }
+    public String getDateNaissance() { return dateNaissance; }
+    public void setDateNaissance(String dateNaissance) { this.dateNaissance = dateNaissance; }
     public String getEntreprise() { return entreprise; }
     public void setEntreprise(String entreprise) { this.entreprise = entreprise; }
     public String getPays() { return pays; }

@@ -168,11 +168,10 @@ public class ClientImportService {
         if (creation) rapport.setComptesCrees(rapport.getComptesCrees() + 1);
         else rapport.setComptesMisAJour(rapport.getComptesMisAJour() + 1);
 
-        // --- Contact principal ---
+        // --- Numéros du client : chaque numéro = un contact (1er = principal) ---
+        // Le nom du contact est facultatif : à défaut on reprend le nom du compte.
         String nomContact = val(ligne, req, "contact_principal");
-        if (nomContact == null || nomContact.isEmpty()) {
-            return; // un client sans contact est accepté
-        }
+        String nomPourContacts = (nomContact != null && !nomContact.isEmpty()) ? nomContact : nomCompte;
 
         String telephone = val(ligne, req, "telephone_principal");
         String whatsappBrut = val(ligne, req, "numero_whatsapp");
@@ -182,36 +181,78 @@ public class ClientImportService {
         if (correction != null && !correction.trim().isEmpty()) {
             whatsappBrut = correction.trim();
         }
-        String whatsappNorm = null;
-        if (whatsappBrut != null && !whatsappBrut.isEmpty()) {
-            PhoneNormalizer.Result r = PhoneNormalizer.normaliser(whatsappBrut, prefixePays);
-            if (r.valide) {
-                whatsappNorm = r.valeurNormalisee;
-            } else {
-                rapport.ajouterErreur(numLigne, "WhatsApp : " + r.message);
-                rapport.ajouterNumeroInvalide(numLigne, nomContact, whatsappBrut, r.message);
-            }
+
+        // Une colonne peut contenir plusieurs numéros (ex. « 0700000000 / 0555555555 ») :
+        // on les éclate pour créer un contact par numéro.
+        java.util.List<String> numerosBruts = new java.util.ArrayList<>();
+        for (String n : eclaterNumeros(whatsappBrut)) if (!numerosBruts.contains(n)) numerosBruts.add(n);
+        for (String n : eclaterNumeros(telephone)) if (!numerosBruts.contains(n)) numerosBruts.add(n);
+
+        // Aucun numéro et aucun contact nommé : client sans contact (accepté).
+        if (numerosBruts.isEmpty() && (nomContact == null || nomContact.isEmpty())) {
+            return;
         }
 
         Long clientId = client.getId();
+        String consentBrut = val(ligne, req, "consentement_whatsapp");
+        boolean consent = consentBrut == null || consentBrut.equalsIgnoreCase("oui")
+                || consentBrut.equalsIgnoreCase("true") || consentBrut.equals("1");
+
+        if (numerosBruts.isEmpty()) {
+            // Contact nommé sans numéro exploitable.
+            enregistrerContact(req, rapport, numLigne, clientId, nomPourContacts, null,
+                    val(ligne, req, "fonction"), val(ligne, req, "email_principal"), true, consent);
+            return;
+        }
+
+        boolean premier = true;
+        for (String brut : numerosBruts) {
+            String norm = null;
+            PhoneNormalizer.Result r = PhoneNormalizer.normaliser(brut, prefixePays);
+            if (r.valide) {
+                norm = r.valeurNormalisee;
+            } else {
+                rapport.ajouterErreur(numLigne, "Numéro : " + r.message);
+                rapport.ajouterNumeroInvalide(numLigne, nomPourContacts, brut, r.message);
+                continue;
+            }
+            enregistrerContact(req, rapport, numLigne, clientId, nomPourContacts, norm,
+                    premier ? val(ligne, req, "fonction") : null,
+                    premier ? val(ligne, req, "email_principal") : null, premier, consent);
+            premier = false;
+        }
+    }
+
+    /** Éclate une chaîne pouvant contenir plusieurs numéros (séparateurs : / , ; | saut de ligne). */
+    private java.util.List<String> eclaterNumeros(String brut) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (brut == null || brut.trim().isEmpty()) return out;
+        for (String p : brut.split("[/,;|\\r\\n]+")) {
+            String t = p.trim();
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out;
+    }
+
+    /** Crée ou met à jour un contact (un numéro) et met à jour le rapport. */
+    private void enregistrerContact(ImportClientRequest req, ImportReport rapport, int numLigne,
+                                    Long clientId, String nom, String numeroNorm,
+                                    String fonction, String email, boolean principal, boolean consent) {
         Optional<ClientContact> doublon = clientId == null ? Optional.empty()
-                : contactService.trouverDoublon(clientId, whatsappNorm, telephone, nomContact);
+                : contactService.trouverDoublon(clientId, numeroNorm, numeroNorm, nom);
         ClientContact contact = doublon.orElseGet(ClientContact::new);
         boolean creationContact = !doublon.isPresent();
 
         contact.setClientId(clientId);
-        contact.setNomComplet(nomContact);
-        contact.setContactPrincipal(true);
-        appliquerSiPresent(val(ligne, req, "fonction"), contact::setFonction);
-        appliquerSiPresent(telephone, contact::setTelephonePrincipal);
-        appliquerSiPresent(val(ligne, req, "telephone_2"), contact::setTelephone2);
-        appliquerSiPresent(val(ligne, req, "email_principal"), contact::setEmail);
-        if (whatsappNorm != null) contact.setNumeroWhatsapp(whatsappNorm);
-        String consent = val(ligne, req, "consentement_whatsapp");
-        if (consent != null) {
-            contact.setConsentementWhatsapp(consent.equalsIgnoreCase("oui")
-                    || consent.equalsIgnoreCase("true") || consent.equals("1"));
+        contact.setNomComplet(nom);
+        if (principal) contact.setContactPrincipal(true);
+        appliquerSiPresent(fonction, contact::setFonction);
+        appliquerSiPresent(email, contact::setEmail);
+        if (numeroNorm != null) {
+            contact.setTelephonePrincipal(numeroNorm);
+            contact.setNumeroWhatsapp(numeroNorm);
         }
+        contact.setConsentementWhatsapp(consent);
 
         if (!req.isSimulation() && clientId != null) {
             if (creationContact) contactService.creer(contact);
