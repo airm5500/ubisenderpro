@@ -13,18 +13,26 @@ Usp.crm.STATUTS = [
 
 Usp.crm._reload = null;
 
+/* Libellé client normalisé : « (code) nom entreprise » (#8). */
+Usp.crm.libelleClient = function (rec) {
+    var code = rec.clientCode ? '(' + Ext.String.htmlEncode(rec.clientCode) + ') ' : '';
+    var nom = rec.clientNom ? Ext.String.htmlEncode(rec.clientNom) : ('#' + (rec.clientId || '-'));
+    var ent = rec.clientEntreprise ? ' <span style="color:#999">' + Ext.String.htmlEncode(rec.clientEntreprise) + '</span>' : '';
+    return code + nom + ent;
+};
+
 Usp.crm.carte = function (rec) {
     var montant = rec.montantEstime ? Ext.util.Format.number(rec.montantEstime, '0,000') + ' F' : '';
-    var client = rec.clientNom ? Ext.String.htmlEncode(rec.clientNom) : ('#' + (rec.clientId || '-'));
     var lienClient = rec.clientId
         ? '<div style="font-size:11px"><span onclick="event.stopPropagation();Usp.crm.ouvrirClient(' + rec.clientId + ')" ' +
-          'style="cursor:pointer;color:#1976d2;text-decoration:underline">👤 ' + client + '</span></div>'
+          'style="cursor:pointer;color:#1976d2;text-decoration:underline">👤 ' + Usp.crm.libelleClient(rec) + '</span></div>'
         : '<div style="font-size:11px;color:#555">Client : -</div>';
     return '<div class="usp-card" draggable="true" ondragstart="Usp.crm.drag(event,' + rec.id + ')" ' +
         'data-id="' + rec.id + '" style="background:#fff;border:1px solid #ddd;border-radius:6px;' +
         'padding:8px;margin:6px;cursor:move;box-shadow:0 1px 2px rgba(0,0,0,.1)">' +
         '<div style="font-weight:bold">Opp #' + rec.id + '</div>' +
         lienClient +
+        (rec.contactNom ? '<div style="font-size:11px;color:#555">Contact : ' + Ext.String.htmlEncode(rec.contactNom) + '</div>' : '') +
         (rec.agentNom ? '<div style="font-size:11px;color:#555">Agent : ' + Ext.String.htmlEncode(rec.agentNom) + '</div>' : '') +
         (montant ? '<div style="font-size:11px;color:#2a7">' + montant + '</div>' : '') +
         (rec.prochaineAction ? '<div style="font-size:10px;color:#999">' + Ext.String.htmlEncode(rec.prochaineAction) + '</div>' : '') +
@@ -111,19 +119,37 @@ Usp.crm.clientCombo = function (cfg) {
     return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nomCompte',
         queryMode: 'remote', minChars: 2, anchor: '100%', emptyText: 'Tapez 2 lettres…',
         listConfig: { getInnerTpl: function () {
-            return '<b>{numeroClient}</b> {nomCompte} <span style="color:#999">{entreprise}</span>'; } } }, cfg || {});
+            // Affichage normalisé « (code) nom entreprise » (#8).
+            return '<b>({numeroClient})</b> {nomCompte} <span style="color:#999">{entreprise}</span>'; } } }, cfg || {});
 };
 
-/* Sélecteur de contact (recherche distante). */
+/* Sélecteur de contact d'un client : peuplé après le choix du client
+ * (un contact appartient à un client — correction #8). Local, alimenté via
+ * Usp.crm.chargerContacts. */
 Usp.crm.contactCombo = function (cfg) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom', 'client', 'numero', 'code', 'entreprise'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
-            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
-    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nom',
-        queryMode: 'remote', queryParam: 'q', minChars: 2, anchor: '100%', emptyText: 'Tapez 2 lettres…',
+        fields: ['id', 'nomComplet', 'telephonePrincipal', 'numeroWhatsapp', 'contactPrincipal'] });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nomComplet',
+        queryMode: 'local', editable: false, anchor: '100%', disabled: true,
+        emptyText: 'Choisissez d\'abord un client…',
         listConfig: { getInnerTpl: function () {
-            return '<b>{code}</b> {entreprise} <span style="color:#999">{nom}</span>'; } } }, cfg || {});
+            return '{nomComplet} <span style="color:#999">{numeroWhatsapp}{[values.contactPrincipal ? " ★" : ""]}</span>'; } } }, cfg || {});
+};
+
+/* Charge les contacts (numéros) d'un client dans un combo « contact ». */
+Usp.crm.chargerContacts = function (combo, clientId) {
+    if (!combo) { return; }
+    combo.clearValue();
+    var store = combo.getStore();
+    store.removeAll();
+    if (!clientId) { combo.setDisabled(true); return; }
+    Usp.ajax({ url: '/clients/' + clientId + '/contacts', method: 'GET', success: function (resp) {
+        var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+        var rows = d.data || (Ext.isArray(d) ? d : []);
+        store.loadData(rows);
+        combo.setDisabled(rows.length === 0);
+        if (!rows.length) { combo.emptyText = 'Aucun contact pour ce client'; if (combo.applyEmptyText) { combo.applyEmptyText(); } }
+    } });
 };
 
 /* Sélecteur d'agent (utilisateurs affectables). */
@@ -140,7 +166,12 @@ Usp.crm.oppForm = function (reload) {
     var win = Ext.create('Ext.window.Window', {
         title: 'Nouvelle opportunité', width: 420, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 120 }, items: [
-            Usp.crm.clientCombo({ name: 'clientId', fieldLabel: 'Client', allowBlank: false }),
+            Usp.crm.clientCombo({ name: 'clientId', fieldLabel: 'Client', allowBlank: false,
+                listeners: { select: function (cb, r) {
+                    var a = Ext.isArray(r) ? r[0] : r;
+                    var contact = cb.up('form').down('[name=contactId]');
+                    Usp.crm.chargerContacts(contact, a ? a.get('id') : cb.getValue());
+                } } }),
             Usp.crm.contactCombo({ name: 'contactId', fieldLabel: 'Contact' }),
             Usp.crm.agentCombo({ name: 'agentId', fieldLabel: 'Agent' }),
             { xtype: 'numberfield', name: 'montantEstime', fieldLabel: 'Montant estimé', hideTrigger: true, minValue: 0 },

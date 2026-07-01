@@ -59,6 +59,14 @@ public class Opportunite {
     private String clientNom;
     @javax.persistence.Transient
     private String agentNom;
+    /** Code et entreprise du client, pour l'affichage « (code) nom entreprise » (#8). */
+    @javax.persistence.Transient
+    private String clientCode;
+    @javax.persistence.Transient
+    private String clientEntreprise;
+    /** Nom de la personne contact rattachée à l'opportunité. */
+    @javax.persistence.Transient
+    private String contactNom;
 
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
@@ -78,6 +86,12 @@ public class Opportunite {
     public void setClientNom(String clientNom) { this.clientNom = clientNom; }
     public String getAgentNom() { return agentNom; }
     public void setAgentNom(String agentNom) { this.agentNom = agentNom; }
+    public String getClientCode() { return clientCode; }
+    public void setClientCode(String clientCode) { this.clientCode = clientCode; }
+    public String getClientEntreprise() { return clientEntreprise; }
+    public void setClientEntreprise(String clientEntreprise) { this.clientEntreprise = clientEntreprise; }
+    public String getContactNom() { return contactNom; }
+    public void setContactNom(String contactNom) { this.contactNom = contactNom; }
     public Long getConversationId() { return conversationId; }
     public void setConversationId(Long conversationId) { this.conversationId = conversationId; }
     public Long getCampagneId() { return campagneId; }
