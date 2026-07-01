@@ -560,13 +560,21 @@ Usp.recouvrement.importRef = function (type, store) {
 
 Usp.recouvrement.referentielsPanel = function () {
     return {
-        title: '⚙️ Référentiels relances', xtype: 'panel', layout: 'fit', bodyPadding: 6,
-        items: [{ xtype: 'tabpanel', items: [
-            // Les segments commerciaux réutilisent la segmentation clients existante
-            // (plus de référentiel dédié). On ne paramètre ici que profils et statuts.
-            Usp.recouvrement.refGrid('PROFIL_PAIEMENT', 'Profils de paiement'),
-            Usp.recouvrement.refGrid('STATUT_RECOUVREMENT', 'Statuts de recouvrement')
-        ] }]
+        title: '⚙️ Référentiels relances', xtype: 'panel', layout: 'border', bodyPadding: 6,
+        items: [
+            { region: 'north', xtype: 'component', style: 'padding:8px;background:#f4f6f8;border-bottom:1px solid #ddd',
+              html: '<span style="color:#33404f"><b>À quoi servent ces référentiels ?</b> Ce sont des étiquettes ' +
+                  'réutilisables pour <b>classer</b> les clients en recouvrement et <b>cibler</b> les campagnes de relance.<br>' +
+                  '• <b>Profil de paiement</b> : comportement de règlement (ex. « Comptant », « 30 jours », « Mauvais payeur »).<br>' +
+                  '• <b>Statut de recouvrement</b> : situation de la créance (ex. « À jour », « Sous surveillance », « Contentieux »).<br>' +
+                  'On les pose sur la fiche d\'un client, puis on filtre/relance dessus.</span>' },
+            { region: 'center', xtype: 'tabpanel', items: [
+                // Les segments commerciaux réutilisent la segmentation clients existante
+                // (plus de référentiel dédié). On ne paramètre ici que profils et statuts.
+                Usp.recouvrement.refGrid('PROFIL_PAIEMENT', 'Profils de paiement'),
+                Usp.recouvrement.refGrid('STATUT_RECOUVREMENT', 'Statuts de recouvrement')
+            ] }
+        ]
     };
 };
 
@@ -777,7 +785,10 @@ Usp.recouvrement.campagnesPanel = function () {
         title: '📣 Campagnes', xtype: 'form', bodyPadding: 14, autoScroll: true,
         defaults: { anchor: '60%', labelWidth: 170 },
         items: [
-            { xtype: 'displayfield', value: '<b>Cibler les clients à relancer</b> selon les critères, puis envoyer un modèle.' },
+            { xtype: 'displayfield', value: '<b>Cibler les clients à relancer</b> selon les critères ci-dessous, ' +
+                'puis envoyer un modèle. Seuls les clients ayant une <b>fiche recouvrement</b> qui correspond sont ciblés ' +
+                '(cliquez « Aperçu » pour compter). L\'<b>Agence</b> restreint l\'envoi aux clients de cette agence ' +
+                '(laisser vide = toutes agences).' },
             Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable recouvrement' },
             // Composant Audience : une ou plusieurs segmentations client (SMC).
