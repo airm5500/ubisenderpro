@@ -332,6 +332,9 @@ Usp.expirerSession = function () {
         + 'border:1px solid #1b2a4a;border-radius:8px;font-size:9px;font-weight:bold;line-height:1;'
         + 'min-width:14px;height:14px;padding:0 3px;display:flex;align-items:center;justify-content:center;'
         + 'box-sizing:border-box}'
+        // Cartes du tableau de bord (dégradé) : soulèvement au survol.
+        + '.usp-card-grad{transition:transform .12s ease, box-shadow .12s ease}'
+        + '.usp-card-grad:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.24)!important}'
         // Bouton déconnexion : rond, rouge, bien visible.
         + '.hdr-logout{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
         + 'border-radius:50%;background:#e74c3c;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(231,76,60,.5);'
@@ -1386,16 +1389,31 @@ Usp.dashboardPanel = function () {
             { k: 'messagesEnvoyesAujourdhui', lib: "Messages envoyés aujourd'hui", icon: '📤', couleur: '#1976d2', vue: 'historique' }
         ] }
     ];
+    // Éclaircit une couleur hex (#rrggbb) d'un ratio 0..1, pour la 2e teinte du dégradé.
+    function eclaircir(hex, ratio) {
+        var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+        if (!m) { return hex; }
+        var n = parseInt(m[1], 16);
+        var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        r = Math.round(r + (255 - r) * ratio);
+        g = Math.round(g + (255 - g) * ratio);
+        b = Math.round(b + (255 - b) * ratio);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    // Carte pleine en dégradé (Option B) : couleur de l'indicateur en fond,
+    // grande icône en filigrane, texte blanc. Clic = navigation (data-vue).
     function carte(it, val) {
-        var nav = it.vue ? ' data-vue="' + it.vue + '" style="cursor:pointer;' : ' style="';
-        return '<div class="usp-card"' + nav +
-            'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:92px;margin:8px;' +
-            'padding:14px 16px;background:#fff;border-radius:10px;border-left:5px solid ' + it.couleur + ';' +
-            'box-shadow:0 1px 4px rgba(0,0,0,.08)">' +
-            '<div style="position:absolute;top:12px;right:14px;font-size:22px;opacity:.85">' + it.icon + '</div>' +
-            '<div style="font-size:30px;font-weight:bold;color:' + it.couleur + ';line-height:1.1">' +
+        var nav = it.vue ? ' data-vue="' + it.vue + '"' : '';
+        return '<div class="usp-card usp-card-grad"' + nav +
+            ' style="' + (it.vue ? 'cursor:pointer;' : '') +
+            'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:96px;margin:8px;' +
+            'padding:14px 16px;border-radius:14px;overflow:hidden;color:#fff;' +
+            'background:linear-gradient(135deg,' + it.couleur + ',' + eclaircir(it.couleur, 0.35) + ');' +
+            'box-shadow:0 3px 10px rgba(0,0,0,.16)">' +
+            '<div style="position:absolute;right:-6px;bottom:-10px;font-size:62px;opacity:.22;pointer-events:none">' + it.icon + '</div>' +
+            '<div style="font-size:30px;font-weight:bold;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.15)">' +
             (val == null ? '–' : val) + '</div>' +
-            '<div style="font-size:12px;color:#5a6573;margin-top:6px">' + it.lib + '</div></div>';
+            '<div style="font-size:12px;opacity:.95;margin-top:6px">' + it.lib + '</div></div>';
     }
     // Sections ordonnées selon les préférences (les nouvelles s'ajoutent à la fin).
     function sectionsOrdonnees() {
