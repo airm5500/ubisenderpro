@@ -61,4 +61,13 @@ public class RecReferentielResource {
         int crees = service.importer(type, body == null ? null : body.get("contenu"));
         return Response.ok(Collections.singletonMap("crees", crees)).build();
     }
+
+    /** Import via l'assistant à mapping de colonnes (fichier CSV/Excel + correspondance). */
+    @POST
+    @Path("/{type}/import-assistant")
+    @Secured(menu = "recouvrement", action = "IMPORTER")
+    public Response importAssistant(@PathParam("type") String type,
+                                    com.ubisenderpro.dto.ImportClientRequest req) {
+        return Response.ok(service.importerAssistant(type, req)).build();
+    }
 }

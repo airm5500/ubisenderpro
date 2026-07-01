@@ -300,6 +300,14 @@ Usp.recouvrement.ficheForm = function (store, rec) {
         Usp.ajax({ url: '/recouvrement/fiches/' + rec.get('id'), method: 'GET', success: function (resp) {
             win.down('form').getForm().setValues(Ext.decode(resp.responseText));
             Usp.recouvrement.autoSegment(win, rec.get('clientId'));
+            // Profil de paiement / statut : verrouillés dès qu'une valeur existe.
+            ['profilPaiement', 'statut'].forEach(function (n) {
+                var f = win.down('[name=' + n + ']');
+                if (f && f.getValue()) {
+                    f.setReadOnly(true);
+                    if (f.inputEl) { f.inputEl.setStyle('background', '#f0f0f0'); }
+                }
+            });
         } });
     }
 };
@@ -525,7 +533,7 @@ Usp.recouvrement.refGrid = function (type, titre) {
         tbar: [
             Usp.permBtn('recouvrement', 'GERER_REFERENTIELS', { text: '➕ Ajouter', handler: function () { form(null); } }),
             '->',
-            Usp.permBtn('recouvrement', 'IMPORTER', { text: '📥 Importer (CSV code;libellé)',
+            Usp.permBtn('recouvrement', 'IMPORTER', { text: '📥 Assistant d\'import',
                 handler: function () { Usp.recouvrement.importRef(type, store); } }),
             { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
         ],
@@ -543,34 +551,11 @@ Usp.recouvrement.refGrid = function (type, titre) {
     };
 };
 
+/* Import d'un référentiel relances via l'assistant à mapping de colonnes
+ * (même assistant que le Catalogue). */
 Usp.recouvrement.importRef = function (type, store) {
-    var win = Ext.create('Ext.window.Window', {
-        title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
-        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Une valeur par ligne, format ' +
-                '<b>code;libellé</b> (séparateur <b>;</b>, sans id). Ex. <code>30J;Paiement 30 jours</code>. En-tête ignoré.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 170, emptyText: '30J;Paiement 30 jours\nCPT;Comptant' },
-            { xtype: 'filefield', fieldLabel: 'ou fichier .csv', msgTarget: 'side',
-              listeners: { change: function (f) {
-                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
-                  var reader = new FileReader();
-                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
-                  reader.readAsText(file);
-              } } }
-        ] }],
-        buttons: [{ text: '📄 Exporter un exemplaire', tooltip: 'Télécharger un modèle CSV',
-            handler: function () { Usp.telechargerCsv('modele_' + String(type).toLowerCase() + '.csv',
-                'code;libelle\n30J;Paiement 30 jours\nCPT;Comptant\n'); } },
-        { text: 'Importer', handler: function (b) {
-            var contenu = b.up('window').down('[name=contenu]').getValue();
-            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée.'); return; }
-            Usp.ajax({ url: '/recouvrement/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
-                success: function (resp) { win.close(); store.load();
-                    Usp.toast(((Ext.decode(resp.responseText) || {}).crees || 0) + ' valeur(s) importée(s).'); },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-        } }]
-    });
-    win.show();
+    Usp.importer.show('REFERENTIEL', '/recouvrement/referentiels/' + type + '/import-assistant',
+        function () { store.load(); });
 };
 
 Usp.recouvrement.referentielsPanel = function () {
@@ -1024,65 +1009,29 @@ Usp.recouvrement.historiquePanel = function () {
 
 /* ---------------------------- Import CSV ---------------------------- */
 Usp.recouvrement.importPanel = function () {
-    var majApercu = function (fs, type) {
-        var contenu = fs.down('#ta_' + type).getValue() || '';
-        var cmp = fs.down('#ap_' + type);
-        var lignes = contenu.split(/\r?\n/).filter(function (l) { return l.trim() !== ''; });
-        // 1ʳᵉ ligne = en-tête, non comptée.
-        var nb = Math.max(0, lignes.length - 1);
-        cmp.update(nb ? '<span style="color:#1976d2"><b>' + nb + '</b> ligne(s) de données détectée(s) (hors en-tête).</span>'
-            : '<span style="color:#888">Aucune donnée pour le moment.</span>');
-    };
-    var bloc = function (titre, type, exemple) {
+    // Chaque section ouvre l'assistant à mapping de colonnes (même que le Catalogue).
+    var carte = function (titre, description, importType, url) {
         return {
-            xtype: 'fieldset', title: titre, margin: '0 0 10 0', defaults: { anchor: '100%' }, items: [
-                { xtype: 'textareafield', itemId: 'ta_' + type, height: 110, emptyText: exemple,
-                  listeners: { change: function (f) { majApercu(f.up('fieldset'), type); }, buffer: 300 } },
-                { xtype: 'component', itemId: 'ap_' + type, margin: '2 0 4 0',
-                  html: '<span style="color:#888">Aucune donnée pour le moment.</span>' },
-                { xtype: 'fieldcontainer', layout: 'hbox', items: [
-                    { xtype: 'button', text: '📄 Exemplaire', margin: '0 8 0 0',
-                      tooltip: 'Télécharger un modèle CSV pour cette section',
-                      handler: function () { Usp.telechargerCsv('modele_' + type + '.csv', exemple + '\n'); } },
-                    { xtype: 'filefield', flex: 1, buttonText: 'Fichier .csv…', buttonOnly: false, msgTarget: 'side',
-                      listeners: { change: function (f) {
-                          var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
-                          var reader = new FileReader();
-                          reader.onload = function (e) {
-                              f.up('fieldset').down('#ta_' + type).setValue(e.target.result);
-                              majApercu(f.up('fieldset'), type);
-                          };
-                          reader.readAsText(file);
-                      } } },
-                    Usp.permBtn('recouvrement', 'IMPORTER', { xtype: 'button', text: '📥 Importer', margin: '0 0 0 8',
-                      handler: function (b) {
-                          var fs = b.up('fieldset');
-                          var contenu = fs.down('#ta_' + type).getValue();
-                          if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée.'); return; }
-                          b.disable();
-                          Usp.ajax({ url: '/recouvrement/import/' + type, method: 'POST', jsonData: { contenu: contenu },
-                              success: function (resp) {
-                                  b.enable();
-                                  var r = Ext.decode(resp.responseText) || {};
-                                  Ext.Msg.show({ title: 'Rapport d\'import', buttons: Ext.Msg.OK, width: 380,
-                                      msg: '<div style="font-family:sans-serif">✅ Créés : <b style="color:#2e7d32">' + (r.crees || 0)
-                                          + '</b><br>♻️ Mis à jour : <b>' + (r.misAJour || 0)
-                                          + '</b><br>⏭️ Ignorés (client introuvable) : <b>' + (r.ignores || 0) + '</b></div>' });
-                              },
-                              failure: function (resp) { b.enable(); Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-                      } })
-                ] }
+            xtype: 'fieldset', title: titre, margin: '0 0 12 0', defaults: { anchor: '100%' }, items: [
+                { xtype: 'displayfield', value: '<span style="color:#666">' + description + '</span>' },
+                Usp.permBtn('recouvrement', 'IMPORTER', { xtype: 'button', text: '📥 Ouvrir l\'assistant d\'import',
+                    scale: 'medium', margin: '4 0 0 0',
+                    handler: function () { Usp.importer.show(importType, url); } })
             ]
         };
     };
     return {
         title: '📥 Import', xtype: 'panel', autoScroll: true, bodyPadding: 12,
         items: [
-            { xtype: 'displayfield', value: '<span style="color:#666">Séparateur <b>;</b> (point-virgule) ou tabulation. ' +
-                '1ʳᵉ ligne = en-tête (noms de colonnes). Rattachement par <b>numero_client</b>.</span>' },
-            bloc('Fiches (initialisation)', 'fiches', 'numero_client;encours_initial;segment;profil;responsable;statut\nC001;150000;Diamond;Paiement 30 jours;Awa;Sous surveillance'),
-            bloc('Créances (factures / avoirs)', 'creances', 'numero_client;type;numero;date_emission;date_echeance;montant;statut\nC001;FACTURE;FA-2026-001;2026-06-01;2026-07-01;250000;ECHUE'),
-            bloc('Règlements', 'paiements', 'numero_client;date_paiement;montant;mode;reference\nC001;2026-06-15;100000;Virement;VIR-123')
+            { xtype: 'displayfield', value: '<span style="color:#666">Import CSV/Excel avec <b>correspondance des colonnes</b> ' +
+                '(mapping), simulation et rapport. Rattachement au client par <b>Code client</b>. ' +
+                'Un modèle est téléchargeable dans chaque assistant (« Exporter un exemplaire »).</span>' },
+            carte('Fiches (initialisation)', 'Encours initial, segment, profil, responsable, statut par client.',
+                'REC_FICHES', '/recouvrement/import/fiches-assistant'),
+            carte('Créances (factures / avoirs)', 'Pièces comptables : type, n°, dates, montant, statut.',
+                'REC_CREANCES', '/recouvrement/import/creances-assistant'),
+            carte('Règlements', 'Paiements reçus : date, montant, mode, référence.',
+                'REC_PAIEMENTS', '/recouvrement/import/paiements-assistant')
         ]
     };
 };

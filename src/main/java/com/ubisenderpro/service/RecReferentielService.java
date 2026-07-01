@@ -115,16 +115,53 @@ public class RecReferentielService {
             String code = null, nom;
             if (cols.length >= 2) { code = cols[0]; nom = cols[1]; }
             else { nom = cols[0]; }
-            if (nom == null || nom.isEmpty() || libelleExiste(t, nom)) { continue; }
-            RecReferentiel r = new RecReferentiel();
-            r.setType(t);
-            r.setLibelle(nom);
-            r.setCode((code == null || code.isEmpty() || codeExiste(t, code))
-                    ? Codes.generer(prefixe(t), c -> codeExiste(t, c)) : code);
-            r.setActif(true);
-            em.persist(r);
-            crees++;
+            if (creerUn(t, code, nom)) { crees++; }
         }
         return crees;
+    }
+
+    /** Crée une valeur de référentiel (code auto si absent/en conflit). Faux si doublon/vide. */
+    private boolean creerUn(String type, String code, String nom) {
+        if (nom == null || nom.isEmpty() || libelleExiste(type, nom)) { return false; }
+        RecReferentiel r = new RecReferentiel();
+        r.setType(type);
+        r.setLibelle(nom);
+        r.setCode((code == null || code.isEmpty() || codeExiste(type, code))
+                ? Codes.generer(prefixe(type), c -> codeExiste(type, c)) : code);
+        r.setActif(true);
+        em.persist(r);
+        return true;
+    }
+
+    /** Import via l'assistant à mapping de colonnes (fichier CSV/Excel + correspondance {code, libelle}). */
+    public com.ubisenderpro.dto.ImportReport importerAssistant(String type, com.ubisenderpro.dto.ImportClientRequest req) {
+        String t = typeValide(type);
+        com.ubisenderpro.dto.ImportReport rapport = new com.ubisenderpro.dto.ImportReport();
+        rapport.setTypeImport("REF_RECOUVREMENT_" + t);
+        java.util.List<java.util.Map<String, String>> lignes;
+        try {
+            byte[] contenu = java.util.Base64.getDecoder().decode(req.getFichierBase64());
+            char sep = req.getSeparateur() != null && !req.getSeparateur().isEmpty() ? req.getSeparateur().charAt(0) : ';';
+            lignes = com.ubisenderpro.importer.FileParser.parse(contenu, req.getNomFichier(), sep);
+        } catch (Exception e) {
+            rapport.ajouterErreur(0, "Lecture du fichier impossible : " + e.getMessage());
+            return rapport;
+        }
+        rapport.setLignesLues(lignes.size());
+        String colCode = req.getMapping().getOrDefault("code", "code");
+        String colLib = req.getMapping().getOrDefault("libelle", "libelle");
+        int crees = 0, ignores = 0, rejets = 0, num = 1;
+        for (java.util.Map<String, String> ligne : lignes) {
+            num++;
+            String nom = ligne.get(colLib) == null ? null : ligne.get(colLib).trim();
+            String code = ligne.get(colCode) == null ? null : ligne.get(colCode).trim();
+            if (nom == null || nom.isEmpty()) { rejets++; rapport.ajouterErreur(num, "Libellé manquant"); continue; }
+            if (req.isSimulation()) { crees++; continue; }
+            if (creerUn(t, code, nom)) { crees++; } else { ignores++; }
+        }
+        rapport.setComptesCrees(crees);
+        rapport.setLignesIgnorees(ignores);
+        rapport.setLignesRejetees(rejets);
+        return rapport;
     }
 }

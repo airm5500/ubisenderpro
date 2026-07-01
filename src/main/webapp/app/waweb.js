@@ -549,7 +549,10 @@ Usp.waweb.filterPanel = function () {
                   queryMode: 'local', editable: false },
                 { xtype: 'fieldcontainer', fieldLabel: 'Importer', layout: 'hbox', items: [
                     { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Charger un fichier (.csv/.xlsx)…',
-                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } }
+                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } },
+                    { xtype: 'button', text: '📄 Exemplaire', margin: '0 0 0 8',
+                      tooltip: 'Télécharger un modèle CSV (un numéro par ligne)',
+                      handler: function () { Usp.telechargerCsv('modele_numeros.csv', 'numero\n2250700000000\n2250500000000\n'); } }
                   ] },
                 { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 300,
                   emptyText: 'Un numéro par ligne (format international)\nou chargez un fichier ci-dessus' }

@@ -172,6 +172,47 @@ public class ReferentielGeoService {
         return false;
     }
 
+    /**
+     * Import via l'assistant à mapping de colonnes (comme le Catalogue) : fichier
+     * CSV/Excel + correspondance {code, libelle}. Renvoie un rapport standard.
+     */
+    public com.ubisenderpro.dto.ImportReport importerAssistant(String type, com.ubisenderpro.dto.ImportClientRequest req) {
+        String t = typeValide(type);
+        com.ubisenderpro.dto.ImportReport rapport = new com.ubisenderpro.dto.ImportReport();
+        rapport.setTypeImport("REFERENTIEL_" + t);
+        java.util.List<java.util.Map<String, String>> lignes;
+        try {
+            byte[] contenu = java.util.Base64.getDecoder().decode(req.getFichierBase64());
+            char sep = req.getSeparateur() != null && !req.getSeparateur().isEmpty() ? req.getSeparateur().charAt(0) : ';';
+            lignes = com.ubisenderpro.importer.FileParser.parse(contenu, req.getNomFichier(), sep);
+        } catch (Exception e) {
+            rapport.ajouterErreur(0, "Lecture du fichier impossible : " + e.getMessage());
+            return rapport;
+        }
+        rapport.setLignesLues(lignes.size());
+        String colCode = req.getMapping().getOrDefault("code", "code");
+        String colLib = req.getMapping().getOrDefault("libelle", "libelle");
+        int crees = 0, ignores = 0, rejets = 0, num = 1;
+        for (java.util.Map<String, String> ligne : lignes) {
+            num++;
+            String nom = valeur(ligne, colLib);
+            String code = valeur(ligne, colCode);
+            if (nom == null || nom.isEmpty()) { rejets++; rapport.ajouterErreur(num, "Libellé manquant"); continue; }
+            if (req.isSimulation()) { crees++; continue; }
+            if (importerUn(t, code, nom)) { crees++; } else { ignores++; }
+        }
+        rapport.setComptesCrees(crees);
+        rapport.setLignesIgnorees(ignores);
+        rapport.setLignesRejetees(rejets);
+        return rapport;
+    }
+
+    private String valeur(java.util.Map<String, String> ligne, String colonne) {
+        if (colonne == null) { return null; }
+        String v = ligne.get(colonne);
+        return v == null ? null : v.trim();
+    }
+
     private boolean importerUn(String type, String code, String nom) {
         boolean existe = !em.createQuery(
                 "SELECT r FROM ReferentielGeo r WHERE r.type = :t AND LOWER(r.libelle) = :l", ReferentielGeo.class)

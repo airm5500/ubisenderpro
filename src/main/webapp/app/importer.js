@@ -31,6 +31,23 @@ Usp.importer.CHAMPS = {
         ['categorie', 'Catégorie'], ['marque', 'Marque'],
         ['stock_disponible', 'Stock disponible'], ['unite', 'Unité'],
         ['image_url', 'Image URL'], ['lien_produit', 'Lien produit']
+    ],
+    REFERENTIEL: [
+        ['code', 'Code'], ['libelle', 'Libellé *']
+    ],
+    REC_FICHES: [
+        ['numero_client', 'Code client *'], ['encours_initial', 'Encours initial'],
+        ['segment', 'Segment'], ['profil', 'Profil de paiement'],
+        ['responsable', 'Responsable'], ['statut', 'Statut']
+    ],
+    REC_CREANCES: [
+        ['numero_client', 'Code client *'], ['type', 'Type (FACTURE/AVOIR)'],
+        ['numero', 'N° pièce'], ['date_emission', 'Date émission'],
+        ['date_echeance', 'Date échéance'], ['montant', 'Montant *'], ['statut', 'Statut']
+    ],
+    REC_PAIEMENTS: [
+        ['numero_client', 'Code client *'], ['date_paiement', 'Date de règlement'],
+        ['montant', 'Montant *'], ['mode', 'Mode'], ['reference', 'Référence']
     ]
 };
 

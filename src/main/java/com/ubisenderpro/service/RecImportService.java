@@ -43,9 +43,68 @@ public class RecImportService {
         DateTimeFormatter.ofPattern("dd-MM-yyyy")
     };
 
-    public Map<String, Object> importerFiches(String contenu) {
+    public Map<String, Object> importerFiches(String contenu) { return traiterFiches(parser(contenu)); }
+    public Map<String, Object> importerCreances(String contenu) { return traiterCreances(parser(contenu)); }
+    public Map<String, Object> importerPaiements(String contenu) { return traiterPaiements(parser(contenu)); }
+
+    /* Variantes « assistant » : fichier CSV/Excel + mapping de colonnes -> ImportReport. */
+    public com.ubisenderpro.dto.ImportReport importerFichesAssistant(com.ubisenderpro.dto.ImportClientRequest req) {
+        return versReport(req, this::traiterFiches);
+    }
+    public com.ubisenderpro.dto.ImportReport importerCreancesAssistant(com.ubisenderpro.dto.ImportClientRequest req) {
+        return versReport(req, this::traiterCreances);
+    }
+    public com.ubisenderpro.dto.ImportReport importerPaiementsAssistant(com.ubisenderpro.dto.ImportClientRequest req) {
+        return versReport(req, this::traiterPaiements);
+    }
+
+    /** Parse le fichier, applique le mapping (clé logique -> colonne) puis traite les lignes. */
+    private com.ubisenderpro.dto.ImportReport versReport(com.ubisenderpro.dto.ImportClientRequest req,
+            java.util.function.Function<List<Map<String, String>>, Map<String, Object>> traitement) {
+        com.ubisenderpro.dto.ImportReport rapport = new com.ubisenderpro.dto.ImportReport();
+        List<Map<String, String>> rows;
+        try {
+            byte[] contenu = java.util.Base64.getDecoder().decode(req.getFichierBase64());
+            char sep = req.getSeparateur() != null && !req.getSeparateur().isEmpty() ? req.getSeparateur().charAt(0) : ';';
+            List<Map<String, String>> brutes = com.ubisenderpro.importer.FileParser.parse(contenu, req.getNomFichier(), sep);
+            rows = appliquerMapping(brutes, req.getMapping());
+        } catch (Exception e) {
+            rapport.ajouterErreur(0, "Lecture du fichier impossible : " + e.getMessage());
+            return rapport;
+        }
+        rapport.setLignesLues(rows.size());
+        if (req.isSimulation()) { rapport.setComptesCrees(rows.size()); return rapport; }
+        Map<String, Object> c = traitement.apply(rows);
+        rapport.setComptesCrees(((Number) c.getOrDefault("crees", 0)).intValue());
+        rapport.setComptesMisAJour(((Number) c.getOrDefault("misAJour", 0)).intValue());
+        rapport.setLignesIgnorees(((Number) c.getOrDefault("ignores", 0)).intValue());
+        return rapport;
+    }
+
+    /** Renomme les colonnes du fichier vers les clés logiques attendues, d'après le mapping. */
+    private List<Map<String, String>> appliquerMapping(List<Map<String, String>> brutes, Map<String, String> mapping) {
+        List<Map<String, String>> out = new ArrayList<>();
+        for (Map<String, String> b : brutes) {
+            Map<String, String> m = new LinkedHashMap<>();
+            // Colonnes brutes accessibles telles quelles (normalisées en minuscules).
+            for (Map.Entry<String, String> e : b.entrySet()) {
+                if (e.getKey() != null) { m.put(e.getKey().toLowerCase().trim(), e.getValue()); }
+            }
+            // Mapping explicite : clé logique <- colonne choisie (prioritaire).
+            if (mapping != null) {
+                for (Map.Entry<String, String> e : mapping.entrySet()) {
+                    String col = e.getValue();
+                    if (col != null && b.containsKey(col)) { m.put(e.getKey(), b.get(col)); }
+                }
+            }
+            out.add(m);
+        }
+        return out;
+    }
+
+    private Map<String, Object> traiterFiches(List<Map<String, String>> rows) {
         int crees = 0, maj = 0, ignores = 0;
-        for (Map<String, String> r : parser(contenu)) {
+        for (Map<String, String> r : rows) {
             Optional<Client> c = client(r);
             if (!c.isPresent()) { ignores++; continue; }
             Long cid = c.get().getId();
@@ -62,9 +121,9 @@ public class RecImportService {
         return rapport(crees, maj, ignores);
     }
 
-    public Map<String, Object> importerCreances(String contenu) {
+    private Map<String, Object> traiterCreances(List<Map<String, String>> rows) {
         int crees = 0, ignores = 0;
-        for (Map<String, String> r : parser(contenu)) {
+        for (Map<String, String> r : rows) {
             Optional<Client> c = client(r);
             if (!c.isPresent()) { ignores++; continue; }
             RecCreance cr = new RecCreance();
@@ -81,9 +140,9 @@ public class RecImportService {
         return rapport(crees, 0, ignores);
     }
 
-    public Map<String, Object> importerPaiements(String contenu) {
+    private Map<String, Object> traiterPaiements(List<Map<String, String>> rows) {
         int crees = 0, ignores = 0;
-        for (Map<String, String> r : parser(contenu)) {
+        for (Map<String, String> r : rows) {
             Optional<Client> c = client(r);
             if (!c.isPresent()) { ignores++; continue; }
             RecPaiement p = new RecPaiement();
