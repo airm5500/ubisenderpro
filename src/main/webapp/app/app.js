@@ -2213,7 +2213,9 @@ Usp.showMain = function () {
                 region: 'north',
                 xtype: 'toolbar',
                 cls: 'usp-header',
-                height: 44,
+                // Hauteur légèrement augmentée : cloche/badge/déconnexion bien centrés et entièrement visibles.
+                height: 54,
+                layout: { type: 'hbox', align: 'middle' },
                 items: [
                     { xtype: 'tbtext', cls: 'usp-brand', text:
                         '<span class="usp-logo">' + Usp.LOGO + '</span>' +
@@ -2229,23 +2231,25 @@ Usp.showMain = function () {
                       tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
                       handler: function () { Usp.escalades.ouvrir(); } },
                     // Centre de notifications : cloche ronde sans cadre + badge collé.
-                    { xtype: 'component', itemId: 'uspNotif', margin: '0 8 0 0',
+                    { xtype: 'component', itemId: 'uspNotif', margin: '0 10 0 0',
                       html: '<span class="hdr-bell" title="Centre de notifications" onclick="Usp.notifications.ouvrir()">' +
                             '<span class="ico">🔔</span>' +
                             '<span class="hdr-badge" style="display:none">0</span></span>' },
-                    // À propos : icône seule, animée au survol.
-                    { xtype: 'button', itemId: 'uspAbout', cls: 'usp-icbtn', text: 'ℹ️', margin: '0 10 0 0',
-                      tooltip: 'À propos (version, développeur)', handler: function () { Usp.apropos(); } },
-                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
+                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 8 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
-                    { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
+                    // Nom de l'utilisateur en gras et un peu plus grand.
+                    { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), <span style="font-weight:bold;font-size:15px">'
+                        + Ext.String.htmlEncode(Usp.user.nomComplet) + '</span>' : '' },
                     // Déconnexion : bouton rond rouge bien visible (icône power-off blanche).
-                    { xtype: 'component', margin: '0 4 0 2',
+                    { xtype: 'component', margin: '0 6 0 4',
                       html: '<span class="hdr-logout" title="Déconnexion" onclick="Usp.deconnexion()">' +
                           "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
                           "stroke='#fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'>" +
                           "<path d='M18.36 6.64a9 9 0 1 1-12.73 0'/><line x1='12' y1='2' x2='12' y2='12'/>" +
-                          "</svg></span>" }
+                          "</svg></span>" },
+                    // À propos : placé après la déconnexion (icône animée au survol).
+                    { xtype: 'button', itemId: 'uspAbout', cls: 'usp-icbtn', text: 'ℹ️', margin: '0 8 0 0',
+                      tooltip: 'À propos (version, développeur)', handler: function () { Usp.apropos(); } }
                 ]
             },
             {
