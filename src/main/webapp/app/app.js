@@ -720,20 +720,22 @@ Usp.segmentationsGrid = function () {
                 { text: 'Description', dataIndex: 'description', flex: 1 },
                 { text: 'Ordre', dataIndex: 'ordreAffichage', width: 70 },
                 { text: 'Active', dataIndex: 'actif', width: 70, renderer: function (v) { return v ? 'Oui' : 'Non'; } },
-                { text: 'Suppr.', width: 60, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
-                  renderer: function () { return '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
+                { text: 'Actions', width: 170, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+                  renderer: function () {
+                      return '<span class="seg-edit" title="Modifier" style="cursor:pointer;margin:0 6px">✏️ Modifier</span>' +
+                          '<span class="seg-del" title="Supprimer" style="cursor:pointer;color:#c62828;margin:0 6px">🗑️</span>';
+                  } }
             ],
             tbar: [
                 Usp.permBtn('clients', 'CREER', { text: 'Nouvelle segmentation', handler: function () { form(null); } }),
-                Usp.permBtn('clients', 'MODIFIER', { text: '✏️ Modifier', handler: function (b) {
-                    var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                    if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une segmentation.'); return; }
-                    form(rec);
-                } }),
                 { text: 'Rafraîchir', handler: function () { store.load(); } }
             ],
             listeners: {
                 cellclick: function (g, td, ci, rec, tr, ri, e) {
+                    if (e.getTarget('.seg-edit')) {
+                        if (!Usp.can('clients', 'MODIFIER')) { Usp.refusPermission(); return; }
+                        form(rec); return;
+                    }
                     if (e.getTarget('.seg-del')) {
                         if (!Usp.can('clients', 'SUPPRIMER')) { Usp.refusPermission(); return; }
                         // Désactive une segmentation utilisée par des clients (au lieu de la supprimer).
