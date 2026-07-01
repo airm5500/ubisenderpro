@@ -1286,7 +1286,14 @@ Usp.dashboardChart._build = function () {
     var ligne = function (champ, titre, couleur) {
         return { type: 'line', axis: 'left', xField: 'date', yField: champ, title: titre, smooth: true,
             style: { stroke: couleur, 'stroke-width': 2 },
-            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur } };
+            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur },
+            highlight: { size: 6, radius: 6 },
+            // Info-bulle au survol d'un point : série + jour + volume.
+            tips: { trackMouse: true, width: 220, height: 52, renderer: function (rec) {
+                var n = rec.get(champ) || 0;
+                this.update('<b style="color:' + couleur + '">' + titre + '</b><br>' +
+                    rec.get('date') + ' — <b>' + n + '</b> message(s)');
+            } } };
     };
     return {
         xtype: 'panel', title: 'Évolution', anchor: '100%', height: 360,
@@ -1362,22 +1369,31 @@ Usp.chargerDashDefaut = function (cb) {
 
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
-    var cartes = Ext.create('Ext.Component', { anchor: '100%',
+    var cartes = Ext.create('Ext.Component', {
         html: '<div style="color:#999">Chargement des indicateurs…</div>' });
     var graphe = Usp.dashboardChart();
-    var items = [cartes];
-    if (graphe) { items.push(graphe); }
+    // Disposition « métro » : tuiles en colonnes au centre, courbe d'évolution
+    // fixée en bas (toujours visible, pas de scroll global de la page).
+    var centre = {
+        region: 'center', xtype: 'panel', border: false, autoScroll: true, bodyPadding: 12,
+        bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: [cartes]
+    };
+    var items = [centre];
+    if (graphe) {
+        items.push(Ext.apply(graphe, {
+            region: 'south', height: 290, split: true, collapsible: true, titleCollapse: true,
+            anchor: undefined, margin: 0
+        }));
+    }
     var panel = Ext.create('Ext.panel.Panel', {
-        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
-        // overflow-x caché : pas de scroll horizontal en bas.
-        bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: items,
+        title: 'Tableau de bord', layout: 'border', items: items,
         tools: [
             { type: 'gear', margin: '0 10 0 0', tooltip: 'Personnaliser (afficher / masquer / réordonner)', handler: function () { personnaliser(); } },
             { type: 'refresh', margin: '0 4 0 0', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }
         ]
     });
     var SECTIONS = [
-        { titre: 'Clients & contacts', items: [
+        { titre: 'Clients & contacts', c: '#1976d2', items: [
             { k: 'comptesClients', lib: 'Comptes clients', icon: '🏢', couleur: '#1976d2', vue: 'clients' },
             { k: 'contacts', lib: 'Contacts', icon: '👥', couleur: '#1976d2', vue: 'clients' },
             { k: 'contactsWhatsapp', lib: 'Contacts WhatsApp', icon: '💬', couleur: '#25d366' },
@@ -1385,29 +1401,29 @@ Usp.dashboardPanel = function () {
             { k: 'contactsConsentement', lib: 'Consentement', icon: '✅', couleur: '#2e7d32' },
             { k: 'contactsDesabonnes', lib: 'Désabonnés', icon: '⛔', couleur: '#c62828' }
         ] },
-        { titre: 'Catalogue', items: [
+        { titre: 'Catalogue', c: '#6a1b9a', items: [
             { k: 'articles', lib: 'Articles', icon: '📦', couleur: '#6a1b9a', vue: 'catalogue' },
             { k: 'articlesActifs', lib: 'Articles actifs', icon: '🟢', couleur: '#2e7d32' },
             { k: 'articlesRupture', lib: 'En rupture', icon: '⚠️', couleur: '#ef6c00' }
         ] },
-        { titre: 'Messagerie', items: [
+        { titre: 'Messagerie', c: '#00897b', items: [
             { k: 'conversationsOuvertes', lib: 'Conversations ouvertes', icon: '💬', couleur: '#1976d2', vue: 'inbox' },
             { k: 'conversationsNonLues', lib: 'Non lues', icon: '🔔', couleur: '#ef6c00', vue: 'inbox' },
             { k: 'messagesEnvoyes', lib: 'Messages envoyés', icon: '📤', couleur: '#1976d2', vue: 'historique' },
             { k: 'sessionsWebConnectees', lib: 'Sessions Web connectées', icon: '🔗', couleur: '#25d366', vue: 'waweb' }
         ] },
-        { titre: 'Campagnes & envois', items: [
+        { titre: 'Campagnes & envois', c: '#0a8f86', items: [
             { k: 'campagnesEnCours', lib: 'Campagnes en cours', icon: '🚀', couleur: '#1976d2', vue: 'campaigns' },
             { k: 'campagnesTerminees', lib: 'Campagnes terminées', icon: '🏁', couleur: '#2e7d32', vue: 'campaigns' },
             { k: 'envoisMasse', lib: 'Envois de masse', icon: '📨', couleur: '#6a1b9a', vue: 'historique' },
             { k: 'modeles', lib: 'Modèles actifs', icon: '📝', couleur: '#455a64', vue: 'settings' }
         ] },
-        { titre: 'Commercial', items: [
+        { titre: 'Commercial', c: '#ef6c00', items: [
             { k: 'commandes', lib: 'Commandes', icon: '🛒', couleur: '#6a1b9a' },
             { k: 'opportunitesOuvertes', lib: 'Opportunités ouvertes', icon: '🎯', couleur: '#ef6c00', vue: 'crm' },
             { k: 'imports', lib: 'Imports', icon: '📥', couleur: '#455a64' }
         ] },
-        { titre: 'Activité & usage', items: [
+        { titre: 'Activité & usage', c: '#455a64', items: [
             { k: 'connexionsAujourdhui', lib: "Connexions aujourd'hui", icon: '🔑', couleur: '#1976d2', vue: 'users' },
             { k: 'utilisateursActifs7j', lib: 'Utilisateurs actifs (7 j)', icon: '👥', couleur: '#2e7d32', vue: 'users' },
             { k: 'sessionsEnCours', lib: 'Sessions en cours', icon: '🟢', couleur: '#00897b', vue: 'users' },
@@ -1425,20 +1441,21 @@ Usp.dashboardPanel = function () {
         b = Math.round(b + (255 - b) * ratio);
         return 'rgb(' + r + ',' + g + ',' + b + ')';
     }
-    // Carte pleine en dégradé (Option B) : couleur de l'indicateur en fond,
-    // grande icône en filigrane, texte blanc. Clic = navigation (data-vue).
+    // Carte pleine en dégradé (Option B), en pleine largeur de sa colonne :
+    // couleur de l'indicateur en fond, grande icône en filigrane, texte blanc.
+    // Clic = navigation (data-vue).
     function carte(it, val) {
         var nav = it.vue ? ' data-vue="' + it.vue + '"' : '';
         return '<div class="usp-card usp-card-grad"' + nav +
             ' style="' + (it.vue ? 'cursor:pointer;' : '') +
-            'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:96px;margin:8px;' +
-            'padding:14px 16px;border-radius:14px;overflow:hidden;color:#fff;' +
+            'position:relative;display:block;min-height:76px;margin:8px 0 0;' +
+            'padding:11px 14px;border-radius:14px;overflow:hidden;color:#fff;' +
             'background:linear-gradient(135deg,' + it.couleur + ',' + eclaircir(it.couleur, 0.35) + ');' +
             'box-shadow:0 3px 10px rgba(0,0,0,.16)">' +
-            '<div style="position:absolute;right:-6px;bottom:-10px;font-size:62px;opacity:.22;pointer-events:none">' + it.icon + '</div>' +
-            '<div style="font-size:30px;font-weight:bold;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.15)">' +
+            '<div style="position:absolute;right:-6px;bottom:-10px;font-size:54px;opacity:.22;pointer-events:none">' + it.icon + '</div>' +
+            '<div style="font-size:26px;font-weight:bold;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.15)">' +
             (val == null ? '–' : val) + '</div>' +
-            '<div style="font-size:12px;opacity:.95;margin-top:6px">' + it.lib + '</div></div>';
+            '<div style="font-size:11.5px;opacity:.95;margin-top:5px">' + it.lib + '</div></div>';
     }
     // Sections ordonnées selon les préférences (les nouvelles s'ajoutent à la fin).
     function sectionsOrdonnees() {
@@ -1463,23 +1480,27 @@ Usp.dashboardPanel = function () {
         return liste;
     }
     var _dernier = {};
+    // Rendu « métro » en colonnes : une colonne par section (toute la largeur est
+    // utilisée), étiquette horizontale colorée en tête, tuiles empilées dessous.
     function rendre(d) {
         _dernier = d || _dernier;
         var conf = sectionsOrdonnees();
-        var html = '';
+        var cols = '';
         conf.liste.forEach(function (sec) {
             if (conf.caches[sec.titre]) { return; } // section masquée
             // Indicateurs de la section, ordonnés puis filtrés (hors ceux décochés).
             var visibles = itemsOrdonnes(sec, conf.ordreItems).filter(function (it) { return !conf.cachesItems[it.k]; });
             if (!visibles.length) { return; } // section vide -> masquée
-            html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
-                'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
-            html += '<div style="margin-bottom:14px">';
-            visibles.forEach(function (it) { html += carte(it, (_dernier || {})[it.k]); });
-            html += '</div>';
+            var col = '<div style="flex:1 1 0;min-width:168px">' +
+                '<div style="background:' + (sec.c || '#33404f') + ';color:#fff;font-size:11.5px;font-weight:bold;' +
+                'text-transform:uppercase;letter-spacing:.6px;padding:7px 12px;border-radius:9px;text-align:center;' +
+                'box-shadow:0 1px 3px rgba(0,0,0,.15)">' + sec.titre + '</div>';
+            visibles.forEach(function (it) { col += carte(it, (_dernier || {})[it.k]); });
+            cols += col + '</div>';
         });
-        if (!html) { html = '<div style="color:#999;padding:10px">Tous les indicateurs sont masqués. ' +
-            'Cliquez sur ⚙ pour en afficher.</div>'; }
+        var html = cols
+            ? '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' + cols + '</div>'
+            : '<div style="color:#999;padding:10px">Tous les indicateurs sont masqués. Cliquez sur ⚙ pour en afficher.</div>';
         cartes.update(html);
     }
 
