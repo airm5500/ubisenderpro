@@ -22,7 +22,9 @@ public class AboutResource {
     /** Version applicative (à mettre à jour à chaque livraison). */
     public static final String VERSION = "1.0.0";
     /** Développeur (renseigné une seule fois ici, rappelé dans « À propos »). */
-    public static final String DEVELOPPEUR = "Franck NZI";
+    public static final String DEVELOPPEUR = "Hermann NZI";
+    /** E-mail de contact du développeur. */
+    public static final String EMAIL = "nzifranck13@gmail.com";
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -31,6 +33,7 @@ public class AboutResource {
         m.put("application", APPLICATION);
         m.put("version", VERSION);
         m.put("developpeur", DEVELOPPEUR);
+        m.put("email", EMAIL);
         return m;
     }
 }

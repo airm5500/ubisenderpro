@@ -366,9 +366,9 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
             { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
               '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
             { xtype: 'hidden', name: 'articleId', value: rec ? rec.get('articleId') : null },
-            { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
+            Usp.cip7Field(rec ? rec.get('cip7') : ''),
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
-            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
+            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '', listeners: Usp.majListeners },
             // On informe simplement le client : Disponible ou Stock limité (pas de quantité/seuil).
             { xtype: 'combobox', name: 'dispoStatut', fieldLabel: 'Disponibilité', editable: false, queryMode: 'local',
               store: [['DISPONIBLE', 'Disponible'], ['STOCK_LIMITE', 'Stock limité']],

@@ -1170,7 +1170,8 @@ Usp.apropos = function () {
             msg: '<div style="padding:6px 2px;line-height:1.7">' +
                  '<b>' + Ext.String.htmlEncode(a.application || 'UbiSenderPro') + '</b><br>' +
                  'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
-                 'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b>' +
+                 'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
+                 'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b>' +
                  '</div>',
             buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 360
         });
@@ -1179,6 +1180,26 @@ Usp.apropos = function () {
 
 /* Listeners de mise en MAJUSCULES automatique d'un champ (noms clients / produits). */
 Usp.majListeners = { blur: function (f) { var v = f.getValue(); if (v) { f.setValue(String(v).toUpperCase()); } } };
+
+/* Renseigne un champ CIP7 avec un code à 7 chiffres garanti libre (serveur). */
+Usp.genererCip7 = function (field) {
+    if (!field) { return; }
+    Usp.ajax({ url: '/articles/cip7-libre', method: 'GET', success: function (resp) {
+        var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+        if (r.cip7) { field.setValue(r.cip7); }
+    } });
+};
+
+/* Champ CIP7 + bouton « générer » (7 chiffres uniques). name = nom du champ. */
+Usp.cip7Field = function (valeur) {
+    return { xtype: 'fieldcontainer', fieldLabel: 'CIP7', layout: 'hbox', items: [
+        { xtype: 'textfield', name: 'cip7', flex: 1, value: valeur || '',
+          emptyText: 'Saisir ou générer' },
+        { xtype: 'button', text: '🎲', width: 34, margin: '0 0 0 6',
+          tooltip: 'Générer un CIP7 unique (7 chiffres)',
+          handler: function (b) { Usp.genererCip7(b.up('fieldcontainer').down('textfield')); } }
+    ] };
+};
 
 /* Code par défaut : 4 chiffres aléatoires (modifiable). Préfixe optionnel. */
 Usp.codeAuto = function (prefixe) {

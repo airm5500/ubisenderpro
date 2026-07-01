@@ -270,9 +270,9 @@ Usp.marketing.produitForm = function (store, promotionId, rec) {
             { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
               '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
             { xtype: 'hidden', name: 'articleId', value: rec ? rec.get('articleId') : null },
-            { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
+            Usp.cip7Field(rec ? rec.get('cip7') : ''),
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
-            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
+            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '', listeners: Usp.majListeners },
             { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale commandée',
               minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
             { xtype: 'fieldcontainer', fieldLabel: 'Unité gratuite (UG)', layout: 'hbox',
