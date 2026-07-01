@@ -128,9 +128,20 @@ public class ReferentielGeoService {
      * (séparateur , ou ;). Dédupliqué par libellé. Renvoie le nombre créé.
      */
     public int importer(String type, String contenu) {
+        return importerRapport(type, contenu).getOrDefault("crees", 0);
+    }
+
+    /**
+     * Import détaillé pour l'assistant : renvoie un rapport
+     * {@code {lues, crees, ignores}} (lignes lues hors en-tête, valeurs créées,
+     * doublons/lignes vides ignorés).
+     */
+    public java.util.Map<String, Integer> importerRapport(String type, String contenu) {
         String t = typeValide(type);
-        if (contenu == null || contenu.trim().isEmpty()) { return 0; }
-        int crees = 0;
+        java.util.Map<String, Integer> r = new java.util.LinkedHashMap<>();
+        r.put("lues", 0); r.put("crees", 0); r.put("ignores", 0);
+        if (contenu == null || contenu.trim().isEmpty()) { return r; }
+        int lues = 0, crees = 0, ignores = 0;
         boolean premiere = true;
         for (String ligne : contenu.split("\\r?\\n")) {
             if (ligne == null || ligne.trim().isEmpty()) { continue; }
@@ -144,10 +155,12 @@ public class ReferentielGeoService {
             String code = null, nom;
             if (cols.length >= 2) { code = cols[0]; nom = cols[1]; }
             else { nom = cols[0]; }
-            if (nom == null || nom.isEmpty()) { continue; }
-            if (importerUn(t, code, nom)) { crees++; }
+            if (nom == null || nom.isEmpty()) { ignores++; continue; }
+            lues++;
+            if (importerUn(t, code, nom)) { crees++; } else { ignores++; }
         }
-        return crees;
+        r.put("lues", lues); r.put("crees", crees); r.put("ignores", ignores);
+        return r;
     }
 
     private boolean estEntete(String[] cols) {

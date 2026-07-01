@@ -49,6 +49,24 @@ Usp.history.store = function () {
 
 Usp.history.panel = function () {
     var store = Usp.history.store();
+    var statutSel = ''; // filtre statut appliqué côté client (données déjà chargées)
+
+    // Regroupe les statuts hétérogènes en familles pour le filtre.
+    var familleStatut = function (v) {
+        var s = (v || '').toUpperCase();
+        if (s === 'ECHEC' || s === 'ECHOUE' || s === 'FAILED') { return 'ECHEC'; }
+        if (s === 'ENVOYE' || s === 'SENT') { return 'ENVOYE'; }
+        if (s === 'DELIVRE' || s === 'DISTRIBUE') { return 'DISTRIBUE'; }
+        if (s === 'LU') { return 'LU'; }
+        return 'AUTRE';
+    };
+    var appliquerStatut = function () {
+        store.clearFilter(true);
+        if (statutSel) {
+            store.filterBy(function (rec) { return familleStatut(rec.get('statut')) === statutSel; });
+        }
+    };
+    store.on('load', appliquerStatut);
 
     var recharger = function (grid) {
         var tb = grid.down('toolbar');
@@ -111,6 +129,11 @@ Usp.history.panel = function () {
             { xtype: 'datefield', itemId: 'fDateFin', emptyText: 'Au', width: 110,
               format: 'd/m/Y', editable: false,
               listeners: { select: function (f) { recharger(f.up('grid')); } } },
+            { xtype: 'combobox', itemId: 'fStatut', fieldLabel: 'Statut', labelWidth: 45, width: 170,
+              emptyText: 'Tous', editable: false, queryMode: 'local',
+              store: [['', 'Tous'], ['ENVOYE', 'Envoyés'], ['DISTRIBUE', 'Distribués'],
+                      ['LU', 'Lus'], ['ECHEC', 'Échecs'], ['AUTRE', 'Autres']],
+              listeners: { select: function (c) { statutSel = c.getValue() || ''; appliquerStatut(); } } },
             { xtype: 'textfield', itemId: 'fRecherche', emptyText: 'Numéro, nom, contenu…', width: 200,
               listeners: { specialkey: function (f, e) {
                   if (e.getKey() === e.ENTER) { recharger(f.up('grid')); } } } },
@@ -120,12 +143,25 @@ Usp.history.panel = function () {
                 tb.down('#fCanal').setValue(''); tb.down('#fType').setValue('');
                 tb.down('#fRecherche').setValue('');
                 tb.down('#fDateDebut').setValue(''); tb.down('#fDateFin').setValue('');
+                tb.down('#fStatut').setValue(''); statutSel = '';
                 recharger(g);
             } },
             '->',
-            { text: 'Rafraîchir', handler: function (b) { recharger(b.up('grid')); } }
+            { itemId: 'btnRefresh', text: '<span class="hist-refresh-ic">↻</span> Rafraîchir',
+              handler: function (b) { recharger(b.up('grid')); } }
         ].concat(Usp.export.boutons('Historique des envois')),
         listeners: {
+            afterrender: function (grid) {
+                // Icône « rafraîchir » animée pendant le chargement.
+                var btn = grid.down('#btnRefresh');
+                var spin = function (on) {
+                    if (!btn || !btn.btnInnerEl) { return; }
+                    var ic = btn.btnInnerEl.dom.querySelector('.hist-refresh-ic');
+                    if (ic) { ic.className = on ? 'hist-refresh-ic usp-spin' : 'hist-refresh-ic'; }
+                };
+                store.on('beforeload', function () { spin(true); });
+                store.on('load', function () { spin(false); });
+            },
             cellclick: function (grid, td, cellIndex, rec, tr, rowIndex, e) {
                 if (e.getTarget('.hist-det')) { Usp.history.detail(rec); }
             },

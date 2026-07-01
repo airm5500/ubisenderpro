@@ -55,7 +55,6 @@ public class ReferentielGeoResource {
     @Path("/{type}/import")
     @Secured(roles = {"ADMIN"})
     public Response importer(@PathParam("type") String type, java.util.Map<String, String> body) {
-        int crees = service.importer(type, body == null ? null : body.get("contenu"));
-        return Response.ok(java.util.Collections.singletonMap("crees", crees)).build();
+        return Response.ok(service.importerRapport(type, body == null ? null : body.get("contenu"))).build();
     }
 }

@@ -184,7 +184,10 @@ Usp.ajax = function (options) {
         // Cloche de notifications avec activité (pace-maker) + pastille de comptage.
         + '.usp-notif-actif .x-btn-inner{animation:uspPace 1.1s ease-in-out infinite}'
         + '.usp-notif-badge{background:#c62828;color:#fff;border-radius:9px;padding:0 5px;font-size:10px;'
-        + 'font-weight:bold;margin-left:3px;vertical-align:top}';
+        + 'font-weight:bold;margin-left:3px;vertical-align:top}'
+        // Icône « rafraîchir » animée (rotation) pendant un chargement.
+        + '@keyframes uspSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}'
+        + '.usp-spin{display:inline-block;animation:uspSpin .8s linear infinite}';
     var style = document.createElement('style');
     style.type = 'text/css';
     style.appendChild(document.createTextNode(css));

@@ -663,34 +663,71 @@ Usp.settings.referentielsPanel = function () {
     };
 };
 
-/* Import CSV (id,code,nom) ou (code,nom) ou (nom) d'un référentiel géographique. */
+/* Assistant d'import d'un référentiel géographique : saisie/fichier -> aperçu
+ * (comptage + échantillon) -> import -> rapport (créés / ignorés). */
 Usp.settings.importerRefGeo = function (type, store) {
+    var majApercu = function (win) {
+        var contenu = win.down('[name=contenu]').getValue() || '';
+        var cmp = win.down('#refApercu');
+        var lignes = contenu.split(/\r?\n/).filter(function (l) { return l.trim() !== ''; });
+        // Ignore une éventuelle ligne d'en-tête (contient id/code/nom/libellé).
+        if (lignes.length && /(^|;|,|\t)\s*(id|code|nom|libell)/i.test(lignes[0])) { lignes = lignes.slice(1); }
+        if (!lignes.length) { cmp.update('<span style="color:#888">Aucune ligne à importer pour le moment.</span>'); return; }
+        var apercu = lignes.slice(0, 8).map(function (l) {
+            var c = l.split(/[;,\t]/);
+            var code = c.length >= 2 ? c[0].trim() : '<i>(auto)</i>';
+            var nom = (c.length >= 2 ? c[1] : c[0]).trim();
+            return '<tr><td style="padding:1px 10px 1px 0;color:#1976d2">' + Ext.String.htmlEncode(code) +
+                '</td><td>' + Ext.String.htmlEncode(nom) + '</td></tr>';
+        }).join('');
+        cmp.update('<div style="font-size:12px"><b>' + lignes.length + '</b> valeur(s) détectée(s). Aperçu :' +
+            '<table style="margin-top:4px;border-collapse:collapse"><tr style="color:#888">' +
+            '<td style="padding-right:10px">Code</td><td>Libellé</td></tr>' + apercu +
+            (lignes.length > 8 ? '<tr><td colspan="2" style="color:#888">… (+' + (lignes.length - 8) + ')</td></tr>' : '') +
+            '</table></div>');
+    };
     var win = Ext.create('Ext.window.Window', {
-        title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
+        title: 'Assistant d\'import — ' + type, width: 560, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Une ligne par valeur, format ' +
-                '<b>code;libellé</b> (séparateur <b>;</b>, <b>sans</b> la colonne id). ' +
-                'Ex. <code>CI;COTE D\'IVOIRE</code>. Une éventuelle ligne d\'en-tête est ignorée.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'CI;COTE D\'IVOIRE\nABJ;ABIDJAN' },
+            { xtype: 'displayfield', value: '<span style="color:#888"><b>Étape 1</b> — Collez vos données ou ' +
+                'choisissez un fichier .csv. Format <b>code;libellé</b> (séparateur <b>;</b>, sans colonne id). ' +
+                'Ex. <code>CI;COTE D\'IVOIRE</code>. Une ligne d\'en-tête éventuelle est ignorée.</span>' },
+            { xtype: 'textareafield', name: 'contenu', height: 150, emptyText: 'CI;COTE D\'IVOIRE\nABJ;ABIDJAN',
+              listeners: { change: function (f) { majApercu(f.up('window')); }, buffer: 300 } },
             { xtype: 'filefield', buttonOnly: false, fieldLabel: 'ou fichier .csv', msgTarget: 'side',
               listeners: { change: function (f) {
                   var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
                   var reader = new FileReader();
-                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
+                  reader.onload = function (e) {
+                      f.up('form').down('[name=contenu]').setValue(e.target.result);
+                      majApercu(f.up('window'));
+                  };
                   reader.readAsText(file);
-              } } }
+              } } },
+            { xtype: 'displayfield', value: '<span style="color:#888"><b>Étape 2</b> — Vérifiez l\'aperçu :</span>' },
+            { xtype: 'component', itemId: 'refApercu', style: 'padding:6px;background:#fafafa;border:1px solid #eee;border-radius:4px',
+              html: '<span style="color:#888">Aucune ligne à importer pour le moment.</span>' }
         ] }],
-        buttons: [{ text: 'Importer', handler: function (b) {
-            var contenu = b.up('window').down('[name=contenu]').getValue();
-            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée à importer.'); return; }
-            Usp.ajax({ url: '/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
-                success: function (resp) {
-                    win.close(); store.load();
-                    var r = Ext.decode(resp.responseText) || {};
-                    Usp.toast((r.crees || 0) + ' valeur(s) importée(s).');
-                },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-        } }]
+        buttons: [
+            { text: 'Annuler', handler: function () { win.close(); } },
+            { text: '📥 Importer', handler: function (b) {
+                var contenu = b.up('window').down('[name=contenu]').getValue();
+                if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée à importer.'); return; }
+                b.disable(); win.setLoading('Import en cours…');
+                Usp.ajax({ url: '/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
+                    success: function (resp) {
+                        win.setLoading(false); win.close(); store.load();
+                        var r = Ext.decode(resp.responseText) || {};
+                        Ext.Msg.show({ title: 'Rapport d\'import', buttons: Ext.Msg.OK, width: 380,
+                            msg: '<div style="font-family:sans-serif">' +
+                                '📄 Lues : <b>' + (r.lues || 0) + '</b><br>' +
+                                '✅ Créées : <b style="color:#2e7d32">' + (r.crees || 0) + '</b><br>' +
+                                '⏭️ Ignorées (doublons/vides) : <b>' + (r.ignores || 0) + '</b></div>' });
+                        Usp.toast((r.crees || 0) + ' valeur(s) importée(s).');
+                    },
+                    failure: function (resp) { win.setLoading(false); b.enable(); Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            } }
+        ]
     });
     win.show();
 };
