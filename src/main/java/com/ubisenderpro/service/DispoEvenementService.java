@@ -96,6 +96,10 @@ public class DispoEvenementService {
         ex.setAudience(data.getAudience());
         ex.setSegmentationId(data.getSegmentationId());
         ex.setSegmentationIds(data.getSegmentationIds());
+        ex.setRegion(data.getRegion());
+        ex.setTournee(data.getTournee());
+        ex.setListeId(data.getListeId());
+        ex.setContactIds(data.getContactIds());
         ex.setCanal(data.getCanal());
         ex.setResponsable(data.getResponsable());
         ex.setUpdatedAt(LocalDateTime.now());
@@ -158,6 +162,10 @@ public class DispoEvenementService {
         c.setAudience(src.getAudience());
         c.setSegmentationId(src.getSegmentationId());
         c.setSegmentationIds(src.getSegmentationIds());
+        c.setRegion(src.getRegion());
+        c.setTournee(src.getTournee());
+        c.setListeId(src.getListeId());
+        c.setContactIds(src.getContactIds());
         c.setCanal(src.getCanal());
         c.setResponsable(src.getResponsable());
         c.setStatut("BROUILLON");

@@ -536,13 +536,15 @@ public class EnvoiProposeService {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
             audienceCampagne = e.getAudience() != null ? e.getAudience() : evt.getAudience();
-            // Ciblage porté par l'événement de disponibilité (segments / agence).
+            // Ciblage porté par l'événement de disponibilité (mêmes options que les infos).
             if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) {
                 if (!nz(evt.getSegmentationIds()).isEmpty()) { cibleSegmentationIds = evt.getSegmentationIds(); }
                 else if (evt.getSegmentationId() != null) { cibleSegmentationId = evt.getSegmentationId(); }
-            } else if ("AGENCE".equals(audienceCampagne)) {
-                cibleAgence = evt.getAgence();
-            }
+            } else if ("AGENCE".equals(audienceCampagne)) { cibleAgence = evt.getAgence(); }
+            else if ("REGION".equals(audienceCampagne)) { cibleRegion = evt.getRegion(); }
+            else if ("TOURNEE".equals(audienceCampagne)) { cibleTournee = evt.getTournee(); }
+            else if ("LISTE_DE_DIFFUSION".equals(audienceCampagne)) { cibleListeId = evt.getListeId(); }
+            else if ("CONTACTS_MANUELS".equals(audienceCampagne)) { cibleContactIds = evt.getContactIds(); }
             List<String> manquants = elementsDispoManquants(evt);
             if (!manquants.isEmpty()) {
                 throw new ValidationException("variables",

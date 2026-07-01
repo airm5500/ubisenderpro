@@ -1434,7 +1434,11 @@ Usp.multiPicker = function (cfg) {
     var container;
     var resumeHtml = function () {
         if (!current.length) { return '<span style="color:#999">Aucun sélectionné</span>'; }
-        var labels = current.map(function (v) { var i = store.findExact('v', v); return i >= 0 ? store.getAt(i).get('t') : v; });
+        var labels = current.map(function (v) {
+            // Comparaison souple (l'id peut être numérique côté store et texte côté CSV).
+            var i = store.findBy(function (rec) { return String(rec.get('v')) === String(v); });
+            return i >= 0 ? store.getAt(i).get('t') : v;
+        });
         return Ext.String.htmlEncode(labels.join(', '));
     };
     var majResume = function () { if (container) { container.down('#resume').update(resumeHtml()); } };
@@ -1581,6 +1585,94 @@ Usp.ajouterAListe = function (rows) {
         } }, { text: 'Annuler', handler: function (b) { b.up('window').close(); } }]
     });
     win.show();
+};
+
+/* ---------- Composant AUDIENCE réutilisable (Informations, Disponibilités…) ---------- */
+/* Une audience pilote l'affichage d'UN seul champ complémentaire ; sélections
+ * multiples via le SMC (segments/agences/régions/tournées) et le SCL (clients). */
+Usp.AUDIENCES = [
+    ['TOUS_LES_SEGMENTS', 'Tous les segments'],
+    ['SEGMENTS_SELECTIONNES', 'Un ou plusieurs segments'],
+    ['AGENCE', 'Une ou plusieurs agences'],
+    ['REGION', 'Une ou plusieurs régions'],
+    ['TOURNEE', 'Une ou plusieurs tournées'],
+    ['LISTE_DE_DIFFUSION', 'Liste de diffusion'],
+    ['CONTACTS_MANUELS', 'Sélection manuelle de clients']
+];
+
+/* Champ « sélection manuelle de clients » (via le SCL) : stocke contactIds en CSV. */
+Usp.audienceContactsField = function (valeur) {
+    var current = valeur ? String(valeur).split(',').filter(function (x) { return x; }) : [];
+    var resume = current.length ? current.length + ' client(s) sélectionné(s)' : '<span style="color:#999">Aucun</span>';
+    return { xtype: 'fieldcontainer', itemId: 'aud_contacts', fieldLabel: 'Clients sélectionnés', hidden: true, layout: 'hbox', items: [
+        { xtype: 'hiddenfield', name: 'contactIds', value: current.join(',') },
+        { xtype: 'component', itemId: 'resume', flex: 1, style: 'padding-top:5px', html: resume },
+        { xtype: 'button', text: '☑ Choisir des clients', width: 160, margin: '0 0 0 8', handler: function (b) {
+            var wrap = b.up('fieldcontainer');
+            Usp.clientPicker({ title: 'Sélection manuelle de clients', boutonValider: 'Valider la sélection',
+                onValider: function (rows) {
+                    var ids = rows.map(function (r) { return r.contactId; }).filter(function (x) { return x; });
+                    wrap.down('[name=contactIds]').setValue(ids.join(','));
+                    wrap.down('#resume').update(ids.length + ' client(s) sélectionné(s)');
+                } });
+        } }
+    ] };
+};
+
+/* Items du bloc audience (combo + champs pilotés). g = getter de valeurs existantes. */
+Usp.audienceFields = function (g) {
+    g = g || function () { return null; };
+    var seg = g('segmentationIds') || (g('segmentationId') ? String(g('segmentationId')) : '');
+    return [
+        { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
+          store: Usp.AUDIENCES, value: g('audience') || 'TOUS_LES_SEGMENTS',
+          listeners: { change: function (c) { Usp.majAudienceFields(c.up('form')); } } },
+        Usp.multiPicker({ itemId: 'aud_segment', name: 'segmentationIds', fieldLabel: 'Segments ciblés', hidden: true,
+            url: '/segmentations', valueField: 'id', displayField: 'libelle', value: seg }),
+        Usp.multiPicker({ itemId: 'aud_agence', name: 'agence', fieldLabel: 'Agences ciblées', hidden: true,
+            url: '/referentiels/AGENCE', valueField: 'libelle', displayField: 'libelle', value: g('agence') || '' }),
+        Usp.multiPicker({ itemId: 'aud_region', name: 'region', fieldLabel: 'Régions ciblées', hidden: true,
+            url: '/referentiels/REGION', valueField: 'libelle', displayField: 'libelle', value: g('region') || '' }),
+        Usp.multiPicker({ itemId: 'aud_tournee', name: 'tournee', fieldLabel: 'Tournées ciblées', hidden: true,
+            url: '/referentiels/TOURNEE', valueField: 'libelle', displayField: 'libelle', value: g('tournee') || '' }),
+        { xtype: 'fieldcontainer', itemId: 'aud_liste', fieldLabel: 'Liste de diffusion', hidden: true, layout: 'hbox', items: [
+            { xtype: 'combobox', name: 'listeId', flex: 1, valueField: 'id', displayField: 'nom', queryMode: 'local',
+              editable: false, value: g('listeId'), emptyText: 'Choisir une liste…',
+              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
+                  proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
+                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
+            { xtype: 'button', text: '👁 Voir le contenu', width: 140, margin: '0 0 0 8', handler: function (b) {
+                var lid = b.up('fieldcontainer').down('[name=listeId]').getValue();
+                if (!lid) { Ext.Msg.alert('Info', 'Choisissez d\'abord une liste.'); return; }
+                Usp.voirListeContenu(lid);
+            } }
+        ] },
+        Usp.audienceContactsField(g('contactIds'))
+    ];
+};
+
+/* Affiche le seul champ complémentaire correspondant à l'audience choisie. */
+Usp.majAudienceFields = function (formPanel) {
+    if (!formPanel) { return; }
+    var aud = formPanel.down('[name=audience]');
+    var v = aud ? aud.getValue() : null;
+    var map = { SEGMENTS_SELECTIONNES: 'aud_segment', AGENCE: 'aud_agence', REGION: 'aud_region',
+        TOURNEE: 'aud_tournee', LISTE_DE_DIFFUSION: 'aud_liste', CONTACTS_MANUELS: 'aud_contacts' };
+    ['aud_segment', 'aud_agence', 'aud_region', 'aud_tournee', 'aud_liste', 'aud_contacts'].forEach(function (id) {
+        var f = formPanel.down('#' + id); if (f) { f.setVisible(map[v] === id); }
+    });
+};
+
+/* Contenu (lecture seule) d'une liste de diffusion. */
+Usp.voirListeContenu = function (listeId) {
+    var store = Ext.create('Ext.data.Store', { fields: ['id', 'nomComplet', 'numeroWhatsapp'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/lists/' + listeId + '/contacts',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    Ext.create('Ext.window.Window', { title: 'Contenu de la liste', width: 520, height: 420, modal: true, layout: 'fit',
+        items: [{ xtype: 'grid', store: store, columns: [
+            { text: 'Nom', dataIndex: 'nomComplet', flex: 1 },
+            { text: 'WhatsApp', dataIndex: 'numeroWhatsapp', width: 160 }
+        ] }] }).show();
 };
 
 /* Durée lisible entre deux dates (ex. « 29 jours », « 1 mois 10 jours », « 4 mois »). */

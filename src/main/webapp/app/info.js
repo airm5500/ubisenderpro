@@ -163,8 +163,8 @@ Usp.info.form = function (store, rec, typeParDefaut) {
     };
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Information — ' + Ext.String.htmlEncode(rec.get('titre')) : 'Nouvelle information',
-        width: 720, height: Ext.getBody().getViewSize().height - 60, maxHeight: 760, modal: true, layout: 'fit',
-        items: [{ xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%', labelWidth: 170 }, items: [
+        width: 840, height: Ext.getBody().getViewSize().height - 60, maxHeight: 780, modal: true, layout: 'fit',
+        items: [{ xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%', labelWidth: 200 }, items: [
             { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false,
               value: g('code') || Usp.codeAuto(), emptyText: 'Généré — modifiable' },
             { xtype: 'combobox', name: 'type', fieldLabel: 'Type', editable: false, queryMode: 'local', allowBlank: false,
@@ -174,37 +174,10 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               emptyText: 'Texte libre injecté dans le modèle ({{message}})' },
             { xtype: 'combobox', name: 'priorite', fieldLabel: 'Priorité', editable: false, queryMode: 'local',
               store: Usp.info.PRIORITES, value: g('priorite') || 'NORMALE' },
-            { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-              store: Usp.info.AUDIENCES, value: g('audience') || 'TOUS_LES_SEGMENTS',
-              listeners: { change: function (c) { Usp.info.majAudience(c.up('form')); } } },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', editable: false, queryMode: 'local',
               store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: g('canal') || 'WEB' },
-            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || Usp.societeParDefaut || '' },
-            // Champ complémentaire unique, affiché selon l'audience choisie (voir majAudience).
-            // Sélection multiple possible (un ou plusieurs) pour chaque type de cible.
-            Usp.multiPicker({ itemId: 'aud_segment', name: 'segmentationIds', fieldLabel: 'Segments ciblés', hidden: true,
-                url: '/segmentations', valueField: 'id', displayField: 'libelle',
-                value: g('segmentationIds') || (g('segmentationId') ? String(g('segmentationId')) : '') }),
-            Usp.multiPicker({ itemId: 'aud_agence', name: 'agence', fieldLabel: 'Agences ciblées', hidden: true,
-                url: '/referentiels/AGENCE', valueField: 'libelle', displayField: 'libelle', value: g('agence') || '' }),
-            Usp.multiPicker({ itemId: 'aud_region', name: 'region', fieldLabel: 'Régions ciblées', hidden: true,
-                url: '/referentiels/REGION', valueField: 'libelle', displayField: 'libelle', value: g('region') || '' }),
-            Usp.multiPicker({ itemId: 'aud_tournee', name: 'tournee', fieldLabel: 'Tournées ciblées', hidden: true,
-                url: '/referentiels/TOURNEE', valueField: 'libelle', displayField: 'libelle', value: g('tournee') || '' }),
-            { xtype: 'combobox', itemId: 'aud_liste', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
-              valueField: 'id', displayField: 'nom', value: g('listeId'), hidden: true,
-              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
-                  proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
-                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
-            { xtype: 'combobox', multiSelect: true, itemId: 'aud_contacts', name: 'contactIds', fieldLabel: 'Clients / contacts',
-              queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom', hidden: true,
-              emptyText: 'Tapez 2 lettres pour rechercher…',
-              value: g('contactIds') ? String(g('contactIds')).split(',') : [],
-              listConfig: { getInnerTpl: function () {
-                  return '<b>{code}</b> {entreprise} <span style="color:#999">{nom}</span>'; } },
-              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero', 'code', 'entreprise'],
-                  proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
-                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
+            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || Usp.societeParDefaut || '' }
+        ].concat(Usp.audienceFields(g)).concat([
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Direction / signataire', value: g('responsable') || '' },
             { xtype: 'datefield', name: 'dateEnvoi', fieldLabel: 'Date d\'envoi', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateEnvoi') },
             { xtype: 'datefield', name: 'dateFinValidite', fieldLabel: 'Fin de validité', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateFinValidite') },
@@ -225,7 +198,7 @@ Usp.info.form = function (store, rec, typeParDefaut) {
                 { xtype: 'textfield', name: 'pharmacienGarde', fieldLabel: 'Pharmacien de garde', value: g('pharmacienGarde') || '' },
                 { xtype: 'textfield', name: 'telephonePharmacien', fieldLabel: 'Téléphone du pharmacien', value: g('telephonePharmacien') || '' }
             ] }
-        ] }],
+        ]) }],
         buttons: [
             { text: 'Annuler', handler: function () { win.close(); } },
             { text: 'Enregistrer', handler: function (b) {
@@ -248,5 +221,5 @@ Usp.info.form = function (store, rec, typeParDefaut) {
         ]
     });
     win.show();
-    Usp.info.majAudience(win.down('form'));
+    Usp.majAudienceFields(win.down('form'));
 };

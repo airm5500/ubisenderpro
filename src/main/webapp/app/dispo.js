@@ -159,7 +159,8 @@ Usp.dispo.regleForm = function (store, rec) {
 Usp.dispo.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'description', 'dateDebut', 'dateFin', 'agence',
-                 'societe', 'audience', 'segmentationId', 'segmentationIds', 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
+                 'societe', 'audience', 'segmentationId', 'segmentationIds', 'region', 'tournee', 'listeId', 'contactIds',
+                 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/dispo-evenements',
             extraParams: filtre,
@@ -243,22 +244,16 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
           value: rec && rec.get('dateDebut') ? Ext.Date.parse(String(rec.get('dateDebut')).substring(0, 10), 'Y-m-d') : null },
         { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateFin') ? Ext.Date.parse(String(rec.get('dateFin')).substring(0, 10), 'Y-m-d') : null },
-        Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence', value: rec ? rec.get('agence') : '' }),
         { xtype: 'textfield', name: 'societe', fieldLabel: 'Société',
           value: rec ? rec.get('societe') : (Usp.societeParDefaut || '') },
-        { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-          store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'TOUS_LES_SEGMENTS',
-          listeners: { change: function (c) { Usp.dispo.majAudience(c.up('form')); } } },
-        Usp.multiPicker({ itemId: 'de_segment', name: 'segmentationIds', fieldLabel: 'Segments ciblés', hidden: true,
-            url: '/segmentations', valueField: 'id', displayField: 'libelle',
-            value: rec ? (rec.get('segmentationIds') || (rec.get('segmentationId') ? String(rec.get('segmentationId')) : '')) : '' }),
         { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal d\'envoi', editable: false, queryMode: 'local',
           store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp (officielle)']], value: rec ? (rec.get('canal') || 'WEB') : 'WEB' },
         { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
-    ];
+    // Bloc audience identique à « Informations clients » (composant réutilisable).
+    ].concat(Usp.audienceFields(function (n) { return rec ? rec.get(n) : null; }));
 
     var formItems = [{ xtype: 'form', itemId: 'deForm', border: false, bodyPadding: '0 0 8 0',
-        defaults: { anchor: '100%', labelWidth: 130 }, items: items }];
+        defaults: { anchor: '100%', labelWidth: 180 }, items: items }];
     if (rec) {
         formItems.push(Usp.dispo.produitsGrid(rec.get('id')));
     } else {
@@ -277,6 +272,8 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
             if (!form.isValid()) { return; }
             if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
             var v = form.getValues();
+            // listeId : numérique ou absent (comme dans Informations).
+            if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
             Usp.ajax({ url: rec ? '/dispo-evenements/' + rec.get('id') : '/dispo-evenements',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
                 success: function (resp) {
@@ -299,15 +296,7 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
     win.show();
     var dForm = win.down('#deForm').getForm();
     Usp.lierPeriode(dForm.findField('dateDebut'), dForm.findField('dateFin'));
-    Usp.dispo.majAudience(win.down('#deForm'));
-};
-
-/* Affiche le sélecteur de segments uniquement pour l'audience « Un ou plusieurs segments ». */
-Usp.dispo.majAudience = function (formPanel) {
-    if (!formPanel) { return; }
-    var aud = formPanel.down('[name=audience]');
-    var seg = formPanel.down('#de_segment');
-    if (seg) { seg.setVisible(aud && aud.getValue() === 'SEGMENTS_SELECTIONNES'); }
+    Usp.majAudienceFields(win.down('#deForm'));
 };
 
 /* Sous-grille des produits d'un événement. */
