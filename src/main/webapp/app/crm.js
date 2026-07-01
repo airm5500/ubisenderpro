@@ -15,15 +15,28 @@ Usp.crm._reload = null;
 
 Usp.crm.carte = function (rec) {
     var montant = rec.montantEstime ? Ext.util.Format.number(rec.montantEstime, '0,000') + ' F' : '';
+    var client = rec.clientNom ? Ext.String.htmlEncode(rec.clientNom) : ('#' + (rec.clientId || '-'));
+    var lienClient = rec.clientId
+        ? '<div style="font-size:11px"><span onclick="event.stopPropagation();Usp.crm.ouvrirClient(' + rec.clientId + ')" ' +
+          'style="cursor:pointer;color:#1976d2;text-decoration:underline">👤 ' + client + '</span></div>'
+        : '<div style="font-size:11px;color:#555">Client : -</div>';
     return '<div class="usp-card" draggable="true" ondragstart="Usp.crm.drag(event,' + rec.id + ')" ' +
         'data-id="' + rec.id + '" style="background:#fff;border:1px solid #ddd;border-radius:6px;' +
         'padding:8px;margin:6px;cursor:move;box-shadow:0 1px 2px rgba(0,0,0,.1)">' +
         '<div style="font-weight:bold">Opp #' + rec.id + '</div>' +
-        '<div style="font-size:11px;color:#555">Client : ' + (rec.clientId || '-') + '</div>' +
-        '<div style="font-size:11px;color:#555">Agent : ' + (rec.agentId || '-') + '</div>' +
+        lienClient +
+        (rec.agentNom ? '<div style="font-size:11px;color:#555">Agent : ' + Ext.String.htmlEncode(rec.agentNom) + '</div>' : '') +
         (montant ? '<div style="font-size:11px;color:#2a7">' + montant + '</div>' : '') +
         (rec.prochaineAction ? '<div style="font-size:10px;color:#999">' + Ext.String.htmlEncode(rec.prochaineAction) + '</div>' : '') +
         '</div>';
+};
+
+/* Ouvre la fiche du client rattaché à une opportunité. */
+Usp.crm.ouvrirClient = function (clientId) {
+    if (!clientId || !Usp.clientForm || !Usp.createClientStore) { return; }
+    var store = Usp.createClientStore(true);
+    var rec = Ext.create(store.model, { id: clientId });
+    Usp.clientForm(store, rec);
 };
 
 /* ---- Handlers de glisser-déposer (HTML5 natif) ---- */
@@ -88,20 +101,55 @@ Usp.crm.panel = function () {
     return board;
 };
 
+/* Sélecteur de client (recherche distante par nom). */
+Usp.crm.clientCombo = function (cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nomCompte', 'numeroClient'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/clients', queryParam: 'q',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
+            reader: { type: 'json', root: 'data', totalProperty: 'total' } } });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nomCompte',
+        queryMode: 'remote', minChars: 2, anchor: '100%', emptyText: 'Tapez 2 lettres…',
+        listConfig: { getInnerTpl: function () { return '{nomCompte} <span style="color:#999">{numeroClient}</span>'; } } }, cfg || {});
+};
+
+/* Sélecteur de contact (recherche distante). */
+Usp.crm.contactCombo = function (cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'client', 'numero'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nom',
+        queryMode: 'remote', queryParam: 'q', minChars: 2, anchor: '100%', emptyText: 'Tapez 2 lettres…',
+        listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } } }, cfg || {});
+};
+
+/* Sélecteur d'agent (utilisateurs affectables). */
+Usp.crm.agentCombo = function (cfg) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/users/affectables',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nom',
+        queryMode: 'local', editable: false, anchor: '100%', emptyText: 'Choisir un agent…' }, cfg || {});
+};
+
 Usp.crm.oppForm = function (reload) {
     var win = Ext.create('Ext.window.Window', {
         title: 'Nouvelle opportunité', width: 420, modal: true, bodyPadding: 12,
-        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'numberfield', name: 'clientId', fieldLabel: 'ID client' },
-            { xtype: 'numberfield', name: 'contactId', fieldLabel: 'ID contact' },
-            { xtype: 'numberfield', name: 'agentId', fieldLabel: 'ID agent' },
-            { xtype: 'numberfield', name: 'montantEstime', fieldLabel: 'Montant estimé' },
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 120 }, items: [
+            Usp.crm.clientCombo({ name: 'clientId', fieldLabel: 'Client', allowBlank: false }),
+            Usp.crm.contactCombo({ name: 'contactId', fieldLabel: 'Contact' }),
+            Usp.crm.agentCombo({ name: 'agentId', fieldLabel: 'Agent' }),
+            { xtype: 'numberfield', name: 'montantEstime', fieldLabel: 'Montant estimé', hideTrigger: true, minValue: 0 },
             { xtype: 'textfield', name: 'prochaineAction', fieldLabel: 'Prochaine action' },
             { xtype: 'combobox', name: 'statut', fieldLabel: 'Étape', value: 'NOUVEAU_CONTACT',
-              store: Usp.crm.STATUTS, editable: false }
+              store: Usp.crm.STATUTS, editable: false, queryMode: 'local' }
         ] }],
-        buttons: [{ text: 'Créer', handler: function (b) {
-            var v = b.up('window').down('form').getForm().getValues();
+        buttons: [{ text: 'Créer', formBind: true, handler: function (b) {
+            var form = b.up('window').down('form').getForm();
+            if (!form.isValid()) { Ext.Msg.alert('Champs requis', 'Choisissez au moins un client.'); return; }
+            var v = form.getValues();
             Usp.ajax({ url: '/opportunities', method: 'POST', jsonData: v,
                 success: function () { win.close(); reload(); Usp.toastEnregistre('Opportunité', false); },
                 failure: function () { Ext.Msg.alert('Erreur', 'Création impossible.'); } });

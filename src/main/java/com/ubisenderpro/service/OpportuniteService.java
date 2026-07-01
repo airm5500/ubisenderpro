@@ -22,7 +22,41 @@ public class OpportuniteService {
         var q = em.createQuery(jpql.toString(), Opportunite.class);
         if (statut != null && !statut.isEmpty()) q.setParameter("s", statut);
         if (agentId != null) q.setParameter("a", agentId);
-        return q.getResultList();
+        List<Opportunite> res = q.getResultList();
+        renseignerLibelles(res);
+        return res;
+    }
+
+    /** Renseigne les libellés d'affichage (nom du client / de l'agent) pour les cartes du pipeline. */
+    private void renseignerLibelles(List<Opportunite> opps) {
+        if (opps == null || opps.isEmpty()) { return; }
+        java.util.Set<Long> clientIds = new java.util.HashSet<>();
+        java.util.Set<Long> agentIds = new java.util.HashSet<>();
+        for (Opportunite o : opps) {
+            if (o.getClientId() != null) { clientIds.add(o.getClientId()); }
+            if (o.getAgentId() != null) { agentIds.add(o.getAgentId()); }
+        }
+        java.util.Map<Long, String> clients = new java.util.HashMap<>();
+        if (!clientIds.isEmpty()) {
+            for (Object[] r : em.createQuery(
+                    "SELECT c.id, c.nomCompte FROM Client c WHERE c.id IN :ids", Object[].class)
+                    .setParameter("ids", clientIds).getResultList()) {
+                clients.put((Long) r[0], (String) r[1]);
+            }
+        }
+        java.util.Map<Long, String> agents = new java.util.HashMap<>();
+        if (!agentIds.isEmpty()) {
+            for (Object[] r : em.createQuery(
+                    "SELECT u.id, u.nomComplet, u.login FROM Utilisateur u WHERE u.id IN :ids", Object[].class)
+                    .setParameter("ids", agentIds).getResultList()) {
+                String nom = r[1] != null ? (String) r[1] : (String) r[2];
+                agents.put((Long) r[0], nom);
+            }
+        }
+        for (Opportunite o : opps) {
+            if (o.getClientId() != null) { o.setClientNom(clients.get(o.getClientId())); }
+            if (o.getAgentId() != null) { o.setAgentNom(agents.get(o.getAgentId())); }
+        }
     }
 
     public Optional<Opportunite> parId(Long id) { return Optional.ofNullable(em.find(Opportunite.class, id)); }

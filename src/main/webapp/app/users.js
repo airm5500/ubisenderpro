@@ -158,8 +158,18 @@ Usp.users.privilegesWindow = function (rec) {
                     return { xtype: 'checkbox', boxLabel: a.libelle, name: mn.code + ':' + a.code,
                              checked: accordees.indexOf(mn.code + ':' + a.code) !== -1, margin: '0 14 4 0' };
                 });
-                return { xtype: 'fieldset', title: mn.libelle, margin: '0 0 8 0',
-                         layout: { type: 'table', columns: 3 }, items: cbs };
+                return { xtype: 'fieldset', margin: '0 0 10 0',
+                         // Entête de section en gras + bleu.
+                         title: '<span style="color:#1565c0;font-weight:bold">' + Ext.String.htmlEncode(mn.libelle) + '</span>',
+                         items: [
+                             { xtype: 'toolbar', border: false, style: 'background:transparent', padding: '0 0 4 0', items: ['->',
+                                 { text: 'Tout cocher', scale: 'small',
+                                   handler: function (b) { b.up('fieldset').query('checkbox').forEach(function (c) { c.setValue(true); }); } },
+                                 { text: 'Tout décocher', scale: 'small', margin: '0 0 0 6',
+                                   handler: function (b) { b.up('fieldset').query('checkbox').forEach(function (c) { c.setValue(false); }); } }
+                             ] },
+                             { xtype: 'container', layout: { type: 'table', columns: 3 }, items: cbs }
+                         ] };
             }));
         } });
     } });

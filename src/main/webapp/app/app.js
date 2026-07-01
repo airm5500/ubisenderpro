@@ -1182,7 +1182,26 @@ Usp.menuChildren = function () {
 };
 
 /* Charge la vue correspondante dans la zone centrale (menu + cartes du tableau de bord). */
+/* Marque le menu actif (pastille + sélection) dans l'arbre de gauche, quelle que
+ * soit la façon d'ouvrir la vue (clic direct ou navigation programmatique). */
+Usp.activerMenu = function (vue) {
+    var tree = Ext.ComponentQuery.query('#menuTree')[0];
+    if (!tree || !vue) { return; }
+    var root = tree.getStore().getRootNode();
+    var cible = null;
+    root.eachChild(function (n) {
+        if (!n.data.baseText) { n.data.baseText = n.get('text'); }
+        n.set('text', n.data.baseText);
+        if (n.get('view') === vue) { cible = n; }
+    });
+    if (cible) {
+        cible.set('text', cible.data.baseText + ' <span style="color:#25d366">●</span>');
+        tree.getSelectionModel().select(cible, false, true);
+    }
+};
+
 Usp.ouvrirVue = function (vue) {
+    Usp.activerMenu(vue);
     // Journalise le menu parcouru (best-effort) pour retracer l'activité de session.
     try {
         var m = Usp.MENU.filter(function (x) { return x.view === vue; })[0];
@@ -1269,6 +1288,7 @@ Usp.showMain = function () {
                 width: 220,
                 collapsible: true,
                 xtype: 'treepanel',
+                itemId: 'menuTree',
                 cls: 'usp-menu',
                 rootVisible: false,
                 store: Ext.create('Ext.data.TreeStore', {
@@ -1276,18 +1296,9 @@ Usp.showMain = function () {
                     root: { expanded: true, children: Usp.menuChildren() }
                 }),
                 listeners: {
+                    // La pastille + la sélection sont gérées de façon centralisée par
+                    // Usp.ouvrirVue (aussi utilisé lors des navigations programmatiques).
                     itemclick: function (v, rec) {
-                        // Pastille sur le menu actif (rec.parentNode = racine, items en enfants directs).
-                        var root = rec.parentNode || rec.store.getRootNode();
-                        if (root) {
-                            root.eachChild(function (n) {
-                                if (!n.data.baseText) { n.data.baseText = n.get('text'); }
-                                n.set('text', n.data.baseText);
-                            });
-                        }
-                        if (!rec.data.baseText) { rec.data.baseText = rec.get('text'); }
-                        rec.set('text', rec.data.baseText + ' <span style="color:#25d366">●</span>');
-
                         Usp.ouvrirVue(rec.get('view') || (rec.raw && rec.raw.view));
                     }
                 }

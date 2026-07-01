@@ -54,6 +54,12 @@ public class Opportunite {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Libellés d'affichage (non persistés) : nom du client / de l'agent. */
+    @javax.persistence.Transient
+    private String clientNom;
+    @javax.persistence.Transient
+    private String agentNom;
+
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
@@ -68,6 +74,10 @@ public class Opportunite {
     public void setContactId(Long contactId) { this.contactId = contactId; }
     public Long getAgentId() { return agentId; }
     public void setAgentId(Long agentId) { this.agentId = agentId; }
+    public String getClientNom() { return clientNom; }
+    public void setClientNom(String clientNom) { this.clientNom = clientNom; }
+    public String getAgentNom() { return agentNom; }
+    public void setAgentNom(String agentNom) { this.agentNom = agentNom; }
     public Long getConversationId() { return conversationId; }
     public void setConversationId(Long conversationId) { this.conversationId = conversationId; }
     public Long getCampagneId() { return campagneId; }

@@ -648,20 +648,31 @@ Usp.marketing._perfHtml = function (t) {
         b('Échoués', t.echoues || 0) + '</div>';
 };
 
-Usp.marketing.propositions = function () {
+/* Un onglet = un statut de proposition (Proposées / Validées / Rejetées / Expirées / Toutes). */
+Usp.marketing.propositionsGrid = function (statut, titre) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'cle', 'type', 'source', 'promotionId', 'evenementId', 'titre', 'message', 'datePrevue',
                  'statut', 'campagneId', 'listeId', 'segmentId', 'motifRejet'],
         groupField: 'datePrevue',
         proxy: { type: 'ajax', url: Usp.apiBase + '/propositions',
-            extraParams: { statut: 'PROPOSEE' },
+            extraParams: { statut: statut },
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
     });
     Usp.marketing._stores.push(store);
 
+    var generer = function () {
+        Usp.ajax({ url: '/propositions/generer', method: 'POST',
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                Usp.marketing.reloadAll();
+                Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' + (r.expirees || 0) + ' expirée(s).');
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
+    };
+
     return {
-        xtype: 'grid', title: '📨 Propositions d\'envoi', store: store,
+        xtype: 'grid', title: titre, store: store,
         features: [{ ftype: 'grouping',
             groupHeaderTpl: 'Échéance : {name:this.fdate} ({rows.length})',
             startCollapsed: false,
@@ -706,27 +717,23 @@ Usp.marketing.propositions = function () {
                 }
             }
         },
-        tbar: [
-            'Afficher :',
-            { xtype: 'combobox', width: 160, editable: false, queryMode: 'local',
-              value: 'PROPOSEE',
-              store: [['PROPOSEE', 'Proposées'], ['VALIDEE', 'Validées'],
-                      ['REJETEE', 'Rejetées'], ['EXPIREE', 'Expirées'], ['', 'Toutes']],
-              listeners: { change: function (cb, v) {
-                  store.getProxy().setExtraParam('statut', v); store.load();
-              } } },
-            '->',
-            { text: '🔄 Générer maintenant', tooltip: 'Régénère les propositions à partir des promotions',
-              handler: function () {
-                  Usp.ajax({ url: '/propositions/generer', method: 'POST',
-                      success: function (resp) {
-                          var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
-                          store.load();
-                          Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' +
-                                    (r.expirees || 0) + ' expirée(s).');
-                      },
-                      failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
-              } }
+        tbar: ['->',
+            { text: '🔄 Générer maintenant', tooltip: 'Régénère les propositions à partir des promotions', handler: generer },
+            { text: '↻ Rafraîchir', handler: function () { store.load(); } }
+        ]
+    };
+};
+
+/* Propositions d'envoi présentées en sous-onglets par statut (au lieu d'une liste « Afficher : »). */
+Usp.marketing.propositions = function () {
+    return {
+        xtype: 'tabpanel', title: '📨 Propositions d\'envoi', listeners: Usp.tabListeners,
+        items: [
+            Usp.marketing.propositionsGrid('PROPOSEE', 'Proposées'),
+            Usp.marketing.propositionsGrid('VALIDEE', 'Validées'),
+            Usp.marketing.propositionsGrid('REJETEE', 'Rejetées'),
+            Usp.marketing.propositionsGrid('EXPIREE', 'Expirées'),
+            Usp.marketing.propositionsGrid('', 'Toutes')
         ]
     };
 };
