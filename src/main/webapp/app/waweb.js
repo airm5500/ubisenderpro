@@ -711,7 +711,7 @@ Usp.waweb.extractPanel = function () {
 Usp.waweb.choisirClients = function (formPanel) {
     // Utilise le SCL unifié (tous les clients + filtres agence/région/segmentation + recherche live).
     Usp.clientPicker({
-        title: 'Choisir des clients', boutonValider: 'Ajouter aux destinataires',
+        title: 'Choisir des clients', boutonValider: 'Ajouter aux destinataires', avecListe: true,
         onValider: function (rows) {
             var lignes = [], sansNumero = 0;
             rows.forEach(function (r) {

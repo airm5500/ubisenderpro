@@ -61,4 +61,13 @@ public class ListeResource {
         listeService.retirerContact(id, contactId);
         return Response.noContent().build();
     }
+
+    /** Importe des clients dans la liste (un code client par ligne). */
+    @POST
+    @Path("/{id}/import-clients")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response importerClients(@PathParam("id") Long id, Map<String, Object> body) {
+        String contenu = body == null ? null : (String) body.get("contenu");
+        return Response.ok(listeService.importerClients(id, contenu)).build();
+    }
 }

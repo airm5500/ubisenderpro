@@ -852,7 +852,9 @@ Usp.listeMembresWindow = function (rec) {
             ],
             tbar: [
                 { text: '➕ Choisir des clients', handler: function () {
-                    Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste', onValider: ajouterClients }); } }
+                    Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste', onValider: ajouterClients }); } },
+                { text: '📥 Importer des clients', tooltip: 'Importer des codes clients (un par ligne / CSV)', handler: function () {
+                    Usp.importerClientsListe(listeId, function () { store.load(); }); } }
             ],
             listeners: { cellclick: function (g, td, ci, r, tr, ri, e) {
                 if (e.getTarget('.ldm-del')) {
@@ -863,6 +865,38 @@ Usp.listeMembresWindow = function (rec) {
             } }
         }]
     }).show();
+};
+
+/* Import de clients dans une liste de diffusion (codes clients, un par ligne ou .csv). */
+Usp.importerClientsListe = function (listeId, onDone) {
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Importer des clients dans la liste', width: 520, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'displayfield', value: '<span style="color:#888">Un <b>code client</b> par ligne ' +
+                '(le contact principal de chaque client est ajouté). Fichier .csv accepté.</span>' },
+            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'C001\nC002\nC003' },
+            { xtype: 'filefield', fieldLabel: 'ou fichier .csv', msgTarget: 'side',
+              listeners: { change: function (f) {
+                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  var reader = new FileReader();
+                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
+                  reader.readAsText(file);
+              } } }
+        ] }],
+        buttons: [{ text: 'Importer', handler: function (b) {
+            var contenu = b.up('window').down('[name=contenu]').getValue();
+            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucun code client.'); return; }
+            Usp.ajax({ url: '/lists/' + listeId + '/import-clients', method: 'POST', jsonData: { contenu: contenu },
+                success: function (resp) {
+                    var r = Ext.decode(resp.responseText) || {};
+                    win.close(); if (onDone) { onDone(); }
+                    Usp.toast((r.ajoutes || 0) + ' ajouté(s), ' + (r.introuvables || 0) + ' introuvable(s), '
+                        + (r.sansContact || 0) + ' sans contact.');
+                },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+        } }, { text: 'Annuler', handler: function (b) { b.up('window').close(); } }]
+    });
+    win.show();
 };
 
 /* Fenêtre de gestion des segmentations (conservée pour compatibilité). */
@@ -1493,7 +1527,13 @@ Usp.clientPicker = function (cfg) {
                 { text: 'Tout désélectionner', handler: function () { sm.deselectAll(); } }
             ]
         }],
-        buttons: [
+        buttons: (cfg.avecListe ? [
+            { text: '📇 Ajouter à une liste de diffusion', handler: function () {
+                var recs = sm.getSelection();
+                if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un client.'); return; }
+                Usp.ajouterAListe(recs.map(function (r) { return r.getData(); }));
+            } }, '->'
+        ] : []).concat([
             { text: cfg.boutonValider || 'Ajouter la sélection', handler: function () {
                 var recs = sm.getSelection();
                 if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un client.'); return; }
@@ -1501,10 +1541,38 @@ Usp.clientPicker = function (cfg) {
                 win.close();
             } },
             { text: 'Annuler', handler: function () { win.close(); } }
-        ]
+        ])
     });
     win.show();
     charger();
+};
+
+/* Ajoute une sélection de clients (leur contact principal) à une liste de diffusion choisie. */
+Usp.ajouterAListe = function (rows) {
+    var ids = rows.map(function (r) { return r.contactId; }).filter(function (x) { return x; });
+    var sansContact = rows.length - ids.length;
+    if (!ids.length) { Ext.Msg.alert('Info', 'Aucun contact rattaché aux clients choisis.'); return; }
+    var store = Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Ajouter à une liste de diffusion', width: 420, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'combobox', name: 'listeId', fieldLabel: 'Liste', store: store, valueField: 'id',
+              displayField: 'nom', queryMode: 'local', editable: false, allowBlank: false, emptyText: 'Choisir une liste…' }
+        ] }],
+        buttons: [{ text: 'Ajouter', formBind: true, handler: function (b) {
+            var lid = b.up('window').down('[name=listeId]').getValue();
+            if (!lid) { return; }
+            var reste = ids.length;
+            ids.forEach(function (cid) {
+                Usp.ajax({ url: '/lists/' + lid + '/contacts', method: 'POST', jsonData: { contactId: cid, source: 'MANUEL' },
+                    success: function () { if (--reste === 0) { win.close(); Usp.toast(ids.length + ' contact(s) ajouté(s)' + (sansContact ? ' — ' + sansContact + ' sans contact ignoré(s).' : '.')); } },
+                    failure: function () { if (--reste === 0) { win.close(); } } });
+            });
+        } }, { text: 'Annuler', handler: function (b) { b.up('window').close(); } }]
+    });
+    win.show();
 };
 
 /* Durée lisible entre deux dates (ex. « 29 jours », « 1 mois 10 jours », « 4 mois »). */
