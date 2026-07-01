@@ -328,7 +328,7 @@ Usp.expirerSession = function () {
         + '.hdr-bell:hover{background:rgba(41,128,236,.45);transform:scale(1.06)}'
         + '.hdr-bell .ico{font-size:18px;line-height:1;color:#fff;display:inline-block}'
         + '.hdr-bell.actif .ico{animation:uspBell 1.1s ease-in-out infinite;transform-origin:center}'
-        + '.hdr-badge{position:absolute;top:0;right:-3px;background:#e74c3c;color:#fff;'
+        + '.hdr-badge{position:absolute;top:-2px;right:-4px;background:#e74c3c;color:#fff;'
         + 'border:1px solid #1b2a4a;border-radius:8px;font-size:9px;font-weight:bold;line-height:1;'
         + 'min-width:14px;height:14px;padding:0 3px;display:flex;align-items:center;justify-content:center;'
         + 'box-sizing:border-box}'
@@ -2236,7 +2236,7 @@ Usp.showMain = function () {
                       html: '<span class="hdr-bell" title="Centre de notifications" onclick="Usp.notifications.ouvrir()">' +
                             '<span class="ico">🔔</span>' +
                             '<span class="hdr-badge" style="display:none">0</span></span>' },
-                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 8 0 0',
+                    { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 8 0 8',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     // Nom de l'utilisateur en gras et un peu plus grand.
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), <span style="font-weight:bold;font-size:15px">'
