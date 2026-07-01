@@ -127,10 +127,10 @@ Usp.crm.contactCombo = function (cfg) {
 /* Sélecteur d'agent (utilisateurs affectables). */
 Usp.crm.agentCombo = function (cfg) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom'], autoLoad: true,
+        fields: ['id', 'nomComplet'], autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/users/affectables',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
-    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nom',
+    return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nomComplet',
         queryMode: 'local', editable: false, anchor: '100%', emptyText: 'Choisir un agent…' }, cfg || {});
 };
 

@@ -259,10 +259,13 @@ Usp.marketing.produitForm = function (store, promotionId, rec) {
               listConfig: { getInnerTpl: function () {
                   return '{designation} <span style="color:#999">{cip}</span>'; } },
               listeners: { select: function (cb, r) {
-                  fld('cip7').setValue(r.get('cip') || '');
-                  fld('cip13').setValue(r.get('codeBarres') || '');
-                  fld('nomProduit').setValue(r.get('designation') || '');
-                  fld('articleId').setValue(r.get('id'));
+                  // En ExtJS 4.2, « select » renvoie un tableau d'enregistrements.
+                  var a = Ext.isArray(r) ? r[0] : r;
+                  if (!a) { return; }
+                  fld('cip7').setValue(a.get('cip') || '');
+                  fld('cip13').setValue(a.get('codeBarres') || '');
+                  fld('nomProduit').setValue(a.get('designation') || '');
+                  fld('articleId').setValue(a.get('id'));
               } } },
             { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
               '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
@@ -692,7 +695,7 @@ Usp.marketing.propositionsGrid = function (statut, titre) {
                   }
                   return '';
               } },
-            { text: 'Actions', width: 200, align: 'left', sortable: false, menuDisabled: true, dataIndex: 'id',
+            { text: 'Actions', width: 250, align: 'left', sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var propose = rec.get('statut') === 'PROPOSEE';
                   var act = propose

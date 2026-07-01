@@ -472,23 +472,29 @@ Usp.clientsGrid = function (actif) {
         store: Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
             proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
                 headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) };
+    // Filtres Agence / Région alimentés par les référentiels (valeur = libellé).
+    var refFilterStore = function (type) {
+        return Ext.create('Ext.data.Store', { fields: ['id', 'code', 'libelle'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    };
     var comboAgence = { xtype: 'combobox', itemId: 'fAgence', emptyText: 'Agence', width: 130,
-        queryMode: 'local', valueField: 'v', displayField: 'v',
-        store: Ext.create('Ext.data.Store', { fields: ['v'] }) };
-    var comboCommune = { xtype: 'combobox', itemId: 'fCommune', emptyText: 'Commune', width: 130,
-        queryMode: 'local', valueField: 'v', displayField: 'v',
-        store: Ext.create('Ext.data.Store', { fields: ['v'] }) };
+        queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
+        store: refFilterStore('AGENCE') };
+    var comboRegion = { xtype: 'combobox', itemId: 'fRegion', emptyText: 'Région', width: 130,
+        queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
+        store: refFilterStore('REGION') };
 
     var appliquer = function (tb) {
         var p = { actif: actif };
         var q = tb.down('#fQ').getValue();
         var seg = tb.down('#fSeg').getValue();
         var ag = tb.down('#fAgence').getValue();
-        var com = tb.down('#fCommune').getValue();
+        var reg = tb.down('#fRegion').getValue();
         if (q) { p.q = q; }
         if (seg) { p.segmentationId = seg; }
         if (ag) { p.agence = ag; }
-        if (com) { p.commune = com; }
+        if (reg) { p.region = reg; }
         store.getProxy().extraParams = p;
         store.loadPage(1);
     };
@@ -517,12 +523,12 @@ Usp.clientsGrid = function (actif) {
     tbar.push(
         { xtype: 'textfield', itemId: 'fQ', emptyText: 'Rechercher...', width: 180,
           listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
-        comboSeg, comboAgence, comboCommune,
+        comboSeg, comboAgence, comboRegion,
         { text: '🔎 Filtrer', tooltip: 'Appliquer les filtres sélectionnés', handler: function (b) { appliquer(b.up('toolbar')); } },
         { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
             var tb = b.up('toolbar');
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
-            tb.down('#fAgence').setValue(null); tb.down('#fCommune').setValue(null);
+            tb.down('#fAgence').setValue(null); tb.down('#fRegion').setValue(null);
             store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
         } });
 
@@ -548,7 +554,7 @@ Usp.clientsGrid = function (actif) {
         tbar: tbar.concat(Usp.export.boutons(actif ? 'Comptes clients' : 'Clients désactivés')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
-            afterrender: function () { Usp.clientFacettes({ agence: comboAgence, commune: comboCommune }); },
+            // Filtres Agence/Région désormais alimentés par les référentiels (autoLoad).
             itemdblclick: function (g, rec) { if (actif) { Usp.clientForm(store, rec); } },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); return; }
