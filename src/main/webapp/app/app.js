@@ -1024,34 +1024,45 @@ Usp.referentielCombo = function (type, cfg) {
 
 /* Grille éditable des numéros d'un client (numéro + WhatsApp + principal unique). */
 Usp.numerosGrid = function (store) {
+    var editing = Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 });
+    // Ajout : préfixe pays pré-rempli, WhatsApp coché, 1er = principal, curseur après le préfixe.
+    var ajouter = function () {
+        store.add({ numero: Usp.prefixe || '', whatsapp: true, principal: store.getCount() === 0 });
+        var idx = store.getCount() - 1;
+        Ext.defer(function () { editing.startEditByPosition({ row: idx, column: 0 }); }, 60);
+    };
     return {
-        xtype: 'grid', columnWidth: 1, margin: '8 0 0 0', height: 160, store: store,
+        xtype: 'grid', columnWidth: 1, margin: '8 0 0 0', height: 150, store: store,
         title: '📞 Numéros du client (le 1er = principal ; on peut en ajouter plusieurs)',
-        plugins: [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })],
+        plugins: [editing],
         columns: [
             { text: 'Numéro (format international, ex. 2250700000000)', dataIndex: 'numero', flex: 1, editor: { xtype: 'textfield' } },
             { xtype: 'checkcolumn', text: 'WhatsApp', dataIndex: 'whatsapp', width: 90 },
             { xtype: 'checkcolumn', text: 'Principal', dataIndex: 'principal', width: 90,
               listeners: { checkchange: function (col, idx, checked) {
                   if (checked) { store.each(function (r, i) { if (i !== idx) { r.set('principal', false); } }); }
-              } } }
+              } } },
+            // « Retirer » sur la ligne du numéro (et non en haut).
+            { text: '', width: 46, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'numero',
+              renderer: function () { return '<span class="num-del" title="Retirer ce numéro" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
         ],
         tbar: [
-            { text: '➕ Ajouter un numéro', handler: function () {
-                store.add({ numero: '', whatsapp: true, principal: store.getCount() === 0 }); } },
-            { text: '🗑️ Retirer', handler: function (b) {
-                var s = b.up('grid').getSelectionModel().getSelection()[0]; if (s) { store.remove(s); } } }
-        ]
+            { text: '➕ Ajouter un numéro', handler: ajouter }
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.num-del')) { store.remove(rec); }
+            }
+        }
     };
 };
 
 Usp.clientForm = function (store, rec) {
     var numStore = Ext.create('Ext.data.Store', { fields: ['numero', 'whatsapp', 'principal'] });
-    if (!rec) { numStore.add({ numero: '', whatsapp: true, principal: true }); }
+    if (!rec) { numStore.add({ numero: Usp.prefixe || '', whatsapp: true, principal: true }); }
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier le client' : 'Nouveau client',
-        width: 780, modal: true, bodyPadding: 12, autoScroll: true,
-        maxHeight: Ext.getBody().getViewSize().height - 40,
+        width: 820, modal: true, bodyPadding: 12,
         items: [{
             xtype: 'form', border: false, layout: 'column',
             defaults: { columnWidth: 0.5, xtype: 'container', layout: 'anchor', border: false,
@@ -1061,20 +1072,20 @@ Usp.clientForm = function (store, rec) {
                     { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client *', allowBlank: false },
                     { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client *', allowBlank: false,
                       listeners: Usp.majListeners },
-                    { xtype: 'textfield', name: 'entreprise', fieldLabel: 'Entreprise',
+                    { xtype: 'textfield', name: 'entreprise', fieldLabel: 'Entreprise *', allowBlank: false,
                       emptyText: 'Nom de l\'officine (ex. PHCIE POLAP)', listeners: Usp.majListeners },
                     { xtype: 'textfield', name: 'emailPrincipal', fieldLabel: 'E-mail', vtype: 'email' },
-                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation' }),
+                    Usp.segmentationCombo({ name: 'segmentationId', fieldLabel: 'Segmentation *', allowBlank: false, anchor: '96%' }),
                     { xtype: 'datefield', name: 'dateNaissance', fieldLabel: 'Date de naissance',
                       format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false, maxValue: new Date() }
                 ] },
                 { items: [
-                    Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
-                    Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
-                    Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée' }),
-                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville', value: rec ? undefined : 'Abidjan' }),
-                    Usp.referentielCombo('COMMUNE', { name: 'commune', fieldLabel: 'Commune' }),
-                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays', value: rec ? undefined : 'Côte d\'Ivoire' })
+                    Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence *', allowBlank: false, anchor: '96%' }),
+                    Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région', anchor: '96%' }),
+                    Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée', anchor: '96%' }),
+                    Usp.referentielCombo('VILLE', { name: 'ville', fieldLabel: 'Ville', value: rec ? undefined : 'Abidjan', anchor: '96%' }),
+                    Usp.referentielCombo('COMMUNE', { name: 'commune', fieldLabel: 'Commune', anchor: '96%' }),
+                    Usp.referentielCombo('PAYS', { name: 'pays', fieldLabel: 'Pays', value: rec ? undefined : 'Côte d\'Ivoire', anchor: '96%' })
                 ] },
                 { columnWidth: 1, items: [
                     { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut', value: 'ACTIF', anchor: '48%',
@@ -1088,13 +1099,21 @@ Usp.clientForm = function (store, rec) {
             text: 'Enregistrer', formBind: true,
             handler: function (b) {
                 var form = b.up('window').down('form').getForm();
-                if (!form.isValid()) { return; }
+                if (!form.isValid()) {
+                    Ext.Msg.alert('Champs à compléter', 'Merci de renseigner les champs obligatoires (repérés par *).');
+                    return;
+                }
                 var vals = form.getValues();
                 var numeros = [];
                 numStore.each(function (r) {
                     var n = (r.get('numero') || '').trim();
                     if (n) { numeros.push({ numero: n, whatsapp: !!r.get('whatsapp'), principal: !!r.get('principal') }); }
                 });
+                // Au moins un numéro de téléphone est obligatoire (bloquant).
+                if (!numeros.length) {
+                    Ext.Msg.alert('Numéro requis', 'Ajoutez au moins un numéro de téléphone pour ce client.');
+                    return;
+                }
                 vals.numeros = numeros;
                 Usp.ajax({
                     url: rec ? '/clients/' + rec.get('id') : '/clients',
