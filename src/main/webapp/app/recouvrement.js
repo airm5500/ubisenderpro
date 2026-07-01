@@ -223,11 +223,17 @@ Usp.recouvrement.autoSegment = function (win, clientId) {
     Usp.ajax({ url: '/clients/' + clientId, method: 'GET', success: function (resp) {
         var c = Ext.decode(resp.responseText) || {};
         if (ent) { ent.setValue(c.entreprise || '<span style="color:#bbb">—</span>'); }
-        if (!c.segmentationId || !seg) { return; }
+        if (!seg) { return; }
+        if (!c.segmentationId) { seg.setReadOnly(false); return; }
         Usp.ajax({ url: '/segmentations', method: 'GET', success: function (r2) {
             var l = []; try { l = Ext.decode(r2.responseText) || []; } catch (e) {}
             var m = l.filter(function (s) { return String(s.id) === String(c.segmentationId); })[0];
-            if (m && !seg.getValue()) { seg.setValue(m.libelle); }
+            if (m) {
+                // Le segment provient du client : renseigné et verrouillé (non modifiable ici).
+                seg.setValue(m.libelle);
+                seg.setReadOnly(true);
+                if (seg.inputEl) { seg.inputEl.setStyle('background', '#f0f0f0'); }
+            }
         } });
     } });
 };
@@ -798,14 +804,21 @@ Usp.recouvrement.campagnesPanel = function () {
               store: Usp.recouvrement.CANAUX, value: 'WHATSAPP' }
         ].concat(Usp.recouvrement.pieceItems())
          .concat([{ xtype: 'component', itemId: 'apercu', margin: '6 0 0 0', html: '' }]),
-        bbar: ['->',
+        bbar: [
+            { text: '🧹 Réinitialiser l\'écran', tooltip: 'Vider les données saisies dans les champs',
+              handler: function (b) {
+                  var fp = b.up('form');
+                  fp.getForm().reset();
+                  var ap = fp.down('#apercu'); if (ap) { ap.update(''); }
+              } },
+            '->',
             { text: '👁️ Aperçu', handler: function (b) {
                 var form = b.up('form').getForm();
                 Usp.ajax({ url: '/recouvrement/campagnes/preview', method: 'POST', jsonData: filtre(form),
                     success: function (resp) {
                         var r = Ext.decode(resp.responseText) || {};
                         b.up('form').down('#apercu').update('<span style="color:#1976d2"><b>' + (r.count || 0)
-                            + '</b> client(s) ciblé(s).</span>');
+                            + '</b> client(s) ciblé(s). ' + (!r.count ? '<span style="color:#888">(Aucune fiche recouvrement ne correspond aux critères — créez des fiches ou élargissez les filtres.)</span>' : '') + '</span>');
                     },
                     failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
             } },
@@ -842,6 +855,18 @@ Usp.recouvrement.modelesPanel = function () {
         var m = Ext.Array.findBy(Usp.recouvrement.TYPES_MODELE, function (a) { return a[0] === v; });
         return m ? m[1] : (v || '');
     };
+    // Active/désactive le bouton « Modèles standard » selon qu'il en manque ou non.
+    var majBoutonStandard = function (grid) {
+        var btn = grid.down('#btnModStd'); if (!btn) { return; }
+        var noms = {};
+        store.each(function (r) { noms[(r.get('nom') || '').toLowerCase()] = true; });
+        var manquants = Usp.recouvrement.MODELES_STANDARD.filter(function (m) { return !noms[m.nom.toLowerCase()]; });
+        if (manquants.length) {
+            btn.enable(); btn.setTooltip('Générer les ' + manquants.length + ' modèle(s) standard manquant(s)');
+        } else {
+            btn.disable(); btn.setTooltip('Tous les modèles standard sont déjà générés');
+        }
+    };
     return {
         xtype: 'grid', title: '✉️ Modèles', store: store,
         columns: [
@@ -849,16 +874,38 @@ Usp.recouvrement.modelesPanel = function () {
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Type', dataIndex: 'type', width: 150, renderer: typeLib },
             { text: 'Canal', dataIndex: 'canal', width: 90 },
-            { text: 'Actif', dataIndex: 'actif', width: 60, align: 'center', renderer: function (v) { return v ? '✔' : '✖'; } }
+            { text: 'Actif', dataIndex: 'actif', width: 60, align: 'center', renderer: function (v) { return v ? '✔' : '✖'; } },
+            { text: 'Actions', width: 130, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function () {
+                  return '<span class="mod-edit" title="Modifier" style="cursor:pointer;margin:0 6px">✏️</span>' +
+                      '<span class="mod-del" title="Supprimer" style="cursor:pointer;color:#c62828;margin:0 6px">🗑️</span>';
+              } }
         ],
         tbar: [
             Usp.permBtn('recouvrement', 'CREER', { text: '➕ Nouveau modèle', handler: function () { Usp.recouvrement.modeleForm(store, null); } }),
-            Usp.permBtn('recouvrement', 'CREER', { text: '📋 Modèles standard',
-                tooltip: 'Créer les modèles de relance standard manquants',
-                handler: function () { Usp.recouvrement.creerModelesStandard(store); } }),
+            Usp.permBtn('recouvrement', 'CREER', { itemId: 'btnModStd', text: '📋 Modèles standard',
+                tooltip: 'Générer les modèles de relance standard manquants',
+                handler: function (b) { Usp.recouvrement.creerModelesStandard(store, b.up('grid')); } }),
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
         ],
-        listeners: { itemdblclick: function (g, rec) { Usp.recouvrement.modeleForm(store, rec); } }
+        listeners: {
+            afterrender: function (g) { store.on('load', function () { majBoutonStandard(g); }); majBoutonStandard(g); },
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.mod-edit')) { Usp.recouvrement.modeleForm(store, rec); return; }
+                if (e.getTarget('.mod-del')) {
+                    if (!Usp.can('recouvrement', 'SUPPRIMER')) { Usp.refusPermission(); return; }
+                    Ext.Msg.confirm('Supprimer', 'Supprimer le modèle « ' + Ext.String.htmlEncode(rec.get('nom')) + ' » ?',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/recouvrement/modeles/' + rec.get('id'), method: 'DELETE',
+                                success: function () { store.load(); Usp.toast('Modèle supprimé.'); },
+                                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                        });
+                    return;
+                }
+            },
+            itemdblclick: function (g, rec) { Usp.recouvrement.modeleForm(store, rec); }
+        }
     };
 };
 
@@ -883,13 +930,19 @@ Usp.recouvrement.creerModelesStandard = function (store) {
     store.each(function (r) { existants[(r.get('nom') || '').toLowerCase()] = true; });
     var aCreer = Usp.recouvrement.MODELES_STANDARD.filter(function (m) { return !existants[m.nom.toLowerCase()]; });
     if (!aCreer.length) { Usp.toast('Les modèles standard existent déjà.'); return; }
-    var reste = aCreer.length, crees = 0;
-    aCreer.forEach(function (m) {
-        var data = Ext.apply({ actif: true }, m);
-        Usp.ajax({ url: '/recouvrement/modeles', method: 'POST', jsonData: data,
-            success: function () { crees++; if (--reste === 0) { store.load(); Usp.toast(crees + ' modèle(s) standard créé(s).'); } },
-            failure: function () { if (--reste === 0) { store.load(); Usp.toast(crees + ' modèle(s) standard créé(s).'); } } });
-    });
+    // Confirmation avant génération groupée.
+    Ext.Msg.confirm('Modèles standard',
+        'Générer ' + aCreer.length + ' modèle(s) de relance standard d\'un coup ?',
+        function (btn) {
+            if (btn !== 'yes') { return; }
+            var reste = aCreer.length, crees = 0;
+            aCreer.forEach(function (m) {
+                var data = Ext.apply({ actif: true }, m);
+                Usp.ajax({ url: '/recouvrement/modeles', method: 'POST', jsonData: data,
+                    success: function () { crees++; if (--reste === 0) { store.load(); Usp.toast(crees + ' modèle(s) standard créé(s).'); } },
+                    failure: function () { if (--reste === 0) { store.load(); Usp.toast(crees + ' modèle(s) standard créé(s).'); } } });
+            });
+        });
 };
 
 Usp.recouvrement.modeleForm = function (store, rec) {
