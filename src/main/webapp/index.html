@@ -120,8 +120,36 @@
             border-color: #086d66 !important;
         }
         .x-panel-header-text-default, .x-panel-header-default .x-panel-header-text { color: #ffffff !important; }
+
+        /* ===== Onglets « dossier » (Option C) =====
+           Pur habillage des classes x-tab : la pastille ✳ animée (usp-pace-tab)
+           dans le libellé de l'onglet actif n'est pas touchée. */
+        .x-tab-bar-default { background: #e4eaf0 !important; background-image: none !important; }
+        .x-tab-bar-strip-default { background: #ffffff !important; border-color: #e4eaf0 !important; }
+        .x-tab-default {
+            background: #dfe7ee !important; background-image: none !important;
+            border: 1px solid #d0d9e2 !important; border-bottom: 0 !important;
+            border-radius: 10px 10px 0 0 !important;
+            transition: background .12s ease;
+        }
+        .x-tab-default .x-tab-inner { color: #5a6573 !important; }
+        .x-tab-default.x-tab-over { background: #eaf1f7 !important; }
+        .x-tab-default.x-tab-over .x-tab-inner { color: #0a8f86 !important; }
+        .x-tab-default.x-tab-active {
+            background: #ffffff !important;
+            box-shadow: 0 -2px 6px rgba(0,0,0,.06);
+        }
         /* Onglet actif aux couleurs ubipharm */
         .x-tab-active .x-tab-inner { color: #0a8f86 !important; font-weight: bold; }
+
+        /* Grilles : en-têtes de colonnes clairs + survol des lignes teinté teal léger
+           (le menu latéral garde son propre style, plus spécifique). */
+        .x-column-header, .x-column-header-default {
+            background: #f7f9fb !important; background-image: none !important;
+            border-bottom: 2px solid #e4e9ef !important;
+        }
+        .x-column-header-inner .x-column-header-text { color: #5a6573; font-weight: 600; }
+        .x-grid-row-over .x-grid-cell { background: #f2f7f6 !important; }
     </style>
 
     <script src="app/app.js"></script>
