@@ -2284,6 +2284,11 @@ Usp.notifications.aller = function (vue) {
 };
 
 Usp.notifications.ouvrir = function () {
+    // Bascule : si le volet est déjà ouvert, un nouveau clic sur la cloche le ferme.
+    if (Usp.notifications._win) {
+        Usp.notifications._win.close();
+        return;
+    }
     var d = Usp.notifications._data || { groupes: [] };
     var fdate = function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; };
     // Dynamique : on n'affiche que les types ayant au moins un élément (pas de bloc vide).
@@ -2310,11 +2315,18 @@ Usp.notifications.ouvrir = function () {
     }
     Usp.notifications._win = Ext.create('Ext.window.Window', {
         title: '🔔 Centre de notifications (' + (d.total || 0) + ')', width: 460,
-        height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: false, autoScroll: true,
+        height: Math.min(480, Ext.getBody().getViewSize().height - 80), modal: false, autoScroll: true,
         bodyPadding: 8, layout: 'anchor', defaults: { anchor: '100%' }, items: items,
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { Usp.notifications.rafraichir(); Usp.notifications._win.close(); Usp.notifications.ouvrir(); } }]
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { Usp.notifications.rafraichir(); Usp.notifications._win.close(); Usp.notifications.ouvrir(); } }],
+        // Référence nettoyée à la fermeture (croix, Échap ou re-clic sur la cloche).
+        listeners: { close: function () { Usp.notifications._win = null; } }
     });
     Usp.notifications._win.show();
+    // Positionne le volet juste SOUS la cloche (aligné à droite), pas au centre.
+    var cloche = Ext.ComponentQuery.query('#uspNotif')[0];
+    if (cloche && cloche.getEl()) {
+        Usp.notifications._win.alignTo(cloche.getEl(), 'tr-br', [0, 8]);
+    }
 };
 
 /* ---------- Viewport principal ---------- */
