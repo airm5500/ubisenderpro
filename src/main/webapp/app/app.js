@@ -1431,6 +1431,26 @@ Usp.erreurServeur = function (resp, repli) {
     return repli || 'Opération impossible.';
 };
 
+/* Nettoie un objet de valeurs de formulaire : les chaînes vides deviennent null.
+ * Évite les erreurs techniques de désérialisation (dates/nombres vides « "" »)
+ * et rend les messages d'erreur explicites plutôt qu'un échec « technique ». */
+Usp.compact = function (obj) {
+    var o = Ext.apply({}, obj);
+    Object.keys(o).forEach(function (k) {
+        if (o[k] === '' || o[k] === undefined) { o[k] = null; }
+    });
+    return o;
+};
+
+/* Affiche une erreur serveur de façon conviviale : message clair + surlignage
+ * (bordure rouge) du champ fautif renvoyé par le serveur ({erreur, champ}). */
+Usp.afficherErreurForm = function (form, resp, repli) {
+    var msg = repli || 'Enregistrement impossible.', champ = null;
+    try { var r = Ext.decode(resp.responseText); if (r) { msg = r.erreur || msg; champ = r.champ || null; } } catch (e) {}
+    if (form && champ) { var f = form.findField(champ); if (f) { f.markInvalid(msg); f.focus(true, 50); } }
+    Ext.Msg.alert('Saisie à corriger', msg);
+};
+
 /* Message standard de refus de permission (clic sur une action non autorisée). */
 Usp.refusPermission = function () {
     Ext.Msg.show({

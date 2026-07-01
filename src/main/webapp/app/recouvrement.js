@@ -275,13 +275,16 @@ Usp.recouvrement.ficheForm = function (store, rec) {
             { text: 'Annuler', handler: function () { win.close(); } },
             { text: 'Enregistrer', formBind: true, handler: function (b) {
                 var form = b.up('window').down('form').getForm();
-                if (!form.isValid()) { return; }
-                var vals = form.getValues();
+                if (!form.isValid()) {
+                    Ext.Msg.alert('Champs à compléter', 'Merci de renseigner les champs obligatoires (repérés par *).');
+                    return;
+                }
+                var vals = Usp.compact(form.getValues());
                 Usp.ajax({
                     url: rec ? '/recouvrement/fiches/' + rec.get('id') : '/recouvrement/fiches',
                     method: rec ? 'PUT' : 'POST', jsonData: vals,
                     success: function () { win.close(); store.load(); Usp.toastEnregistre('Fiche', !!rec); },
-                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); }
+                    failure: function (resp) { Usp.afficherErreurForm(form, resp); }
                 });
             } }
         ]
@@ -415,7 +418,7 @@ Usp.recouvrement.creanceForm = function (base, store, cb) {
         buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
-            Usp.ajax({ url: base + '/creances', method: 'POST', jsonData: f.getValues(),
+            Usp.ajax({ url: base + '/creances', method: 'POST', jsonData: Usp.compact(f.getValues()),
                 success: function () { win.close(); cb(); },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
@@ -435,7 +438,7 @@ Usp.recouvrement.paiementForm = function (base, cb) {
         buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
-            Usp.ajax({ url: base + '/paiements', method: 'POST', jsonData: f.getValues(),
+            Usp.ajax({ url: base + '/paiements', method: 'POST', jsonData: Usp.compact(f.getValues()),
                 success: function () { win.close(); cb(); },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
@@ -456,7 +459,7 @@ Usp.recouvrement.promesseForm = function (base, cb) {
         buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
-            Usp.ajax({ url: base + '/promesses', method: 'POST', jsonData: f.getValues(),
+            Usp.ajax({ url: base + '/promesses', method: 'POST', jsonData: Usp.compact(f.getValues()),
                 success: function () { win.close(); cb(); },
                 failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
@@ -481,7 +484,7 @@ Usp.recouvrement.refGrid = function (type, titre) {
                 var f = b.up('window').down('form').getForm();
                 if (!f.isValid()) { return; }
                 Usp.ajax({ url: '/recouvrement/referentiels/' + type + (rec ? '/' + rec.get('id') : ''),
-                    method: rec ? 'PUT' : 'POST', jsonData: f.getValues(),
+                    method: rec ? 'PUT' : 'POST', jsonData: Usp.compact(f.getValues()),
                     success: function () { win.close(); store.load(); },
                     failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
             } }]

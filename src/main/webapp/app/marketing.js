@@ -208,15 +208,19 @@ Usp.marketing.action = function (rec, action, message) {
 
 /* Formulaire d'une promotion : informations générales + produits (si existante). */
 Usp.marketing.promotionForm = function (store, rec) {
+    // Code auto (4 caractères) pré-affiché et modifiable à la création.
+    var codeInitial = rec ? rec.get('code') : (Usp.codeAuto ? Usp.codeAuto() : '');
     var items = [
-        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: rec ? rec.get('code') : '' },
-        { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false, value: rec ? rec.get('nom') : '' },
+        { xtype: 'textfield', name: 'code', fieldLabel: 'Code *', allowBlank: false, value: codeInitial,
+          emptyText: 'code court modifiable' },
+        { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom *', allowBlank: false, value: rec ? rec.get('nom') : '' },
         { xtype: 'textarea', name: 'description', fieldLabel: 'Description', height: 50, value: rec ? rec.get('description') : '' },
-        { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
+        { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début *', allowBlank: false, format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateDebut') ? Ext.Date.parse(String(rec.get('dateDebut')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
+        { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin *', allowBlank: false, format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateFin') ? Ext.Date.parse(String(rec.get('dateFin')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
+        { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable',
+          fieldStyle: 'color:#1565c0;font-weight:bold', value: rec ? rec.get('responsable') : '' }
     ];
 
     var formItems = [{ xtype: 'form', itemId: 'promoForm', border: false, bodyPadding: '0 0 8 0',
@@ -237,9 +241,13 @@ Usp.marketing.promotionForm = function (store, rec) {
         items: formItems,
         buttons: [{ text: 'Enregistrer', formBind: false, handler: function (b) {
             var form = b.up('window').down('#promoForm').getForm();
-            if (!form.isValid()) { return; }
+            if (!form.isValid()) {
+                Ext.Msg.alert('Champs à compléter', 'Merci de renseigner les champs obligatoires (repérés par *).');
+                return;
+            }
             if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
-            var v = form.getValues();
+            // Chaînes vides -> null (évite l'échec technique sur dates vides).
+            var v = Usp.compact(form.getValues());
             Usp.ajax({ url: rec ? '/promotions/' + rec.get('id') : '/promotions',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
                 success: function (resp) {
@@ -253,11 +261,7 @@ Usp.marketing.promotionForm = function (store, rec) {
                         Usp.marketing.promotionForm(store, m);
                     }
                 },
-                failure: function (resp) {
-                    var msg = 'Enregistrement impossible.';
-                    try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
-                    Ext.Msg.alert('Erreur', msg);
-                } });
+                failure: function (resp) { Usp.afficherErreurForm(form, resp); } });
         } }]
     });
     win.show();
