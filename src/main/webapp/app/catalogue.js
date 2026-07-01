@@ -87,9 +87,12 @@ Usp.catalogue.articlesPanel = function () {
 Usp.catalogue.articleForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'article' : 'Nouvel article',
-        width: 520, modal: true, bodyPadding: 12, layout: 'anchor',
+        width: 560, modal: true, bodyPadding: 12, layout: 'fit',
+        maxHeight: Ext.getBody().getViewSize().height - 40,
+        // Défilement vertical uniquement : jamais de scroll horizontal.
+        bodyStyle: 'overflow-x:hidden',
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, autoScroll: true, bodyStyle: 'overflow-x:hidden', defaults: { anchor: '98%' },
             items: [
                 { xtype: 'textfield', name: 'pscode', fieldLabel: 'PS Code', allowBlank: false },
                 { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false,

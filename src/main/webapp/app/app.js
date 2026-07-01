@@ -1322,6 +1322,15 @@ Usp.dashboardChart._build = function () {
     };
 };
 
+/* Préférences d'affichage du tableau de bord (par utilisateur, en localStorage). */
+Usp.CLE_DASH = 'usp_dash_prefs';
+Usp.lireDashPrefs = function () {
+    try { return JSON.parse(localStorage.getItem(Usp.CLE_DASH)) || {}; } catch (e) { return {}; }
+};
+Usp.ecrireDashPrefs = function (p) {
+    try { localStorage.setItem(Usp.CLE_DASH, JSON.stringify(p)); } catch (e) { /* ignore */ }
+};
+
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
     var cartes = Ext.create('Ext.Component', { anchor: '100%',
@@ -1331,8 +1340,12 @@ Usp.dashboardPanel = function () {
     if (graphe) { items.push(graphe); }
     var panel = Ext.create('Ext.panel.Panel', {
         title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
-        bodyStyle: 'background:#eef1f5', items: items,
-        tools: [{ type: 'refresh', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }]
+        // overflow-x caché : pas de scroll horizontal en bas.
+        bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: items,
+        tools: [
+            { type: 'gear', tooltip: 'Personnaliser (afficher / masquer / réordonner)', handler: function () { personnaliser(); } },
+            { type: 'refresh', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }
+        ]
     });
     var SECTIONS = [
         { titre: 'Clients & contacts', items: [
@@ -1383,16 +1396,70 @@ Usp.dashboardPanel = function () {
             (val == null ? '–' : val) + '</div>' +
             '<div style="font-size:12px;color:#5a6573;margin-top:6px">' + it.lib + '</div></div>';
     }
+    // Sections ordonnées selon les préférences (les nouvelles s'ajoutent à la fin).
+    function sectionsOrdonnees() {
+        var p = Usp.lireDashPrefs();
+        var ordre = p.ordre || [];
+        var caches = p.caches || {};
+        var parTitre = {}; SECTIONS.forEach(function (s) { parTitre[s.titre] = s; });
+        var out = [];
+        ordre.forEach(function (t) { if (parTitre[t]) { out.push(parTitre[t]); delete parTitre[t]; } });
+        SECTIONS.forEach(function (s) { if (parTitre[s.titre]) { out.push(s); } });
+        return { liste: out, caches: caches };
+    }
+    var _dernier = {};
     function rendre(d) {
+        _dernier = d || _dernier;
+        var conf = sectionsOrdonnees();
         var html = '';
-        SECTIONS.forEach(function (sec) {
+        conf.liste.forEach(function (sec) {
+            if (conf.caches[sec.titre]) { return; } // section masquée
             html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
                 'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
             html += '<div style="margin-bottom:14px">';
-            sec.items.forEach(function (it) { html += carte(it, d[it.k]); });
+            sec.items.forEach(function (it) { html += carte(it, (_dernier || {})[it.k]); });
             html += '</div>';
         });
+        if (!html) { html = '<div style="color:#999;padding:10px">Toutes les sections sont masquées. ' +
+            'Cliquez sur ⚙ pour en afficher.</div>'; }
         cartes.update(html);
+    }
+
+    // Fenêtre de personnalisation : cases afficher/masquer + réordonnancement.
+    function personnaliser() {
+        var conf = sectionsOrdonnees();
+        var pstore = Ext.create('Ext.data.Store', { fields: ['titre', 'afficher'],
+            data: conf.liste.map(function (s) { return { titre: s.titre, afficher: !conf.caches[s.titre] }; }) });
+        var deplacer = function (grid, sens) {
+            var r = grid.getSelectionModel().getSelection()[0];
+            if (!r) { return; }
+            var i = pstore.indexOf(r), j = i + sens;
+            if (j < 0 || j >= pstore.getCount()) { return; }
+            pstore.remove(r); pstore.insert(j, r); grid.getSelectionModel().select(r);
+        };
+        Ext.create('Ext.window.Window', {
+            title: 'Personnaliser le tableau de bord', width: 420, height: 420, modal: true, layout: 'fit',
+            items: [{ xtype: 'grid', itemId: 'g', store: pstore, hideHeaders: false,
+                columns: [
+                    { xtype: 'checkcolumn', text: 'Afficher', dataIndex: 'afficher', width: 80 },
+                    { text: 'Section', dataIndex: 'titre', flex: 1 }
+                ],
+                tbar: [
+                    { text: '▲ Monter', handler: function (b) { deplacer(b.up('grid'), -1); } },
+                    { text: '▼ Descendre', handler: function (b) { deplacer(b.up('grid'), 1); } }
+                ] }],
+            buttons: [
+                { text: 'Réinitialiser', handler: function (b) {
+                    Usp.ecrireDashPrefs({}); b.up('window').close(); rendre(_dernier); } },
+                '->',
+                { text: 'Enregistrer', handler: function (b) {
+                    var ordre = [], caches = {};
+                    pstore.each(function (r) { ordre.push(r.get('titre')); if (!r.get('afficher')) { caches[r.get('titre')] = true; } });
+                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches });
+                    b.up('window').close(); rendre(_dernier);
+                } }
+            ]
+        }).show();
     }
     function charger() {
         Usp.ajax({
