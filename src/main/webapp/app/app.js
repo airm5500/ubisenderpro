@@ -784,12 +784,19 @@ Usp.listeMembresWindow = function (rec) {
         proxy: { type: 'ajax', url: Usp.apiBase + '/lists/' + listeId + '/contacts',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
     });
-    var selCombo = { xtype: 'combobox', itemId: 'selContact', flex: 1, emptyText: 'Rechercher un contact (2 lettres)…',
-        valueField: 'id', displayField: 'nom', queryMode: 'remote', queryParam: 'q', minChars: 2,
-        listConfig: { getInnerTpl: function () { return '<b>{code}</b> {entreprise} <span style="color:#999">{nom}</span>'; } },
-        store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero', 'code', 'entreprise'],
-            proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
-                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) };
+    // Ajout de membres via le SCL (Sélecteur de Clients) : on ajoute le contact
+    // principal de chaque client coché. Les clients sans contact sont ignorés.
+    var ajouterClients = function (rows) {
+        var contactIds = [], sansContact = 0;
+        rows.forEach(function (r) { if (r.contactId) { contactIds.push(r.contactId); } else { sansContact++; } });
+        if (!contactIds.length) { Ext.Msg.alert('Info', 'Aucun contact rattaché aux clients choisis.'); return; }
+        var reste = contactIds.length, erreurs = 0;
+        contactIds.forEach(function (cid) {
+            Usp.ajax({ url: '/lists/' + listeId + '/contacts', method: 'POST', jsonData: { contactId: cid, source: 'MANUEL' },
+                success: function () { if (--reste === 0) { store.load(); Usp.toast(contactIds.length + ' membre(s) ajouté(s)' + (sansContact ? ' — ' + sansContact + ' sans contact ignoré(s).' : '.')); } },
+                failure: function () { erreurs++; if (--reste === 0) { store.load(); } } });
+        });
+    };
     Ext.create('Ext.window.Window', {
         title: 'Membres — ' + Ext.String.htmlEncode(rec.get('nom')), width: 640, height: 460, modal: true, layout: 'fit',
         items: [{ xtype: 'grid', store: store,
@@ -799,13 +806,10 @@ Usp.listeMembresWindow = function (rec) {
                 { text: '', width: 50, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
                   renderer: function () { return '<span class="ldm-del" title="Retirer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
             ],
-            tbar: [selCombo, { text: '➕ Ajouter', handler: function (b) {
-                var cb = b.up('toolbar').down('#selContact'); var cid = cb.getValue();
-                if (!cid) { Ext.Msg.alert('Info', 'Choisissez un contact.'); return; }
-                Usp.ajax({ url: '/lists/' + listeId + '/contacts', method: 'POST', jsonData: { contactId: cid, source: 'MANUEL' },
-                    success: function () { cb.setValue(null); store.load(); },
-                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-            } }],
+            tbar: [
+                { text: '➕ Choisir des clients', handler: function () {
+                    Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste', onValider: ajouterClients }); } }
+            ],
             listeners: { cellclick: function (g, td, ci, r, tr, ri, e) {
                 if (e.getTarget('.ldm-del')) {
                     Usp.ajax({ url: '/lists/' + listeId + '/contacts/' + r.get('id'), method: 'DELETE',
@@ -1387,6 +1391,76 @@ Usp.multiPicker = function (cfg) {
         ]
     });
     return container;
+};
+
+/* SCL — Sélecteur de Clients : fenêtre listant tous les clients actifs
+ * (code / nom / entreprise / agence / région / téléphone) avec filtres
+ * segmentation + agence + région + recherche live (combinables) et cases à
+ * cocher (un / tout le résultat). cfg.onValider(rows) reçoit les clients cochés
+ * ({clientId, code, nom, entreprise, agence, region, contactId, numero}). */
+Usp.clientPicker = function (cfg) {
+    cfg = cfg || {};
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['clientId', 'code', 'nom', 'entreprise', 'agence', 'region', 'contactId', 'numero'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/clients/selection',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var refStore = function (type) {
+        return Ext.create('Ext.data.Store', { fields: ['id', 'code', 'libelle'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    };
+    var segStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
+    var etat = { q: '', agence: '', region: '', seg: '' };
+    var charger = function () {
+        store.getProxy().extraParams = { q: etat.q, agence: etat.agence, region: etat.region, segmentationId: etat.seg };
+        store.load();
+    };
+    var win = Ext.create('Ext.window.Window', {
+        title: cfg.title || 'Choisir des clients', width: 800,
+        height: Math.min(560, Ext.getBody().getViewSize().height - 40), modal: true, layout: 'fit',
+        items: [{ xtype: 'grid', store: store, selModel: sm,
+            columns: [
+                { text: 'Code', dataIndex: 'code', width: 90 },
+                { text: 'Nom client', dataIndex: 'nom', flex: 1 },
+                { text: 'Entreprise', dataIndex: 'entreprise', flex: 1 },
+                { text: 'Agence', dataIndex: 'agence', width: 110 },
+                { text: 'Région', dataIndex: 'region', width: 110 },
+                { text: 'Téléphone', dataIndex: 'numero', width: 120 }
+            ],
+            tbar: [
+                { xtype: 'textfield', emptyText: '🔎 Rechercher…', width: 170,
+                  listeners: { change: { buffer: 350, fn: function (f, v) { etat.q = v || ''; charger(); } },
+                      specialkey: function (f, e) { if (e.getKey() === e.ENTER) { etat.q = f.getValue() || ''; charger(); } } } },
+                { xtype: 'combobox', emptyText: 'Segmentation', width: 150, store: segStore, valueField: 'id',
+                  displayField: 'libelle', queryMode: 'local', editable: false,
+                  listeners: { change: function (f, v) { etat.seg = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Agence', width: 130, store: refStore('AGENCE'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false,
+                  listeners: { change: function (f, v) { etat.agence = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Région', width: 130, store: refStore('REGION'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false,
+                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } }
+            ],
+            bbar: ['->',
+                { text: 'Tout sélectionner (résultat)', handler: function () { sm.selectAll(); } },
+                { text: 'Tout désélectionner', handler: function () { sm.deselectAll(); } }
+            ]
+        }],
+        buttons: [
+            { text: cfg.boutonValider || 'Ajouter la sélection', handler: function () {
+                var recs = sm.getSelection();
+                if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un client.'); return; }
+                if (cfg.onValider) { cfg.onValider(recs.map(function (r) { return r.getData(); })); }
+                win.close();
+            } },
+            { text: 'Annuler', handler: function () { win.close(); } }
+        ]
+    });
+    win.show();
+    charger();
 };
 
 /* Durée lisible entre deux dates (ex. « 29 jours », « 1 mois 10 jours », « 4 mois »). */

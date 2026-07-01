@@ -46,6 +46,17 @@ public class ClientResource {
         return clientService.facettes();
     }
 
+    /** Sélecteur de clients (SCL) : clients actifs + contact principal, filtrables. */
+    @GET
+    @Path("/selection")
+    public java.util.List<java.util.Map<String, Object>> selection(
+            @QueryParam("q") String q,
+            @QueryParam("agence") String agence,
+            @QueryParam("region") String region,
+            @QueryParam("segmentationId") Long segmentationId) {
+        return clientService.pourSelectionClients(q, agence, region, segmentationId);
+    }
+
     @GET
     @Path("/{id}")
     public Response parId(@PathParam("id") Long id) {

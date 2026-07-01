@@ -66,6 +66,59 @@ public class ClientService {
     }
 
     /**
+     * Sélecteur de clients (SCL) : tous les clients actifs (filtrables par recherche,
+     * agence, région, segmentation) avec leur contact principal (id + numéro). Une
+     * ligne par client — sert à constituer des destinataires / listes / sélections.
+     */
+    public List<java.util.Map<String, Object>> pourSelectionClients(String q, String agence,
+                                                                    String region, Long segmentationId) {
+        StringBuilder where = new StringBuilder(" WHERE c.actif = true");
+        List<Object[]> params = new ArrayList<>();
+        if (q != null && !q.trim().isEmpty()) {
+            where.append(" AND (LOWER(c.nomCompte) LIKE :q OR LOWER(c.numeroClient) LIKE :q OR LOWER(c.entreprise) LIKE :q)");
+            params.add(new Object[]{"q", "%" + q.trim().toLowerCase() + "%"});
+        }
+        if (agence != null && !agence.isEmpty()) { where.append(" AND c.agence = :ag"); params.add(new Object[]{"ag", agence}); }
+        if (region != null && !region.isEmpty()) { where.append(" AND c.region = :reg"); params.add(new Object[]{"reg", region}); }
+        if (segmentationId != null) { where.append(" AND c.segmentationId = :seg"); params.add(new Object[]{"seg", segmentationId}); }
+
+        TypedQuery<Client> query = em.createQuery("SELECT c FROM Client c" + where + " ORDER BY c.nomCompte", Client.class);
+        for (Object[] p : params) { query.setParameter((String) p[0], p[1]); }
+        List<Client> clients = query.setMaxResults(5000).getResultList();
+
+        // Contact principal (id + numéro joignable) par client, en une requête.
+        java.util.Map<Long, com.ubisenderpro.entity.ClientContact> principal = new java.util.HashMap<>();
+        List<Long> ids = new ArrayList<>();
+        for (Client c : clients) { if (c.getId() != null) { ids.add(c.getId()); } }
+        if (!ids.isEmpty()) {
+            for (com.ubisenderpro.entity.ClientContact cc : em.createQuery(
+                    "SELECT cc FROM ClientContact cc WHERE cc.clientId IN :ids " +
+                    "ORDER BY cc.contactPrincipal DESC, cc.id ASC", com.ubisenderpro.entity.ClientContact.class)
+                    .setParameter("ids", ids).getResultList()) {
+                if (!principal.containsKey(cc.getClientId())) { principal.put(cc.getClientId(), cc); }
+            }
+        }
+        List<java.util.Map<String, Object>> out = new ArrayList<>();
+        for (Client c : clients) {
+            com.ubisenderpro.entity.ClientContact cc = principal.get(c.getId());
+            String numero = cc == null ? null
+                    : (cc.getNumeroWhatsapp() != null && !cc.getNumeroWhatsapp().trim().isEmpty()
+                        ? cc.getNumeroWhatsapp() : cc.getTelephonePrincipal());
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("clientId", c.getId());
+            m.put("code", c.getNumeroClient());
+            m.put("nom", c.getNomCompte());
+            m.put("entreprise", c.getEntreprise());
+            m.put("agence", c.getAgence());
+            m.put("region", c.getRegion());
+            m.put("contactId", cc == null ? null : cc.getId());
+            m.put("numero", numero);
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
      * Renseigne le téléphone du contact principal pour chaque client de la page
      * (une seule requête sur les contacts, contact principal prioritaire, repli
      * sur le numéro WhatsApp). Champ transient, affiché en liste.
@@ -118,6 +171,7 @@ public class ClientService {
         // sont préservés ; updated_at est positionné par @PreUpdate.
         ex.setNumeroClient(client.getNumeroClient());
         ex.setNomCompte(client.getNomCompte());
+        ex.setEntreprise(client.getEntreprise());
         ex.setAgence(client.getAgence());
         ex.setRegion(client.getRegion());
         ex.setTournee(client.getTournee());
