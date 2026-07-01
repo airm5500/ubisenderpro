@@ -247,6 +247,12 @@ Usp.restaurerSession = function () {
         failure: function () { Usp.effacerSession(); Usp.showLogin(); } });
 };
 
+/* Déconnexion manuelle : clôture serveur puis nettoyage + rechargement. */
+Usp.deconnexion = function () {
+    Usp.ajax({ url: '/auth/logout', method: 'POST',
+        callback: function () { Usp.effacerSession(); location.reload(); } });
+};
+
 /* Expire la session (inactivité ou invalidation serveur) : nettoie et recharge
  * vers l'écran de connexion avec un message d'information. */
 Usp.expirerSession = function () {
@@ -289,7 +295,27 @@ Usp.expirerSession = function () {
         + 'font-weight:bold;margin-left:3px;vertical-align:top}'
         // Icône « rafraîchir » animée (rotation) pendant un chargement.
         + '@keyframes uspSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}'
-        + '.usp-spin{display:inline-block;animation:uspSpin .8s linear infinite}';
+        + '.usp-spin{display:inline-block;animation:uspSpin .8s linear infinite}'
+        // Retour visuel net au survol de TOUS les boutons (lift + ombre).
+        + '.x-btn{transition:transform .1s ease, box-shadow .1s ease}'
+        + '.x-btn-over{transform:translateY(-1px);box-shadow:0 2px 7px rgba(0,0,0,.22)}'
+        // Cloche de notifications : bouton rond sans cadre, pulsation contenue.
+        + '@keyframes uspBell{0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)}}'
+        + '.hdr-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;'
+        + 'width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);cursor:pointer;'
+        + 'transition:background .15s ease, transform .15s ease}'
+        + '.hdr-bell:hover{background:rgba(41,128,236,.45);transform:scale(1.06)}'
+        + '.hdr-bell .ico{font-size:18px;line-height:1;color:#fff;display:inline-block}'
+        + '.hdr-bell.actif .ico{animation:uspBell 1.1s ease-in-out infinite;transform-origin:center}'
+        + '.hdr-badge{position:absolute;top:-4px;right:-4px;background:#e74c3c;color:#fff;'
+        + 'border:1px solid #1b2a4a;border-radius:9px;font-size:10px;font-weight:bold;line-height:1;'
+        + 'min-width:15px;height:15px;padding:1px 3px;display:flex;align-items:center;justify-content:center}'
+        // Bouton déconnexion : rond, rouge, bien visible.
+        + '.hdr-logout{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
+        + 'border-radius:50%;background:#e74c3c;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(231,76,60,.5);'
+        + 'transition:background .15s ease, transform .15s ease, box-shadow .15s ease}'
+        + '.hdr-logout:hover{background:#c0392b;transform:scale(1.1);box-shadow:0 3px 10px rgba(192,57,43,.7)}'
+        + '.hdr-logout svg{width:16px;height:16px}';
     var style = document.createElement('style');
     style.type = 'text/css';
     style.appendChild(document.createTextNode(css));
@@ -1985,12 +2011,18 @@ Usp.notifications.rafraichir = function () {
         } });
 };
 
-/* Met à jour la cloche : pastille de comptage + animation « pace-maker » si activité. */
+/* Met à jour la cloche : pastille de comptage collée + pulsation si activité. */
 Usp.notifications.majBadge = function (total) {
-    var btn = Ext.ComponentQuery.query('#uspNotif')[0];
-    if (!btn) { return; }
-    btn.setText('🔔' + (total ? ' <span class="usp-notif-badge">' + total + '</span>' : ''));
-    if (total) { btn.addCls('usp-notif-actif'); } else { btn.removeCls('usp-notif-actif'); }
+    var cmp = Ext.ComponentQuery.query('#uspNotif')[0];
+    if (!cmp || !cmp.getEl()) { return; }
+    var el = cmp.getEl().dom;
+    var bell = el.querySelector('.hdr-bell');
+    var badge = el.querySelector('.hdr-badge');
+    if (badge) {
+        badge.textContent = total > 99 ? '99+' : String(total || 0);
+        badge.style.display = total ? 'flex' : 'none';
+    }
+    if (bell) { if (total) { bell.classList.add('actif'); } else { bell.classList.remove('actif'); } }
 };
 
 /* Clic sur une notification → va au menu/onglet concerné et ferme le volet. */
@@ -2002,7 +2034,11 @@ Usp.notifications.aller = function (vue) {
 Usp.notifications.ouvrir = function () {
     var d = Usp.notifications._data || { groupes: [] };
     var fdate = function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; };
-    var items = (d.groupes || []).map(function (g) {
+    // Dynamique : on n'affiche que les types ayant au moins un élément (pas de bloc vide).
+    var groupesPleins = (d.groupes || []).filter(function (g) {
+        return (g.count || 0) > 0 || (g.items && g.items.length);
+    });
+    var items = groupesPleins.map(function (g) {
         var lignes = (g.items || []).map(function (it) {
             return '<div class="usp-notif-item" onclick="Usp.notifications.aller(\'' + g.vue + '\')" ' +
                 'style="cursor:pointer;padding:3px 6px;border-bottom:1px solid #f0f0f0;font-size:12px">' +
@@ -2010,12 +2046,16 @@ Usp.notifications.ouvrir = function () {
                 (it.date ? ' <span style="color:#999">' + fdate(it.date) + '</span>' : '') + '</div>';
         }).join('') || '<div style="padding:6px;color:#999;font-size:12px">Aucun élément récent.</div>';
         return {
-            xtype: 'panel', collapsible: true, collapsed: true, titleCollapse: true, margin: '0 0 4 0',
+            xtype: 'panel', collapsible: true, collapsed: false, titleCollapse: true, margin: '0 0 4 0',
             title: g.titre + ' (' + (g.count || 0) + ')',
             tools: [{ type: 'right', tooltip: 'Ouvrir le menu', handler: function () { Usp.notifications.aller(g.vue); } }],
             items: [{ xtype: 'component', html: lignes }]
         };
     });
+    if (!items.length) {
+        items = [{ xtype: 'component', html: '<div style="padding:16px;color:#888;text-align:center">' +
+            'Aucune notification pour le moment. 🎉</div>' }];
+    }
     Usp.notifications._win = Ext.create('Ext.window.Window', {
         title: '🔔 Centre de notifications (' + (d.total || 0) + ')', width: 460,
         height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: false, autoScroll: true,
@@ -2076,29 +2116,24 @@ Usp.showMain = function () {
                       margin: '0 10 0 0',
                       tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
                       handler: function () { Usp.escalades.ouvrir(); } },
-                    // Centre de notifications : cloche + pastille cumulée (animée s'il y a des notifs).
-                    { xtype: 'button', itemId: 'uspNotif', cls: 'usp-icbtn', margin: '0 6 0 0',
-                      text: '🔔', tooltip: 'Centre de notifications',
-                      handler: function () { Usp.notifications.ouvrir(); } },
+                    // Centre de notifications : cloche ronde sans cadre + badge collé.
+                    { xtype: 'component', itemId: 'uspNotif', margin: '0 8 0 0',
+                      html: '<span class="hdr-bell" title="Centre de notifications" onclick="Usp.notifications.ouvrir()">' +
+                            '<span class="ico">🔔</span>' +
+                            '<span class="hdr-badge" style="display:none">0</span></span>' },
                     // À propos : icône seule, animée au survol.
                     { xtype: 'button', itemId: 'uspAbout', cls: 'usp-icbtn', text: 'ℹ️', margin: '0 10 0 0',
                       tooltip: 'À propos (version, développeur)', handler: function () { Usp.apropos(); } },
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
-                    { tooltip: 'Déconnexion', cls: 'usp-logout usp-logout-round usp-icbtn',
-                      text: '<img src="data:image/svg+xml,' +
-                          "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
-                          "stroke='%23c62828' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E" +
-                          "%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E" +
-                          "%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cline x1='21' y1='12' x2='9' y2='12'/%3E" +
-                          "%3C/svg%3E" +
-                          '" style="width:18px;height:18px;vertical-align:middle"/>',
-                      handler: function () {
-                        // Recharge seulement APRÈS la déconnexion (sinon la session n'est pas clôturée).
-                        Usp.ajax({ url: '/auth/logout', method: 'POST',
-                            callback: function () { Usp.effacerSession(); location.reload(); } });
-                    } }
+                    // Déconnexion : bouton rond rouge bien visible (icône power-off blanche).
+                    { xtype: 'component', margin: '0 4 0 2',
+                      html: '<span class="hdr-logout" title="Déconnexion" onclick="Usp.deconnexion()">' +
+                          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
+                          "stroke='#fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'>" +
+                          "<path d='M18.36 6.64a9 9 0 1 1-12.73 0'/><line x1='12' y1='2' x2='12' y2='12'/>" +
+                          "</svg></span>" }
                 ]
             },
             {
