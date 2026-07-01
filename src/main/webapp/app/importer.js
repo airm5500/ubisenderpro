@@ -78,7 +78,9 @@ Usp.importer.show = function (type, url, onDone) {
     };
 
     var win = Ext.create('Ext.window.Window', {
-        title: 'Assistant d\'import — ' + type, width: 560, height: 560, modal: true,
+        title: 'Assistant d\'import — ' + type, width: 640,
+        height: Math.min(720, Ext.getBody().getViewSize().height - 40),
+        maxHeight: Ext.getBody().getViewSize().height - 40, modal: true,
         layout: 'fit',
         items: [{
             xtype: 'form', border: false, autoScroll: true, bodyPadding: 12,
@@ -117,7 +119,7 @@ Usp.importer.show = function (type, url, onDone) {
                       } catch (e) { }
                   } } },
                 { xtype: 'fieldset', title: 'Correspondance des colonnes', collapsible: true,
-                  defaults: { labelWidth: 160 }, items: mappingItems },
+                  defaults: { labelWidth: 160, anchor: '100%' }, items: mappingItems },
                 { xtype: 'combobox', name: 'mode', fieldLabel: 'En cas de doublon', value: 'AJOUT_MAJ',
                   store: [['AJOUT_MAJ', 'Ajouter et mettre à jour'], ['IGNORER', 'Ignorer les doublons']],
                   queryMode: 'local', editable: false },

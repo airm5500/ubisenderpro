@@ -498,11 +498,19 @@ Usp.clientsPanel = function () {
 Usp.clientsGrid = function (actif) {
     var store = Usp.createClientStore(actif);
 
+    // Store des segmentations partagé : sert au filtre ET au rendu de la colonne.
+    var segStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var segLib = function (id) {
+        if (id === null || id === undefined || id === '') { return ''; }
+        var i = segStore.findExact('id', id); return i >= 0 ? segStore.getAt(i).get('libelle') : '';
+    };
+    // Un filtre appliqué automatiquement à la sélection (et combinable avec les autres).
+    var autoFiltre = { change: function (f) { appliquer(f.up('toolbar')); } };
     var comboSeg = { xtype: 'combobox', itemId: 'fSeg', emptyText: 'Segmentation', width: 150,
         queryMode: 'local', editable: false, valueField: 'id', displayField: 'libelle',
-        store: Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
-            proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
-                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) };
+        store: segStore, listeners: autoFiltre };
     // Filtres Agence / Région alimentés par les référentiels (valeur = libellé).
     var refFilterStore = function (type) {
         return Ext.create('Ext.data.Store', { fields: ['id', 'code', 'libelle'], autoLoad: true,
@@ -511,10 +519,10 @@ Usp.clientsGrid = function (actif) {
     };
     var comboAgence = { xtype: 'combobox', itemId: 'fAgence', emptyText: 'Agence', width: 130,
         queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
-        store: refFilterStore('AGENCE') };
+        store: refFilterStore('AGENCE'), listeners: autoFiltre };
     var comboRegion = { xtype: 'combobox', itemId: 'fRegion', emptyText: 'Région', width: 130,
         queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
-        store: refFilterStore('REGION') };
+        store: refFilterStore('REGION'), listeners: autoFiltre };
 
     var appliquer = function (tb) {
         var p = { actif: actif };
@@ -530,15 +538,19 @@ Usp.clientsGrid = function (actif) {
         store.loadPage(1);
     };
 
+    var detailSpan = '<span class="cli-detail" title="Voir le détail" style="cursor:pointer;margin:0 4px">🔍</span>';
+    var contactsSpan = '<span class="cli-contacts" title="Voir / ajouter les contacts" style="cursor:pointer;margin:0 4px;color:#1976d2">👥</span>';
     var actionCol = actif
-        ? { text: 'Actions', width: 120, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+        ? { text: 'Actions', width: 150, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
             renderer: function () {
-                return '<span class="cli-edit" title="Modifier ce compte" style="cursor:pointer;margin:0 4px">✏️</span>' +
+                return detailSpan + contactsSpan +
+                    '<span class="cli-edit" title="Modifier ce compte" style="cursor:pointer;margin:0 4px">✏️</span>' +
                     '<span class="cli-off" title="Désactiver ce compte" style="cursor:pointer;margin:0 4px;color:#c62828">⛔</span>';
             } }
-        : { text: 'Actions', width: 100, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
+        : { text: 'Actions', width: 150, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
             renderer: function () {
-                return '<span class="cli-on" title="Réactiver ce compte" style="cursor:pointer;color:#2e7d32">✅ Activer</span>';
+                return detailSpan + contactsSpan +
+                    '<span class="cli-on" title="Réactiver ce compte" style="cursor:pointer;color:#2e7d32">✅ Activer</span>';
             } };
 
     var tbar = [];
@@ -558,7 +570,6 @@ Usp.clientsGrid = function (actif) {
               change: { buffer: 400, fn: function (f) { appliquer(f.up('toolbar')); } },
               specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
         comboSeg, comboAgence, comboRegion,
-        { text: '🔎 Filtrer', tooltip: 'Appliquer les filtres sélectionnés', handler: function (b) { appliquer(b.up('toolbar')); } },
         { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
             var tb = b.up('toolbar');
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
@@ -566,23 +577,30 @@ Usp.clientsGrid = function (actif) {
             store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
         } });
 
+    // Info-bulle (survol) sur code / nom / entreprise : segmentation + e-mail.
+    var tip = function (v, meta, rec) {
+        var seg = segLib(rec.get('segmentationId')) || '—';
+        var email = rec.get('emailPrincipal') || '—';
+        meta.tdAttr = 'data-qtip="' + Ext.String.htmlEncode('Segmentation : ' + seg + ' &#10; E-mail : ' + email) + '"';
+        return Ext.String.htmlEncode(v || '');
+    };
     return {
         xtype: 'grid',
-        title: actif ? '🏢 Liste des comptes' : '🚫 Clients désactivés',
+        title: actif ? '👥 Liste des Clients' : '🚫 Clients désactivés',
         store: store,
         columns: [
-            { text: 'Code client', dataIndex: 'numeroClient', width: 100 },
-            { text: 'Nom client', dataIndex: 'nomCompte', flex: 1 },
-            { text: 'Entreprise', dataIndex: 'entreprise', width: 160 },
+            { text: 'Code client', dataIndex: 'numeroClient', width: 100, renderer: tip },
+            { text: 'Nom client', dataIndex: 'nomCompte', flex: 1, renderer: tip },
+            { text: 'Entreprise', dataIndex: 'entreprise', width: 160, renderer: tip },
             { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 130 },
+            { text: 'Segmentation', dataIndex: 'segmentationId', width: 120,
+              renderer: function (v) { return Ext.String.htmlEncode(segLib(v)); } },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
-            { text: 'E-mail', dataIndex: 'emailPrincipal', width: 180 },
-            { text: 'Statut', dataIndex: 'statut', width: 80 },
-            { text: 'Contacts', width: 100, sortable: false, menuDisabled: true, dataIndex: 'id',
-              renderer: function () {
-                  return '<span class="cli-contacts" title="Voir / ajouter les contacts" ' +
-                      'style="cursor:pointer;color:#1976d2">👥 contacts</span>';
+            { text: 'Statut', dataIndex: 'statut', width: 90,
+              renderer: function (v) {
+                  return '<span style="color:' + (actif ? '#2e7d32' : '#c62828') + ';font-weight:bold">'
+                      + Ext.String.htmlEncode(v || '') + '</span>';
               } },
             actionCol
         ],
@@ -592,6 +610,7 @@ Usp.clientsGrid = function (actif) {
             // Filtres Agence/Région désormais alimentés par les référentiels (autoLoad).
             itemdblclick: function (g, rec) { if (actif) { Usp.clientForm(store, rec); } },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.cli-detail')) { Usp.clientDetail(rec.get('id'), segLib); return; }
                 if (e.getTarget('.cli-contacts')) { Usp.contactsWindow(rec.get('id'), rec.get('nomCompte')); return; }
                 if (e.getTarget('.cli-edit')) { Usp.clientForm(store, rec); return; }
                 if (e.getTarget('.cli-off')) { Usp.clientActif(rec, false); return; }
@@ -615,6 +634,30 @@ Usp.clientActif = function (rec, actif) {
     if (actif) { faire(); return; }
     Ext.Msg.confirm('Désactiver', 'Désactiver le compte « ' + Ext.String.htmlEncode(nom) +
         ' » ? Il passera dans l\'onglet « Clients désactivés ».', function (b) { if (b === 'yes') { faire(); } });
+};
+
+/* Fiche client en lecture seule (bouton « Détail »). */
+Usp.clientDetail = function (id, segLib) {
+    Usp.ajax({ url: '/clients/' + id, method: 'GET', success: function (resp) {
+        var c = {}; try { c = Ext.decode(resp.responseText) || {}; } catch (e) {}
+        var seg = (segLib ? segLib(c.segmentationId) : '') || '—';
+        var l = function (lib, val) {
+            return '<tr><td style="color:#888;padding:2px 12px 2px 0;white-space:nowrap">' + lib
+                + '</td><td style="font-weight:bold">' + Ext.String.htmlEncode(val || '—') + '</td></tr>';
+        };
+        var html = '<table style="width:100%;border-collapse:collapse">'
+            + l('Code client', c.numeroClient) + l('Nom client', c.nomCompte) + l('Entreprise', c.entreprise)
+            + l('Segmentation', seg) + l('E-mail', c.emailPrincipal)
+            + l('Agence', c.agence) + l('Région', c.region) + l('Ville', c.ville)
+            + l('Commune', c.commune) + l('Pays', c.pays) + l('Tournée', c.tournee) + l('Statut', c.statut)
+            + '</table>'
+            + (c.notes ? '<div style="margin-top:8px;color:#555"><b>Notes :</b><br>' + Ext.String.htmlEncode(c.notes) + '</div>' : '');
+        Ext.create('Ext.window.Window', {
+            title: '🔍 Détail — ' + Ext.String.htmlEncode(c.nomCompte || ''), width: 480, modal: true,
+            bodyPadding: 14, autoScroll: true, items: [{ xtype: 'component', html: html }],
+            buttons: [{ text: 'Fermer', handler: function (b) { b.up('window').close(); } }]
+        }).show();
+    } });
 };
 
 /* ---------- Gestion des segmentations (CRUD) ---------- */
@@ -1633,6 +1676,10 @@ Usp.ouvrirVue = function (vue) {
 
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
+    // Info-bulles au survol (data-qtip) — nécessaire pour les tooltips des grilles.
+    if (Ext.tip && Ext.tip.QuickTipManager && !Ext.tip.QuickTipManager.isEnabled()) {
+        Ext.tip.QuickTipManager.init();
+    }
     // Boutons des boîtes de dialogue en français (Oui / Non).
     Ext.MessageBox.buttonText.yes = 'Oui';
     Ext.MessageBox.buttonText.no = 'Non';
