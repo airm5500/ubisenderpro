@@ -35,6 +35,8 @@ public class PromotionProduitService {
 
     @EJB
     private PromotionService promotionService;
+    @EJB
+    private ArticleService articleService;
 
     public List<PromotionProduit> lister(Long promotionId) {
         return em.createQuery(
@@ -105,24 +107,13 @@ public class PromotionProduitService {
 
     private boolean negatif(BigDecimal v) { return v != null && v.signum() < 0; }
 
-    /** Rattache l'article du catalogue par CIP7=cip ou CIP13=code-barres (si trouvé). */
+    /** Rattache l'article du catalogue (CIP7/CIP13) et le crée s'il est absent. */
     private void resoudreArticle(PromotionProduit p) {
-        Article a = null;
-        if (p.getCip7() != null && !p.getCip7().trim().isEmpty()) {
-            a = unArticle("SELECT a FROM Article a WHERE a.cip = :v", p.getCip7().trim());
-        }
-        if (a == null && p.getCip13() != null && !p.getCip13().trim().isEmpty()) {
-            a = unArticle("SELECT a FROM Article a WHERE a.codeBarres = :v", p.getCip13().trim());
-        }
+        Article a = articleService.resoudreOuCreer(p.getCip7(), p.getCip13(), p.getNomProduit());
         if (a != null) {
             p.setArticleId(a.getId());
             if (p.getNomProduit() == null || p.getNomProduit().isEmpty()) { p.setNomProduit(a.getDesignation()); }
         }
-    }
-
-    private Article unArticle(String jpql, String v) {
-        List<Article> l = em.createQuery(jpql, Article.class).setParameter("v", v).setMaxResults(1).getResultList();
-        return l.isEmpty() ? null : l.get(0);
     }
 
     private boolean doublon(Long promotionId, String cip7, String cip13, Long excludeId) {

@@ -22,8 +22,9 @@ Usp.dispo.COULEUR_PROD = {
 };
 
 Usp.dispo.AUDIENCES = [
-    ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
-    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'], ['SEGMENTS_SELECTIONNES', 'Segments sélectionnés'],
+    ['TOUS_LES_SEGMENTS', 'Tous les segments'],
+    ['SEGMENTS_SELECTIONNES', 'Un ou plusieurs segments'],
+    ['AGENCE', 'Clients de l\'agence'],
     ['LISTE_DE_DIFFUSION', 'Liste de diffusion'], ['CLIENTS_ACHETEURS_DU_PRODUIT', 'Clients acheteurs du produit'],
     ['CLIENTS_AYANT_DEMANDE_LE_PRODUIT', 'Clients ayant demandé le produit']
 ];
@@ -158,7 +159,8 @@ Usp.dispo.regleForm = function (store, rec) {
 Usp.dispo.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'description', 'dateDebut', 'dateFin', 'agence',
-                 'societe', 'audience', 'segmentationId', 'canal', 'modeleId', 'statut', 'responsable'],
+                 'societe', 'audience', 'segmentationId', 'segmentationIds', 'region', 'tournee', 'listeId', 'contactIds',
+                 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/dispo-evenements',
             extraParams: filtre,
@@ -177,6 +179,7 @@ Usp.dispo.grille = function (filtre, libelleTab) {
             { text: 'Fin', dataIndex: 'dateFin', width: 100, renderer: Usp.dispo.fdate },
             { text: 'Agence', dataIndex: 'agence', width: 110 },
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.dispo.statutRenderer },
+            Usp.parColonne('creePar'),
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -194,13 +197,18 @@ Usp.dispo.grille = function (filtre, libelleTab) {
                   return h;
               } }
         ],
-        tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
-                .concat(Usp.export.boutons('Disponibilités historique'))
+        tbar: (historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
             : [
                 Usp.permBtn('dispo', 'CREER', { text: '➕ Nouvel événement', tooltip: 'Créer un événement disponibilité / rupture',
                   handler: function () { Usp.dispo.evenementForm(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-            ].concat(Usp.export.boutons('Disponibilités ' + (filtre.type || filtre.statut || ''))),
+            ]).concat(['-']).concat(Usp.grilleFiltre(store, {
+                champs: ['code', 'titre'], periode: true,
+                selects: [
+                    { field: 'statut', label: 'Statut', width: 130,
+                      options: ['BROUILLON', 'PROGRAMMEE', 'ENVOYEE', 'ANNULEE', 'ARCHIVEE'].map(function (s) { return { v: s, t: s }; }) }
+                ]
+            })).concat(Usp.export.boutons('Disponibilités ' + (filtre.type || filtre.statut || ''))),
         listeners: {
             itemdblclick: function (g, rec) { Usp.dispo.evenementForm(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -226,7 +234,8 @@ Usp.dispo.action = function (rec, action, message) {
 /* Fiche d'un événement : informations + produits (si existant). */
 Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
     var items = [
-        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: rec ? rec.get('code') : '' },
+        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false,
+          value: rec ? rec.get('code') : Usp.codeAuto(), emptyText: 'Généré — modifiable' },
         { xtype: 'combobox', name: 'type', fieldLabel: 'Type', editable: false, queryMode: 'local', allowBlank: false,
           store: Usp.dispo.TYPES, value: rec ? rec.get('type') : (typeParDefaut || 'ANNONCE_DISPONIBILITE') },
         { xtype: 'textfield', name: 'titre', fieldLabel: 'Titre', allowBlank: false, value: rec ? rec.get('titre') : '' },
@@ -235,17 +244,16 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
           value: rec && rec.get('dateDebut') ? Ext.Date.parse(String(rec.get('dateDebut')).substring(0, 10), 'Y-m-d') : null },
         { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateFin') ? Ext.Date.parse(String(rec.get('dateFin')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: rec ? rec.get('agence') : '' },
-        { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: rec ? rec.get('societe') : '' },
-        { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-          store: Usp.dispo.AUDIENCES, value: rec ? rec.get('audience') : 'TOUS_LES_SEGMENTS' },
+        { xtype: 'textfield', name: 'societe', fieldLabel: 'Société',
+          value: rec ? rec.get('societe') : (Usp.societeParDefaut || '') },
         { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal d\'envoi', editable: false, queryMode: 'local',
           store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp (officielle)']], value: rec ? (rec.get('canal') || 'WEB') : 'WEB' },
         { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
-    ];
+    // Bloc audience identique à « Informations clients » (composant réutilisable).
+    ].concat(Usp.audienceFields(function (n) { return rec ? rec.get(n) : null; }));
 
     var formItems = [{ xtype: 'form', itemId: 'deForm', border: false, bodyPadding: '0 0 8 0',
-        defaults: { anchor: '100%', labelWidth: 130 }, items: items }];
+        defaults: { anchor: '100%', labelWidth: 180 }, items: items }];
     if (rec) {
         formItems.push(Usp.dispo.produitsGrid(rec.get('id')));
     } else {
@@ -255,14 +263,17 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
 
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Événement — ' + Ext.String.htmlEncode(rec.get('titre')) : 'Nouvel événement',
-        width: 860, height: rec ? 620 : 360, modal: true,
+        width: 880, height: rec ? 640 : 560, modal: true,
         layout: { type: 'vbox', align: 'stretch' }, bodyPadding: 12,
         maxHeight: Ext.getBody().getViewSize().height - 20,
         items: formItems,
         buttons: [{ text: 'Enregistrer', handler: function (b) {
             var form = b.up('window').down('#deForm').getForm();
             if (!form.isValid()) { return; }
+            if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
             var v = form.getValues();
+            // listeId : numérique ou absent (comme dans Informations).
+            if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
             Usp.ajax({ url: rec ? '/dispo-evenements/' + rec.get('id') : '/dispo-evenements',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
                 success: function (resp) {
@@ -283,6 +294,9 @@ Usp.dispo.evenementForm = function (store, rec, typeParDefaut) {
         } }]
     });
     win.show();
+    var dForm = win.down('#deForm').getForm();
+    Usp.lierPeriode(dForm.findField('dateDebut'), dForm.findField('dateFin'));
+    Usp.majAudienceFields(win.down('#deForm'));
 };
 
 /* Sous-grille des produits d'un événement. */
@@ -300,9 +314,8 @@ Usp.dispo.produitsGrid = function (evenementId) {
             { text: 'CIP7', dataIndex: 'cip7', width: 90 },
             { text: 'CIP13', dataIndex: 'cip13', width: 120 },
             { text: 'Produit', dataIndex: 'nomProduit', flex: 1 },
-            { text: 'Qté dispo', dataIndex: 'quantiteDisponible', width: 80, align: 'right' },
-            { text: 'Seuil', dataIndex: 'seuilRupture', width: 70, align: 'right' },
-            { text: 'Statut', dataIndex: 'statut', width: 120, renderer: Usp.dispo.prodStatutRenderer },
+            { text: 'Agence', dataIndex: 'agence', width: 120 },
+            { text: 'Disponibilité', dataIndex: 'statut', width: 130, renderer: Usp.dispo.prodStatutRenderer },
             { text: 'Catalogue', dataIndex: 'articleId', width: 75, align: 'center',
               renderer: function (v) { return v ? '✅' : '—'; } },
             { text: 'Actions', width: 80, align: 'center', sortable: false, menuDisabled: true, dataIndex: 'id',
@@ -351,28 +364,29 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
               emptyText: 'Rechercher un article (désignation, CIP)…',
               listConfig: { getInnerTpl: function () { return '{designation} <span style="color:#999">{cip}</span>'; } },
               listeners: { select: function (cb, r) {
-                  fld('cip7').setValue(r.get('cip') || '');
-                  fld('cip13').setValue(r.get('codeBarres') || '');
-                  fld('nomProduit').setValue(r.get('designation') || '');
-                  fld('articleId').setValue(r.get('id'));
+                  // En ExtJS 4.2, « select » renvoie un tableau d'enregistrements.
+                  var a = Ext.isArray(r) ? r[0] : r;
+                  if (!a) { return; }
+                  fld('cip7').setValue(a.get('cip') || '');
+                  fld('cip13').setValue(a.get('codeBarres') || '');
+                  fld('nomProduit').setValue(a.get('designation') || '');
+                  fld('articleId').setValue(a.get('id'));
               } } },
             { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
               '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
             { xtype: 'hidden', name: 'articleId', value: rec ? rec.get('articleId') : null },
-            { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
+            Usp.cip7Field(rec ? rec.get('cip7') : ''),
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
-            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
-            { xtype: 'numberfield', name: 'quantiteDisponible', fieldLabel: 'Quantité disponible', minValue: 0, value: rec ? rec.get('quantiteDisponible') : null },
-            { xtype: 'numberfield', name: 'seuilRupture', fieldLabel: 'Seuil de rupture', minValue: 0, value: rec ? rec.get('seuilRupture') : null },
-            { xtype: 'numberfield', name: 'couvertureJours', fieldLabel: 'Couverture estimée (jours)', minValue: 0, value: rec ? rec.get('couvertureJours') : null },
+            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '', listeners: Usp.majListeners },
+            // On informe simplement le client : Disponible ou Stock limité (pas de quantité/seuil).
+            { xtype: 'combobox', name: 'dispoStatut', fieldLabel: 'Disponibilité', editable: false, queryMode: 'local',
+              store: [['DISPONIBLE', 'Disponible'], ['STOCK_LIMITE', 'Stock limité']],
+              value: rec && rec.get('stockLimite') ? 'STOCK_LIMITE' : 'DISPONIBLE' },
+            Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence de disponibilité',
+              value: rec ? rec.get('agence') : '', emptyText: 'Toutes les agences (laisser vide)' }),
             { xtype: 'datefield', name: 'datePeremption', fieldLabel: 'Date de péremption', format: 'd/m/Y', submitFormat: 'Y-m-d', editable: false,
               value: rec && rec.get('datePeremption') ? Ext.Date.parse(String(rec.get('datePeremption')).substring(0, 10), 'Y-m-d') : null },
             { xtype: 'textfield', name: 'numeroLot', fieldLabel: 'Numéro de lot', value: rec ? rec.get('numeroLot') : '' },
-            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence de disponibilité', value: rec ? rec.get('agence') : '' },
-            { xtype: 'textfield', name: 'lienReservation', fieldLabel: 'Lien de réservation', value: rec ? rec.get('lienReservation') : '' },
-            { xtype: 'combobox', name: 'statut', fieldLabel: 'Statut produit', editable: false, queryMode: 'local',
-              store: Usp.dispo.STATUTS_PROD, value: rec ? rec.get('statut') : '', emptyText: 'Auto (selon type / quantités)' },
-            { xtype: 'checkbox', name: 'stockLimite', fieldLabel: 'Stock limité', checked: rec ? rec.get('stockLimite') : false },
             { xtype: 'checkbox', name: 'actif', fieldLabel: 'Actif', checked: rec ? rec.get('actif') : true }
         ] }],
         buttons: [
@@ -381,20 +395,17 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var aid = form.findField('articleId').getValue();
+                var dispoStatut = form.findField('dispoStatut').getValue();
                 var payload = {
                     articleId: aid ? Number(aid) : null,
                     cip7: form.findField('cip7').getValue() || null,
                     cip13: form.findField('cip13').getValue() || null,
                     nomProduit: form.findField('nomProduit').getValue() || null,
-                    quantiteDisponible: form.findField('quantiteDisponible').getValue(),
-                    seuilRupture: form.findField('seuilRupture').getValue(),
-                    couvertureJours: form.findField('couvertureJours').getValue(),
                     datePeremption: form.findField('datePeremption').getSubmitValue() || null,
                     numeroLot: form.findField('numeroLot').getValue() || null,
                     agence: form.findField('agence').getValue() || null,
-                    lienReservation: form.findField('lienReservation').getValue() || null,
-                    statut: form.findField('statut').getValue() || null,
-                    stockLimite: form.findField('stockLimite').getValue(),
+                    // Statut calculé côté serveur à partir de « stock limité ».
+                    stockLimite: dispoStatut === 'STOCK_LIMITE',
                     actif: form.findField('actif').getValue()
                 };
                 Usp.ajax({ url: rec ? '/dispo-evenements/' + evenementId + '/produits/' + rec.get('id') : '/dispo-evenements/' + evenementId + '/produits',

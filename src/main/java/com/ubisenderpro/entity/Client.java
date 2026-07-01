@@ -59,6 +59,23 @@ public class Client {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Nom de l'officine / entreprise (ex. « PHCIE POLAP »), distinct du nom client. */
+    @Column(name = "entreprise", length = 255)
+    private String entreprise;
+
+    /** Téléphone du contact principal (non persisté) : renseigné pour l'affichage en liste. */
+    @javax.persistence.Transient
+    private String telephonePrincipal;
+
+    /** Numéros du client saisis dans la fiche (non persistés) : chaque élément
+     *  {numero, whatsapp, principal} crée/maj un contact au save. */
+    @javax.persistence.Transient
+    private java.util.List<java.util.Map<String, Object>> numeros;
+
+    /** Date de naissance (yyyy-MM-dd, non persistée) : appliquée au contact principal. */
+    @javax.persistence.Transient
+    private String dateNaissance;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
@@ -91,6 +108,14 @@ public class Client {
     public void setVille(String ville) { this.ville = ville; }
     public String getCommune() { return commune; }
     public void setCommune(String commune) { this.commune = commune; }
+    public String getTelephonePrincipal() { return telephonePrincipal; }
+    public void setTelephonePrincipal(String telephonePrincipal) { this.telephonePrincipal = telephonePrincipal; }
+    public java.util.List<java.util.Map<String, Object>> getNumeros() { return numeros; }
+    public void setNumeros(java.util.List<java.util.Map<String, Object>> numeros) { this.numeros = numeros; }
+    public String getDateNaissance() { return dateNaissance; }
+    public void setDateNaissance(String dateNaissance) { this.dateNaissance = dateNaissance; }
+    public String getEntreprise() { return entreprise; }
+    public void setEntreprise(String entreprise) { this.entreprise = entreprise; }
     public String getPays() { return pays; }
     public void setPays(String pays) { this.pays = pays; }
     public String getStatut() { return statut; }

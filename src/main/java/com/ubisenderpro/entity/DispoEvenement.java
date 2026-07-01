@@ -48,6 +48,22 @@ public class DispoEvenement {
     @Column(name = "segmentation_id")
     private Long segmentationId;
 
+    /** Sélection multiple de segments (IDs de segmentation séparés par des virgules). */
+    @Column(name = "segmentation_ids", length = 255)
+    private String segmentationIds;
+
+    @Column(name = "region", length = 150)
+    private String region;
+
+    @Column(name = "tournee", length = 150)
+    private String tournee;
+
+    @Column(name = "liste_id")
+    private Long listeId;
+
+    @Column(name = "contact_ids", length = 2000)
+    private String contactIds;
+
     @Column(name = "canal", length = 10)
     private String canal;
 
@@ -101,6 +117,16 @@ public class DispoEvenement {
     public void setAudience(String audience) { this.audience = audience; }
     public Long getSegmentationId() { return segmentationId; }
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
+    public String getSegmentationIds() { return segmentationIds; }
+    public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
+    public String getRegion() { return region; }
+    public void setRegion(String region) { this.region = region; }
+    public String getTournee() { return tournee; }
+    public void setTournee(String tournee) { this.tournee = tournee; }
+    public Long getListeId() { return listeId; }
+    public void setListeId(Long listeId) { this.listeId = listeId; }
+    public String getContactIds() { return contactIds; }
+    public void setContactIds(String contactIds) { this.contactIds = contactIds; }
     public String getCanal() { return canal; }
     public void setCanal(String canal) { this.canal = canal; }
     public Long getModeleId() { return modeleId; }

@@ -51,6 +51,10 @@ public class InfoEvenement {
     @Column(name = "segmentation_id")
     private Long segmentationId;
 
+    /** Sélection multiple de segments (IDs de segmentation séparés par des virgules). */
+    @Column(name = "segmentation_ids", length = 255)
+    private String segmentationIds;
+
     @Column(name = "liste_id")
     private Long listeId;
 
@@ -149,6 +153,8 @@ public class InfoEvenement {
     public void setAudience(String audience) { this.audience = audience; }
     public Long getSegmentationId() { return segmentationId; }
     public void setSegmentationId(Long segmentationId) { this.segmentationId = segmentationId; }
+    public String getSegmentationIds() { return segmentationIds; }
+    public void setSegmentationIds(String segmentationIds) { this.segmentationIds = segmentationIds; }
     public Long getListeId() { return listeId; }
     public void setListeId(Long listeId) { this.listeId = listeId; }
     public String getContactIds() { return contactIds; }

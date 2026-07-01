@@ -22,7 +22,60 @@ public class OpportuniteService {
         var q = em.createQuery(jpql.toString(), Opportunite.class);
         if (statut != null && !statut.isEmpty()) q.setParameter("s", statut);
         if (agentId != null) q.setParameter("a", agentId);
-        return q.getResultList();
+        List<Opportunite> res = q.getResultList();
+        renseignerLibelles(res);
+        return res;
+    }
+
+    /** Renseigne les libellés d'affichage (nom du client / de l'agent) pour les cartes du pipeline. */
+    private void renseignerLibelles(List<Opportunite> opps) {
+        if (opps == null || opps.isEmpty()) { return; }
+        java.util.Set<Long> clientIds = new java.util.HashSet<>();
+        java.util.Set<Long> agentIds = new java.util.HashSet<>();
+        java.util.Set<Long> contactIds = new java.util.HashSet<>();
+        for (Opportunite o : opps) {
+            if (o.getClientId() != null) { clientIds.add(o.getClientId()); }
+            if (o.getAgentId() != null) { agentIds.add(o.getAgentId()); }
+            if (o.getContactId() != null) { contactIds.add(o.getContactId()); }
+        }
+        // Client : nom, code et entreprise pour l'affichage « (code) nom entreprise ».
+        java.util.Map<Long, Object[]> clients = new java.util.HashMap<>();
+        if (!clientIds.isEmpty()) {
+            for (Object[] r : em.createQuery(
+                    "SELECT c.id, c.nomCompte, c.numeroClient, c.entreprise FROM Client c WHERE c.id IN :ids", Object[].class)
+                    .setParameter("ids", clientIds).getResultList()) {
+                clients.put((Long) r[0], r);
+            }
+        }
+        java.util.Map<Long, String> agents = new java.util.HashMap<>();
+        if (!agentIds.isEmpty()) {
+            for (Object[] r : em.createQuery(
+                    "SELECT u.id, u.nomComplet, u.login FROM Utilisateur u WHERE u.id IN :ids", Object[].class)
+                    .setParameter("ids", agentIds).getResultList()) {
+                String nom = r[1] != null ? (String) r[1] : (String) r[2];
+                agents.put((Long) r[0], nom);
+            }
+        }
+        java.util.Map<Long, String> contacts = new java.util.HashMap<>();
+        if (!contactIds.isEmpty()) {
+            for (Object[] r : em.createQuery(
+                    "SELECT ct.id, ct.nomComplet FROM ClientContact ct WHERE ct.id IN :ids", Object[].class)
+                    .setParameter("ids", contactIds).getResultList()) {
+                contacts.put((Long) r[0], (String) r[1]);
+            }
+        }
+        for (Opportunite o : opps) {
+            if (o.getClientId() != null) {
+                Object[] c = clients.get(o.getClientId());
+                if (c != null) {
+                    o.setClientNom((String) c[1]);
+                    o.setClientCode((String) c[2]);
+                    o.setClientEntreprise((String) c[3]);
+                }
+            }
+            if (o.getAgentId() != null) { o.setAgentNom(agents.get(o.getAgentId())); }
+            if (o.getContactId() != null) { o.setContactNom(contacts.get(o.getContactId())); }
+        }
     }
 
     public Optional<Opportunite> parId(Long id) { return Optional.ofNullable(em.find(Opportunite.class, id)); }

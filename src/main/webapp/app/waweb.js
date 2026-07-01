@@ -549,7 +549,10 @@ Usp.waweb.filterPanel = function () {
                   queryMode: 'local', editable: false },
                 { xtype: 'fieldcontainer', fieldLabel: 'Importer', layout: 'hbox', items: [
                     { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Charger un fichier (.csv/.xlsx)…',
-                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } }
+                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } },
+                    { xtype: 'button', text: '📄 Exemplaire', margin: '0 0 0 8',
+                      tooltip: 'Télécharger un modèle CSV (un numéro par ligne)',
+                      handler: function () { Usp.telechargerCsv('modele_numeros.csv', 'numero\n2250700000000\n2250500000000\n'); } }
                   ] },
                 { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 300,
                   emptyText: 'Un numéro par ligne (format international)\nou chargez un fichier ci-dessus' }
@@ -709,62 +712,23 @@ Usp.waweb.extractPanel = function () {
 
 /* Sélecteur de clients (recherche + filtre segmentation + cocher) -> remplit les destinataires. */
 Usp.waweb.choisirClients = function (formPanel) {
-    var store = Ext.create('Ext.data.Store', {
-        fields: ['numero', 'nom', 'client'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection',
-            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } }
-    });
-    var segStore = Ext.create('Ext.data.Store', {
-        fields: ['id', 'libelle'],
-        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
-            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true
-    });
-    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
-    var charger = function (win) {
-        store.getProxy().extraParams = {
-            segmentationId: win.down('#segF').getValue() || '',
-            q: win.down('#qF').getValue() || ''
-        };
-        store.load();
-    };
-    var win = Ext.create('Ext.window.Window', {
-        title: 'Choisir des clients', width: 640, height: 480, modal: true, layout: 'fit',
-        items: [{
-            xtype: 'grid', store: store, selModel: sm,
-            columns: [
-                { text: 'Numéro', dataIndex: 'numero', width: 150 },
-                { text: 'Contact', dataIndex: 'nom', flex: 1 },
-                { text: 'Client', dataIndex: 'client', flex: 1 }
-            ],
-            tbar: [
-                { xtype: 'combobox', itemId: 'segF', emptyText: 'Segmentation…', width: 180,
-                  store: segStore, valueField: 'id', displayField: 'libelle', queryMode: 'local', editable: false },
-                { xtype: 'textfield', itemId: 'qF', emptyText: 'Recherche…', width: 160,
-                  listeners: { specialkey: function (f, e) { if (e.getKey() === e.ENTER) { charger(win); } } } },
-                { text: 'Filtrer', handler: function () { charger(win); } },
-                '->',
-                { text: 'Tout sélectionner', handler: function () { sm.selectAll(); } },
-                { text: 'Tout désélectionner', handler: function () { sm.deselectAll(); } }
-            ]
-        }],
-        buttons: [
-            { text: 'Ajouter aux destinataires', handler: function () {
-                var recs = sm.getSelection();
-                if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un client.'); return; }
-                var lignes = recs.map(function (r) {
-                    return r.get('numero') + (r.get('nom') ? ';' + r.get('nom') : '');
-                });
+    // Utilise le SCL unifié (tous les clients + filtres agence/région/segmentation + recherche live).
+    Usp.clientPicker({
+        title: 'Choisir des clients', boutonValider: 'Ajouter aux destinataires', avecListe: true,
+        onValider: function (rows) {
+            var lignes = [], sansNumero = 0;
+            rows.forEach(function (r) {
+                if (r.numero) { lignes.push(r.numero + (r.nom ? ';' + r.nom : '')); } else { sansNumero++; }
+            });
+            if (lignes.length) {
                 var champ = formPanel.down('[name=destinatairesTexte]');
                 var actuel = champ.getValue();
                 champ.setValue((actuel ? actuel.replace(/\s*$/, '') + '\n' : '') + lignes.join('\n'));
-                win.close();
-            } },
-            { text: 'Annuler', handler: function () { win.close(); } }
-        ]
+            }
+            Usp.toast(lignes.length + ' destinataire(s) ajouté(s)'
+                + (sansNumero ? ' — ' + sansNumero + ' sans numéro WhatsApp ignoré(s).' : '.'));
+        }
     });
-    win.show();
-    charger(win);
 };
 
 /* Détail d'un envoi : contenu + statut par destinataire (réussi/échoué). */

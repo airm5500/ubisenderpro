@@ -98,6 +98,7 @@ public class UserService {
         m.put("nomComplet", u.getNomComplet());
         m.put("avatar", u.getAvatar());
         m.put("email", u.getEmail());
+        m.put("agence", u.getAgence());
         m.put("actif", u.isActif());
         m.put("derniereConnexion", u.getDerniereConnexion());
         m.put("roles", u.getRoles().stream().map(Role::getCode).collect(Collectors.toList()));
@@ -141,6 +142,7 @@ public class UserService {
         u.setAvatar(req.getAvatar());
         u.setPhoto(req.getPhoto());
         u.setEmail(req.getEmail());
+        u.setAgence(req.getAgence());
         u.setActif(req.getActif() == null || req.getActif());
         String mdp = (req.getMotDePasse() == null || req.getMotDePasse().isEmpty())
                 ? "Change@2026" : req.getMotDePasse();
@@ -158,6 +160,7 @@ public class UserService {
         // Photo : "" efface, valeur = remplace, null = inchangée.
         if (req.getPhoto() != null) u.setPhoto(req.getPhoto().isEmpty() ? null : req.getPhoto());
         if (req.getEmail() != null) u.setEmail(req.getEmail());
+        if (req.getAgence() != null) u.setAgence(req.getAgence().isEmpty() ? null : req.getAgence());
         if (req.getActif() != null) u.setActif(req.getActif());
         if (req.getMotDePasse() != null && !req.getMotDePasse().isEmpty()) {
             u.setMotDePasseHash(PasswordHasher.hash(req.getMotDePasse()));

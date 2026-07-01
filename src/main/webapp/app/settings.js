@@ -604,7 +604,17 @@ Usp.settings.refGeoGrid = function (type, titre) {
             } }]
         });
         win.show();
-        if (rec) { win.down('form').getForm().setValues(rec.getData()); }
+        if (rec) {
+            // Toujours repartir de la donnée fraîche du store (évite d'afficher
+            // une valeur périmée après une modification précédente).
+            var frais = store.getById(rec.get('id')) || rec;
+            win.down('form').getForm().setValues(frais.getData());
+        }
+    };
+    var basculerActif = function (rec) {
+        Usp.ajax({ url: '/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
+            method: 'PUT', success: function () { store.load(); },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
     };
     return {
         xtype: 'grid', title: titre, store: store, flex: 1,
@@ -612,26 +622,27 @@ Usp.settings.refGeoGrid = function (type, titre) {
             { text: 'Code', dataIndex: 'code', width: 160 },
             { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
             { text: 'Actif', dataIndex: 'actif', width: 70, align: 'center',
-              renderer: function (v) { return v ? '✅' : '—'; } }
+              renderer: function (v) { return v ? '✅' : '—'; } },
+            { text: 'Actions', width: 200, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  return '<span class="rg-edit" title="Modifier" style="cursor:pointer;margin-right:12px">✏️ Modifier</span>' +
+                      '<span class="rg-act" title="Activer / Désactiver" style="cursor:pointer;color:' +
+                      (rec.get('actif') ? '#c62828' : '#2e7d32') + '">' +
+                      (rec.get('actif') ? '⛔ Désactiver' : '✅ Activer') + '</span>';
+              } }
         ],
         tbar: [
             { text: '➕ Ajouter', handler: function () { form(null); } },
-            { text: '✏️ Modifier', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
-                form(rec);
-            } },
-            { text: '🗑️ Activer/Désactiver', handler: function (b) {
-                var rec = b.up('grid').getSelectionModel().getSelection()[0];
-                if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez une ligne.'); return; }
-                Usp.ajax({ url: '/referentiels/' + type + '/' + rec.get('id') + '/actif?actif=' + (!rec.get('actif')),
-                    method: 'PUT', success: function () { store.load(); },
-                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-            } },
             '->',
-            { text: '📥 Importer (CSV id,code,nom)', handler: function () { Usp.settings.importerRefGeo(type, store); } },
+            { text: '📥 Assistant d\'import', handler: function () { Usp.settings.importerRefGeo(type, store); } },
             { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
-        ]
+        ],
+        listeners: {
+            cellclick: function (g, td, ci, rec, tr, ri, e) {
+                if (e.getTarget('.rg-edit')) { form(rec); }
+                else if (e.getTarget('.rg-act')) { basculerActif(rec); }
+            }
+        }
     };
 };
 
@@ -645,42 +656,19 @@ Usp.settings.referentielsPanel = function () {
                 Usp.settings.refGeoGrid('REGION', 'Régions'),
                 Usp.settings.refGeoGrid('VILLE', 'Villes'),
                 Usp.settings.refGeoGrid('COMMUNE', 'Communes'),
-                Usp.settings.refGeoGrid('AGENCE', 'Agences')
+                Usp.settings.refGeoGrid('AGENCE', 'Agences'),
+                Usp.settings.refGeoGrid('TOURNEE', 'Tournées')
             ]
         }]
     };
 };
 
-/* Import CSV (id,code,nom) ou (code,nom) ou (nom) d'un référentiel géographique. */
+/* Import d'un référentiel géographique via l'assistant à mapping de colonnes
+ * (même assistant que le Catalogue : fichier, correspondance des colonnes,
+ * simulation, rapport, exemplaire). */
 Usp.settings.importerRefGeo = function (type, store) {
-    var win = Ext.create('Ext.window.Window', {
-        title: 'Importer — ' + type, width: 520, modal: true, bodyPadding: 12,
-        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Une ligne par valeur. Colonnes acceptées : ' +
-                '<b>id,code,nom</b> ou <b>code,nom</b> ou <b>nom</b> (séparateur , ou ;). ' +
-                'Une éventuelle ligne d\'en-tête est ignorée.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'CI,Côte d\'Ivoire\nABJ,Abidjan' },
-            { xtype: 'filefield', buttonOnly: false, fieldLabel: 'ou fichier .csv', msgTarget: 'side',
-              listeners: { change: function (f) {
-                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
-                  var reader = new FileReader();
-                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
-                  reader.readAsText(file);
-              } } }
-        ] }],
-        buttons: [{ text: 'Importer', handler: function (b) {
-            var contenu = b.up('window').down('[name=contenu]').getValue();
-            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucune donnée à importer.'); return; }
-            Usp.ajax({ url: '/referentiels/' + type + '/import', method: 'POST', jsonData: { contenu: contenu },
-                success: function (resp) {
-                    win.close(); store.load();
-                    var r = Ext.decode(resp.responseText) || {};
-                    Usp.toast((r.crees || 0) + ' valeur(s) importée(s).');
-                },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-        } }]
-    });
-    win.show();
+    Usp.importer.show('REFERENTIEL', '/referentiels/' + type + '/import-assistant',
+        function () { store.load(); });
 };
 
 /* Importe un modèle depuis un fichier .docx exporté (lecture base64 -> POST). */

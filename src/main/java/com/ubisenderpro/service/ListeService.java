@@ -34,6 +34,44 @@ public class ListeService {
                 .executeUpdate();
     }
 
+    public void retirerContact(Long listeId, Long contactId) {
+        em.createNativeQuery(
+                "DELETE FROM usp_liste_diffusion_contact WHERE liste_id = ?1 AND contact_id = ?2")
+                .setParameter(1, listeId).setParameter(2, contactId).executeUpdate();
+    }
+
+    /**
+     * Importe des clients dans une liste à partir d'un contenu texte (un code client
+     * par ligne). Pour chaque client trouvé, ajoute son contact principal. Renvoie
+     * un récapitulatif {ajoutes, introuvables, sansContact}.
+     */
+    public java.util.Map<String, Object> importerClients(Long listeId, String contenu) {
+        int ajoutes = 0, introuvables = 0, sansContact = 0;
+        if (contenu != null) {
+            for (String ligne : contenu.split("\\r?\\n")) {
+                String code = ligne == null ? "" : ligne.split("[;,\\t]")[0].trim();
+                if (code.isEmpty() || code.equalsIgnoreCase("code") || code.equalsIgnoreCase("code_client")
+                        || code.equalsIgnoreCase("numero_client")) { continue; }
+                List<com.ubisenderpro.entity.Client> cl = em.createQuery(
+                        "SELECT c FROM Client c WHERE c.numeroClient = :n", com.ubisenderpro.entity.Client.class)
+                        .setParameter("n", code).setMaxResults(1).getResultList();
+                if (cl.isEmpty()) { introuvables++; continue; }
+                List<ClientContact> cc = em.createQuery(
+                        "SELECT ct FROM ClientContact ct WHERE ct.clientId = :id " +
+                        "ORDER BY ct.contactPrincipal DESC, ct.id ASC", ClientContact.class)
+                        .setParameter("id", cl.get(0).getId()).setMaxResults(1).getResultList();
+                if (cc.isEmpty()) { sansContact++; continue; }
+                ajouterContact(listeId, cc.get(0).getId(), "IMPORT");
+                ajoutes++;
+            }
+        }
+        java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("ajoutes", ajoutes);
+        r.put("introuvables", introuvables);
+        r.put("sansContact", sansContact);
+        return r;
+    }
+
     @SuppressWarnings("unchecked")
     public List<ClientContact> contacts(Long listeId) {
         return em.createQuery(

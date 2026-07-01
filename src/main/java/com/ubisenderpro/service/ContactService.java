@@ -26,13 +26,15 @@ public class ContactService {
      */
     public List<Map<String, Object>> pourSelection(Long segmentationId, String q, int offset, int limit) {
         StringBuilder jpql = new StringBuilder(
-                "SELECT ct.id, ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte FROM ClientContact ct, Client cl " +
+                "SELECT ct.id, ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte, cl.numeroClient, cl.entreprise " +
+                "FROM ClientContact ct, Client cl " +
                 "WHERE ct.clientId = cl.id AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
                 "AND ct.desabonne = false ");
         boolean hasSeg = segmentationId != null;
         boolean hasQ = q != null && !q.trim().isEmpty();
         if (hasSeg) { jpql.append("AND cl.segmentationId = :seg "); }
-        if (hasQ) { jpql.append("AND (LOWER(ct.nomComplet) LIKE :q OR LOWER(cl.nomCompte) LIKE :q) "); }
+        if (hasQ) { jpql.append("AND (LOWER(ct.nomComplet) LIKE :q OR LOWER(cl.nomCompte) LIKE :q " +
+                "OR LOWER(cl.numeroClient) LIKE :q OR LOWER(cl.entreprise) LIKE :q) "); }
         jpql.append("ORDER BY cl.nomCompte, ct.nomComplet");
 
         Query query = em.createQuery(jpql.toString());
@@ -48,6 +50,8 @@ public class ContactService {
             m.put("numero", r[1]);
             m.put("nom", r[2]);
             m.put("client", r[3]);
+            m.put("code", r[4]);
+            m.put("entreprise", r[5]);
             out.add(m);
         }
         return out;
@@ -103,13 +107,38 @@ public class ContactService {
     }
 
     public ClientContact creer(ClientContact contact) {
+        normaliserPrincipal(contact, true);
         em.persist(contact);
         return contact;
     }
 
     public ClientContact modifier(ClientContact contact) {
         contact.setUpdatedAt(LocalDateTime.now());
+        normaliserPrincipal(contact, false);
         return em.merge(contact);
+    }
+
+    /**
+     * Garantit un seul contact principal par client :
+     * - à la création du 1er contact, il devient automatiquement principal ;
+     * - si un contact est marqué principal, les autres du même client sont dé-marqués.
+     */
+    private void normaliserPrincipal(ClientContact contact, boolean creation) {
+        Long clientId = contact.getClientId();
+        if (clientId == null) { return; }
+        if (creation) {
+            long total = em.createQuery(
+                    "SELECT COUNT(c) FROM ClientContact c WHERE c.clientId = :cid", Long.class)
+                    .setParameter("cid", clientId).getSingleResult();
+            if (total == 0) { contact.setContactPrincipal(true); }
+        }
+        if (contact.isContactPrincipal()) {
+            String jpql = "UPDATE ClientContact c SET c.contactPrincipal = false WHERE c.clientId = :cid";
+            if (!creation && contact.getId() != null) { jpql += " AND c.id <> :id"; }
+            javax.persistence.Query q = em.createQuery(jpql).setParameter("cid", clientId);
+            if (!creation && contact.getId() != null) { q.setParameter("id", contact.getId()); }
+            q.executeUpdate();
+        }
     }
 
     public void supprimer(Long id) {

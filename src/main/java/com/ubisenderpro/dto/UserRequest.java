@@ -13,6 +13,7 @@ public class UserRequest {
     private String avatar;
     private String photo;
     private String email;
+    private String agence;
     private String motDePasse;
     private Boolean actif;
     private List<String> roles = new ArrayList<>();
@@ -27,6 +28,8 @@ public class UserRequest {
     public void setPhoto(String photo) { this.photo = photo; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    public String getAgence() { return agence; }
+    public void setAgence(String agence) { this.agence = agence; }
     public String getMotDePasse() { return motDePasse; }
     public void setMotDePasse(String motDePasse) { this.motDePasse = motDePasse; }
     public Boolean getActif() { return actif; }

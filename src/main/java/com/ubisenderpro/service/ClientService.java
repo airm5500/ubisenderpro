@@ -61,7 +61,85 @@ public class ClientService {
 
         List<Client> data = q.setFirstResult(offset).setMaxResults(limit).getResultList();
         long total = qc.getSingleResult();
+        renseignerTelephonePrincipal(data);
         return new PageResult<>(data, total);
+    }
+
+    /**
+     * Sélecteur de clients (SCL) : tous les clients actifs (filtrables par recherche,
+     * agence, région, segmentation) avec leur contact principal (id + numéro). Une
+     * ligne par client — sert à constituer des destinataires / listes / sélections.
+     */
+    public List<java.util.Map<String, Object>> pourSelectionClients(String q, String agence,
+                                                                    String region, Long segmentationId) {
+        StringBuilder where = new StringBuilder(" WHERE c.actif = true");
+        List<Object[]> params = new ArrayList<>();
+        if (q != null && !q.trim().isEmpty()) {
+            where.append(" AND (LOWER(c.nomCompte) LIKE :q OR LOWER(c.numeroClient) LIKE :q OR LOWER(c.entreprise) LIKE :q)");
+            params.add(new Object[]{"q", "%" + q.trim().toLowerCase() + "%"});
+        }
+        if (agence != null && !agence.isEmpty()) { where.append(" AND c.agence = :ag"); params.add(new Object[]{"ag", agence}); }
+        if (region != null && !region.isEmpty()) { where.append(" AND c.region = :reg"); params.add(new Object[]{"reg", region}); }
+        if (segmentationId != null) { where.append(" AND c.segmentationId = :seg"); params.add(new Object[]{"seg", segmentationId}); }
+
+        TypedQuery<Client> query = em.createQuery("SELECT c FROM Client c" + where + " ORDER BY c.nomCompte", Client.class);
+        for (Object[] p : params) { query.setParameter((String) p[0], p[1]); }
+        List<Client> clients = query.setMaxResults(5000).getResultList();
+
+        // Contact principal (id + numéro joignable) par client, en une requête.
+        java.util.Map<Long, com.ubisenderpro.entity.ClientContact> principal = new java.util.HashMap<>();
+        List<Long> ids = new ArrayList<>();
+        for (Client c : clients) { if (c.getId() != null) { ids.add(c.getId()); } }
+        if (!ids.isEmpty()) {
+            for (com.ubisenderpro.entity.ClientContact cc : em.createQuery(
+                    "SELECT cc FROM ClientContact cc WHERE cc.clientId IN :ids " +
+                    "ORDER BY cc.contactPrincipal DESC, cc.id ASC", com.ubisenderpro.entity.ClientContact.class)
+                    .setParameter("ids", ids).getResultList()) {
+                if (!principal.containsKey(cc.getClientId())) { principal.put(cc.getClientId(), cc); }
+            }
+        }
+        List<java.util.Map<String, Object>> out = new ArrayList<>();
+        for (Client c : clients) {
+            com.ubisenderpro.entity.ClientContact cc = principal.get(c.getId());
+            String numero = cc == null ? null
+                    : (cc.getNumeroWhatsapp() != null && !cc.getNumeroWhatsapp().trim().isEmpty()
+                        ? cc.getNumeroWhatsapp() : cc.getTelephonePrincipal());
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("clientId", c.getId());
+            m.put("code", c.getNumeroClient());
+            m.put("nom", c.getNomCompte());
+            m.put("entreprise", c.getEntreprise());
+            m.put("agence", c.getAgence());
+            m.put("region", c.getRegion());
+            m.put("contactId", cc == null ? null : cc.getId());
+            m.put("numero", numero);
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * Renseigne le téléphone du contact principal pour chaque client de la page
+     * (une seule requête sur les contacts, contact principal prioritaire, repli
+     * sur le numéro WhatsApp). Champ transient, affiché en liste.
+     */
+    private void renseignerTelephonePrincipal(List<Client> clients) {
+        if (clients == null || clients.isEmpty()) { return; }
+        List<Long> ids = new ArrayList<>();
+        for (Client c : clients) { if (c.getId() != null) { ids.add(c.getId()); } }
+        if (ids.isEmpty()) { return; }
+        List<com.ubisenderpro.entity.ClientContact> contacts = em.createQuery(
+                "SELECT cc FROM ClientContact cc WHERE cc.clientId IN :ids " +
+                "ORDER BY cc.contactPrincipal DESC, cc.id ASC", com.ubisenderpro.entity.ClientContact.class)
+                .setParameter("ids", ids).getResultList();
+        java.util.Map<Long, String> parClient = new java.util.HashMap<>();
+        for (com.ubisenderpro.entity.ClientContact cc : contacts) {
+            if (parClient.containsKey(cc.getClientId())) { continue; } // 1er = principal (tri)
+            String tel = cc.getTelephonePrincipal();
+            if (tel == null || tel.trim().isEmpty()) { tel = cc.getNumeroWhatsapp(); }
+            if (tel != null && !tel.trim().isEmpty()) { parClient.put(cc.getClientId(), tel.trim()); }
+        }
+        for (Client c : clients) { c.setTelephonePrincipal(parClient.get(c.getId())); }
     }
 
     public Optional<Client> parId(Long id) {
@@ -81,6 +159,8 @@ public class ClientService {
         valider(client, true);
         canonicaliserGeo(client);
         em.persist(client);
+        em.flush();
+        appliquerNumerosEtNaissance(client, client.getNumeros(), client.getDateNaissance());
         return client;
     }
 
@@ -93,6 +173,7 @@ public class ClientService {
         // sont préservés ; updated_at est positionné par @PreUpdate.
         ex.setNumeroClient(client.getNumeroClient());
         ex.setNomCompte(client.getNomCompte());
+        ex.setEntreprise(client.getEntreprise());
         ex.setAgence(client.getAgence());
         ex.setRegion(client.getRegion());
         ex.setTournee(client.getTournee());
@@ -104,7 +185,75 @@ public class ClientService {
         ex.setPays(client.getPays());
         ex.setStatut(client.getStatut());
         ex.setNotes(client.getNotes());
-        return em.merge(ex);
+        Client saved = em.merge(ex);
+        appliquerNumerosEtNaissance(saved, client.getNumeros(), client.getDateNaissance());
+        return saved;
+    }
+
+    /**
+     * Applique une liste de numéros à un client existant (écran « Contacts » =
+     * numéros seuls). Réutilise la même logique additive que la fiche client.
+     */
+    public void enregistrerNumeros(Long clientId, List<java.util.Map<String, Object>> numeros) {
+        Client client = em.find(Client.class, clientId);
+        if (client == null) { throw new ValidationException("id", "Compte client introuvable."); }
+        appliquerNumerosEtNaissance(client, numeros, null);
+    }
+
+    /**
+     * Crée/met à jour les contacts d'un client à partir des numéros saisis dans la
+     * fiche (additif : rapproche par numéro, ne supprime jamais). Le 1er marqué
+     * « principal » devient le contact principal ; la date de naissance est portée
+     * par ce contact principal. Consentements cochés par défaut à la création.
+     */
+    private void appliquerNumerosEtNaissance(Client client, List<java.util.Map<String, Object>> numeros, String dateNaissance) {
+        if (numeros == null) { return; }
+        com.ubisenderpro.entity.ClientContact principal = null;
+        com.ubisenderpro.entity.ClientContact premier = null;
+        for (java.util.Map<String, Object> n : numeros) {
+            if (n == null) { continue; }
+            String num = n.get("numero") == null ? "" : String.valueOf(n.get("numero")).trim();
+            if (num.isEmpty()) { continue; }
+            boolean wa = !Boolean.FALSE.equals(n.get("whatsapp"));      // WhatsApp par défaut
+            boolean princ = Boolean.TRUE.equals(n.get("principal"));
+            List<com.ubisenderpro.entity.ClientContact> ex = em.createQuery(
+                    "SELECT c FROM ClientContact c WHERE c.clientId = :cid AND " +
+                    "(c.numeroWhatsapp = :n OR c.telephonePrincipal = :n)", com.ubisenderpro.entity.ClientContact.class)
+                    .setParameter("cid", client.getId()).setParameter("n", num).setMaxResults(1).getResultList();
+            com.ubisenderpro.entity.ClientContact ct = ex.isEmpty() ? new com.ubisenderpro.entity.ClientContact() : ex.get(0);
+            boolean creation = ct.getId() == null;
+            if (creation) {
+                ct.setClientId(client.getId());
+                ct.setConsentementWhatsapp(true);
+                ct.setConsentRelationnel(true);
+            }
+            if (ct.getNomComplet() == null || ct.getNomComplet().trim().isEmpty()) { ct.setNomComplet(client.getNomCompte()); }
+            ct.setTelephonePrincipal(num);
+            ct.setNumeroWhatsapp(wa ? num : ct.getNumeroWhatsapp());
+            if (creation) { em.persist(ct); } else { em.merge(ct); }
+            if (premier == null) { premier = ct; }
+            if (princ && principal == null) { principal = ct; }
+        }
+        if (principal == null) { principal = premier; }
+        if (principal != null) {
+            em.flush();
+            // Un seul contact principal pour ce client.
+            em.createQuery("UPDATE ClientContact c SET c.contactPrincipal = false WHERE c.clientId = :cid")
+                    .setParameter("cid", client.getId()).executeUpdate();
+            principal.setContactPrincipal(true);
+            appliquerNaissance(principal, dateNaissance);
+            em.merge(principal);
+        }
+    }
+
+    private void appliquerNaissance(com.ubisenderpro.entity.ClientContact ct, String dateNaissance) {
+        if (dateNaissance == null || dateNaissance.trim().isEmpty()) { return; }
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(dateNaissance.trim().substring(0, 10));
+            ct.setJourNaissance(d.getDayOfMonth());
+            ct.setMoisNaissance(d.getMonthValue());
+            ct.setAnneeNaissance(d.getYear());
+        } catch (RuntimeException ignore) { /* format invalide : ignoré */ }
     }
 
     /**

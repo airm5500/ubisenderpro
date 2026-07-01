@@ -42,6 +42,62 @@ public class ArticleService {
 
     public Optional<Article> parId(Long id) { return Optional.ofNullable(em.find(Article.class, id)); }
 
+    /** Génère un CIP7 (7 chiffres) libre : jamais un code déjà utilisé (cip ou pscode). */
+    public String genererCip7Libre() {
+        for (int i = 0; i < 100; i++) {
+            String c = String.valueOf(1000000 + (int) (Math.random() * 9000000));
+            if (!cipOuPscodeExiste(c)) { return c; }
+        }
+        return String.format("%07d", System.currentTimeMillis() % 10000000L);
+    }
+
+    private boolean cipOuPscodeExiste(String c) {
+        boolean cip = !em.createQuery("SELECT a FROM Article a WHERE a.cip = :c", Article.class)
+                .setParameter("c", c).setMaxResults(1).getResultList().isEmpty();
+        if (cip) { return true; }
+        return !em.createQuery("SELECT a FROM Article a WHERE a.pscode = :c", Article.class)
+                .setParameter("c", c).setMaxResults(1).getResultList().isEmpty();
+    }
+
+    /**
+     * Rattache l'article du catalogue par CIP7 (=cip) ou CIP13 (=code-barres) ;
+     * s'il n'existe pas et qu'un CIP7 + un nom sont fournis, le crée légèrement
+     * dans le catalogue. Renvoie l'article rattaché/créé, ou null.
+     */
+    public Article resoudreOuCreer(String cip7, String cip13, String nom) {
+        Article a = null;
+        if (cip7 != null && !cip7.trim().isEmpty()) {
+            a = unArticle("SELECT a FROM Article a WHERE a.cip = :v", cip7.trim());
+        }
+        if (a == null && cip13 != null && !cip13.trim().isEmpty()) {
+            a = unArticle("SELECT a FROM Article a WHERE a.codeBarres = :v", cip13.trim());
+        }
+        if (a != null) { return a; }
+        if (cip7 == null || cip7.trim().isEmpty() || nom == null || nom.trim().isEmpty()) { return null; }
+        Article n = new Article();
+        n.setPscode(pscodeLibre(cip7.trim()));
+        n.setCip(cip7.trim());
+        if (cip13 != null && !cip13.trim().isEmpty()) { n.setCodeBarres(cip13.trim()); }
+        n.setDesignation(nom.trim());
+        em.persist(n);
+        return n;
+    }
+
+    private Article unArticle(String jpql, String v) {
+        List<Article> l = em.createQuery(jpql, Article.class).setParameter("v", v).setMaxResults(1).getResultList();
+        return l.isEmpty() ? null : l.get(0);
+    }
+
+    private String pscodeLibre(String base) {
+        String c = base;
+        int i = 1;
+        while (!em.createQuery("SELECT a FROM Article a WHERE a.pscode = :c", Article.class)
+                .setParameter("c", c).setMaxResults(1).getResultList().isEmpty()) {
+            c = base + "-" + (i++);
+        }
+        return c;
+    }
+
     public Optional<Article> parCode(String code) {
         List<Article> l = em.createQuery("SELECT a FROM Article a WHERE a.pscode = :c", Article.class)
                 .setParameter("c", code).setMaxResults(1).getResultList();

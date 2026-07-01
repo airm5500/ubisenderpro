@@ -53,4 +53,21 @@ public class ListeResource {
         listeService.ajouterContact(id, contactId, source);
         return Response.ok().build();
     }
+
+    @DELETE
+    @Path("/{id}/contacts/{contactId}")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response retirerContact(@PathParam("id") Long id, @PathParam("contactId") Long contactId) {
+        listeService.retirerContact(id, contactId);
+        return Response.noContent().build();
+    }
+
+    /** Importe des clients dans la liste (un code client par ligne). */
+    @POST
+    @Path("/{id}/import-clients")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response importerClients(@PathParam("id") Long id, Map<String, Object> body) {
+        String contenu = body == null ? null : (String) body.get("contenu");
+        return Response.ok(listeService.importerClients(id, contenu)).build();
+    }
 }

@@ -2,12 +2,16 @@ package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.Promotion;
 import com.ubisenderpro.entity.PromotionProduit;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.PromotionProduitService;
 import com.ubisenderpro.service.PromotionService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Base64;
@@ -24,6 +28,16 @@ public class PromotionResource {
     private PromotionService promotionService;
     @EJB
     private PromotionProduitService produitService;
+    @Inject
+    private SessionStore sessionStore;
+
+    /** Nom d'affichage du créateur (nom complet, sinon login). */
+    private String createur(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        if (u == null) { return null; }
+        return u.getNomComplet() != null && !u.getNomComplet().isEmpty() ? u.getNomComplet() : u.getLogin();
+    }
 
     @GET
     public List<Promotion> lister(@QueryParam("statut") String statut) {
@@ -39,8 +53,9 @@ public class PromotionResource {
 
     @POST
     @Secured(menu = "promotions")
-    public Response creer(Promotion p) {
+    public Response creer(Promotion p, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
         try {
+            if (p.getCreePar() == null || p.getCreePar().isEmpty()) { p.setCreePar(createur(authHeader)); }
             return Response.status(Response.Status.CREATED).entity(promotionService.creer(p)).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", e.getMessage())).build();

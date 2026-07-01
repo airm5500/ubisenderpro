@@ -14,15 +14,17 @@ Usp.info.TYPES = [
     ['INFORMATION_GARDE', '🏥 Information de garde'], ['INFORMATION_JOUR_FERIE', '📅 Jour férié'],
     ['MODIFICATION_HORAIRES', '🕒 Modification des horaires'], ['FERMETURE_AGENCE', '🚪 Fermeture d\'agence'],
     ['INFORMATION_GENERALE', '📢 Information générale'], ['ALERTE_URGENTE', '🚨 Alerte urgente'],
+    ['RETRAIT_PRODUIT', '⚠️ Retrait de produit'],
     ['ANNIVERSAIRE_CLIENT', '🎂 Anniversaire client']
 ];
 Usp.info.PRIORITES = [['NORMALE', 'Normale'], ['IMPORTANTE', 'Importante'], ['URGENTE', 'Urgente'], ['CRITIQUE', 'Critique']];
+/* Une seule cible à la fois : chaque audience pilote l'affichage d'UN champ complémentaire. */
 Usp.info.AUDIENCES = [
-    ['TOUS_LES_SEGMENTS', 'Tous les segments'], ['DIAMOND', 'Diamond'], ['PLATINIUM', 'Platinium'],
-    ['DIAMOND_ET_PLATINIUM', 'Diamond et Platinium'],
+    ['TOUS_LES_SEGMENTS', 'Tous les segments'],
+    ['SEGMENTS_SELECTIONNES', 'Un segment précis'],
     ['AGENCE', 'Clients de l\'agence'], ['REGION', 'Clients de la région'],
     ['TOURNEE', 'Clients de la tournée'], ['LISTE_DE_DIFFUSION', 'Liste de diffusion'],
-    ['CONTACTS_MANUELS', 'Contacts sélectionnés']
+    ['CONTACTS_MANUELS', 'Sélection manuelle de clients']
 ];
 Usp.info.COULEUR_STATUT = {
     BROUILLON: '#777', EN_ATTENTE: '#777', PROGRAMMEE: '#1976d2', EN_COURS: '#ef6c00',
@@ -61,8 +63,8 @@ Usp.info.panel = function () {
 Usp.info.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'region', 'tournee',
-                 'audience', 'segmentationId', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
-                 'statut', 'responsable', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
+                 'audience', 'segmentationId', 'segmentationIds', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
+                 'statut', 'responsable', 'creePar', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
                  'causeInterne', 'causeCommunicable', 'dateResolution', 'jourFerie', 'dateGarde',
                  'heureLimiteCommande', 'consignesLivraison', 'pharmacienGarde', 'telephonePharmacien'],
         autoLoad: true,
@@ -81,6 +83,7 @@ Usp.info.grille = function (filtre, libelleTab) {
             { text: 'Agence', dataIndex: 'agence', width: 110 },
             { text: 'Envoi', dataIndex: 'dateEnvoi', width: 100, renderer: Usp.info.fdate },
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.info.statutRenderer },
+            Usp.parColonne('creePar'),
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -98,12 +101,18 @@ Usp.info.grille = function (filtre, libelleTab) {
                   return h;
               } }
         ],
-        tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
-                .concat(Usp.export.boutons('Informations historique'))
+        tbar: (historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
             : [
                 Usp.permBtn('infos', 'CREER', { text: '➕ Nouvelle information', handler: function () { Usp.info.form(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-            ].concat(Usp.export.boutons('Informations')),
+            ]).concat(['-']).concat(Usp.grilleFiltre(store, {
+                champs: ['code', 'titre'], periode: true, dateChamp: 'dateEnvoi',
+                selects: [
+                    { field: 'priorite', label: 'Priorité', options: Usp.info.PRIORITES.map(function (p) { return { v: p[0], t: p[1] }; }) },
+                    { field: 'statut', label: 'Statut', width: 130,
+                      options: ['BROUILLON', 'EN_ATTENTE', 'PROGRAMMEE', 'EN_COURS', 'ENVOYEE', 'ANNULEE', 'EXPIREE', 'ECHOUEE', 'ARCHIVEE'].map(function (s) { return { v: s, t: s }; }) }
+                ]
+            })).concat(Usp.export.boutons(historique ? 'Informations historique' : 'Informations')),
         listeners: {
             itemdblclick: function (g, rec) { Usp.info.form(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -130,6 +139,22 @@ Usp.info.action = function (rec, action, message) {
     });
 };
 
+/* Affiche le seul champ complémentaire correspondant à l'audience choisie. */
+Usp.info.majAudience = function (formPanel) {
+    if (!formPanel) { return; }
+    var aud = formPanel.down('[name=audience]');
+    var val = aud ? aud.getValue() : null;
+    var mapping = {
+        SEGMENTS_SELECTIONNES: 'aud_segment', AGENCE: 'aud_agence', REGION: 'aud_region',
+        TOURNEE: 'aud_tournee', LISTE_DE_DIFFUSION: 'aud_liste', CONTACTS_MANUELS: 'aud_contacts'
+    };
+    var visible = mapping[val];
+    ['aud_segment', 'aud_agence', 'aud_region', 'aud_tournee', 'aud_liste', 'aud_contacts'].forEach(function (id) {
+        var f = formPanel.down('#' + id);
+        if (f) { f.setVisible(id === visible); }
+    });
+};
+
 Usp.info.form = function (store, rec, typeParDefaut) {
     var g = function (n) { return rec ? rec.get(n) : null; };
     var dParse = function (n) {
@@ -138,9 +163,10 @@ Usp.info.form = function (store, rec, typeParDefaut) {
     };
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Information — ' + Ext.String.htmlEncode(rec.get('titre')) : 'Nouvelle information',
-        width: 720, height: Ext.getBody().getViewSize().height - 60, maxHeight: 760, modal: true, layout: 'fit',
-        items: [{ xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%', labelWidth: 170 }, items: [
-            { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: g('code') || '' },
+        width: 840, height: Ext.getBody().getViewSize().height - 60, maxHeight: 780, modal: true, layout: 'fit',
+        items: [{ xtype: 'form', border: false, bodyPadding: 12, autoScroll: true, defaults: { anchor: '100%', labelWidth: 200 }, items: [
+            { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false,
+              value: g('code') || Usp.codeAuto(), emptyText: 'Généré — modifiable' },
             { xtype: 'combobox', name: 'type', fieldLabel: 'Type', editable: false, queryMode: 'local', allowBlank: false,
               store: Usp.info.TYPES, value: g('type') || typeParDefaut || 'INFORMATION_GENERALE' },
             { xtype: 'textfield', name: 'titre', fieldLabel: 'Titre', allowBlank: false, value: g('titre') || '' },
@@ -148,30 +174,10 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               emptyText: 'Texte libre injecté dans le modèle ({{message}})' },
             { xtype: 'combobox', name: 'priorite', fieldLabel: 'Priorité', editable: false, queryMode: 'local',
               store: Usp.info.PRIORITES, value: g('priorite') || 'NORMALE' },
-            { xtype: 'combobox', name: 'audience', fieldLabel: 'Audience', editable: false, queryMode: 'local',
-              store: Usp.info.AUDIENCES, value: g('audience') || 'TOUS_LES_SEGMENTS' },
             { xtype: 'combobox', name: 'canal', fieldLabel: 'Canal', editable: false, queryMode: 'local',
               store: [['WEB', 'WhatsApp Web'], ['API', 'API WhatsApp']], value: g('canal') || 'WEB' },
-            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || '' },
-            { xtype: 'textfield', name: 'agence', fieldLabel: 'Agence', value: g('agence') || '',
-              emptyText: 'Sert au texte et au ciblage « Clients de l\'agence »' },
-            { xtype: 'textfield', name: 'region', fieldLabel: 'Région', value: g('region') || '',
-              emptyText: 'Sert au ciblage « Clients de la région »' },
-            { xtype: 'textfield', name: 'tournee', fieldLabel: 'Tournée', value: g('tournee') || '',
-              emptyText: 'Sert au ciblage « Clients de la tournée »' },
-            { xtype: 'combobox', name: 'listeId', fieldLabel: 'Liste de diffusion', queryMode: 'local',
-              valueField: 'id', displayField: 'nom', value: g('listeId'), emptyText: '(si audience = Liste de diffusion)',
-              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom'], autoLoad: true,
-                  proxy: { type: 'ajax', url: Usp.apiBase + '/lists',
-                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
-            { xtype: 'combobox', multiSelect: true, name: 'contactIds', fieldLabel: 'Contacts sélectionnés',
-              queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom',
-              emptyText: '(si audience = Contacts sélectionnés) — tapez 2 lettres',
-              value: g('contactIds') ? String(g('contactIds')).split(',') : [],
-              listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } },
-              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero'],
-                  proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
-                      headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
+            { xtype: 'textfield', name: 'societe', fieldLabel: 'Société', value: g('societe') || Usp.societeParDefaut || '' }
+        ].concat(Usp.audienceFields(g)).concat([
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Direction / signataire', value: g('responsable') || '' },
             { xtype: 'datefield', name: 'dateEnvoi', fieldLabel: 'Date d\'envoi', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateEnvoi') },
             { xtype: 'datefield', name: 'dateFinValidite', fieldLabel: 'Fin de validité', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false, value: dParse('dateFinValidite') },
@@ -192,15 +198,16 @@ Usp.info.form = function (store, rec, typeParDefaut) {
                 { xtype: 'textfield', name: 'pharmacienGarde', fieldLabel: 'Pharmacien de garde', value: g('pharmacienGarde') || '' },
                 { xtype: 'textfield', name: 'telephonePharmacien', fieldLabel: 'Téléphone du pharmacien', value: g('telephonePharmacien') || '' }
             ] }
-        ] }],
+        ]) }],
         buttons: [
             { text: 'Annuler', handler: function () { win.close(); } },
             { text: 'Enregistrer', handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
                 var v = form.getValues();
-                // listeId : null si non choisi (évite l'échec de désérialisation Long).
+                // listeId / segmentationId : null si non choisi (évite l'échec de désérialisation Long).
                 if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
+                if (v.segmentationId === '' || v.segmentationId == null) { delete v.segmentationId; } else { v.segmentationId = Number(v.segmentationId); }
                 // contactIds (multi-sélection) -> CSV attendu par le serveur.
                 if (Ext.isArray(v.contactIds)) { v.contactIds = v.contactIds.join(','); }
                 Usp.ajax({ url: rec ? '/infos/' + rec.get('id') : '/infos', method: rec ? 'PUT' : 'POST', jsonData: v,
@@ -214,4 +221,5 @@ Usp.info.form = function (store, rec, typeParDefaut) {
         ]
     });
     win.show();
+    Usp.majAudienceFields(win.down('form'));
 };

@@ -31,6 +31,15 @@ public class ArticleResource {
         return articleService.rechercher(q, categorieId, marqueId, actif, start, limit);
     }
 
+    /** CIP7 (7 chiffres) libre pour la création rapide d'un produit. */
+    @GET
+    @Path("/cip7-libre")
+    public Map<String, Object> cip7Libre() {
+        Map<String, Object> m = new java.util.HashMap<>();
+        m.put("cip7", articleService.genererCip7Libre());
+        return m;
+    }
+
     @GET
     @Path("/{id}")
     public Response parId(@PathParam("id") Long id) {

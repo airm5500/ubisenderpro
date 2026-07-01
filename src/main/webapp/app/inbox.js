@@ -60,10 +60,7 @@ Usp.inbox.panel = function () {
         bodyStyle: 'background:#efeae2',
         html: '<div style="padding:20px;color:#999">Sélectionnez une conversation</div>',
         tbar: [
-            { text: '👤 Affecter', tooltip: 'Affecter cette discussion à un agent', handler: function () { Usp.inbox.action('assign'); } },
-            { text: '✅ Clôturer', tooltip: 'Marquer la discussion comme traitée (fermée)', handler: function () { Usp.inbox.action('close'); } },
-            { text: '↩️ Rouvrir', tooltip: 'Rouvrir une discussion clôturée', handler: function () { Usp.inbox.action('reopen'); } },
-            '-',
+            // Boutons Affecter / Clôturer / Rouvrir masqués (demande client).
             { text: '🙋 Reprendre', tooltip: 'Reprendre la main (le bot cesse de répondre sur cette discussion)', handler: function () { Usp.inbox.bot(false); } },
             { text: '🤖 Rendre au bot', tooltip: 'Réactiver les réponses automatiques du bot sur cette discussion', handler: function () { Usp.inbox.bot(true); } }
         ],

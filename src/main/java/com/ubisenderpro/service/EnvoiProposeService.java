@@ -159,6 +159,45 @@ public class EnvoiProposeService {
         return crees;
     }
 
+    /**
+     * Génère les propositions puis renvoie la liste des propositions <b>nouvellement
+     * créées</b> (pour un aperçu/sélection). L'utilisateur pourra ensuite écarter
+     * (rejeter) celles qu'il ne veut pas conserver.
+     */
+    public Map<String, Object> genererAvecApercu() {
+        Long maxAvant = em.createQuery("SELECT COALESCE(MAX(e.id), 0) FROM EnvoiPropose e", Long.class).getSingleResult();
+        int crees = genererPropositions();
+        int expirees = expirerDepassees();
+        List<EnvoiPropose> nouvelles = em.createQuery(
+                "SELECT e FROM EnvoiPropose e WHERE e.id > :m AND e.statut = 'PROPOSEE' ORDER BY e.datePrevue, e.id",
+                EnvoiPropose.class).setParameter("m", maxAvant).getResultList();
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (EnvoiPropose e : nouvelles) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", e.getId());
+            m.put("titre", e.getTitre());
+            m.put("type", e.getType());
+            m.put("source", e.getSource());
+            m.put("datePrevue", e.getDatePrevue());
+            items.add(m);
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("crees", crees);
+        res.put("expirees", expirees);
+        res.put("items", items);
+        return res;
+    }
+
+    /** Rejette plusieurs propositions (aperçu : celles non conservées). Renvoie le nombre traité. */
+    public int rejeterPlusieurs(List<Long> ids, String motif) {
+        if (ids == null) { return 0; }
+        int n = 0;
+        for (Long id : ids) {
+            try { rejeter(id, motif); n++; } catch (RuntimeException ignore) { /* déjà traité */ }
+        }
+        return n;
+    }
+
     /** Génère une proposition « anniversaires du jour » s'il existe des contacts éligibles. */
     private int genererAnniversaires(LocalDate today) {
         long n = compteAnniversairesEligibles(today.getDayOfMonth(), today.getMonthValue());
@@ -453,6 +492,7 @@ public class EnvoiProposeService {
         String audienceCampagne = null;
         Long cibleListeId = null;
         Long cibleSegmentationId = null;
+        String cibleSegmentationIds = null;   // sélection multiple de segments (CSV)
         String cibleAgence = null;
         String cibleRegion = null;
         String cibleTournee = null;
@@ -484,7 +524,10 @@ public class EnvoiProposeService {
             objectif = "Information";
             audienceCampagne = e.getAudience() != null ? e.getAudience() : info.getAudience();
             if ("LISTE_DE_DIFFUSION".equals(audienceCampagne)) { cibleListeId = info.getListeId(); }
-            else if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) { cibleSegmentationId = info.getSegmentationId(); }
+            else if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) {
+                if (!nz(info.getSegmentationIds()).isEmpty()) { cibleSegmentationIds = info.getSegmentationIds(); }
+                else { cibleSegmentationId = info.getSegmentationId(); }
+            }
             else if ("AGENCE".equals(audienceCampagne)) { cibleAgence = info.getAgence(); }
             else if ("REGION".equals(audienceCampagne)) { cibleRegion = info.getRegion(); }
             else if ("TOURNEE".equals(audienceCampagne)) { cibleTournee = info.getTournee(); }
@@ -493,6 +536,15 @@ public class EnvoiProposeService {
             DispoEvenement evt = em.find(DispoEvenement.class, e.getEvenementId());
             if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
             audienceCampagne = e.getAudience() != null ? e.getAudience() : evt.getAudience();
+            // Ciblage porté par l'événement de disponibilité (mêmes options que les infos).
+            if ("SEGMENTS_SELECTIONNES".equals(audienceCampagne)) {
+                if (!nz(evt.getSegmentationIds()).isEmpty()) { cibleSegmentationIds = evt.getSegmentationIds(); }
+                else if (evt.getSegmentationId() != null) { cibleSegmentationId = evt.getSegmentationId(); }
+            } else if ("AGENCE".equals(audienceCampagne)) { cibleAgence = evt.getAgence(); }
+            else if ("REGION".equals(audienceCampagne)) { cibleRegion = evt.getRegion(); }
+            else if ("TOURNEE".equals(audienceCampagne)) { cibleTournee = evt.getTournee(); }
+            else if ("LISTE_DE_DIFFUSION".equals(audienceCampagne)) { cibleListeId = evt.getListeId(); }
+            else if ("CONTACTS_MANUELS".equals(audienceCampagne)) { cibleContactIds = evt.getContactIds(); }
             List<String> manquants = elementsDispoManquants(evt);
             if (!manquants.isEmpty()) {
                 throw new ValidationException("variables",
@@ -567,9 +619,10 @@ public class EnvoiProposeService {
             c.setAudience(audienceCampagne);
             c.setSegmentationIds(audienceService.segmentationIdsCsv(audienceCampagne));
         }
-        // Ciblage explicite porté par l'information (liste / segmentation / agence / région).
+        // Ciblage explicite porté par l'information (liste / segmentation(s) / agence / région).
         if (cibleListeId != null) { c.setListeId(cibleListeId); }
         if (cibleSegmentationId != null) { c.setSegmentationId(cibleSegmentationId); }
+        if (cibleSegmentationIds != null && !cibleSegmentationIds.isEmpty()) { c.setSegmentationIds(cibleSegmentationIds); }
         if (cibleAgence != null && !cibleAgence.isEmpty()) { c.setAgenceCible(cibleAgence); }
         if (cibleRegion != null && !cibleRegion.isEmpty()) { c.setRegionCible(cibleRegion); }
         if (cibleTournee != null && !cibleTournee.isEmpty()) { c.setTourneeCible(cibleTournee); }
@@ -921,6 +974,20 @@ public class EnvoiProposeService {
         e.setStatut("REJETEE");
         e.setMotifRejet(motif);
         return em.merge(e);
+    }
+
+    /**
+     * Supprime définitivement une proposition. Interdit si elle a déjà donné lieu
+     * à une campagne (on préserve le lien d'historique) : rejeter alors plutôt.
+     */
+    public void supprimer(Long id) {
+        EnvoiPropose e = em.find(EnvoiPropose.class, id);
+        if (e == null) { throw new IllegalArgumentException("Proposition introuvable"); }
+        if (e.getCampagneId() != null) {
+            throw new ValidationException("statut",
+                    "Cette proposition est liée à une campagne : elle ne peut pas être supprimée.");
+        }
+        em.remove(e);
     }
 
     /* ====================== Messages suggérés ======================

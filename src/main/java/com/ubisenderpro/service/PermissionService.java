@@ -50,7 +50,8 @@ public class PermissionService {
             {"historique", "Historique des envois"},
             {"crm", "CRM / Opportunités"},
             {"settings", "Paramètres"},
-            {"users", "Utilisateurs"}
+            {"users", "Utilisateurs"},
+            {"recouvrement", "Suivi Relance et Recouvrements"}
     };
 
     /** Libellés explicites des actions. */
@@ -69,6 +70,9 @@ public class PermissionService {
         LIB_ACTION.put("VOIR_DETAILS", "Voir les détails");
         LIB_ACTION.put("ENVOI_MASSE", "Envoyer en masse");
         LIB_ACTION.put("RENVOI_ECHECS", "Renvoyer après échec");
+        LIB_ACTION.put("IMPORTER", "Importer");
+        LIB_ACTION.put("GERER_REFERENTIELS", "Gérer les référentiels");
+        LIB_ACTION.put("VOIR_GROUPE", "Vue consolidée (toutes agences)");
     }
 
     private static final List<String> ROLES =
@@ -80,10 +84,13 @@ public class PermissionService {
         a.add("VOIR");
         a.add("VOIR_DETAILS"); // privilège « voir les détails » (transverse, point 5)
         if (Arrays.asList("clients", "catalogue", "promotions", "marketing", "dispo",
-                "infos", "users", "campaigns").contains(code)) {
+                "infos", "users", "campaigns", "recouvrement").contains(code)) {
             a.add("CREER"); a.add("MODIFIER"); a.add("SUPPRIMER"); a.add("DESACTIVER");
         }
-        if (Arrays.asList("campaigns", "marketing", "waweb").contains(code)) { a.add("ENVOYER"); }
+        if ("recouvrement".equals(code)) {
+            a.add("IMPORTER"); a.add("EXPORTER"); a.add("GERER_REFERENTIELS"); a.add("VOIR_GROUPE");
+        }
+        if (Arrays.asList("campaigns", "marketing", "waweb", "recouvrement").contains(code)) { a.add("ENVOYER"); }
         if (Arrays.asList("clients", "historique").contains(code)) { a.add("EXPORTER"); }
         if ("settings".equals(code)) { if (!a.contains("MODIFIER")) { a.add("MODIFIER"); } a.add("SUPPRIMER"); }
         // Actions spécifiques (point 11 / 5).
@@ -110,6 +117,7 @@ public class PermissionService {
             case "crm": return Arrays.asList("ADMIN", "SUPERVISEUR", "AGENT", "MARKETING");
             case "settings": return Arrays.asList("ADMIN");
             case "users": return Arrays.asList("ADMIN");
+            case "recouvrement": return Arrays.asList("ADMIN");
             default: return Arrays.asList("ADMIN");
         }
     }

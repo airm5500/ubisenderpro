@@ -46,6 +46,17 @@ public class ClientResource {
         return clientService.facettes();
     }
 
+    /** Sélecteur de clients (SCL) : clients actifs + contact principal, filtrables. */
+    @GET
+    @Path("/selection")
+    public java.util.List<java.util.Map<String, Object>> selection(
+            @QueryParam("q") String q,
+            @QueryParam("agence") String agence,
+            @QueryParam("region") String region,
+            @QueryParam("segmentationId") Long segmentationId) {
+        return clientService.pourSelectionClients(q, agence, region, segmentationId);
+    }
+
     @GET
     @Path("/{id}")
     public Response parId(@PathParam("id") Long id) {
@@ -91,6 +102,21 @@ public class ClientResource {
                               @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
         clientService.supprimer(id);
         auditService.tracer(auth, "SUPPRESSION", "Client", id, null);
+        return Response.noContent().build();
+    }
+
+    /** Écran « Contacts » (numéros seuls) : enregistre la liste des numéros du client. */
+    @POST
+    @Path("/{id}/numeros")
+    @Secured(menu = "clients")
+    public Response numeros(@PathParam("id") Long id,
+                            java.util.List<java.util.Map<String, Object>> numeros,
+                            @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        if (!clientService.parId(id).isPresent()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        clientService.enregistrerNumeros(id, numeros);
+        auditService.tracer(auth, "MODIFICATION", "Client", id, "numéros");
         return Response.noContent().build();
     }
 

@@ -23,7 +23,7 @@ public class ReferentielGeoService {
 
     /** Types de référentiel autorisés. */
     public static final List<String> TYPES =
-            Arrays.asList("PAYS", "REGION", "VILLE", "COMMUNE", "AGENCE");
+            Arrays.asList("PAYS", "REGION", "VILLE", "COMMUNE", "AGENCE", "TOURNEE");
 
     /** Préfixe de code généré par type. */
     private static String prefixe(String type) {
@@ -33,6 +33,7 @@ public class ReferentielGeoService {
             case "VILLE": return "VILLE";
             case "COMMUNE": return "COM";
             case "AGENCE": return "AG";
+            case "TOURNEE": return "TOUR";
             default: return "GEO";
         }
     }
@@ -127,9 +128,20 @@ public class ReferentielGeoService {
      * (séparateur , ou ;). Dédupliqué par libellé. Renvoie le nombre créé.
      */
     public int importer(String type, String contenu) {
+        return importerRapport(type, contenu).getOrDefault("crees", 0);
+    }
+
+    /**
+     * Import détaillé pour l'assistant : renvoie un rapport
+     * {@code {lues, crees, ignores}} (lignes lues hors en-tête, valeurs créées,
+     * doublons/lignes vides ignorés).
+     */
+    public java.util.Map<String, Integer> importerRapport(String type, String contenu) {
         String t = typeValide(type);
-        if (contenu == null || contenu.trim().isEmpty()) { return 0; }
-        int crees = 0;
+        java.util.Map<String, Integer> r = new java.util.LinkedHashMap<>();
+        r.put("lues", 0); r.put("crees", 0); r.put("ignores", 0);
+        if (contenu == null || contenu.trim().isEmpty()) { return r; }
+        int lues = 0, crees = 0, ignores = 0;
         boolean premiere = true;
         for (String ligne : contenu.split("\\r?\\n")) {
             if (ligne == null || ligne.trim().isEmpty()) { continue; }
@@ -139,14 +151,16 @@ public class ReferentielGeoService {
                 premiere = false;
                 if (estEntete(cols)) { continue; }
             }
+            // Format attendu : code;libellé (sans id). 1 seule colonne = libellé seul.
             String code = null, nom;
-            if (cols.length >= 3) { code = cols[1]; nom = cols[2]; }
-            else if (cols.length == 2) { code = cols[0]; nom = cols[1]; }
+            if (cols.length >= 2) { code = cols[0]; nom = cols[1]; }
             else { nom = cols[0]; }
-            if (nom == null || nom.isEmpty()) { continue; }
-            if (importerUn(t, code, nom)) { crees++; }
+            if (nom == null || nom.isEmpty()) { ignores++; continue; }
+            lues++;
+            if (importerUn(t, code, nom)) { crees++; } else { ignores++; }
         }
-        return crees;
+        r.put("lues", lues); r.put("crees", crees); r.put("ignores", ignores);
+        return r;
     }
 
     private boolean estEntete(String[] cols) {
@@ -156,6 +170,47 @@ public class ReferentielGeoService {
                     || v.equals("libelle") || v.equals("libellé")) { return true; }
         }
         return false;
+    }
+
+    /**
+     * Import via l'assistant à mapping de colonnes (comme le Catalogue) : fichier
+     * CSV/Excel + correspondance {code, libelle}. Renvoie un rapport standard.
+     */
+    public com.ubisenderpro.dto.ImportReport importerAssistant(String type, com.ubisenderpro.dto.ImportClientRequest req) {
+        String t = typeValide(type);
+        com.ubisenderpro.dto.ImportReport rapport = new com.ubisenderpro.dto.ImportReport();
+        rapport.setTypeImport("REFERENTIEL_" + t);
+        java.util.List<java.util.Map<String, String>> lignes;
+        try {
+            byte[] contenu = java.util.Base64.getDecoder().decode(req.getFichierBase64());
+            char sep = req.getSeparateur() != null && !req.getSeparateur().isEmpty() ? req.getSeparateur().charAt(0) : ';';
+            lignes = com.ubisenderpro.importer.FileParser.parse(contenu, req.getNomFichier(), sep);
+        } catch (Exception e) {
+            rapport.ajouterErreur(0, "Lecture du fichier impossible : " + e.getMessage());
+            return rapport;
+        }
+        rapport.setLignesLues(lignes.size());
+        String colCode = req.getMapping().getOrDefault("code", "code");
+        String colLib = req.getMapping().getOrDefault("libelle", "libelle");
+        int crees = 0, ignores = 0, rejets = 0, num = 1;
+        for (java.util.Map<String, String> ligne : lignes) {
+            num++;
+            String nom = valeur(ligne, colLib);
+            String code = valeur(ligne, colCode);
+            if (nom == null || nom.isEmpty()) { rejets++; rapport.ajouterErreur(num, "Libellé manquant"); continue; }
+            if (req.isSimulation()) { crees++; continue; }
+            if (importerUn(t, code, nom)) { crees++; } else { ignores++; }
+        }
+        rapport.setComptesCrees(crees);
+        rapport.setLignesIgnorees(ignores);
+        rapport.setLignesRejetees(rejets);
+        return rapport;
+    }
+
+    private String valeur(java.util.Map<String, String> ligne, String colonne) {
+        if (colonne == null) { return null; }
+        String v = ligne.get(colonne);
+        return v == null ? null : v.trim();
     }
 
     private boolean importerUn(String type, String code, String nom) {

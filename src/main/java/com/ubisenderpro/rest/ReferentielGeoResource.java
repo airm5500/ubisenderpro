@@ -55,7 +55,15 @@ public class ReferentielGeoResource {
     @Path("/{type}/import")
     @Secured(roles = {"ADMIN"})
     public Response importer(@PathParam("type") String type, java.util.Map<String, String> body) {
-        int crees = service.importer(type, body == null ? null : body.get("contenu"));
-        return Response.ok(java.util.Collections.singletonMap("crees", crees)).build();
+        return Response.ok(service.importerRapport(type, body == null ? null : body.get("contenu"))).build();
+    }
+
+    /** Import via l'assistant à mapping de colonnes (fichier CSV/Excel + correspondance). */
+    @POST
+    @Path("/{type}/import-assistant")
+    @Secured(roles = {"ADMIN"})
+    public Response importAssistant(@PathParam("type") String type,
+                                    com.ubisenderpro.dto.ImportClientRequest req) {
+        return Response.ok(service.importerAssistant(type, req)).build();
     }
 }

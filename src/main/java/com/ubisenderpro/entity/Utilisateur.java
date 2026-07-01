@@ -30,6 +30,10 @@ public class Utilisateur {
     @Column(name = "email", length = 150)
     private String email;
 
+    /** Agence de rattachement (cloisonnement recouvrement). Null = pas de restriction. */
+    @Column(name = "agence", length = 150)
+    private String agence;
+
     @Column(name = "mot_de_passe_hash", nullable = false)
     private String motDePasseHash;
 
@@ -68,6 +72,8 @@ public class Utilisateur {
     public void setPhoto(String photo) { this.photo = photo; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    public String getAgence() { return agence; }
+    public void setAgence(String agence) { this.agence = agence; }
     public String getMotDePasseHash() { return motDePasseHash; }
     public void setMotDePasseHash(String motDePasseHash) { this.motDePasseHash = motDePasseHash; }
     public boolean isActif() { return actif; }

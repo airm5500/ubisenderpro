@@ -106,6 +106,10 @@ public class Campagne {
     @Column(name = "cree_par")
     private Long creePar;
 
+    /** Nom d'affichage du créateur (non persisté) : rempli pour la liste. */
+    @javax.persistence.Transient
+    private String createurNom;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -173,6 +177,8 @@ public class Campagne {
     public void setNbEchoues(int nbEchoues) { this.nbEchoues = nbEchoues; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getCreateurNom() { return createurNom; }
+    public void setCreateurNom(String createurNom) { this.createurNom = createurNom; }
     public Long getCreePar() { return creePar; }
     public void setCreePar(Long creePar) { this.creePar = creePar; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

@@ -51,9 +51,7 @@ Usp.catalogue.articlesPanel = function () {
               } }
         ],
         tbar: [
-            { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
-                change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
-            '->',
+            // « Nouvel article » et les actions en tête, avant la recherche (#11).
             Usp.permBtn('catalogue', 'CREER', { text: '➕ Nouvel article', tooltip: 'Créer un nouvel article', handler: function () { Usp.catalogue.articleForm(store, null); } }),
             Usp.permBtn('catalogue', 'AJUSTER_STOCK', { text: 'Ajuster stock', handler: function (b) {
                 var rec = b.up('grid').getSelectionModel().getSelection()[0];
@@ -61,7 +59,11 @@ Usp.catalogue.articlesPanel = function () {
                 Usp.catalogue.stockForm(store, rec);
             } }),
             Usp.permBtn('catalogue', 'MAJ_PROMO', { text: 'Mettre à jour une promo', handler: function () { Usp.catalogue.majPromo(store); } }),
-            Usp.permBtn('catalogue', 'CREER', { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } })
+            Usp.permBtn('catalogue', 'CREER', { text: '📥 Importer', tooltip: 'Importer des articles depuis un fichier Excel/CSV', handler: function () { Usp.catalogue.importArticles(store); } }),
+            '-',
+            { xtype: 'textfield', emptyText: 'Rechercher (désignation, PS code, code promo)...', width: 280, listeners: {
+                change: function (f, v) { store.getProxy().extraParams = { q: v }; store.loadPage(1); }, buffer: 400 } },
+            '->'
         ].concat(Usp.export.boutons('Catalogue articles')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
@@ -85,12 +87,16 @@ Usp.catalogue.articlesPanel = function () {
 Usp.catalogue.articleForm = function (store, rec) {
     var win = Ext.create('Ext.window.Window', {
         title: rec ? 'Modifier l\'article' : 'Nouvel article',
-        width: 520, modal: true, bodyPadding: 12, layout: 'anchor',
+        width: 560, modal: true, bodyPadding: 12, layout: 'fit',
+        maxHeight: Ext.getBody().getViewSize().height - 40,
+        // Défilement vertical uniquement : jamais de scroll horizontal.
+        bodyStyle: 'overflow-x:hidden',
         items: [{
-            xtype: 'form', border: false, defaults: { anchor: '100%' },
+            xtype: 'form', border: false, autoScroll: true, bodyStyle: 'overflow-x:hidden', defaults: { anchor: '98%' },
             items: [
                 { xtype: 'textfield', name: 'pscode', fieldLabel: 'PS Code', allowBlank: false },
-                { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false },
+                { xtype: 'textfield', name: 'designation', fieldLabel: 'Désignation', allowBlank: false,
+                  listeners: Usp.majListeners },
                 { xtype: 'textfield', name: 'cip', fieldLabel: 'CIP' },
                 { xtype: 'textfield', name: 'codeBarres', fieldLabel: 'Code-barres' },
                 { xtype: 'numberfield', name: 'prixVente', fieldLabel: 'Prix de vente', allowBlank: false,

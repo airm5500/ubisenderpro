@@ -2,12 +2,16 @@ package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.DispoEvenement;
 import com.ubisenderpro.entity.DispoProduit;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.DispoEvenementService;
 import com.ubisenderpro.service.DispoProduitService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Base64;
@@ -24,6 +28,15 @@ public class DispoEvenementResource {
     private DispoEvenementService service;
     @EJB
     private DispoProduitService produitService;
+    @Inject
+    private SessionStore sessionStore;
+
+    private String createur(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        if (u == null) { return null; }
+        return u.getNomComplet() != null && !u.getNomComplet().isEmpty() ? u.getNomComplet() : u.getLogin();
+    }
 
     @GET
     public List<DispoEvenement> lister(@QueryParam("type") String type,
@@ -44,7 +57,8 @@ public class DispoEvenementResource {
 
     @POST
     @Secured(menu = "dispo")
-    public Response creer(DispoEvenement e) {
+    public Response creer(DispoEvenement e, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        if (e.getCreePar() == null || e.getCreePar().isEmpty()) { e.setCreePar(createur(authHeader)); }
         return Response.status(Response.Status.CREATED).entity(service.creer(e)).build();
     }
 

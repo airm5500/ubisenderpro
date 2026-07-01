@@ -8,7 +8,8 @@ Ext.define('Usp.importer', { singleton: true });
 
 Usp.importer.CHAMPS = {
     CLIENTS: [
-        ['numero_client', 'Numéro client *'], ['nom_compte', 'Nom du compte *'],
+        ['numero_client', 'Code client *'], ['nom_compte', 'Nom client *'],
+        ['entreprise', 'Entreprise'],
         ['contact_principal', 'Contact principal'], ['telephone_principal', 'Téléphone principal'],
         ['telephone_2', 'Téléphone 2'], ['numero_whatsapp', 'Numéro WhatsApp'],
         ['fonction', 'Fonction'], ['agence', 'Agence'], ['region', 'Région'],
@@ -30,6 +31,23 @@ Usp.importer.CHAMPS = {
         ['categorie', 'Catégorie'], ['marque', 'Marque'],
         ['stock_disponible', 'Stock disponible'], ['unite', 'Unité'],
         ['image_url', 'Image URL'], ['lien_produit', 'Lien produit']
+    ],
+    REFERENTIEL: [
+        ['code', 'Code'], ['libelle', 'Libellé *']
+    ],
+    REC_FICHES: [
+        ['numero_client', 'Code client *'], ['encours_initial', 'Encours initial'],
+        ['segment', 'Segment'], ['profil', 'Profil de paiement'],
+        ['responsable', 'Responsable'], ['statut', 'Statut']
+    ],
+    REC_CREANCES: [
+        ['numero_client', 'Code client *'], ['type', 'Type (FACTURE/AVOIR)'],
+        ['numero', 'N° pièce'], ['date_emission', 'Date émission'],
+        ['date_echeance', 'Date échéance'], ['montant', 'Montant *'], ['statut', 'Statut']
+    ],
+    REC_PAIEMENTS: [
+        ['numero_client', 'Code client *'], ['date_paiement', 'Date de règlement'],
+        ['montant', 'Montant *'], ['mode', 'Mode'], ['reference', 'Référence']
     ]
 };
 
@@ -77,7 +95,9 @@ Usp.importer.show = function (type, url, onDone) {
     };
 
     var win = Ext.create('Ext.window.Window', {
-        title: 'Assistant d\'import — ' + type, width: 560, height: 560, modal: true,
+        title: 'Assistant d\'import — ' + type, width: 640,
+        height: Math.min(720, Ext.getBody().getViewSize().height - 40),
+        maxHeight: Ext.getBody().getViewSize().height - 40, modal: true,
         layout: 'fit',
         items: [{
             xtype: 'form', border: false, autoScroll: true, bodyPadding: 12,
@@ -116,7 +136,7 @@ Usp.importer.show = function (type, url, onDone) {
                       } catch (e) { }
                   } } },
                 { xtype: 'fieldset', title: 'Correspondance des colonnes', collapsible: true,
-                  defaults: { labelWidth: 160 }, items: mappingItems },
+                  defaults: { labelWidth: 160, anchor: '100%' }, items: mappingItems },
                 { xtype: 'combobox', name: 'mode', fieldLabel: 'En cas de doublon', value: 'AJOUT_MAJ',
                   store: [['AJOUT_MAJ', 'Ajouter et mettre à jour'], ['IGNORER', 'Ignorer les doublons']],
                   queryMode: 'local', editable: false },
@@ -124,12 +144,28 @@ Usp.importer.show = function (type, url, onDone) {
             ]
         }],
         buttons: [
+            { text: '📄 Exporter un exemplaire', tooltip: 'Télécharger un modèle CSV avec les colonnes attendues',
+              handler: function (b) { Usp.importer.exempleCsv(type, champs, b.up('window').down('[name=separateur]').getValue()); } },
             { text: 'Enregistrer ce mapping', handler: function (b) { Usp.importer.saveMapping(b.up('window'), type, champs, mappingStore); } },
             '->',
             { text: 'Lancer l\'import', handler: function (b) { Usp.importer.run(b.up('window'), type, url, champs, fileData, onDone); } }
         ]
     });
     win.show();
+};
+
+/* Génère et télécharge un exemplaire CSV : en-tête = colonnes attendues
+ * (avec * sur les obligatoires) + une ligne d'exemple vide, pour guider la saisie. */
+Usp.importer.exempleCsv = function (type, champs, sep) {
+    sep = sep || ';';
+    var entetes = champs.map(function (c) { return c[0]; });
+    var libelles = champs.map(function (c) { return c[1]; });
+    // 1re ligne : noms de colonnes techniques ; 2e ligne (commentaire) : libellés.
+    var contenu = entetes.join(sep) + '\n' + libelles.join(sep) + '\n';
+    var uri = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(contenu);
+    var a = document.createElement('a');
+    a.href = uri; a.download = 'modele_import_' + String(type).toLowerCase() + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
 };
 
 Usp.importer.collecterMapping = function (win, champs) {

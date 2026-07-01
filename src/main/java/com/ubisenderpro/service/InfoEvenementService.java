@@ -97,6 +97,7 @@ public class InfoEvenementService {
         valider(data, false);
         data.setStatut(ex.getStatut());
         data.setCreatedAt(ex.getCreatedAt());
+        if (data.getCreePar() == null || data.getCreePar().isEmpty()) { data.setCreePar(ex.getCreePar()); }
         data.setUpdatedAt(LocalDateTime.now());
         return em.merge(data);
     }
@@ -150,6 +151,7 @@ public class InfoEvenementService {
         c.setTournee(s.getTournee());
         c.setAudience(s.getAudience());
         c.setSegmentationId(s.getSegmentationId());
+        c.setSegmentationIds(s.getSegmentationIds());
         c.setListeId(s.getListeId());
         c.setCanal(s.getCanal());
         c.setDateEnvoi(s.getDateEnvoi());

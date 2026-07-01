@@ -31,8 +31,9 @@ Usp.marketing.reloadAll = function () {
 Usp.marketing.panel = function () {
     Usp.marketing._stores = [];
     return {
-        xtype: 'tabpanel', title: 'Marketing', listeners: Usp.tabListeners,
+        xtype: 'tabpanel', title: 'Marketing', itemId: 'mktTabs', listeners: Usp.tabListeners,
         items: [
+            Usp.marketing.tableauBord(),
             Usp.marketing.calendrier(),
             Usp.marketing.propositions(),
             Usp.marketing.modelesMessages(),
@@ -40,6 +41,88 @@ Usp.marketing.panel = function () {
             Usp.marketing.performance()
         ]
     };
+};
+
+/* Onglet « Tableau de bord » : synthèse marketing (promotions, propositions,
+ * campagnes) via des tuiles calculées côté client à partir des endpoints existants. */
+Usp.marketing.tableauBord = function () {
+    var tuile = function (icone, valeur, libelle, couleur) {
+        return '<div style="display:inline-block;vertical-align:top;width:190px;height:96px;margin:8px;' +
+            'border:1px solid #e0e0e0;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06);' +
+            'padding:10px 12px">' +
+            '<div style="font-size:22px">' + icone + '</div>' +
+            '<div style="font-size:26px;font-weight:bold;color:' + (couleur || '#333') + '">' + valeur + '</div>' +
+            '<div style="color:#888;font-size:12px">' + libelle + '</div></div>';
+    };
+    var charger = function (panel) {
+        var body = panel.down('#tbBody');
+        if (body) { body.update('<div style="padding:20px;color:#888">Chargement…</div>'); }
+        var res = { promoActives: 0, promoProg: 0, propProposees: 0, propValidees: 0,
+                    campEnCours: 0, campTerminees: 0, cibles: 0, envoyes: 0, lus: 0 };
+        var restants = 3;
+        var fini = function () {
+            if (--restants > 0 || !body) { return; }
+            var tauxLecture = res.envoyes ? Math.round(res.lus / res.envoyes * 100) : 0;
+            body.update(
+                '<div style="font-family:sans-serif">' +
+                '<h3 style="margin:6px 8px">Promotions</h3>' +
+                tuile('🟢', res.promoActives, 'Actives', '#2e7d32') +
+                tuile('🔵', res.promoProg, 'Programmées', '#1976d2') +
+                '<h3 style="margin:6px 8px">Propositions d\'envoi</h3>' +
+                tuile('📨', res.propProposees, 'En attente de décision', '#1976d2') +
+                tuile('✅', res.propValidees, 'Validées', '#2e7d32') +
+                '<h3 style="margin:6px 8px">Campagnes marketing</h3>' +
+                tuile('🚀', res.campEnCours, 'En cours', '#f57c00') +
+                tuile('🏁', res.campTerminees, 'Terminées', '#777') +
+                tuile('🎯', res.cibles, 'Ciblés (total)') +
+                tuile('📬', res.envoyes, 'Envoyés (total)', '#1976d2') +
+                tuile('👁️', tauxLecture + ' %', 'Taux de lecture moyen', '#2e7d32') +
+                '</div>');
+        };
+        Usp.ajax({ url: '/promotions', method: 'GET', success: function (resp) {
+            var l = []; try { l = Ext.decode(resp.responseText) || []; } catch (e) {}
+            l.forEach(function (p) {
+                if (p.statut === 'ACTIVE') { res.promoActives++; }
+                else if (p.statut === 'PROGRAMMEE') { res.promoProg++; }
+            });
+            fini();
+        }, failure: fini });
+        Usp.ajax({ url: '/propositions', method: 'GET', success: function (resp) {
+            var l = []; try { l = Ext.decode(resp.responseText) || []; } catch (e) {}
+            l.forEach(function (p) {
+                if (p.statut === 'PROPOSEE') { res.propProposees++; }
+                else if (p.statut === 'VALIDEE') { res.propValidees++; }
+            });
+            fini();
+        }, failure: fini });
+        Usp.ajax({ url: '/campaigns', method: 'GET', success: function (resp) {
+            var l = []; try { l = Ext.decode(resp.responseText) || []; } catch (e) {}
+            l.forEach(function (c) {
+                var cat = String(c.categorie || '').toUpperCase();
+                if (cat !== 'PROMOTION' && cat !== 'DISPONIBILITE' && cat !== 'INFORMATION') { return; }
+                if (c.statut === 'EN_COURS') { res.campEnCours++; }
+                else if (c.statut === 'TERMINEE') { res.campTerminees++; }
+                res.cibles += (c.nbDestinataires || 0);
+                res.envoyes += (c.nbEnvoyes || 0);
+                res.lus += (c.nbLus || 0);
+            });
+            fini();
+        }, failure: fini });
+    };
+    return {
+        xtype: 'panel', title: '📊 Tableau de bord', autoScroll: true, bodyStyle: 'background:#fafafa',
+        tbar: [{ text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } }],
+        items: [{ xtype: 'component', itemId: 'tbBody', html: '<div style="padding:20px;color:#888">Chargement…</div>' }],
+        listeners: { afterrender: function (p) { charger(p); } }
+    };
+};
+
+/* Depuis le calendrier : bascule sur l'onglet « Propositions d'envoi ». */
+Usp.marketing.ouvrirPropositions = function () {
+    var tp = Ext.ComponentQuery.query('#mktTabs')[0];
+    if (!tp) { return; }
+    var cible = tp.items.findBy(function (t) { return /Propositions/.test(t.title || ''); });
+    if (cible) { tp.setActiveTab(cible); }
 };
 
 /* Vue PROMOTIONS : un onglet par statut. Menu dédié, distinct de Marketing. */
@@ -59,7 +142,7 @@ Usp.marketing.promotionsPanel = function () {
 
 Usp.marketing.grille = function (statut, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'code', 'nom', 'description', 'dateDebut', 'dateFin', 'statut', 'responsable'],
+        fields: ['id', 'code', 'nom', 'description', 'dateDebut', 'dateFin', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/promotions',
             extraParams: { statut: statut },
@@ -74,8 +157,12 @@ Usp.marketing.grille = function (statut, libelleTab) {
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Début', dataIndex: 'dateDebut', width: 100, renderer: Usp.marketing.fdate },
             { text: 'Fin', dataIndex: 'dateFin', width: 100, renderer: Usp.marketing.fdate },
+            Usp.periodeColonne(),
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.marketing.statutRenderer },
-            { text: 'Responsable', dataIndex: 'responsable', width: 140 },
+            { text: 'Responsable', dataIndex: 'responsable', width: 140, renderer: function (v) {
+                return v ? '<span style="color:#1565c0">' + Ext.String.htmlEncode(v) + '</span>' : ''; } },
+            { text: 'Par', dataIndex: 'creePar', width: 110, renderer: function (v) {
+                return v ? '<span style="color:#000;font-weight:bold">' + Ext.String.htmlEncode(v) + '</span>' : ''; } },
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -92,8 +179,9 @@ Usp.marketing.grille = function (statut, libelleTab) {
         ],
         tbar: [
             Usp.permBtn('promotions', 'CREER', { text: '➕ Nouvelle promotion', tooltip: 'Créer une promotion', handler: function () { Usp.marketing.promotionForm(store, null); } }),
-            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-        ].concat(Usp.export.boutons('Promotions ' + statut)),
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }, '-'
+        ].concat(Usp.grilleFiltre(store, { champs: ['code', 'nom', 'responsable'], periode: true }))
+         .concat(Usp.export.boutons('Promotions ' + statut)),
         listeners: {
             itemdblclick: function (g, rec) { Usp.marketing.promotionForm(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
@@ -120,15 +208,19 @@ Usp.marketing.action = function (rec, action, message) {
 
 /* Formulaire d'une promotion : informations générales + produits (si existante). */
 Usp.marketing.promotionForm = function (store, rec) {
+    // Code auto (4 caractères) pré-affiché et modifiable à la création.
+    var codeInitial = rec ? rec.get('code') : (Usp.codeAuto ? Usp.codeAuto() : '');
     var items = [
-        { xtype: 'textfield', name: 'code', fieldLabel: 'Code', allowBlank: false, value: rec ? rec.get('code') : '' },
-        { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom', allowBlank: false, value: rec ? rec.get('nom') : '' },
+        { xtype: 'textfield', name: 'code', fieldLabel: 'Code *', allowBlank: false, value: codeInitial,
+          emptyText: 'code court modifiable' },
+        { xtype: 'textfield', name: 'nom', fieldLabel: 'Nom *', allowBlank: false, value: rec ? rec.get('nom') : '' },
         { xtype: 'textarea', name: 'description', fieldLabel: 'Description', height: 50, value: rec ? rec.get('description') : '' },
-        { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
+        { xtype: 'datefield', name: 'dateDebut', fieldLabel: 'Date de début *', allowBlank: false, format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateDebut') ? Ext.Date.parse(String(rec.get('dateDebut')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin', format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
+        { xtype: 'datefield', name: 'dateFin', fieldLabel: 'Date de fin *', allowBlank: false, format: 'd/m/Y', submitFormat: 'Y-m-d\\TH:i:s', editable: false,
           value: rec && rec.get('dateFin') ? Ext.Date.parse(String(rec.get('dateFin')).substring(0, 10), 'Y-m-d') : null },
-        { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable', value: rec ? rec.get('responsable') : '' }
+        { xtype: 'textfield', name: 'responsable', fieldLabel: 'Responsable',
+          fieldStyle: 'color:#1565c0;font-weight:bold', value: rec ? rec.get('responsable') : '' }
     ];
 
     var formItems = [{ xtype: 'form', itemId: 'promoForm', border: false, bodyPadding: '0 0 8 0',
@@ -149,8 +241,13 @@ Usp.marketing.promotionForm = function (store, rec) {
         items: formItems,
         buttons: [{ text: 'Enregistrer', formBind: false, handler: function (b) {
             var form = b.up('window').down('#promoForm').getForm();
-            if (!form.isValid()) { return; }
-            var v = form.getValues();
+            if (!form.isValid()) {
+                Ext.Msg.alert('Champs à compléter', 'Merci de renseigner les champs obligatoires (repérés par *).');
+                return;
+            }
+            if (!Usp.periodeValide(form.findField('dateDebut').getValue(), form.findField('dateFin').getValue())) { return; }
+            // Chaînes vides -> null (évite l'échec technique sur dates vides).
+            var v = Usp.compact(form.getValues());
             Usp.ajax({ url: rec ? '/promotions/' + rec.get('id') : '/promotions',
                 method: rec ? 'PUT' : 'POST', jsonData: v,
                 success: function (resp) {
@@ -164,14 +261,12 @@ Usp.marketing.promotionForm = function (store, rec) {
                         Usp.marketing.promotionForm(store, m);
                     }
                 },
-                failure: function (resp) {
-                    var msg = 'Enregistrement impossible.';
-                    try { msg = Ext.decode(resp.responseText).erreur || msg; } catch (e) {}
-                    Ext.Msg.alert('Erreur', msg);
-                } });
+                failure: function (resp) { Usp.afficherErreurForm(form, resp); } });
         } }]
     });
     win.show();
+    var pForm = win.down('#promoForm').getForm();
+    Usp.lierPeriode(pForm.findField('dateDebut'), pForm.findField('dateFin'));
 };
 
 /* Sous-grille des produits d'une promotion (ajout/modif/suppression + import). */
@@ -256,17 +351,21 @@ Usp.marketing.produitForm = function (store, promotionId, rec) {
               listConfig: { getInnerTpl: function () {
                   return '{designation} <span style="color:#999">{cip}</span>'; } },
               listeners: { select: function (cb, r) {
-                  fld('cip7').setValue(r.get('cip') || '');
-                  fld('cip13').setValue(r.get('codeBarres') || '');
-                  fld('nomProduit').setValue(r.get('designation') || '');
-                  fld('articleId').setValue(r.get('id'));
+                  // En ExtJS 4.2, « select » renvoie un tableau d'enregistrements.
+                  var a = Ext.isArray(r) ? r[0] : r;
+                  if (!a) { return; }
+                  fld('cip7').setValue(a.get('cip') || '');
+                  fld('cip13').setValue(a.get('codeBarres') || '');
+                  fld('nomProduit').setValue(a.get('designation') || '');
+                  fld('articleId').setValue(a.get('id'));
+                  Usp.marketing._verrouCatalogue(win, true); // produit existant : CIP grisés
               } } },
             { xtype: 'displayfield', value: '<span style="color:#888">Choisissez un article du catalogue ' +
               '(recommandé, évite les doublons) <b>ou</b> saisissez manuellement le CIP.</span>' },
             { xtype: 'hidden', name: 'articleId', value: rec ? rec.get('articleId') : null },
-            { xtype: 'textfield', name: 'cip7', fieldLabel: 'CIP7', value: rec ? rec.get('cip7') : '' },
+            Usp.cip7Field(rec ? rec.get('cip7') : ''),
             { xtype: 'textfield', name: 'cip13', fieldLabel: 'CIP13', value: rec ? rec.get('cip13') : '' },
-            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '' },
+            { xtype: 'textfield', name: 'nomProduit', fieldLabel: 'Nom du produit', value: rec ? rec.get('nomProduit') : '', listeners: Usp.majListeners },
             { xtype: 'numberfield', name: 'quantiteMinimale', fieldLabel: 'Quantité minimale commandée',
               minValue: 0, value: rec ? rec.get('quantiteMinimale') : null },
             { xtype: 'fieldcontainer', fieldLabel: 'Unité gratuite (UG)', layout: 'hbox',
@@ -311,6 +410,19 @@ Usp.marketing.produitForm = function (store, promotionId, rec) {
         ]
     });
     win.show();
+    // À l'ouverture : produit déjà lié au catalogue -> CIP/CIP13/nom grisés.
+    if (rec && rec.get('articleId')) { Usp.marketing._verrouCatalogue(win, true); }
+};
+
+/* Grise (ou libère) les champs CIP7/CIP13/nom quand le produit provient du catalogue. */
+Usp.marketing._verrouCatalogue = function (win, verrou) {
+    var form = win.down('form').getForm();
+    ['cip7', 'cip13', 'nomProduit'].forEach(function (n) {
+        var f = form.findField(n);
+        if (!f) { return; }
+        f.setReadOnly(verrou);
+        if (f.inputEl) { f.inputEl.setStyle('background', verrou ? '#f0f0f0' : ''); }
+    });
 };
 
 /* Import Excel des produits + rapport. */
@@ -447,13 +559,22 @@ Usp.marketing._calHtml = function (y, m, data) {
 
     var vide = function () { return '<td style="border:1px solid #eee;height:96px;background:#fafafa"></td>'; };
     var jour = function (d, items, today) {
-        var h = '<td style="border:1px solid #e0e0e0;height:96px;vertical-align:top;padding:3px;background:'
-            + (today ? '#e3f2fd' : '#fff') + '">';
-        h += '<div style="font-size:12px;font-weight:bold;color:#555">' + d + '</div>';
+        // Fond : bleu clair pour aujourd'hui, jaune très clair pour un jour avec événement(s).
+        var fond = today ? '#e3f2fd' : (items.length ? '#fffdf0' : '#fff');
+        var h = '<td' + (items.length ? ' onclick="Usp.marketing.ouvrirPropositions()"' : '')
+            + ' style="' + (items.length ? 'cursor:pointer;' : '')
+            + 'border:1px solid #e0e0e0;height:96px;vertical-align:top;padding:3px;background:' + fond + '">';
+        h += '<div style="font-size:12px;font-weight:bold;color:#555">' + d
+            + (items.length ? ' <span style="color:#1976d2;font-weight:normal">(' + items.length + ')</span>' : '') + '</div>';
         items.forEach(function (p) {
             var c = Usp.marketing.COULEUR_PROP[p.statut] || '#1976d2';
             var lib = Usp.marketing.LIB_TYPE[p.type] || p.type || '';
-            h += '<div title="' + Ext.String.htmlEncode((p.titre || '') + ' — ' + (p.statut || '')) + '"'
+            // Info-bulle détaillée (survol) au lieu du seul nom.
+            var detail = 'Type : ' + lib + '\nTitre : ' + (p.titre || '')
+                + '\nStatut : ' + (p.statut || '') + '\nÉchéance : ' + String(p.datePrevue || '').substring(0, 10)
+                + (p.source ? '\nSource : ' + (Usp.marketing.LIB_SOURCE[p.source] || p.source) : '')
+                + '\n(cliquez pour ouvrir les Propositions)';
+            h += '<div title="' + Ext.String.htmlEncode(detail) + '"'
                 + ' style="margin:2px 0;padding:1px 4px;border-left:3px solid ' + c + ';background:#f7f7f7;'
                 + 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
                 + Ext.String.htmlEncode(lib) + '</div>';
@@ -540,12 +661,21 @@ Usp.marketing.campagnesPromo = function () {
                  'nbEnvoyes', 'nbDistribues', 'nbLus', 'nbEchoues'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true,
-        // Campagnes marketing : issues des promotions ou des disponibilités/ruptures.
-        filters: [{ filterFn: function (rec) {
-            var c = String(rec.get('categorie') || '').toUpperCase();
-            return c === 'PROMOTION' || c === 'DISPONIBILITE' || c === 'INFORMATION'; } }]
+        autoLoad: true
     });
+    // Campagnes marketing : issues des promotions ou des disponibilités/ruptures.
+    var estMarketing = function (rec) {
+        var c = String(rec.get('categorie') || '').toUpperCase();
+        return c === 'PROMOTION' || c === 'DISPONIBILITE' || c === 'INFORMATION';
+    };
+    var etatStatut = '';
+    var statutFiltre = function () {
+        store.clearFilter(true);
+        store.filterBy(function (rec) {
+            return estMarketing(rec) && (!etatStatut || rec.get('statut') === etatStatut);
+        });
+    };
+    statutFiltre();
     var libCat = function (v) {
         var c = String(v || '').toUpperCase();
         return c === 'DISPONIBILITE' ? '📦 Dispo' : (c === 'PROMOTION' ? '🏷️ Promo'
@@ -567,6 +697,11 @@ Usp.marketing.campagnesPromo = function () {
         ],
         tbar: [
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } },
+            'Statut',
+            { xtype: 'combobox', itemId: 'fStatut', width: 150, editable: false, queryMode: 'local', value: '',
+              store: [['', 'Tous'], ['BROUILLON', 'Brouillon'], ['PROGRAMMEE', 'Programmée'],
+                      ['EN_COURS', 'En cours'], ['TERMINEE', 'Terminée'], ['ANNULEE', 'Annulée']],
+              listeners: { change: function (c, v) { etatStatut = v || ''; statutFiltre(); } } },
             '->',
             { text: 'Ouvrir le menu Campagnes', tooltip: 'Aller à la gestion complète des campagnes',
               handler: function () { Usp.ouvrirVue('campaigns'); } }
@@ -634,10 +769,11 @@ Usp.marketing.performance = function () {
 
 Usp.marketing._perfHtml = function (t) {
     var b = function (l, v) {
-        return '<span style="display:inline-block;min-width:130px;margin:0 14px 6px 0">' +
+        return '<span style="display:inline-block;text-align:center;min-width:96px;margin:0 10px">' +
             '<b style="font-size:16px">' + v + '</b><br><span style="color:#888;font-size:11px">' + l + '</span></span>';
     };
-    return '<div style="font-family:sans-serif">' +
+    // Une seule ligne : pas de retour, défilement horizontal si nécessaire.
+    return '<div style="font-family:sans-serif;white-space:nowrap;overflow-x:auto">' +
         b('Campagnes', t.nbCampagnes || 0) + b('Ciblés', t.cibles || 0) + b('Envoyés', t.envoyes || 0) +
         b('Distribués', (t.distribues || 0) + ' (' + (t.tauxDistribution || 0) + '%)') +
         b('Lus', (t.lus || 0) + ' (' + (t.tauxLecture || 0) + '%)') +
@@ -645,20 +781,36 @@ Usp.marketing._perfHtml = function (t) {
         b('Échoués', t.echoues || 0) + '</div>';
 };
 
-Usp.marketing.propositions = function () {
+/* Un onglet = un statut de proposition (Proposées / Validées / Rejetées / Expirées / Toutes). */
+Usp.marketing.propositionsGrid = function (statut, titre) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'cle', 'type', 'source', 'promotionId', 'evenementId', 'titre', 'message', 'datePrevue',
                  'statut', 'campagneId', 'listeId', 'segmentId', 'motifRejet'],
         groupField: 'datePrevue',
         proxy: { type: 'ajax', url: Usp.apiBase + '/propositions',
-            extraParams: { statut: 'PROPOSEE' },
+            extraParams: { statut: statut },
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
     });
     Usp.marketing._stores.push(store);
 
+    var generer = function () {
+        Usp.ajax({ url: '/propositions/generer', method: 'POST',
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var items = r.items || [];
+                if (!items.length) {
+                    Usp.marketing.reloadAll();
+                    Usp.toast('Aucune nouvelle proposition à générer' + (r.expirees ? ' (' + r.expirees + ' expirée(s)).' : '.'));
+                    return;
+                }
+                Usp.marketing.apercuGeneration(items);
+            },
+            failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
+    };
+
     return {
-        xtype: 'grid', title: '📨 Propositions d\'envoi', store: store,
+        xtype: 'grid', title: titre, store: store,
         features: [{ ftype: 'grouping',
             groupHeaderTpl: 'Échéance : {name:this.fdate} ({rows.length})',
             startCollapsed: false,
@@ -678,53 +830,104 @@ Usp.marketing.propositions = function () {
                   }
                   return '';
               } },
-            { text: 'Actions', xtype: 'actioncolumn', width: 150, align: 'center',
-              renderer: function (v, meta, rec) {
-                  if (rec.get('statut') !== 'PROPOSEE') { meta.style = 'color:#bbb'; }
-              },
-              items: [
-                { iconCls: 'x-fa fa-check', tooltip: 'Valider (créer la campagne brouillon)',
-                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
-                  handler: function (g, r, c, i, e, rec) { Usp.marketing.validerProposition(rec, store); } },
-                { iconCls: 'x-fa fa-times', tooltip: 'Rejeter',
-                  isDisabled: function (g, r, c, i, rec) { return rec.get('statut') !== 'PROPOSEE'; },
-                  handler: function (g, r, c, i, e, rec) { Usp.marketing.rejeterProposition(rec, store); } },
-                { iconCls: 'x-fa fa-eye', tooltip: 'Voir le message proposé',
-                  handler: function (g, r, c, i, e, rec) {
-                      Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('titre')),
-                          message: '<pre style="white-space:pre-wrap;font-family:inherit">' +
-                                   Ext.String.htmlEncode(rec.get('message') || '') + '</pre>',
-                          buttons: Ext.Msg.OK, width: 460 });
-                  } }
-              ] }
+            { text: 'Actions', width: 320, align: 'left', sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, m, rec) {
+                  var propose = rec.get('statut') === 'PROPOSEE';
+                  var act = propose
+                      ? '<span class="pm-ok" title="Valider (créer la campagne brouillon)" style="cursor:pointer;color:#2e7d32;margin-right:10px">✅ Valider</span>'
+                        + '<span class="pm-no" title="Rejeter" style="cursor:pointer;color:#c62828;margin-right:10px">✖ Rejeter</span>'
+                      : '';
+                  act += '<span class="pm-see" title="Voir le message proposé" style="cursor:pointer;color:#1976d2;margin-right:10px">👁️ Voir</span>';
+                  // Suppression définitive : uniquement si non liée à une campagne (privilège SUPPRIMER).
+                  if (!rec.get('campagneId')) {
+                      act += '<span class="pm-del" title="Supprimer définitivement" style="cursor:pointer;color:#c62828">🗑️</span>';
+                  }
+                  return act;
+              } }
         ],
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 var a = e.getTarget('.pm-gocamp');
-                if (a) { e.preventDefault(); Usp.ouvrirVue('campaigns'); }
+                if (a) { e.preventDefault(); Usp.ouvrirVue('campaigns'); return; }
+                if (e.getTarget('.pm-ok')) { Usp.marketing.validerProposition(rec, store); return; }
+                if (e.getTarget('.pm-no')) { Usp.marketing.rejeterProposition(rec, store); return; }
+                if (e.getTarget('.pm-del')) { Usp.marketing.supprimerProposition(rec); return; }
+                if (e.getTarget('.pm-see')) {
+                    Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('titre')),
+                        msg: '<pre style="white-space:pre-wrap;font-family:inherit">' +
+                             Ext.String.htmlEncode(rec.get('message') || '') + '</pre>',
+                        buttons: Ext.Msg.OK, width: 460 });
+                    return;
+                }
             }
         },
+        tbar: Usp.grilleFiltre(store, { champs: ['titre', 'type'], periode: true, dateChamp: 'datePrevue' }).concat(['->',
+            { text: '🔄 Générer les propositions', tooltip: 'Régénère les propositions à partir des promotions', handler: generer },
+            { text: '↻ Rafraîchir', handler: function () { store.load(); } }
+        ])
+    };
+};
+
+/* Aperçu des propositions fraîchement générées : cocher celles à conserver ;
+ * les décochées sont écartées (rejetées). « Tout annuler » les rejette toutes. */
+Usp.marketing.apercuGeneration = function (items) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'titre', 'type', 'source', 'datePrevue'],
+        data: items
+    });
+    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true, mode: 'SIMPLE' });
+    var rejeterLot = function (ids, cb) {
+        if (!ids.length) { if (cb) { cb(); } return; }
+        Usp.ajax({ url: '/propositions/rejeter-lot', method: 'POST', jsonData: { ids: ids, motif: 'Écartée à la génération' },
+            success: function () { if (cb) { cb(); } },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Propositions générées — cochez celles à conserver', width: 640,
+        height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: true, layout: 'fit',
+        items: [{ xtype: 'grid', itemId: 'g', store: store, selModel: sm,
+            columns: [
+                { text: 'Échéance', dataIndex: 'datePrevue', width: 100, renderer: function (v) { return v ? String(v).substring(0, 10) : ''; } },
+                { text: 'Type', dataIndex: 'type', width: 150, renderer: function (v) { return Usp.marketing.LIB_TYPE[v] || v; } },
+                { text: 'Titre', dataIndex: 'titre', flex: 1 }
+            ] }],
         tbar: [
-            'Afficher :',
-            { xtype: 'combobox', width: 160, editable: false, queryMode: 'local',
-              value: 'PROPOSEE',
-              store: [['PROPOSEE', 'Proposées'], ['VALIDEE', 'Validées'],
-                      ['REJETEE', 'Rejetées'], ['EXPIREE', 'Expirées'], ['', 'Toutes']],
-              listeners: { change: function (cb, v) {
-                  store.getProxy().setExtraParam('statut', v); store.load();
-              } } },
-            '->',
-            { text: '🔄 Générer maintenant', tooltip: 'Régénère les propositions à partir des promotions',
-              handler: function () {
-                  Usp.ajax({ url: '/propositions/generer', method: 'POST',
-                      success: function (resp) {
-                          var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
-                          store.load();
-                          Usp.toast((r.crees || 0) + ' proposition(s) créée(s), ' +
-                                    (r.expirees || 0) + ' expirée(s).');
-                      },
-                      failure: function () { Ext.Msg.alert('Erreur', 'Génération impossible.'); } });
-              } }
+            { text: 'Tout cocher', handler: function (b) { b.up('window').down('#g').getSelectionModel().selectAll(); } },
+            { text: 'Tout décocher', handler: function (b) { b.up('window').down('#g').getSelectionModel().deselectAll(); } },
+            '->', { xtype: 'tbtext', text: items.length + ' proposition(s) générée(s)' }
+        ],
+        buttons: [
+            { text: '🗑️ Tout annuler', handler: function () {
+                var tous = store.getRange().map(function (r) { return r.get('id'); });
+                rejeterLot(tous, function () { win.close(); Usp.marketing.reloadAll(); Usp.toast('Génération annulée.'); });
+            } },
+            { text: '✅ Conserver la sélection', handler: function (b) {
+                var g = b.up('window').down('#g');
+                var gardes = {};
+                g.getSelectionModel().getSelection().forEach(function (r) { gardes[r.get('id')] = true; });
+                var aRejeter = store.getRange().filter(function (r) { return !gardes[r.get('id')]; })
+                    .map(function (r) { return r.get('id'); });
+                rejeterLot(aRejeter, function () {
+                    win.close(); Usp.marketing.reloadAll();
+                    Usp.toast((store.getCount() - aRejeter.length) + ' proposition(s) conservée(s), ' + aRejeter.length + ' écartée(s).');
+                });
+            } }
+        ]
+    });
+    win.show();
+    win.down('#g').getSelectionModel().selectAll(); // tout coché par défaut
+};
+
+/* Propositions d'envoi présentées en sous-onglets par statut (au lieu d'une liste « Afficher : »). */
+Usp.marketing.propositions = function () {
+    return {
+        xtype: 'tabpanel', title: '📨 Propositions d\'envoi', listeners: Usp.tabListeners,
+        items: [
+            Usp.marketing.propositionsGrid('PROPOSEE', 'Proposées'),
+            Usp.marketing.propositionsGrid('VALIDEE', 'Validées'),
+            Usp.marketing.propositionsGrid('REJETEE', 'Rejetées'),
+            Usp.marketing.propositionsGrid('EXPIREE', 'Expirées'),
+            Usp.marketing.propositionsGrid('', 'Toutes')
         ]
     };
 };
@@ -746,15 +949,23 @@ Usp.marketing.validerProposition = function (rec, store) {
             ] }],
         buttons: [
             { text: 'Annuler', handler: function (b) { b.up('window').close(); } },
-            { text: 'Valider', formBind: false, handler: function (b) {
+            { text: 'Valider', itemId: 'btnValider', formBind: false, handler: function (b) {
                 var v = b.up('window').down('#vForm').getForm().getValues();
+                // Indicateur d'attente + anti double-soumission (#9).
+                b.disable();
+                b.setText('Validation…');
+                win.setLoading('Création de la campagne…');
                 Usp.ajax({ url: '/propositions/' + rec.get('id') + '/valider', method: 'POST',
                     jsonData: { listeId: v.listeId || null, segmentId: v.segmentId || null },
                     success: function () {
-                        win.close(); store.load();
+                        win.setLoading(false);
+                        win.close();
+                        Usp.marketing.reloadAll();
                         Usp.toast('Campagne brouillon créée. Complétez-la dans Campagnes.');
                     },
                     failure: function (resp) {
+                        win.setLoading(false);
+                        b.enable(); b.setText('Valider');
                         var m = 'Validation impossible.';
                         try { m = Ext.decode(resp.responseText).erreur || m; } catch (e) {}
                         Ext.Msg.alert('Erreur', m);
@@ -765,12 +976,25 @@ Usp.marketing.validerProposition = function (rec, store) {
     win.show();
 };
 
+/* Suppression définitive d'une proposition (privilège marketing/SUPPRIMER). */
+Usp.marketing.supprimerProposition = function (rec) {
+    if (!Usp.can('marketing', 'SUPPRIMER')) { Usp.refusPermission(); return; }
+    Ext.Msg.confirm('Supprimer', 'Supprimer définitivement la proposition « '
+        + Ext.String.htmlEncode(rec.get('titre') || '') + ' » ? Cette action est irréversible.',
+        function (btn) {
+            if (btn !== 'yes') { return; }
+            Usp.ajax({ url: '/propositions/' + rec.get('id'), method: 'DELETE',
+                success: function () { Usp.marketing.reloadAll(); Usp.toast('Proposition supprimée.'); },
+                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Suppression impossible.')); } });
+        });
+};
+
 Usp.marketing.rejeterProposition = function (rec, store) {
     Ext.Msg.prompt('Rejeter la proposition', 'Motif (facultatif) :', function (btn, txt) {
         if (btn !== 'ok') { return; }
         Usp.ajax({ url: '/propositions/' + rec.get('id') + '/rejeter', method: 'POST',
             jsonData: { motif: txt || null },
-            success: function () { store.load(); Usp.toast('Proposition rejetée.'); },
+            success: function () { Usp.marketing.reloadAll(); Usp.toast('Proposition rejetée.'); },
             failure: function () { Ext.Msg.alert('Erreur', 'Rejet impossible.'); } });
     });
 };
