@@ -160,6 +160,28 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Personnalisations globales UI (exécutées au chargement) ---------- */
+(function () {
+    // Pagination en français (toutes les grilles paginées).
+    if (Ext.toolbar && Ext.toolbar.Paging) {
+        Ext.override(Ext.toolbar.Paging, {
+            displayMsg: 'Affichage {0} - {1} sur {2}',
+            emptyMsg: 'Aucune donnée à afficher',
+            beforePageText: 'Page',
+            afterPageText: 'sur {0}',
+            firstText: 'Première page', prevText: 'Page précédente',
+            nextText: 'Page suivante', lastText: 'Dernière page', refreshText: 'Actualiser'
+        });
+    }
+    // Pastille active animée (effet « pace-maker ») + styles utilitaires.
+    var css = '@keyframes uspPace{0%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}100%{transform:scale(1);opacity:1}}'
+        + '.usp-pace{color:#25d366;display:inline-block;animation:uspPace 1.2s ease-in-out infinite}';
+    var style = document.createElement('style');
+    style.type = 'text/css';
+    style.appendChild(document.createTextNode(css));
+    document.getElementsByTagName('head')[0].appendChild(style);
+})();
+
 /* ---------- Export CSV / PDF (réutilisable, sans dépendance) ---------- */
 Usp.export = {};
 
@@ -242,19 +264,25 @@ Usp.export.recuperer = function (grid, cb) {
     });
 };
 
-/* Boutons « Export CSV » / « Export PDF » à ajouter à la tbar d'une grille. */
+/* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille. */
 Usp.export.boutons = function (titre) {
-    var faire = function (b, format) {
-        var grid = b.up('grid');
+    var btn;
+    var faire = function (format) {
+        var grid = btn ? btn.up('grid') : null;
+        if (!grid) { return; }
         Usp.export.recuperer(grid, function (recs) {
             var cols = Usp.export.colonnes(grid);
             if (format === 'csv') { Usp.export.csv(titre, cols, recs); } else { Usp.export.pdf(titre, cols, recs); }
         });
     };
-    return [
-        { text: '📊 Export CSV', tooltip: 'Exporter « ' + titre + ' » au format CSV (ouvrable dans Excel)', handler: function (b) { faire(b, 'csv'); } },
-        { text: '🖨️ Export PDF', tooltip: 'Exporter / imprimer « ' + titre + ' » au format PDF', handler: function (b) { faire(b, 'pdf'); } }
-    ];
+    return [{
+        text: '⬇️ Exporter', tooltip: 'Exporter « ' + titre + ' » (CSV ou PDF)',
+        listeners: { afterrender: function (b) { btn = b; } },
+        menu: [
+            { text: '📊 CSV (Excel)', handler: function () { faire('csv'); } },
+            { text: '🖨️ PDF', handler: function () { faire('pdf'); } }
+        ]
+    }];
 };
 
 /* ---------- Fenêtre de connexion ---------- */
@@ -1457,7 +1485,7 @@ Usp.tabPastille = function (tp, active) {
     if (!tp || !tp.items) { return; }
     tp.items.each(function (t) {
         if (t.baseTitle === undefined) { t.baseTitle = t.title; }
-        t.setTitle(t.baseTitle + (t === active ? ' <span style="color:#25d366">●</span>' : ''));
+        t.setTitle(t.baseTitle + (t === active ? ' <span class="usp-pace">●</span>' : ''));
     });
 };
 Usp.tabListeners = {
@@ -1491,7 +1519,7 @@ Usp.activerMenu = function (vue) {
         if (n.get('view') === vue) { cible = n; }
     });
     if (cible) {
-        cible.set('text', cible.data.baseText + ' <span style="color:#25d366">●</span>');
+        cible.set('text', cible.data.baseText + ' <span class="usp-pace">●</span>');
         tree.getSelectionModel().select(cible, false, true);
     }
 };
