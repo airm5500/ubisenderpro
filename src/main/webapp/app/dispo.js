@@ -158,7 +158,7 @@ Usp.dispo.regleForm = function (store, rec) {
 Usp.dispo.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'description', 'dateDebut', 'dateFin', 'agence',
-                 'societe', 'audience', 'segmentationId', 'canal', 'modeleId', 'statut', 'responsable'],
+                 'societe', 'audience', 'segmentationId', 'canal', 'modeleId', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/dispo-evenements',
             extraParams: filtre,
@@ -177,6 +177,7 @@ Usp.dispo.grille = function (filtre, libelleTab) {
             { text: 'Fin', dataIndex: 'dateFin', width: 100, renderer: Usp.dispo.fdate },
             { text: 'Agence', dataIndex: 'agence', width: 110 },
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.dispo.statutRenderer },
+            Usp.parColonne('creePar'),
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -194,13 +195,18 @@ Usp.dispo.grille = function (filtre, libelleTab) {
                   return h;
               } }
         ],
-        tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
-                .concat(Usp.export.boutons('Disponibilités historique'))
+        tbar: (historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
             : [
                 Usp.permBtn('dispo', 'CREER', { text: '➕ Nouvel événement', tooltip: 'Créer un événement disponibilité / rupture',
                   handler: function () { Usp.dispo.evenementForm(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-            ].concat(Usp.export.boutons('Disponibilités ' + (filtre.type || filtre.statut || ''))),
+            ]).concat(['-']).concat(Usp.grilleFiltre(store, {
+                champs: ['code', 'titre'], periode: true,
+                selects: [
+                    { field: 'statut', label: 'Statut', width: 130,
+                      options: ['BROUILLON', 'PROGRAMMEE', 'ENVOYEE', 'ANNULEE', 'ARCHIVEE'].map(function (s) { return { v: s, t: s }; }) }
+                ]
+            })).concat(Usp.export.boutons('Disponibilités ' + (filtre.type || filtre.statut || ''))),
         listeners: {
             itemdblclick: function (g, rec) { Usp.dispo.evenementForm(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {

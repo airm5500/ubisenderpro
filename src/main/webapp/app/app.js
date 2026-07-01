@@ -1297,6 +1297,91 @@ Usp.cip7Field = function (valeur) {
     ] };
 };
 
+/* Durée lisible entre deux dates (ex. « 29 jours », « 1 mois 10 jours », « 4 mois »). */
+Usp.dureeLisible = function (debut, fin) {
+    var d = debut ? new Date(String(debut).substring(0, 10)) : null;
+    var f = fin ? new Date(String(fin).substring(0, 10)) : null;
+    if (!d || !f || isNaN(d) || isNaN(f) || f < d) { return ''; }
+    var mois = (f.getFullYear() - d.getFullYear()) * 12 + (f.getMonth() - d.getMonth());
+    var jours = f.getDate() - d.getDate();
+    if (jours < 0) { mois -= 1; var tmp = new Date(f.getFullYear(), f.getMonth(), 0); jours += tmp.getDate(); }
+    var totalJours = Math.round((f - d) / 86400000);
+    if (mois <= 0) { return totalJours + ' jour' + (totalJours > 1 ? 's' : ''); }
+    var out = mois + ' mois';
+    if (jours > 0) { out += ' ' + jours + ' jour' + (jours > 1 ? 's' : ''); }
+    return out;
+};
+
+/* Colonne « Période » calculée à partir de dateDebut/dateFin. */
+Usp.periodeColonne = function () {
+    return { text: 'Période', width: 130, sortable: false, menuDisabled: true, dataIndex: 'dateFin',
+        renderer: function (v, m, rec) { return Usp.dureeLisible(rec.get('dateDebut'), rec.get('dateFin')); } };
+};
+
+/* Colonne « Par » (créateur), dataIndex configurable (défaut creePar). */
+Usp.parColonne = function (dataIndex) {
+    return { text: 'Par', dataIndex: dataIndex || 'creePar', width: 110 };
+};
+
+/* Filtre client-side réutilisable pour une grille (recherche live + période + champs).
+ * cfg : { champs:['code','nom'], periode:true }. Renvoie un tbar (array) + pose store.filterBy.
+ * Recherche déclenchée pendant la saisie (anti-rebond) ET on garde Entrée. */
+Usp.grilleFiltre = function (store, cfg) {
+    cfg = cfg || {};
+    var etat = { q: '', du: null, au: null, selects: {}, dateChamp: cfg.dateChamp || null };
+    var appliquer = function () {
+        store.clearFilter(true);
+        store.filterBy(function (rec) {
+            if (etat.q) {
+                var ok = false, ql = etat.q.toLowerCase();
+                (cfg.champs || []).forEach(function (c) {
+                    var val = rec.get(c); if (val && String(val).toLowerCase().indexOf(ql) !== -1) { ok = true; }
+                });
+                if (!ok) { return false; }
+            }
+            var champsSelect = Object.keys(etat.selects);
+            for (var i = 0; i < champsSelect.length; i++) {
+                var k = champsSelect[i], val = etat.selects[k];
+                if (val && String(rec.get(k)) !== String(val)) { return false; }
+            }
+            if (cfg.periode && (etat.du || etat.au)) {
+                var deb, fin;
+                if (etat.dateChamp) {
+                    var dv = rec.get(etat.dateChamp);
+                    deb = fin = dv ? new Date(String(dv).substring(0, 10)) : null;
+                } else {
+                    var dd = rec.get('dateDebut'), df = rec.get('dateFin');
+                    deb = dd ? new Date(String(dd).substring(0, 10)) : null;
+                    fin = df ? new Date(String(df).substring(0, 10)) : deb;
+                }
+                if (etat.du && fin && fin < etat.du) { return false; }
+                if (etat.au && deb && deb > etat.au) { return false; }
+            }
+            return true;
+        });
+    };
+    var items = [];
+    if (cfg.champs && cfg.champs.length) {
+        items.push({ xtype: 'textfield', emptyText: '🔎 Rechercher…', width: 190,
+            listeners: {
+                change: { buffer: 350, fn: function (f, v) { etat.q = v || ''; appliquer(); } },
+                specialkey: function (f, e) { if (e.getKey() === e.ENTER) { etat.q = f.getValue() || ''; appliquer(); } }
+            } });
+    }
+    (cfg.selects || []).forEach(function (s) {
+        items.push({ xtype: 'combobox', emptyText: s.label, width: s.width || 130, queryMode: 'local', editable: false,
+            store: s.options, valueField: 'v', displayField: 't',
+            listeners: { change: function (f, v) { etat.selects[s.field] = v; appliquer(); } } });
+    });
+    if (cfg.periode) {
+        items.push({ xtype: 'datefield', emptyText: 'Du', width: 105, format: 'd/m/Y', editable: false,
+            listeners: { change: function (f, v) { etat.du = v || null; appliquer(); } } });
+        items.push({ xtype: 'datefield', emptyText: 'Au', width: 105, format: 'd/m/Y', editable: false,
+            listeners: { change: function (f, v) { etat.au = v || null; appliquer(); } } });
+    }
+    return items;
+};
+
 /* Code par défaut : 4 chiffres aléatoires (modifiable). Préfixe optionnel. */
 Usp.codeAuto = function (prefixe) {
     var n = Math.floor(1000 + Math.random() * 9000);

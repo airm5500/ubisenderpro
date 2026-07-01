@@ -1,11 +1,15 @@
 package com.ubisenderpro.rest;
 
 import com.ubisenderpro.entity.InfoEvenement;
+import com.ubisenderpro.security.AuthenticatedUser;
 import com.ubisenderpro.security.Secured;
+import com.ubisenderpro.security.SessionStore;
 import com.ubisenderpro.service.InfoEvenementService;
 
 import javax.ejb.EJB;
+import javax.inject.Inject;
 import javax.ws.rs.*;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Arrays;
@@ -19,6 +23,15 @@ public class InfoEvenementResource {
 
     @EJB
     private InfoEvenementService service;
+    @Inject
+    private SessionStore sessionStore;
+
+    private String createur(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) { return null; }
+        AuthenticatedUser u = sessionStore.validate(authHeader.substring("Bearer ".length()).trim());
+        if (u == null) { return null; }
+        return u.getNomComplet() != null && !u.getNomComplet().isEmpty() ? u.getNomComplet() : u.getLogin();
+    }
 
     @GET
     public List<InfoEvenement> lister(@QueryParam("type") String type,
@@ -43,7 +56,8 @@ public class InfoEvenementResource {
 
     @POST
     @Secured(menu = "infos")
-    public Response creer(InfoEvenement i) {
+    public Response creer(InfoEvenement i, @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        if (i.getCreePar() == null || i.getCreePar().isEmpty()) { i.setCreePar(createur(authHeader)); }
         return Response.status(Response.Status.CREATED).entity(service.creer(i)).build();
     }
 

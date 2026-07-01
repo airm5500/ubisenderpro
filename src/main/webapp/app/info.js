@@ -64,7 +64,7 @@ Usp.info.grille = function (filtre, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
         fields: ['id', 'code', 'type', 'titre', 'message', 'priorite', 'societe', 'agence', 'region', 'tournee',
                  'audience', 'segmentationId', 'listeId', 'contactIds', 'canal', 'dateEnvoi', 'dateFinValidite',
-                 'statut', 'responsable', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
+                 'statut', 'responsable', 'creePar', 'dateLivraison', 'creneau', 'heureInitiale', 'nouvelleHeure',
                  'causeInterne', 'causeCommunicable', 'dateResolution', 'jourFerie', 'dateGarde',
                  'heureLimiteCommande', 'consignesLivraison', 'pharmacienGarde', 'telephonePharmacien'],
         autoLoad: true,
@@ -83,6 +83,7 @@ Usp.info.grille = function (filtre, libelleTab) {
             { text: 'Agence', dataIndex: 'agence', width: 110 },
             { text: 'Envoi', dataIndex: 'dateEnvoi', width: 100, renderer: Usp.info.fdate },
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.info.statutRenderer },
+            Usp.parColonne('creePar'),
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -100,12 +101,18 @@ Usp.info.grille = function (filtre, libelleTab) {
                   return h;
               } }
         ],
-        tbar: historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
-                .concat(Usp.export.boutons('Informations historique'))
+        tbar: (historique ? [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
             : [
                 Usp.permBtn('infos', 'CREER', { text: '➕ Nouvelle information', handler: function () { Usp.info.form(store, null, filtre.type); } }),
                 { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-            ].concat(Usp.export.boutons('Informations')),
+            ]).concat(['-']).concat(Usp.grilleFiltre(store, {
+                champs: ['code', 'titre'], periode: true, dateChamp: 'dateEnvoi',
+                selects: [
+                    { field: 'priorite', label: 'Priorité', options: Usp.info.PRIORITES.map(function (p) { return { v: p[0], t: p[1] }; }) },
+                    { field: 'statut', label: 'Statut', width: 130,
+                      options: ['BROUILLON', 'EN_ATTENTE', 'PROGRAMMEE', 'EN_COURS', 'ENVOYEE', 'ANNULEE', 'EXPIREE', 'ECHOUEE', 'ARCHIVEE'].map(function (s) { return { v: s, t: s }; }) }
+                ]
+            })).concat(Usp.export.boutons(historique ? 'Informations historique' : 'Informations')),
         listeners: {
             itemdblclick: function (g, rec) { Usp.info.form(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {

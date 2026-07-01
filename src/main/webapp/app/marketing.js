@@ -59,7 +59,7 @@ Usp.marketing.promotionsPanel = function () {
 
 Usp.marketing.grille = function (statut, libelleTab) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'code', 'nom', 'description', 'dateDebut', 'dateFin', 'statut', 'responsable'],
+        fields: ['id', 'code', 'nom', 'description', 'dateDebut', 'dateFin', 'statut', 'responsable', 'creePar'],
         autoLoad: true,
         proxy: { type: 'ajax', url: Usp.apiBase + '/promotions',
             extraParams: { statut: statut },
@@ -74,8 +74,10 @@ Usp.marketing.grille = function (statut, libelleTab) {
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Début', dataIndex: 'dateDebut', width: 100, renderer: Usp.marketing.fdate },
             { text: 'Fin', dataIndex: 'dateFin', width: 100, renderer: Usp.marketing.fdate },
+            Usp.periodeColonne(),
             { text: 'Statut', dataIndex: 'statut', width: 110, renderer: Usp.marketing.statutRenderer },
             { text: 'Responsable', dataIndex: 'responsable', width: 140 },
+            Usp.parColonne('creePar'),
             { text: 'Actions', width: 230, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = rec.get('statut');
@@ -92,8 +94,9 @@ Usp.marketing.grille = function (statut, libelleTab) {
         ],
         tbar: [
             Usp.permBtn('promotions', 'CREER', { text: '➕ Nouvelle promotion', tooltip: 'Créer une promotion', handler: function () { Usp.marketing.promotionForm(store, null); } }),
-            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
-        ].concat(Usp.export.boutons('Promotions ' + statut)),
+            { text: '🔄 Rafraîchir', handler: function () { store.load(); } }, '-'
+        ].concat(Usp.grilleFiltre(store, { champs: ['code', 'nom', 'responsable'], periode: true }))
+         .concat(Usp.export.boutons('Promotions ' + statut)),
         listeners: {
             itemdblclick: function (g, rec) { Usp.marketing.promotionForm(store, rec); },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
