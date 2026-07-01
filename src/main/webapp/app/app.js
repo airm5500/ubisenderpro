@@ -2395,7 +2395,7 @@ Usp.showMain = function () {
             {
                 region: 'west',
                 title: 'Menu',
-                width: 220,
+                width: 236,
                 collapsible: true,
                 xtype: 'treepanel',
                 itemId: 'menuTree',
