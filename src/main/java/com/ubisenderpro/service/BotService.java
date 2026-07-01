@@ -256,7 +256,7 @@ public class BotService {
                     + "Canal : " + (conv.getCanal() != null ? conv.getCanal() : "API") + "\n"
                     + "Raison : " + raison + "\n"
                     + "Dernier message : " + (conv.getDernierMessage() != null ? conv.getDernierMessage() : "") + "\n\n"
-                    + "Ouvrez UbiSenderPro > Discussions pour reprendre cette conversation.";
+                    + "Ouvrez UbiSmartCRM Pro > Discussions pour reprendre cette conversation.";
             mailService.envoyer(emails, sujet, corps);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Notification e-mail d'escalade KO (conversation " + conv.getId() + ")", e);

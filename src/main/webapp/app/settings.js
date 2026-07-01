@@ -676,7 +676,7 @@ Usp.settings.importerModeleDocx = function (f, store) {
     var file = f.fileInputEl.dom.files[0];
     if (!file) { return; }
     if (!/\.docx$/i.test(file.name)) {
-        Ext.Msg.alert('Import', 'Veuillez choisir un fichier .docx exporté depuis UbiSenderPro.');
+        Ext.Msg.alert('Import', 'Veuillez choisir un fichier .docx exporté depuis UbiSmartCRM Pro.');
         f.reset();
         return;
     }

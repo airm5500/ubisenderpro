@@ -464,7 +464,7 @@ Usp.showLogin = function () {
         '        <div class="pl-brand-row">',
         '          <div class="pl-brand">',
         '            <span class="pl-brand__mark" aria-hidden="true">✈</span>',
-        '            <span class="pl-brand__text pl-animated-text--brand">UbiSenderPro</span>',
+        '            <span class="pl-brand__text pl-animated-text--brand">UbiSmartCRM Pro</span>',
         '          </div>',
         '        </div>',
         '        <div class="pl-pharmacy-stack">',
@@ -475,7 +475,7 @@ Usp.showLogin = function () {
         '            </span>',
         '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
         '          </div>',
-        '          <div class="pl-version-badge">UbiSenderPro · v1.0</div>',
+        '          <div class="pl-version-badge">UbiSmartCRM Pro · v2.0</div>',
         '        </div>',
         '      </aside>',
         '      <div class="pl-login-panel">',
@@ -1773,7 +1773,7 @@ Usp.apropos = function () {
         Ext.Msg.show({
             title: 'À propos',
             msg: '<div style="padding:6px 2px;line-height:1.7">' +
-                 '<b>' + Ext.String.htmlEncode(a.application || 'UbiSenderPro') + '</b><br>' +
+                 '<b>' + Ext.String.htmlEncode(a.application || 'UbiSmartCRM Pro') + '</b><br>' +
                  'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
                  'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
                  'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b>' +
@@ -2359,7 +2359,7 @@ Usp.showMain = function () {
                 items: [
                     { xtype: 'tbtext', cls: 'usp-brand', text:
                         '<span class="usp-logo">' + Usp.LOGO + '</span>' +
-                        '<span class="usp-brand-text pl-animated-text--brand">UbiSenderPro</span>',
+                        '<span class="usp-brand-text pl-animated-text--brand">UbiSmartCRM Pro</span>',
                       listeners: { afterrender: function (c) {
                           // Même animation « vague » que l'accroche du login, appliquée au branding du header.
                           var el = c.getEl().dom.querySelector('.usp-brand-text');
