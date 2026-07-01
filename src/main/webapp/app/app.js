@@ -409,7 +409,7 @@ Usp._clientStores = [];
 
 Usp.createClientStore = function (actif) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'numeroClient', 'nomCompte', 'agence', 'region', 'tournee', 'commune',
+        fields: ['id', 'numeroClient', 'nomCompte', 'entreprise', 'agence', 'region', 'tournee', 'commune',
                  'telephonePrincipal', 'emailPrincipal', 'statut', 'segmentationId', 'actif'],
         pageSize: 25,
         proxy: {
@@ -537,8 +537,9 @@ Usp.clientsGrid = function (actif) {
         title: actif ? '🏢 Liste des comptes' : '🚫 Clients désactivés',
         store: store,
         columns: [
-            { text: 'Code client', dataIndex: 'numeroClient', width: 110 },
-            { text: 'Nom du compte', dataIndex: 'nomCompte', flex: 1 },
+            { text: 'Code client', dataIndex: 'numeroClient', width: 100 },
+            { text: 'Nom client', dataIndex: 'nomCompte', flex: 1 },
+            { text: 'Entreprise', dataIndex: 'entreprise', width: 160 },
             { text: 'Téléphone', dataIndex: 'telephonePrincipal', width: 130 },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
@@ -735,7 +736,9 @@ Usp.clientForm = function (store, rec) {
             items: [
                 { items: [
                     { xtype: 'textfield', name: 'numeroClient', fieldLabel: 'Code client', allowBlank: false },
-                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom du compte', allowBlank: false },
+                    { xtype: 'textfield', name: 'nomCompte', fieldLabel: 'Nom client', allowBlank: false },
+                    { xtype: 'textfield', name: 'entreprise', fieldLabel: 'Entreprise',
+                      emptyText: 'Nom de l\'officine (ex. PHCIE POLAP)' },
                     Usp.referentielCombo('AGENCE', { name: 'agence', fieldLabel: 'Agence' }),
                     Usp.referentielCombo('REGION', { name: 'region', fieldLabel: 'Région' }),
                     Usp.referentielCombo('TOURNEE', { name: 'tournee', fieldLabel: 'Tournée' }),

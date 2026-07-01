@@ -59,6 +59,10 @@ public class Client {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Nom de l'officine / entreprise (ex. « PHCIE POLAP »), distinct du nom client. */
+    @Column(name = "entreprise", length = 255)
+    private String entreprise;
+
     /** Téléphone du contact principal (non persisté) : renseigné pour l'affichage en liste. */
     @javax.persistence.Transient
     private String telephonePrincipal;
@@ -97,6 +101,8 @@ public class Client {
     public void setCommune(String commune) { this.commune = commune; }
     public String getTelephonePrincipal() { return telephonePrincipal; }
     public void setTelephonePrincipal(String telephonePrincipal) { this.telephonePrincipal = telephonePrincipal; }
+    public String getEntreprise() { return entreprise; }
+    public void setEntreprise(String entreprise) { this.entreprise = entreprise; }
     public String getPays() { return pays; }
     public void setPays(String pays) { this.pays = pays; }
     public String getStatut() { return statut; }

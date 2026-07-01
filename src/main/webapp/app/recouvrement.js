@@ -55,13 +55,14 @@ Usp.recouvrement.segmentationCombo = function (cfg) {
 /* Combo de sélection d'un client (recherche distante sur /clients). */
 Usp.recouvrement.clientCombo = function (cfg) {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nomCompte', 'numeroClient'],
+        fields: ['id', 'nomCompte', 'numeroClient', 'entreprise'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/clients', queryParam: 'q',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
             reader: { type: 'json', root: 'data', totalProperty: 'total' } } });
     return Ext.apply({ xtype: 'combobox', store: store, valueField: 'id', displayField: 'nomCompte',
         queryMode: 'remote', minChars: 2, anchor: '100%', emptyText: 'Tapez 2 lettres…',
-        listConfig: { getInnerTpl: function () { return '{nomCompte} <span style="color:#999">{numeroClient}</span>'; } } }, cfg || {});
+        listConfig: { getInnerTpl: function () {
+            return '<b>{numeroClient}</b> {nomCompte} <span style="color:#999">{entreprise}</span>'; } } }, cfg || {});
 };
 
 /* ============================ Panneau principal ============================ */

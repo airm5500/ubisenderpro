@@ -191,8 +191,9 @@ Usp.info.form = function (store, rec, typeParDefaut) {
               queryMode: 'remote', queryParam: 'q', minChars: 2, valueField: 'id', displayField: 'nom', hidden: true,
               emptyText: 'Tapez 2 lettres pour rechercher…',
               value: g('contactIds') ? String(g('contactIds')).split(',') : [],
-              listConfig: { getInnerTpl: function () { return '{nom} <span style="color:#999">{client}</span>'; } },
-              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero'],
+              listConfig: { getInnerTpl: function () {
+                  return '<b>{code}</b> {entreprise} <span style="color:#999">{nom}</span>'; } },
+              store: Ext.create('Ext.data.Store', { fields: ['id', 'nom', 'client', 'numero', 'code', 'entreprise'],
                   proxy: { type: 'ajax', url: Usp.apiBase + '/contacts/selection', queryParam: 'q',
                       headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } }) },
             { xtype: 'textfield', name: 'responsable', fieldLabel: 'Direction / signataire', value: g('responsable') || '' },

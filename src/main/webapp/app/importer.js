@@ -8,7 +8,8 @@ Ext.define('Usp.importer', { singleton: true });
 
 Usp.importer.CHAMPS = {
     CLIENTS: [
-        ['numero_client', 'Numéro client *'], ['nom_compte', 'Nom du compte *'],
+        ['numero_client', 'Code client *'], ['nom_compte', 'Nom client *'],
+        ['entreprise', 'Entreprise'],
         ['contact_principal', 'Contact principal'], ['telephone_principal', 'Téléphone principal'],
         ['telephone_2', 'Téléphone 2'], ['numero_whatsapp', 'Numéro WhatsApp'],
         ['fonction', 'Fonction'], ['agence', 'Agence'], ['region', 'Région'],

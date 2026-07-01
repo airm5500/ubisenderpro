@@ -26,13 +26,15 @@ public class ContactService {
      */
     public List<Map<String, Object>> pourSelection(Long segmentationId, String q, int offset, int limit) {
         StringBuilder jpql = new StringBuilder(
-                "SELECT ct.id, ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte FROM ClientContact ct, Client cl " +
+                "SELECT ct.id, ct.numeroWhatsapp, ct.nomComplet, cl.nomCompte, cl.numeroClient, cl.entreprise " +
+                "FROM ClientContact ct, Client cl " +
                 "WHERE ct.clientId = cl.id AND ct.numeroWhatsapp IS NOT NULL AND ct.numeroWhatsapp <> '' " +
                 "AND ct.desabonne = false ");
         boolean hasSeg = segmentationId != null;
         boolean hasQ = q != null && !q.trim().isEmpty();
         if (hasSeg) { jpql.append("AND cl.segmentationId = :seg "); }
-        if (hasQ) { jpql.append("AND (LOWER(ct.nomComplet) LIKE :q OR LOWER(cl.nomCompte) LIKE :q) "); }
+        if (hasQ) { jpql.append("AND (LOWER(ct.nomComplet) LIKE :q OR LOWER(cl.nomCompte) LIKE :q " +
+                "OR LOWER(cl.numeroClient) LIKE :q OR LOWER(cl.entreprise) LIKE :q) "); }
         jpql.append("ORDER BY cl.nomCompte, ct.nomComplet");
 
         Query query = em.createQuery(jpql.toString());
@@ -48,6 +50,8 @@ public class ContactService {
             m.put("numero", r[1]);
             m.put("nom", r[2]);
             m.put("client", r[3]);
+            m.put("code", r[4]);
+            m.put("entreprise", r[5]);
             out.add(m);
         }
         return out;

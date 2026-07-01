@@ -142,6 +142,7 @@ public class ClientImportService {
 
         client.setNumeroClient(numeroClient);
         client.setNomCompte(nomCompte);
+        appliquerSiPresent(val(ligne, req, "entreprise"), client::setEntreprise);
         appliquerSiPresent(val(ligne, req, "agence"), client::setAgence);
         appliquerSiPresent(val(ligne, req, "region"), client::setRegion);
         appliquerSiPresent(val(ligne, req, "email_principal"), client::setEmailPrincipal);
