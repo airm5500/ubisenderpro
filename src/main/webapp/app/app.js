@@ -2303,7 +2303,8 @@ Usp.notifications.ouvrir = function () {
                 (it.date ? ' <span style="color:#999">' + fdate(it.date) + '</span>' : '') + '</div>';
         }).join('') || '<div style="padding:6px;color:#999;font-size:12px">Aucun élément récent.</div>';
         return {
-            xtype: 'panel', collapsible: true, collapsed: false, titleCollapse: true, margin: '0 0 4 0',
+            // Sections repliées à l'ouverture : on déplie celle qu'on veut consulter.
+            xtype: 'panel', collapsible: true, collapsed: true, titleCollapse: true, margin: '0 0 4 0',
             title: g.titre + ' (' + (g.count || 0) + ')',
             tools: [{ type: 'right', tooltip: 'Ouvrir le menu', handler: function () { Usp.notifications.aller(g.vue); } }],
             items: [{ xtype: 'component', html: lignes }]
