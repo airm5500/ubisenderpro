@@ -976,6 +976,20 @@ public class EnvoiProposeService {
         return em.merge(e);
     }
 
+    /**
+     * Supprime définitivement une proposition. Interdit si elle a déjà donné lieu
+     * à une campagne (on préserve le lien d'historique) : rejeter alors plutôt.
+     */
+    public void supprimer(Long id) {
+        EnvoiPropose e = em.find(EnvoiPropose.class, id);
+        if (e == null) { throw new IllegalArgumentException("Proposition introuvable"); }
+        if (e.getCampagneId() != null) {
+            throw new ValidationException("statut",
+                    "Cette proposition est liée à une campagne : elle ne peut pas être supprimée.");
+        }
+        em.remove(e);
+    }
+
     /* ====================== Messages suggérés ======================
      * Le texte provient des modèles « promo » éditables en base (clé système),
      * avec repli sur les textes par défaut (PromoTemplates) si supprimés.

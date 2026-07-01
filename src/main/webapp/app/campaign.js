@@ -98,7 +98,9 @@ Usp.campaign.show = function (store) {
             xtype: 'form', itemId: 'wizForm', layout: 'card', activeItem: 0, border: false,
             items: [step1, step2, step3, step4, step5]
         }],
-        bbar: ['->',
+        bbar: [
+            { text: 'Annuler', itemId: 'cancel', handler: function () { Usp.campaign.annulerAssistant(wizard); } },
+            '->',
             { text: '« Précédent', itemId: 'prev', disabled: true, handler: function () { Usp.campaign.nav(wizard, -1); } },
             { text: 'Suivant »', itemId: 'next', handler: function () { Usp.campaign.nav(wizard, 1); } },
             { text: 'Construire', itemId: 'build', hidden: true, handler: function () { Usp.campaign.build(wizard); } },
@@ -108,6 +110,28 @@ Usp.campaign.show = function (store) {
     wizard.campagneId = null;
     wizard.refreshStore = store || null;
     wizard.show();
+};
+
+/** Annule l'assistant : si un brouillon a déjà été créé (étape « Construire »),
+ *  propose de le supprimer pour ne pas laisser de campagne orpheline. */
+Usp.campaign.annulerAssistant = function (wizard) {
+    if (!wizard.campagneId) { wizard.close(); return; }
+    Ext.Msg.confirm('Annuler la campagne',
+        'Une campagne brouillon a déjà été créée. Voulez-vous la supprimer ?',
+        function (btn) {
+            if (btn === 'yes') {
+                Usp.ajax({ url: '/campaigns/' + wizard.campagneId, method: 'DELETE',
+                    success: function () {
+                        if (wizard.refreshStore) { wizard.refreshStore.load(); }
+                        wizard.close(); Usp.toast('Brouillon supprimé.');
+                    },
+                    failure: function () { wizard.close(); } });
+            } else {
+                // Conserver le brouillon : fermer et rafraîchir la liste.
+                if (wizard.refreshStore) { wizard.refreshStore.load(); }
+                wizard.close();
+            }
+        });
 };
 
 /** Affiche le champ « compte » adapté au canal choisi (API ↔ WhatsApp Web). */
@@ -246,6 +270,33 @@ Usp.campaign.tauxRenderer = function (v, m, rec) {
     return '<span style="color:' + couleur + ';font-weight:bold">' + pct + ' %</span>';
 };
 
+/* Synthèse (tableau de bord compact) au-dessus de la grille des campagnes. */
+Usp.campaign._majSynthese = function (store) {
+    var cmp = Ext.ComponentQuery.query('#campSynthese')[0];
+    if (!cmp) { return; }
+    var t = { total: 0, enCours: 0, terminees: 0, cibles: 0, envoyes: 0, lus: 0, echoues: 0 };
+    store.each(function (c) {
+        t.total++;
+        if (c.get('statut') === 'EN_COURS') { t.enCours++; }
+        else if (c.get('statut') === 'TERMINEE') { t.terminees++; }
+        t.cibles += (c.get('nbDestinataires') || 0);
+        t.envoyes += (c.get('nbEnvoyes') || 0);
+        t.lus += (c.get('nbLus') || 0);
+        t.echoues += (c.get('nbEchoues') || 0);
+    });
+    var tauxLecture = t.envoyes ? Math.round(t.lus / t.envoyes * 100) : 0;
+    var b = function (l, v, couleur) {
+        return '<span style="display:inline-block;text-align:center;min-width:92px;margin:0 8px">' +
+            '<b style="font-size:16px;color:' + (couleur || '#333') + '">' + v + '</b><br>' +
+            '<span style="color:#888;font-size:11px">' + l + '</span></span>';
+    };
+    cmp.update('<div style="font-family:sans-serif;white-space:nowrap;overflow-x:auto">' +
+        b('Campagnes', t.total) + b('En cours', t.enCours, '#f57c00') + b('Terminées', t.terminees, '#777') +
+        b('Ciblés', t.cibles) + b('Envoyés', t.envoyes, '#1976d2') +
+        b('Lus', t.lus + ' (' + tauxLecture + '%)', '#2e7d32') + b('Échoués', t.echoues, '#c62828') +
+        '</div>');
+};
+
 /* ---------- Grille de suivi des campagnes ---------- */
 Usp.campaign.listPanel = function () {
     var store = Ext.create('Ext.data.Store', {
@@ -253,10 +304,13 @@ Usp.campaign.listPanel = function () {
                  'dateProgrammee', 'creePar', 'createurNom'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
-        autoLoad: true
+        autoLoad: true,
+        listeners: { load: function (s) { Usp.campaign._majSynthese(s); } }
     });
     return {
         xtype: 'grid', title: '🚀 Campagnes', store: store,
+        dockedItems: [{ xtype: 'component', itemId: 'campSynthese', dock: 'top',
+            style: 'padding:8px 4px;background:#fafafa;border-bottom:1px solid #eee', html: '' }],
         columns: [
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
             { text: 'Canal', dataIndex: 'canal', width: 70, renderer: function (v) {

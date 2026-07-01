@@ -72,6 +72,18 @@ public class EnvoiProposeResource {
         }
     }
 
+    @DELETE
+    @Path("/{id}")
+    @Secured(menu = "marketing", action = "SUPPRIMER")
+    public Response supprimer(@PathParam("id") Long id) {
+        try {
+            service.supprimer(id);
+            return Response.noContent().build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", ex.getMessage())).build();
+        }
+    }
+
     @POST
     @Path("/{id}/rejeter")
     @Secured(menu = "marketing")
