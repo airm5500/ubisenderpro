@@ -1326,13 +1326,38 @@ Usp.dashboardChart._build = function () {
     };
 };
 
-/* Préférences d'affichage du tableau de bord (par utilisateur, en localStorage). */
+/* Préférences d'affichage du tableau de bord.
+ * Deux niveaux : personnalisation de l'utilisateur (localStorage), sinon la
+ * configuration PAR DÉFAUT enregistrée en base (paramètre dashboard.prefs_defaut,
+ * définie par un ADMIN et partagée par tous les utilisateurs). */
 Usp.CLE_DASH = 'usp_dash_prefs';
+Usp.PARAM_DASH_DEFAUT = 'dashboard.prefs_defaut';
+Usp._dashDefaut = null; // défaut serveur (chargé au 1er affichage du tableau de bord)
+
 Usp.lireDashPrefs = function () {
-    try { return JSON.parse(localStorage.getItem(Usp.CLE_DASH)) || {}; } catch (e) { return {}; }
+    try {
+        var brut = localStorage.getItem(Usp.CLE_DASH);
+        if (brut) { return JSON.parse(brut) || {}; }
+    } catch (e) { /* stockage indisponible */ }
+    return Usp._dashDefaut || {};
 };
 Usp.ecrireDashPrefs = function (p) {
     try { localStorage.setItem(Usp.CLE_DASH, JSON.stringify(p)); } catch (e) { /* ignore */ }
+};
+Usp.effacerDashPrefs = function () {
+    try { localStorage.removeItem(Usp.CLE_DASH); } catch (e) { /* ignore */ }
+};
+
+/* Charge (une fois) la configuration par défaut depuis la base, puis rappelle cb. */
+Usp.chargerDashDefaut = function (cb) {
+    if (Usp._dashDefaut !== null) { if (cb) { cb(); } return; }
+    Usp.ajax({ url: '/parametres/' + Usp.PARAM_DASH_DEFAUT, method: 'GET',
+        success: function (resp) {
+            var v = (Ext.decode(resp.responseText) || {}).valeur;
+            try { Usp._dashDefaut = v ? JSON.parse(v) : {}; } catch (e) { Usp._dashDefaut = {}; }
+            if (cb) { cb(); }
+        },
+        failure: function () { Usp._dashDefaut = {}; if (cb) { cb(); } } });
 };
 
 /* ---------- Tableau de bord ---------- */
@@ -1499,38 +1524,63 @@ Usp.dashboardPanel = function () {
         var basculerTout = function (tp, etat) {
             tp.getStore().getRootNode().cascadeBy(function (n) { if (!n.isRoot()) { n.set('checked', etat); } });
         };
+        // Collecte l'état courant de l'arbre en objet de préférences.
+        var collecter = function () {
+            var ordre = [], caches = {}, cachesItems = {}, ordreItems = {};
+            tree.getStore().getRootNode().eachChild(function (sec) {
+                var titre = sec.get('titre');
+                ordre.push(titre);
+                if (!sec.get('checked')) { caches[titre] = true; }
+                var cles = [];
+                sec.eachChild(function (it) {
+                    cles.push(it.get('cle'));
+                    if (!it.get('checked')) { cachesItems[it.get('cle')] = true; }
+                });
+                ordreItems[titre] = cles;
+            });
+            return { ordre: ordre, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems };
+        };
+        var estAdmin = !!(Usp.user && (Usp.user.roles || []).indexOf('ADMIN') !== -1);
         Ext.create('Ext.window.Window', {
             title: 'Personnaliser le tableau de bord', width: 460,
             height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: true, layout: 'fit',
             items: [tree],
             buttons: [
-                { text: 'Réinitialiser', handler: function (b) {
-                    Usp.ecrireDashPrefs({}); b.up('window').close(); rendre(_dernier); } },
+                { text: 'Revenir au défaut', tooltip: 'Efface votre personnalisation : la configuration par défaut (base) s\'applique',
+                  handler: function (b) {
+                    Usp.effacerDashPrefs(); b.up('window').close(); rendre(_dernier); } },
+                // ADMIN : enregistre cette configuration comme défaut pour TOUS (en base).
+                { text: '💾 Définir comme défaut (tous)', hidden: !estAdmin,
+                  tooltip: 'Enregistre cette configuration en base : appliquée à tous les utilisateurs sans personnalisation',
+                  handler: function (b) {
+                    var prefs = collecter();
+                    var win = b.up('window');
+                    Usp.ajax({ url: '/parametres/' + Usp.PARAM_DASH_DEFAUT, method: 'PUT',
+                        jsonData: { valeur: JSON.stringify(prefs),
+                            description: 'Configuration par défaut du tableau de bord', categorie: 'GENERAL' },
+                        success: function () {
+                            Usp._dashDefaut = prefs;
+                            win.close(); rendre(_dernier);
+                            Usp.toast('Configuration par défaut enregistrée pour tous les utilisateurs.');
+                        },
+                        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                } },
                 '->',
-                { text: 'Enregistrer', handler: function (b) {
-                    var ordre = [], caches = {}, cachesItems = {}, ordreItems = {};
-                    tree.getStore().getRootNode().eachChild(function (sec) {
-                        var titre = sec.get('titre');
-                        ordre.push(titre);
-                        if (!sec.get('checked')) { caches[titre] = true; }
-                        var cles = [];
-                        sec.eachChild(function (it) {
-                            cles.push(it.get('cle'));
-                            if (!it.get('checked')) { cachesItems[it.get('cle')] = true; }
-                        });
-                        ordreItems[titre] = cles;
-                    });
-                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems });
+                { text: 'Enregistrer (pour moi)', handler: function (b) {
+                    Usp.ecrireDashPrefs(collecter());
                     b.up('window').close(); rendre(_dernier);
                 } }
             ]
         }).show();
     }
     function charger() {
-        Usp.ajax({
-            url: '/dashboard', method: 'GET',
-            success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
-            failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+        // Configuration par défaut (base) chargée d'abord, puis les indicateurs.
+        Usp.chargerDashDefaut(function () {
+            Usp.ajax({
+                url: '/dashboard', method: 'GET',
+                success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
+                failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+            });
         });
         if (graphe && graphe.serieStore) { graphe.serieStore.load(); }
     }
