@@ -1344,8 +1344,8 @@ Usp.dashboardPanel = function () {
         // overflow-x caché : pas de scroll horizontal en bas.
         bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: items,
         tools: [
-            { type: 'gear', tooltip: 'Personnaliser (afficher / masquer / réordonner)', handler: function () { personnaliser(); } },
-            { type: 'refresh', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }
+            { type: 'gear', margin: '0 10 0 0', tooltip: 'Personnaliser (afficher / masquer / réordonner)', handler: function () { personnaliser(); } },
+            { type: 'refresh', margin: '0 4 0 0', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }
         ]
     });
     var SECTIONS = [
@@ -1402,11 +1402,12 @@ Usp.dashboardPanel = function () {
         var p = Usp.lireDashPrefs();
         var ordre = p.ordre || [];
         var caches = p.caches || {};
+        var cachesItems = p.cachesItems || {};
         var parTitre = {}; SECTIONS.forEach(function (s) { parTitre[s.titre] = s; });
         var out = [];
         ordre.forEach(function (t) { if (parTitre[t]) { out.push(parTitre[t]); delete parTitre[t]; } });
         SECTIONS.forEach(function (s) { if (parTitre[s.titre]) { out.push(s); } });
-        return { liste: out, caches: caches };
+        return { liste: out, caches: caches, cachesItems: cachesItems };
     }
     var _dernier = {};
     function rendre(d) {
@@ -1415,48 +1416,74 @@ Usp.dashboardPanel = function () {
         var html = '';
         conf.liste.forEach(function (sec) {
             if (conf.caches[sec.titre]) { return; } // section masquée
+            // Indicateurs visibles de la section (hors ceux décochés).
+            var visibles = sec.items.filter(function (it) { return !conf.cachesItems[it.k]; });
+            if (!visibles.length) { return; } // section vide -> masquée
             html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
                 'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
             html += '<div style="margin-bottom:14px">';
-            sec.items.forEach(function (it) { html += carte(it, (_dernier || {})[it.k]); });
+            visibles.forEach(function (it) { html += carte(it, (_dernier || {})[it.k]); });
             html += '</div>';
         });
-        if (!html) { html = '<div style="color:#999;padding:10px">Toutes les sections sont masquées. ' +
+        if (!html) { html = '<div style="color:#999;padding:10px">Tous les indicateurs sont masqués. ' +
             'Cliquez sur ⚙ pour en afficher.</div>'; }
         cartes.update(html);
     }
 
-    // Fenêtre de personnalisation : cases afficher/masquer + réordonnancement.
+    // Fenêtre de personnalisation : arbre à cases (sections + indicateurs), réordonnancement des sections.
     function personnaliser() {
         var conf = sectionsOrdonnees();
-        var pstore = Ext.create('Ext.data.Store', { fields: ['titre', 'afficher'],
-            data: conf.liste.map(function (s) { return { titre: s.titre, afficher: !conf.caches[s.titre] }; }) });
-        var deplacer = function (grid, sens) {
-            var r = grid.getSelectionModel().getSelection()[0];
-            if (!r) { return; }
-            var i = pstore.indexOf(r), j = i + sens;
-            if (j < 0 || j >= pstore.getCount()) { return; }
-            pstore.remove(r); pstore.insert(j, r); grid.getSelectionModel().select(r);
+        var racine = { expanded: true, children: conf.liste.map(function (s) {
+            return {
+                titre: s.titre, text: s.titre, checked: !conf.caches[s.titre],
+                expanded: true, iconCls: 'x-tree-noicon',
+                children: s.items.map(function (it) {
+                    return { cle: it.k, text: it.icon + ' ' + it.lib, checked: !conf.cachesItems[it.k],
+                        leaf: true, iconCls: 'x-tree-noicon' };
+                })
+            };
+        }) };
+        var tree = Ext.create('Ext.tree.Panel', {
+            itemId: 'tree', rootVisible: false, useArrows: true, border: false,
+            store: Ext.create('Ext.data.TreeStore', { fields: ['text', 'titre', 'cle', 'checked'], root: racine }),
+            tbar: [
+                { text: '▲ Monter la section', handler: function (b) { deplacer(b.up('treepanel'), -1); } },
+                { text: '▼ Descendre la section', handler: function (b) { deplacer(b.up('treepanel'), 1); } },
+                '->',
+                { text: 'Tout cocher', handler: function (b) { basculerTout(b.up('treepanel'), true); } },
+                { text: 'Tout décocher', handler: function (b) { basculerTout(b.up('treepanel'), false); } }
+            ]
+        });
+        var deplacer = function (tp, sens) {
+            var sel = tp.getSelectionModel().getSelection()[0];
+            var root = tp.getStore().getRootNode();
+            if (!sel || sel.parentNode !== root) { Ext.Msg.alert('Info', 'Sélectionnez une section (ligne de titre).'); return; }
+            if (sens < 0 && sel.previousSibling) { root.insertBefore(sel, sel.previousSibling); }
+            else if (sens > 0 && sel.nextSibling) {
+                var apres = sel.nextSibling.nextSibling;
+                if (apres) { root.insertBefore(sel, apres); } else { root.appendChild(sel); }
+            }
+            tp.getSelectionModel().select(sel);
+        };
+        var basculerTout = function (tp, etat) {
+            tp.getStore().getRootNode().cascadeBy(function (n) { if (!n.isRoot()) { n.set('checked', etat); } });
         };
         Ext.create('Ext.window.Window', {
-            title: 'Personnaliser le tableau de bord', width: 420, height: 420, modal: true, layout: 'fit',
-            items: [{ xtype: 'grid', itemId: 'g', store: pstore, hideHeaders: false,
-                columns: [
-                    { xtype: 'checkcolumn', text: 'Afficher', dataIndex: 'afficher', width: 80 },
-                    { text: 'Section', dataIndex: 'titre', flex: 1 }
-                ],
-                tbar: [
-                    { text: '▲ Monter', handler: function (b) { deplacer(b.up('grid'), -1); } },
-                    { text: '▼ Descendre', handler: function (b) { deplacer(b.up('grid'), 1); } }
-                ] }],
+            title: 'Personnaliser le tableau de bord', width: 460,
+            height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: true, layout: 'fit',
+            items: [tree],
             buttons: [
                 { text: 'Réinitialiser', handler: function (b) {
                     Usp.ecrireDashPrefs({}); b.up('window').close(); rendre(_dernier); } },
                 '->',
                 { text: 'Enregistrer', handler: function (b) {
-                    var ordre = [], caches = {};
-                    pstore.each(function (r) { ordre.push(r.get('titre')); if (!r.get('afficher')) { caches[r.get('titre')] = true; } });
-                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches });
+                    var ordre = [], caches = {}, cachesItems = {};
+                    tree.getStore().getRootNode().eachChild(function (sec) {
+                        ordre.push(sec.get('titre'));
+                        if (!sec.get('checked')) { caches[sec.get('titre')] = true; }
+                        sec.eachChild(function (it) { if (!it.get('checked')) { cachesItems[it.get('cle')] = true; } });
+                    });
+                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches, cachesItems: cachesItems });
                     b.up('window').close(); rendre(_dernier);
                 } }
             ]
