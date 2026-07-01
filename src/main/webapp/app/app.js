@@ -176,7 +176,15 @@ Usp.ajax = function (options) {
     // Pastille active animée (effet « pace-maker ») + styles utilitaires.
     var css = '@keyframes uspPace{0%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}100%{transform:scale(1);opacity:1}}'
         + '.usp-pace{color:#25d366;display:inline-block;animation:uspPace 1.2s ease-in-out infinite}'
-        + '.usp-pace-tab{color:#d97757;display:inline-block;font-weight:bold;animation:uspPace 1.1s ease-in-out infinite}';
+        + '.usp-pace-tab{color:#d97757;display:inline-block;font-weight:bold;animation:uspPace 1.1s ease-in-out infinite}'
+        // Boutons icône du header : animation au survol.
+        + '.usp-icbtn .x-btn-inner,.usp-icbtn img{transition:transform .15s ease}'
+        + '.usp-icbtn:hover .x-btn-inner,.usp-icbtn:hover img{transform:scale(1.3)}'
+        + '.usp-logout-round .x-btn-button{border-radius:50%}'
+        // Cloche de notifications avec activité (pace-maker) + pastille de comptage.
+        + '.usp-notif-actif .x-btn-inner{animation:uspPace 1.1s ease-in-out infinite}'
+        + '.usp-notif-badge{background:#c62828;color:#fff;border-radius:9px;padding:0 5px;font-size:10px;'
+        + 'font-weight:bold;margin-left:3px;vertical-align:top}';
     var style = document.createElement('style');
     style.type = 'text/css';
     style.appendChild(document.createTextNode(css));
@@ -1742,6 +1750,68 @@ Usp.ouvrirVue = function (vue) {
     }
 };
 
+/* ---------- Centre de notifications ---------- */
+Usp.notifications = { _data: null, _win: null, _timer: null };
+
+/* Démarre le rafraîchissement périodique (~30 s) du centre de notifications. */
+Usp.notifications.demarrer = function () {
+    Usp.notifications.rafraichir();
+    if (!Usp.notifications._timer) {
+        Usp.notifications._timer = Ext.TaskManager.start({ interval: 30000, run: function () {
+            if (Usp.token) { Usp.notifications.rafraichir(); }
+        } });
+    }
+};
+
+Usp.notifications.rafraichir = function () {
+    Usp.ajax({ url: '/notifications', method: 'GET',
+        success: function (resp) {
+            var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+            Usp.notifications._data = d;
+            Usp.notifications.majBadge(d.total || 0);
+        } });
+};
+
+/* Met à jour la cloche : pastille de comptage + animation « pace-maker » si activité. */
+Usp.notifications.majBadge = function (total) {
+    var btn = Ext.ComponentQuery.query('#uspNotif')[0];
+    if (!btn) { return; }
+    btn.setText('🔔' + (total ? ' <span class="usp-notif-badge">' + total + '</span>' : ''));
+    if (total) { btn.addCls('usp-notif-actif'); } else { btn.removeCls('usp-notif-actif'); }
+};
+
+/* Clic sur une notification → va au menu/onglet concerné et ferme le volet. */
+Usp.notifications.aller = function (vue) {
+    if (Usp.notifications._win) { Usp.notifications._win.close(); }
+    Usp.ouvrirVue(vue);
+};
+
+Usp.notifications.ouvrir = function () {
+    var d = Usp.notifications._data || { groupes: [] };
+    var fdate = function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; };
+    var items = (d.groupes || []).map(function (g) {
+        var lignes = (g.items || []).map(function (it) {
+            return '<div class="usp-notif-item" onclick="Usp.notifications.aller(\'' + g.vue + '\')" ' +
+                'style="cursor:pointer;padding:3px 6px;border-bottom:1px solid #f0f0f0;font-size:12px">' +
+                Ext.String.htmlEncode(it.libelle || '') +
+                (it.date ? ' <span style="color:#999">' + fdate(it.date) + '</span>' : '') + '</div>';
+        }).join('') || '<div style="padding:6px;color:#999;font-size:12px">Aucun élément récent.</div>';
+        return {
+            xtype: 'panel', collapsible: true, collapsed: true, titleCollapse: true, margin: '0 0 4 0',
+            title: g.titre + ' (' + (g.count || 0) + ')',
+            tools: [{ type: 'right', tooltip: 'Ouvrir le menu', handler: function () { Usp.notifications.aller(g.vue); } }],
+            items: [{ xtype: 'component', html: lignes }]
+        };
+    });
+    Usp.notifications._win = Ext.create('Ext.window.Window', {
+        title: '🔔 Centre de notifications (' + (d.total || 0) + ')', width: 460,
+        height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: false, autoScroll: true,
+        bodyPadding: 8, layout: 'anchor', defaults: { anchor: '100%' }, items: items,
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { Usp.notifications.rafraichir(); Usp.notifications._win.close(); Usp.notifications.ouvrir(); } }]
+    });
+    Usp.notifications._win.show();
+};
+
 /* ---------- Viewport principal ---------- */
 Usp.showMain = function () {
     // Info-bulles au survol (data-qtip) — nécessaire pour les tooltips des grilles.
@@ -1779,12 +1849,17 @@ Usp.showMain = function () {
                       margin: '0 10 0 0',
                       tooltip: 'Discussions où le bot a passé la main — cliquez pour les afficher',
                       handler: function () { Usp.escalades.ouvrir(); } },
-                    { xtype: 'button', itemId: 'uspAbout', text: 'ℹ️ À propos', margin: '0 10 0 0',
-                      tooltip: 'Version de l\'application et développeur', handler: function () { Usp.apropos(); } },
+                    // Centre de notifications : cloche + pastille cumulée (animée s'il y a des notifs).
+                    { xtype: 'button', itemId: 'uspNotif', cls: 'usp-icbtn', margin: '0 6 0 0',
+                      text: '🔔', tooltip: 'Centre de notifications',
+                      handler: function () { Usp.notifications.ouvrir(); } },
+                    // À propos : icône seule, animée au survol.
+                    { xtype: 'button', itemId: 'uspAbout', cls: 'usp-icbtn', text: 'ℹ️', margin: '0 10 0 0',
+                      tooltip: 'À propos (version, développeur)', handler: function () { Usp.apropos(); } },
                     { xtype: 'component', itemId: 'uspHeaderAvatar', margin: '0 6 0 0',
                       html: Usp.avatarRond(Usp.user && Usp.user.photo) },
                     { xtype: 'tbtext', text: Usp.user ? 'Bienvenu(e), ' + Usp.user.nomComplet : '' },
-                    { tooltip: 'Déconnexion', cls: 'usp-logout',
+                    { tooltip: 'Déconnexion', cls: 'usp-logout usp-logout-round usp-icbtn',
                       text: '<img src="data:image/svg+xml,' +
                           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' " +
                           "stroke='%23c62828' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E" +
@@ -1831,6 +1906,8 @@ Usp.showMain = function () {
     });
     // Surveillance des escalades du bot (notification aux agents).
     Usp.escalades.demarrer();
+    // Centre de notifications : première charge + rafraîchissement périodique.
+    Usp.notifications.demarrer();
 };
 
 /* ------------------------------------------------------------------
