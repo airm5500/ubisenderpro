@@ -37,9 +37,25 @@ public class EnvoiProposeResource {
     @Path("/generer")
     @Secured(menu = "marketing")
     public Response generer() {
-        int crees = service.genererPropositions();
-        int expirees = service.expirerDepassees();
-        return Response.ok(Map.of("crees", crees, "expirees", expirees)).build();
+        // Renvoie aussi la liste des propositions nouvellement créées (aperçu / sélection).
+        return Response.ok(service.genererAvecApercu()).build();
+    }
+
+    /** Rejette en lot les propositions non conservées après l'aperçu de génération. */
+    @POST
+    @Path("/rejeter-lot")
+    @Secured(menu = "marketing")
+    public Response rejeterLot(Map<String, Object> body) {
+        List<Long> ids = new java.util.ArrayList<>();
+        Object raw = body == null ? null : body.get("ids");
+        if (raw instanceof List) {
+            for (Object o : (List<?>) raw) {
+                if (o instanceof Number) { ids.add(((Number) o).longValue()); }
+                else if (o != null) { try { ids.add(Long.valueOf(o.toString())); } catch (NumberFormatException ignore) { } }
+            }
+        }
+        String motif = body == null ? null : (String) body.get("motif");
+        return Response.ok(Map.of("rejetes", service.rejeterPlusieurs(ids, motif))).build();
     }
 
     @POST

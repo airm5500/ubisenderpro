@@ -159,6 +159,45 @@ public class EnvoiProposeService {
         return crees;
     }
 
+    /**
+     * Génère les propositions puis renvoie la liste des propositions <b>nouvellement
+     * créées</b> (pour un aperçu/sélection). L'utilisateur pourra ensuite écarter
+     * (rejeter) celles qu'il ne veut pas conserver.
+     */
+    public Map<String, Object> genererAvecApercu() {
+        Long maxAvant = em.createQuery("SELECT COALESCE(MAX(e.id), 0) FROM EnvoiPropose e", Long.class).getSingleResult();
+        int crees = genererPropositions();
+        int expirees = expirerDepassees();
+        List<EnvoiPropose> nouvelles = em.createQuery(
+                "SELECT e FROM EnvoiPropose e WHERE e.id > :m AND e.statut = 'PROPOSEE' ORDER BY e.datePrevue, e.id",
+                EnvoiPropose.class).setParameter("m", maxAvant).getResultList();
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (EnvoiPropose e : nouvelles) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", e.getId());
+            m.put("titre", e.getTitre());
+            m.put("type", e.getType());
+            m.put("source", e.getSource());
+            m.put("datePrevue", e.getDatePrevue());
+            items.add(m);
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("crees", crees);
+        res.put("expirees", expirees);
+        res.put("items", items);
+        return res;
+    }
+
+    /** Rejette plusieurs propositions (aperçu : celles non conservées). Renvoie le nombre traité. */
+    public int rejeterPlusieurs(List<Long> ids, String motif) {
+        if (ids == null) { return 0; }
+        int n = 0;
+        for (Long id : ids) {
+            try { rejeter(id, motif); n++; } catch (RuntimeException ignore) { /* déjà traité */ }
+        }
+        return n;
+    }
+
     /** Génère une proposition « anniversaires du jour » s'il existe des contacts éligibles. */
     private int genererAnniversaires(LocalDate today) {
         long n = compteAnniversairesEligibles(today.getDayOfMonth(), today.getMonthValue());
