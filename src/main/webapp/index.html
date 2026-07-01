@@ -76,6 +76,43 @@
            (classe .pl-animated-text--brand, cf. app/login.css) appliquée au
            rendu — plus besoin du pulse d'opacité usp-fade. */
 
+        /* ===== Barre latérale (menus) — Option C : teal assorti au header =====
+           Pur habillage du treepanel existant : la pastille animée (usp-pace),
+           la sélection et les permissions ne sont pas touchées. */
+        .usp-menu .x-panel-body,
+        .usp-menu .x-grid-view {
+            background: linear-gradient(180deg, #12a99e 0%, #0a8f86 60%, #087f77 100%) !important;
+            border: 0 !important;
+        }
+        .usp-menu .x-grid-cell {
+            background: transparent !important;
+            border-color: transparent !important;
+        }
+        .usp-menu .x-grid-cell-inner {
+            padding-top: 8px !important; padding-bottom: 8px !important;
+            transition: padding-left .12s ease;
+        }
+        .usp-menu .x-tree-node-text {
+            color: rgba(255,255,255,.92);
+            font-size: 13px;
+        }
+        /* Survol : voile blanc + léger décalage. */
+        .usp-menu .x-grid-row-over .x-grid-cell {
+            background: rgba(255,255,255,.14) !important;
+        }
+        .usp-menu .x-grid-row-over .x-grid-cell-inner { padding-left: 10px; }
+        /* Menu actif : carte blanche, texte teal en gras. */
+        .usp-menu .x-grid-row-selected .x-grid-cell,
+        .usp-menu .x-grid-row-focused .x-grid-cell {
+            background: #ffffff !important;
+            border-radius: 8px;
+        }
+        .usp-menu .x-grid-row-selected .x-tree-node-text,
+        .usp-menu .x-grid-row-focused .x-tree-node-text {
+            color: #0a8f86;
+            font-weight: bold;
+        }
+
         /* En-têtes de panneaux / grilles aux couleurs ubipharm */
         .x-panel-header-default {
             background: #0a8f86 !important;
