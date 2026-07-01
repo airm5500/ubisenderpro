@@ -733,10 +733,10 @@ Usp.marketing.propositionsGrid = function (statut, titre) {
                 }
             }
         },
-        tbar: ['->',
+        tbar: Usp.grilleFiltre(store, { champs: ['titre', 'type'], periode: true, dateChamp: 'datePrevue' }).concat(['->',
             { text: '🔄 Générer les propositions', tooltip: 'Régénère les propositions à partir des promotions', handler: generer },
             { text: '↻ Rafraîchir', handler: function () { store.load(); } }
-        ]
+        ])
     };
 };
 

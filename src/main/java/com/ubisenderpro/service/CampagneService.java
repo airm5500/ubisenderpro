@@ -34,13 +34,26 @@ public class CampagneService {
 
     /** Liste les campagnes, éventuellement filtrées par catégorie (ex. PROMOTION). */
     public List<Campagne> lister(String categorie) {
-        if (categorie == null || categorie.trim().isEmpty()) {
-            return em.createQuery("SELECT c FROM Campagne c ORDER BY c.createdAt DESC", Campagne.class)
-                    .getResultList();
+        List<Campagne> l = (categorie == null || categorie.trim().isEmpty())
+                ? em.createQuery("SELECT c FROM Campagne c ORDER BY c.createdAt DESC", Campagne.class).getResultList()
+                : em.createQuery("SELECT c FROM Campagne c WHERE c.categorie = :cat ORDER BY c.createdAt DESC", Campagne.class)
+                        .setParameter("cat", categorie).getResultList();
+        renseignerCreateur(l);
+        return l;
+    }
+
+    /** Renseigne le nom d'affichage du créateur (id -> nom complet / login). */
+    private void renseignerCreateur(List<Campagne> campagnes) {
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        for (Campagne c : campagnes) { if (c.getCreePar() != null) { ids.add(c.getCreePar()); } }
+        if (ids.isEmpty()) { return; }
+        java.util.Map<Long, String> noms = new java.util.HashMap<>();
+        for (Object[] r : em.createQuery(
+                "SELECT u.id, u.nomComplet, u.login FROM Utilisateur u WHERE u.id IN :ids", Object[].class)
+                .setParameter("ids", ids).getResultList()) {
+            noms.put((Long) r[0], r[1] != null ? (String) r[1] : (String) r[2]);
         }
-        return em.createQuery(
-                "SELECT c FROM Campagne c WHERE c.categorie = :cat ORDER BY c.createdAt DESC", Campagne.class)
-                .setParameter("cat", categorie).getResultList();
+        for (Campagne c : campagnes) { if (c.getCreePar() != null) { c.setCreateurNom(noms.get(c.getCreePar())); } }
     }
 
     public Optional<Campagne> parId(Long id) { return Optional.ofNullable(em.find(Campagne.class, id)); }

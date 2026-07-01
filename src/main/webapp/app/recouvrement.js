@@ -825,7 +825,14 @@ Usp.recouvrement.historiquePanel = function () {
             { text: 'Erreur', dataIndex: 'erreur', width: 200 },
             { text: 'Par', dataIndex: 'creePar', width: 110 }
         ],
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }]
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }, '-']
+            .concat(Usp.grilleFiltre(store, {
+                champs: ['destinataire', 'message', 'creePar'], periode: true, dateChamp: 'createdAt',
+                selects: [
+                    { field: 'canal', label: 'Canal', width: 110, options: [{ v: 'WHATSAPP', t: 'WhatsApp' }, { v: 'EMAIL', t: 'Email' }] },
+                    { field: 'statut', label: 'Statut', width: 110, options: [{ v: 'ENVOYE', t: 'Envoyé' }, { v: 'ECHOUE', t: 'Échoué' }] }
+                ]
+            }))
             .concat(Usp.export.boutons('Recouvrement - historique'))
     };
 };

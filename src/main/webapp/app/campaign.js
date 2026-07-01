@@ -249,7 +249,8 @@ Usp.campaign.tauxRenderer = function (v, m, rec) {
 /* ---------- Grille de suivi des campagnes ---------- */
 Usp.campaign.listPanel = function () {
     var store = Ext.create('Ext.data.Store', {
-        fields: ['id', 'nom', 'statut', 'canal', 'nbDestinataires', 'nbEnvoyes', 'nbDistribues', 'nbLus', 'nbEchoues'],
+        fields: ['id', 'nom', 'statut', 'canal', 'nbDestinataires', 'nbEnvoyes', 'nbDistribues', 'nbLus', 'nbEchoues',
+                 'dateProgrammee', 'creePar', 'createurNom'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/campaigns',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
@@ -270,6 +271,7 @@ Usp.campaign.listPanel = function () {
             { text: 'Échoués', dataIndex: 'nbEchoues', width: 75, align: 'right',
               renderer: Usp.campaign.compteurRenderer('#c62828') },
             { text: 'Taux', dataIndex: 'nbEnvoyes', width: 70, align: 'right', renderer: Usp.campaign.tauxRenderer },
+            { text: 'Par', dataIndex: 'createurNom', width: 110 },
             { text: 'Actions', width: 260, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
                   var s = '<span class="camp-details" title="Voir les destinataires" ' +
@@ -285,8 +287,15 @@ Usp.campaign.listPanel = function () {
         ],
         tbar: [
             Usp.permBtn('campaigns', 'CREER', { text: '➕ Nouvelle campagne', tooltip: 'Créer et lancer une nouvelle campagne', handler: function () { Usp.campaign.show(store); } }),
-            { text: 'Rafraîchir', handler: function () { store.load(); } }
-        ].concat(Usp.export.boutons('Campagnes')),
+            { text: 'Rafraîchir', handler: function () { store.load(); } }, '-'
+        ].concat(Usp.grilleFiltre(store, {
+            champs: ['nom', 'createurNom'], periode: true, dateChamp: 'dateProgrammee',
+            selects: [
+                { field: 'canal', label: 'Canal', width: 100, options: [{ v: 'WEB', t: 'WA Web' }, { v: 'API', t: 'API' }] },
+                { field: 'statut', label: 'Statut', width: 130,
+                  options: ['BROUILLON', 'PROGRAMMEE', 'EN_COURS', 'ENVOYEE', 'ANNULEE', 'TERMINEE'].map(function (s) { return { v: s, t: s }; }) }
+            ]
+        })).concat(Usp.export.boutons('Campagnes')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.camp-details')) {
