@@ -124,21 +124,30 @@
         /* ===== Onglets « dossier » (Option C) =====
            Pur habillage des classes x-tab : la pastille ✳ animée (usp-pace-tab)
            dans le libellé de l'onglet actif n'est pas touchée. */
-        .x-tab-bar-default { background: #e4eaf0 !important; background-image: none !important; }
-        .x-tab-bar-strip-default { background: #ffffff !important; border-color: #e4eaf0 !important; }
+        .x-tab-bar-default { background: #d9e2ea !important; background-image: none !important; }
+        .x-tab-bar-strip-default { background: #ffffff !important; border-color: #d9e2ea !important; }
         .x-tab-default {
-            background: #dfe7ee !important; background-image: none !important;
-            border: 1px solid #d0d9e2 !important; border-bottom: 0 !important;
+            background: #bfcedb !important; background-image: none !important;
+            border: 1px solid #a9bccb !important; border-bottom: 0 !important;
             border-radius: 10px 10px 0 0 !important;
             transition: background .12s ease;
         }
-        .x-tab-default .x-tab-inner { color: #5a6573 !important; }
-        .x-tab-default.x-tab-over { background: #eaf1f7 !important; }
+        .x-tab-default .x-tab-inner { color: #3f4e5c !important; font-weight: 600; }
+        .x-tab-default.x-tab-over { background: #d6e4ee !important; }
         .x-tab-default.x-tab-over .x-tab-inner { color: #0a8f86 !important; }
         .x-tab-default.x-tab-active {
             background: #ffffff !important;
-            box-shadow: 0 -2px 6px rgba(0,0,0,.06);
+            box-shadow: 0 -2px 6px rgba(0,0,0,.08);
         }
+
+        /* Bouton principal (créations « ➕ Nouveau… ») : dégradé teal bien visible. */
+        .usp-btn-pri, .usp-btn-pri.x-btn-default-small, .usp-btn-pri.x-btn-default-toolbar-small {
+            background: #0a8f86 !important;
+            background-image: linear-gradient(135deg, #12a99e, #0a8f86) !important;
+            border-color: #087f77 !important;
+        }
+        .usp-btn-pri .x-btn-inner { color: #ffffff !important; font-weight: bold; }
+        .usp-btn-pri.x-btn-over { background-image: linear-gradient(135deg, #16bcb0, #0c9c92) !important; }
         /* Onglet actif aux couleurs ubipharm */
         .x-tab-active .x-tab-inner { color: #0a8f86 !important; font-weight: bold; }
 

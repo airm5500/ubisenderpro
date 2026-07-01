@@ -1601,6 +1601,9 @@ Usp.permBtn = function (menu, action, cfg) {
         cfg.tooltip = (cfg.tooltip ? cfg.tooltip + ' — ' : '') + 'Droit non accordé (' + action + ')';
         // Bloque l'action au clic et informe l'utilisateur (il ne peut pas poursuivre).
         cfg.handler = function () { Usp.refusPermission(); };
+    } else if (/➕|^Nouve(au|lle)/.test(cfg.text || '')) {
+        // Bouton principal de création : mise en avant (dégradé teal).
+        cfg.cls = (cfg.cls ? cfg.cls + ' ' : '') + 'usp-btn-pri';
     }
     return cfg;
 };

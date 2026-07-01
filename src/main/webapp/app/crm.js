@@ -72,7 +72,7 @@ Usp.crm.panel = function () {
         title: 'Opportunités (pipeline)', layout: { type: 'hbox', align: 'stretch' },
         autoScroll: true, bodyStyle: 'background:#eceff1',
         tbar: [
-            { text: 'Nouvelle opportunité', handler: function () { Usp.crm.oppForm(reload); } },
+            { text: 'Nouvelle opportunité', cls: 'usp-btn-pri', handler: function () { Usp.crm.oppForm(reload); } },
             { text: 'Rafraîchir', handler: function () { reload(); } },
             '->', { xtype: 'tbtext', text: 'Glissez une carte d\'une colonne à l\'autre pour changer d\'étape' }
         ]

@@ -89,7 +89,7 @@ Usp.waweb.sessionsPanel = function () {
               } }
         ],
         tbar: [
-            { text: 'Nouveau compte', handler: function () {
+            { text: 'Nouveau compte', cls: 'usp-btn-pri', handler: function () {
                 Ext.Msg.prompt('Nouveau compte', 'Libellé :', function (b, val) {
                     if (b === 'ok' && val) {
                         Usp.ajax({ url: '/wa-web/sessions', method: 'POST', jsonData: { libelle: val },

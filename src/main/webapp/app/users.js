@@ -105,7 +105,7 @@ Usp.users.permissionsPanel = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouveau rôle', tooltip: 'Créer un nouveau rôle', handler: nouveau },
+            { text: '➕ Nouveau rôle', cls: 'usp-btn-pri', tooltip: 'Créer un nouveau rôle', handler: nouveau },
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }
         ],
         listeners: {
