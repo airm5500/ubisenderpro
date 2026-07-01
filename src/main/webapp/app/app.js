@@ -328,9 +328,10 @@ Usp.expirerSession = function () {
         + '.hdr-bell:hover{background:rgba(41,128,236,.45);transform:scale(1.06)}'
         + '.hdr-bell .ico{font-size:18px;line-height:1;color:#fff;display:inline-block}'
         + '.hdr-bell.actif .ico{animation:uspBell 1.1s ease-in-out infinite;transform-origin:center}'
-        + '.hdr-badge{position:absolute;top:-4px;right:-4px;background:#e74c3c;color:#fff;'
-        + 'border:1px solid #1b2a4a;border-radius:9px;font-size:10px;font-weight:bold;line-height:1;'
-        + 'min-width:15px;height:15px;padding:1px 3px;display:flex;align-items:center;justify-content:center}'
+        + '.hdr-badge{position:absolute;top:0;right:-3px;background:#e74c3c;color:#fff;'
+        + 'border:1px solid #1b2a4a;border-radius:8px;font-size:9px;font-weight:bold;line-height:1;'
+        + 'min-width:14px;height:14px;padding:0 3px;display:flex;align-items:center;justify-content:center;'
+        + 'box-sizing:border-box}'
         // Bouton déconnexion : rond, rouge, bien visible.
         + '.hdr-logout{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
         + 'border-radius:50%;background:#e74c3c;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(231,76,60,.5);'
