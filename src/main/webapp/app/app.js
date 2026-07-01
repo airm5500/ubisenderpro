@@ -175,7 +175,8 @@ Usp.ajax = function (options) {
     }
     // Pastille active animée (effet « pace-maker ») + styles utilitaires.
     var css = '@keyframes uspPace{0%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}100%{transform:scale(1);opacity:1}}'
-        + '.usp-pace{color:#25d366;display:inline-block;animation:uspPace 1.2s ease-in-out infinite}';
+        + '.usp-pace{color:#25d366;display:inline-block;animation:uspPace 1.2s ease-in-out infinite}'
+        + '.usp-pace-tab{color:#d97757;display:inline-block;font-weight:bold;animation:uspPace 1.1s ease-in-out infinite}';
     var style = document.createElement('style');
     style.type = 'text/css';
     style.appendChild(document.createTextNode(css));
@@ -1559,7 +1560,8 @@ Usp.tabPastille = function (tp, active) {
     if (!tp || !tp.items) { return; }
     tp.items.each(function (t) {
         if (t.baseTitle === undefined) { t.baseTitle = t.title; }
-        t.setTitle(t.baseTitle + (t === active ? ' <span class="usp-pace">●</span>' : ''));
+        // Onglet actif : sunburst orange animé (distinct du point vert des menus).
+        t.setTitle(t.baseTitle + (t === active ? ' <span class="usp-pace-tab">✳</span>' : ''));
     });
 };
 Usp.tabListeners = {
