@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Unité de persistance des tests d'intégration : EclipseLink en RESOURCE_LOCAL
+     contre la MariaDB éphémère démarrée par Testcontainers (URL fournie à
+     l'exécution). Le schéma vient exclusivement des migrations Flyway. -->
+<persistence version="2.2"
+             xmlns="http://xmlns.jcp.org/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence
+                                 http://xmlns.jcp.org/xml/ns/persistence/persistence_2_2.xsd">
+    <persistence-unit name="ubisenderproTestPU" transaction-type="RESOURCE_LOCAL">
+        <provider>org.eclipse.persistence.jpa.PersistenceProvider</provider>
+        <class>com.ubisenderpro.entity.Client</class>
+        <class>com.ubisenderpro.entity.RecFiche</class>
+        <class>com.ubisenderpro.entity.RecCreance</class>
+        <class>com.ubisenderpro.entity.RecPaiement</class>
+        <class>com.ubisenderpro.entity.RecPromesse</class>
+        <class>com.ubisenderpro.entity.Menu</class>
+        <class>com.ubisenderpro.entity.MenuAction</class>
+        <class>com.ubisenderpro.entity.RolePermission</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+        <properties>
+            <property name="javax.persistence.jdbc.driver" value="org.mariadb.jdbc.Driver"/>
+            <!-- Sans plateforme explicite, EclipseLink ne reconnaît pas MariaDB et
+                 simule les identités via une table SEQUENCE inexistante. -->
+            <property name="eclipselink.target-database" value="MySQL"/>
+            <property name="eclipselink.weaving" value="false"/>
+            <property name="eclipselink.logging.level" value="WARNING"/>
+        </properties>
+    </persistence-unit>
+</persistence>

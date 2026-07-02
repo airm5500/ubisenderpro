@@ -22,13 +22,18 @@ jobs:
           java-version: '11'
           cache: maven
 
-      - name: Compilation + tests
-        run: mvn -B --no-transfer-progress test
+      # « verify » enchaîne les tests unitaires (surefire) puis les tests
+      # d'intégration Testcontainers (*IT, failsafe) — Docker est fourni
+      # par les runners GitHub.
+      - name: Compilation + tests unitaires et d'intégration
+        run: mvn -B --no-transfer-progress verify
 
       - name: Rapports de tests (en cas d'échec)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: rapports-surefire
-          path: target/surefire-reports/
+          name: rapports-de-tests
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
           retention-days: 7
