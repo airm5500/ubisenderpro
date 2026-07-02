@@ -1,0 +1,142 @@
+package com.ubisenderpro.service;
+
+import com.ubisenderpro.dto.ImportClientRequest;
+import com.ubisenderpro.dto.ImportReport;
+import com.ubisenderpro.importer.PhoneNormalizer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+import javax.persistence.EntityManager;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Robustesse face aux saisies hasardeuses (« l'utilisateur peut taper
+ * n'importe quoi ») : aucune de ces entrées ne doit lever d'exception non
+ * contrôlée ; le résultat doit être un rejet propre ou une normalisation.
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class SaisieHasardeuseTest {
+
+    @Mock
+    private EntityManager em;
+    @Mock
+    private ClientService clientService;
+
+    @InjectMocks
+    private RecImportService recImportService;
+
+    @InjectMocks
+    private ReferentielGeoService referentielGeoService;
+
+    /* ------------------- Numéros de téléphone ------------------- */
+
+    @Test
+    void telephoneEntreesFollesNeLeventJamaisDException() {
+        String[] folles = {
+            null, "", "   ", "abc", "\uD83D\uDE00\uD83D\uDCF1", "'; DROP TABLE usp_client;--",
+            "<script>alert(1)</script>", "+++++", "0000000000000000000000000",
+            "07-07 07 07\t07\n", "\u0660\u0667\u0660\u0667\u0660\u0667\u0660\u0667", // chiffres arabes
+            new String(new char[10000]).replace('\0', '9'), // 10 000 chiffres
+            "\u0000\u0001\u0002", "NaN", "-225070000000"
+        };
+        for (String brut : folles) {
+            PhoneNormalizer.Result r = assertDoesNotThrow(
+                    () -> PhoneNormalizer.normaliser(brut, "225"),
+                    "Ne doit pas planter pour : " + brut);
+            assertNotNull(r, "Résultat attendu pour : " + brut);
+            // Un numéro invalide doit être signalé, pas accepté silencieusement.
+            if (r.valide && r.valeurNormalisee != null) {
+                assertTrue(r.valeurNormalisee.matches("[0-9]+"),
+                        "La forme normalisée ne doit contenir que des chiffres : " + r.valeurNormalisee);
+            }
+        }
+    }
+
+    @Test
+    void telephoneNominalToujoursNormalise() {
+        PhoneNormalizer.Result r = PhoneNormalizer.normaliser("+225 07 00 00 00 00", "225");
+        assertTrue(r.valide);
+        assertEquals("2250700000000", r.valeurNormalisee);
+    }
+
+    /* --------------- Import recouvrement (contenu texte) --------------- */
+
+    @Test
+    void importRecouvrementContenusFousSansException() {
+        String[] contenus = {
+            null, "", ";;;;;;", "\n\n\n", "une seule cellule",
+            "numero_client;montant\n'; DROP TABLE x;--;99999999999999999999",
+            "numero_client;encours_initial\nC1;pas-un-nombre",
+            "numero_client;date_paiement;montant\nC1;31/02/2026;12,5",
+            "numero_client\n" + new String(new char[50000]).replace('\0', 'A')
+        };
+        for (String contenu : contenus) {
+            assertDoesNotThrow(() -> recImportService.importerFiches(contenu),
+                    "importerFiches ne doit pas planter");
+            assertDoesNotThrow(() -> recImportService.importerCreances(contenu),
+                    "importerCreances ne doit pas planter");
+            assertDoesNotThrow(() -> recImportService.importerPaiements(contenu),
+                    "importerPaiements ne doit pas planter");
+        }
+    }
+
+    /* --------------- Assistant d'import (fichier + mapping) --------------- */
+
+    @Test
+    void assistantImportBase64InvalideRejetePropre() {
+        ImportClientRequest req = new ImportClientRequest();
+        req.setNomFichier("test.csv");
+        req.setFichierBase64("%%%pas-du-base64%%%");
+        ImportReport r = assertDoesNotThrow(() -> recImportService.importerFichesAssistant(req));
+        assertFalse(r.getErreurs().isEmpty(), "Une erreur de lecture doit être rapportée");
+    }
+
+    @Test
+    void assistantImportCsvPiegeCompteSansPlanter() {
+        // CSV lisible mais piégé : XSS, colonnes en trop, ligne vide.
+        String csv = "code;libelle\n"
+                + "<img src=x onerror=alert(1)>;PAYS PIEGE\n"
+                + ";\n"
+                + "AB;OK;COLONNE_EN_TROP\n";
+        ImportClientRequest req = new ImportClientRequest();
+        req.setNomFichier("piege.csv");
+        req.setSeparateur(";");
+        req.setSimulation(true); // parcours de parsing complet, sans écriture
+        req.setFichierBase64(Base64.getEncoder().encodeToString(csv.getBytes(StandardCharsets.UTF_8)));
+        ImportReport r = assertDoesNotThrow(() -> referentielGeoService.importerAssistant("PAYS", req));
+        assertTrue(r.getLignesLues() >= 1, "Le fichier doit être lu");
+    }
+
+    @Test
+    void assistantImportCsvMalformeRejeteProprement() {
+        // Guillemet non fermé : le fichier est illisible -> rejet PROPRE en bloc
+        // (rapport d'erreur explicite), jamais d'exception non contrôlée.
+        String csv = "code;libelle\n\"CI;COTE D'IVOIRE\n";
+        ImportClientRequest req = new ImportClientRequest();
+        req.setNomFichier("malforme.csv");
+        req.setSeparateur(";");
+        req.setSimulation(true);
+        req.setFichierBase64(Base64.getEncoder().encodeToString(csv.getBytes(StandardCharsets.UTF_8)));
+        ImportReport r = assertDoesNotThrow(() -> referentielGeoService.importerAssistant("PAYS", req));
+        assertTrue(r.getLignesLues() == 0 || !r.getErreurs().isEmpty(),
+                "Fichier illisible : rejet propre attendu (0 ligne ou erreur rapportée)");
+    }
+
+    @Test
+    void assistantImportTypeReferentielInconnuRefuse() {
+        ImportClientRequest req = new ImportClientRequest();
+        req.setFichierBase64(Base64.getEncoder().encodeToString("libelle\nX".getBytes(StandardCharsets.UTF_8)));
+        // Un type non prévu (tentative de manipulation d'URL) doit être rejeté proprement.
+        assertThrows(ValidationException.class,
+                () -> referentielGeoService.importerAssistant("../../etc", req));
+    }
+}

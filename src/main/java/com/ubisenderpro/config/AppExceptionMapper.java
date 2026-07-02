@@ -73,6 +73,27 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
                     .type(MediaType.APPLICATION_JSON).entity(body).build();
         }
 
+        // Erreur de format JSON (ex. lettres dans un champ nombre/date) : message clair
+        // avec le champ fautif, plutôt qu'un échec technique opaque.
+        com.fasterxml.jackson.databind.JsonMappingException jme =
+                chercher(ex, com.fasterxml.jackson.databind.JsonMappingException.class);
+        if (jme != null) {
+            String champ = null;
+            if (jme.getPath() != null && !jme.getPath().isEmpty()) {
+                champ = jme.getPath().get(jme.getPath().size() - 1).getFieldName();
+            }
+            String message = champ != null
+                    ? "La valeur saisie pour « " + champ + " » n'est pas au bon format (nombre ou date attendu)."
+                    : "Le format des données envoyées est invalide. Vérifiez les champs numériques et les dates.";
+            LOG.warning("FORMAT_KO chemin=/" + chemin + (champ != null ? " champ=" + champ : ""));
+            auditService.tracer(auth, "VALIDATION_REFUS", "Saisie", null, message);
+            Map<String, Object> corpsJson = new LinkedHashMap<>();
+            corpsJson.put("erreur", message);
+            if (champ != null) { corpsJson.put("champ", champ); }
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .type(MediaType.APPLICATION_JSON).entity(corpsJson).build();
+        }
+
         // Violation de contrainte BDD (NOT NULL, doublon, clé étrangère) : message clair
         // adapté au menu + log précis, plutôt qu'un message technique opaque.
         String sql = messageSql(ex);

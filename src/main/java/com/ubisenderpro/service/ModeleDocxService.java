@@ -115,7 +115,7 @@ public class ModeleDocxService {
             appliquerRetouches(doc, m);
             if ((m.getNom() == null || m.getNom().isEmpty()) && (m.getCorps() == null || m.getCorps().isEmpty())) {
                 throw new ValidationException("fichier",
-                        "Ce fichier .docx n'est pas un modèle UbiSenderPro reconnaissable.");
+                        "Ce fichier .docx n'est pas un modèle UbiSmartCRM Pro reconnaissable.");
             }
             if (m.getCorps() == null) { m.setCorps(""); }
             return m;

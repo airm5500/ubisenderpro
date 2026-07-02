@@ -18,9 +18,9 @@ import java.util.Map;
 public class AboutResource {
 
     /** Nom de l'application. */
-    public static final String APPLICATION = "UbiSenderPro";
+    public static final String APPLICATION = "UbiSmartCRM Pro";
     /** Version applicative (à mettre à jour à chaque livraison). */
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "2.0.0";
     /** Développeur (renseigné une seule fois ici, rappelé dans « À propos »). */
     public static final String DEVELOPPEUR = "Hermann NZI";
     /** E-mail de contact du développeur. */

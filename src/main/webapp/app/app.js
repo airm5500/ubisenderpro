@@ -332,6 +332,9 @@ Usp.expirerSession = function () {
         + 'border:1px solid #1b2a4a;border-radius:8px;font-size:9px;font-weight:bold;line-height:1;'
         + 'min-width:14px;height:14px;padding:0 3px;display:flex;align-items:center;justify-content:center;'
         + 'box-sizing:border-box}'
+        // Cartes du tableau de bord (dégradé) : soulèvement au survol.
+        + '.usp-card-grad{transition:transform .12s ease, box-shadow .12s ease}'
+        + '.usp-card-grad:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.24)!important}'
         // Bouton déconnexion : rond, rouge, bien visible.
         + '.hdr-logout{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
         + 'border-radius:50%;background:#e74c3c;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(231,76,60,.5);'
@@ -461,7 +464,7 @@ Usp.showLogin = function () {
         '        <div class="pl-brand-row">',
         '          <div class="pl-brand">',
         '            <span class="pl-brand__mark" aria-hidden="true">✈</span>',
-        '            <span class="pl-brand__text pl-animated-text--brand">UbiSenderPro</span>',
+        '            <span class="pl-brand__text pl-animated-text--brand">UbiSmartCRM Pro</span>',
         '          </div>',
         '        </div>',
         '        <div class="pl-pharmacy-stack">',
@@ -472,7 +475,7 @@ Usp.showLogin = function () {
         '            </span>',
         '            <strong id="pl-pharma-name" class="pl-animated-text--pharmacy">Smart CRM</strong>',
         '          </div>',
-        '          <div class="pl-version-badge">UbiSenderPro · v1.0</div>',
+        '          <div class="pl-version-badge">UbiSmartCRM Pro · v2.0</div>',
         '        </div>',
         '      </aside>',
         '      <div class="pl-login-panel">',
@@ -1283,7 +1286,14 @@ Usp.dashboardChart._build = function () {
     var ligne = function (champ, titre, couleur) {
         return { type: 'line', axis: 'left', xField: 'date', yField: champ, title: titre, smooth: true,
             style: { stroke: couleur, 'stroke-width': 2 },
-            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur } };
+            markerConfig: { type: 'circle', size: 3, fill: couleur, stroke: couleur },
+            highlight: { size: 6, radius: 6 },
+            // Info-bulle au survol d'un point : série + jour + volume.
+            tips: { trackMouse: true, width: 220, height: 52, renderer: function (rec) {
+                var n = rec.get(champ) || 0;
+                this.update('<b style="color:' + couleur + '">' + titre + '</b><br>' +
+                    rec.get('date') + ' — <b>' + n + '</b> message(s)');
+            } } };
     };
     return {
         xtype: 'panel', title: 'Évolution', anchor: '100%', height: 360,
@@ -1323,33 +1333,67 @@ Usp.dashboardChart._build = function () {
     };
 };
 
-/* Préférences d'affichage du tableau de bord (par utilisateur, en localStorage). */
+/* Préférences d'affichage du tableau de bord.
+ * Deux niveaux : personnalisation de l'utilisateur (localStorage), sinon la
+ * configuration PAR DÉFAUT enregistrée en base (paramètre dashboard.prefs_defaut,
+ * définie par un ADMIN et partagée par tous les utilisateurs). */
 Usp.CLE_DASH = 'usp_dash_prefs';
+Usp.PARAM_DASH_DEFAUT = 'dashboard.prefs_defaut';
+Usp._dashDefaut = null; // défaut serveur (chargé au 1er affichage du tableau de bord)
+
 Usp.lireDashPrefs = function () {
-    try { return JSON.parse(localStorage.getItem(Usp.CLE_DASH)) || {}; } catch (e) { return {}; }
+    try {
+        var brut = localStorage.getItem(Usp.CLE_DASH);
+        if (brut) { return JSON.parse(brut) || {}; }
+    } catch (e) { /* stockage indisponible */ }
+    return Usp._dashDefaut || {};
 };
 Usp.ecrireDashPrefs = function (p) {
     try { localStorage.setItem(Usp.CLE_DASH, JSON.stringify(p)); } catch (e) { /* ignore */ }
 };
+Usp.effacerDashPrefs = function () {
+    try { localStorage.removeItem(Usp.CLE_DASH); } catch (e) { /* ignore */ }
+};
+
+/* Charge (une fois) la configuration par défaut depuis la base, puis rappelle cb. */
+Usp.chargerDashDefaut = function (cb) {
+    if (Usp._dashDefaut !== null) { if (cb) { cb(); } return; }
+    Usp.ajax({ url: '/parametres/' + Usp.PARAM_DASH_DEFAUT, method: 'GET',
+        success: function (resp) {
+            var v = (Ext.decode(resp.responseText) || {}).valeur;
+            try { Usp._dashDefaut = v ? JSON.parse(v) : {}; } catch (e) { Usp._dashDefaut = {}; }
+            if (cb) { cb(); }
+        },
+        failure: function () { Usp._dashDefaut = {}; if (cb) { cb(); } } });
+};
 
 /* ---------- Tableau de bord ---------- */
 Usp.dashboardPanel = function () {
-    var cartes = Ext.create('Ext.Component', { anchor: '100%',
+    var cartes = Ext.create('Ext.Component', {
         html: '<div style="color:#999">Chargement des indicateurs…</div>' });
     var graphe = Usp.dashboardChart();
-    var items = [cartes];
-    if (graphe) { items.push(graphe); }
+    // Disposition « métro » : tuiles en colonnes au centre, courbe d'évolution
+    // fixée en bas (toujours visible, pas de scroll global de la page).
+    var centre = {
+        region: 'center', xtype: 'panel', border: false, autoScroll: true, bodyPadding: 12,
+        bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: [cartes]
+    };
+    var items = [centre];
+    if (graphe) {
+        items.push(Ext.apply(graphe, {
+            region: 'south', height: 290, split: true, collapsible: true, titleCollapse: true,
+            anchor: undefined, margin: 0
+        }));
+    }
     var panel = Ext.create('Ext.panel.Panel', {
-        title: 'Tableau de bord', autoScroll: true, bodyPadding: 18, layout: 'anchor',
-        // overflow-x caché : pas de scroll horizontal en bas.
-        bodyStyle: 'background:#eef1f5;overflow-x:hidden', items: items,
+        title: 'Tableau de bord', layout: 'border', items: items,
         tools: [
             { type: 'gear', margin: '0 10 0 0', tooltip: 'Personnaliser (afficher / masquer / réordonner)', handler: function () { personnaliser(); } },
             { type: 'refresh', margin: '0 4 0 0', tooltip: 'Rafraîchir les indicateurs', handler: function () { charger(); } }
         ]
     });
     var SECTIONS = [
-        { titre: 'Clients & contacts', items: [
+        { titre: 'Clients & contacts', c: '#1976d2', items: [
             { k: 'comptesClients', lib: 'Comptes clients', icon: '🏢', couleur: '#1976d2', vue: 'clients' },
             { k: 'contacts', lib: 'Contacts', icon: '👥', couleur: '#1976d2', vue: 'clients' },
             { k: 'contactsWhatsapp', lib: 'Contacts WhatsApp', icon: '💬', couleur: '#25d366' },
@@ -1357,45 +1401,61 @@ Usp.dashboardPanel = function () {
             { k: 'contactsConsentement', lib: 'Consentement', icon: '✅', couleur: '#2e7d32' },
             { k: 'contactsDesabonnes', lib: 'Désabonnés', icon: '⛔', couleur: '#c62828' }
         ] },
-        { titre: 'Catalogue', items: [
+        { titre: 'Catalogue', c: '#6a1b9a', items: [
             { k: 'articles', lib: 'Articles', icon: '📦', couleur: '#6a1b9a', vue: 'catalogue' },
             { k: 'articlesActifs', lib: 'Articles actifs', icon: '🟢', couleur: '#2e7d32' },
             { k: 'articlesRupture', lib: 'En rupture', icon: '⚠️', couleur: '#ef6c00' }
         ] },
-        { titre: 'Messagerie', items: [
+        { titre: 'Messagerie', c: '#00897b', items: [
             { k: 'conversationsOuvertes', lib: 'Conversations ouvertes', icon: '💬', couleur: '#1976d2', vue: 'inbox' },
             { k: 'conversationsNonLues', lib: 'Non lues', icon: '🔔', couleur: '#ef6c00', vue: 'inbox' },
             { k: 'messagesEnvoyes', lib: 'Messages envoyés', icon: '📤', couleur: '#1976d2', vue: 'historique' },
             { k: 'sessionsWebConnectees', lib: 'Sessions Web connectées', icon: '🔗', couleur: '#25d366', vue: 'waweb' }
         ] },
-        { titre: 'Campagnes & envois', items: [
+        { titre: 'Campagnes & envois', c: '#0a8f86', items: [
             { k: 'campagnesEnCours', lib: 'Campagnes en cours', icon: '🚀', couleur: '#1976d2', vue: 'campaigns' },
             { k: 'campagnesTerminees', lib: 'Campagnes terminées', icon: '🏁', couleur: '#2e7d32', vue: 'campaigns' },
             { k: 'envoisMasse', lib: 'Envois de masse', icon: '📨', couleur: '#6a1b9a', vue: 'historique' },
             { k: 'modeles', lib: 'Modèles actifs', icon: '📝', couleur: '#455a64', vue: 'settings' }
         ] },
-        { titre: 'Commercial', items: [
+        { titre: 'Commercial', c: '#ef6c00', items: [
             { k: 'commandes', lib: 'Commandes', icon: '🛒', couleur: '#6a1b9a' },
             { k: 'opportunitesOuvertes', lib: 'Opportunités ouvertes', icon: '🎯', couleur: '#ef6c00', vue: 'crm' },
             { k: 'imports', lib: 'Imports', icon: '📥', couleur: '#455a64' }
         ] },
-        { titre: 'Activité & usage', items: [
+        { titre: 'Activité & usage', c: '#455a64', items: [
             { k: 'connexionsAujourdhui', lib: "Connexions aujourd'hui", icon: '🔑', couleur: '#1976d2', vue: 'users' },
             { k: 'utilisateursActifs7j', lib: 'Utilisateurs actifs (7 j)', icon: '👥', couleur: '#2e7d32', vue: 'users' },
             { k: 'sessionsEnCours', lib: 'Sessions en cours', icon: '🟢', couleur: '#00897b', vue: 'users' },
             { k: 'messagesEnvoyesAujourdhui', lib: "Messages envoyés aujourd'hui", icon: '📤', couleur: '#1976d2', vue: 'historique' }
         ] }
     ];
+    // Éclaircit une couleur hex (#rrggbb) d'un ratio 0..1, pour la 2e teinte du dégradé.
+    function eclaircir(hex, ratio) {
+        var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+        if (!m) { return hex; }
+        var n = parseInt(m[1], 16);
+        var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        r = Math.round(r + (255 - r) * ratio);
+        g = Math.round(g + (255 - g) * ratio);
+        b = Math.round(b + (255 - b) * ratio);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    // Carte pleine en dégradé (Option B), en pleine largeur de sa colonne :
+    // couleur de l'indicateur en fond, grande icône en filigrane, texte blanc.
+    // Clic = navigation (data-vue).
     function carte(it, val) {
-        var nav = it.vue ? ' data-vue="' + it.vue + '" style="cursor:pointer;' : ' style="';
-        return '<div class="usp-card"' + nav +
-            'position:relative;display:inline-block;vertical-align:top;width:200px;min-height:92px;margin:8px;' +
-            'padding:14px 16px;background:#fff;border-radius:10px;border-left:5px solid ' + it.couleur + ';' +
-            'box-shadow:0 1px 4px rgba(0,0,0,.08)">' +
-            '<div style="position:absolute;top:12px;right:14px;font-size:22px;opacity:.85">' + it.icon + '</div>' +
-            '<div style="font-size:30px;font-weight:bold;color:' + it.couleur + ';line-height:1.1">' +
+        var nav = it.vue ? ' data-vue="' + it.vue + '"' : '';
+        return '<div class="usp-card usp-card-grad"' + nav +
+            ' style="' + (it.vue ? 'cursor:pointer;' : '') +
+            'position:relative;display:block;min-height:76px;margin:8px 0 0;' +
+            'padding:11px 14px;border-radius:14px;overflow:hidden;color:#fff;' +
+            'background:linear-gradient(135deg,' + it.couleur + ',' + eclaircir(it.couleur, 0.35) + ');' +
+            'box-shadow:0 3px 10px rgba(0,0,0,.16)">' +
+            '<div style="position:absolute;right:-6px;bottom:-10px;font-size:54px;opacity:.22;pointer-events:none">' + it.icon + '</div>' +
+            '<div style="font-size:26px;font-weight:bold;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.15)">' +
             (val == null ? '–' : val) + '</div>' +
-            '<div style="font-size:12px;color:#5a6573;margin-top:6px">' + it.lib + '</div></div>';
+            '<div style="font-size:11.5px;opacity:.95;margin-top:5px">' + it.lib + '</div></div>';
     }
     // Sections ordonnées selon les préférences (les nouvelles s'ajoutent à la fin).
     function sectionsOrdonnees() {
@@ -1420,23 +1480,27 @@ Usp.dashboardPanel = function () {
         return liste;
     }
     var _dernier = {};
+    // Rendu « métro » en colonnes : une colonne par section (toute la largeur est
+    // utilisée), étiquette horizontale colorée en tête, tuiles empilées dessous.
     function rendre(d) {
         _dernier = d || _dernier;
         var conf = sectionsOrdonnees();
-        var html = '';
+        var cols = '';
         conf.liste.forEach(function (sec) {
             if (conf.caches[sec.titre]) { return; } // section masquée
             // Indicateurs de la section, ordonnés puis filtrés (hors ceux décochés).
             var visibles = itemsOrdonnes(sec, conf.ordreItems).filter(function (it) { return !conf.cachesItems[it.k]; });
             if (!visibles.length) { return; } // section vide -> masquée
-            html += '<div style="margin:6px 8px 2px;font-size:13px;font-weight:bold;color:#33404f;' +
-                'text-transform:uppercase;letter-spacing:.5px">' + sec.titre + '</div>';
-            html += '<div style="margin-bottom:14px">';
-            visibles.forEach(function (it) { html += carte(it, (_dernier || {})[it.k]); });
-            html += '</div>';
+            var col = '<div style="flex:1 1 0;min-width:168px">' +
+                '<div style="background:' + (sec.c || '#33404f') + ';color:#fff;font-size:11.5px;font-weight:bold;' +
+                'text-transform:uppercase;letter-spacing:.6px;padding:7px 12px;border-radius:9px;text-align:center;' +
+                'box-shadow:0 1px 3px rgba(0,0,0,.15)">' + sec.titre + '</div>';
+            visibles.forEach(function (it) { col += carte(it, (_dernier || {})[it.k]); });
+            cols += col + '</div>';
         });
-        if (!html) { html = '<div style="color:#999;padding:10px">Tous les indicateurs sont masqués. ' +
-            'Cliquez sur ⚙ pour en afficher.</div>'; }
+        var html = cols
+            ? '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' + cols + '</div>'
+            : '<div style="color:#999;padding:10px">Tous les indicateurs sont masqués. Cliquez sur ⚙ pour en afficher.</div>';
         cartes.update(html);
     }
 
@@ -1481,38 +1545,64 @@ Usp.dashboardPanel = function () {
         var basculerTout = function (tp, etat) {
             tp.getStore().getRootNode().cascadeBy(function (n) { if (!n.isRoot()) { n.set('checked', etat); } });
         };
+        // Collecte l'état courant de l'arbre en objet de préférences.
+        var collecter = function () {
+            var ordre = [], caches = {}, cachesItems = {}, ordreItems = {};
+            tree.getStore().getRootNode().eachChild(function (sec) {
+                var titre = sec.get('titre');
+                ordre.push(titre);
+                if (!sec.get('checked')) { caches[titre] = true; }
+                var cles = [];
+                sec.eachChild(function (it) {
+                    cles.push(it.get('cle'));
+                    if (!it.get('checked')) { cachesItems[it.get('cle')] = true; }
+                });
+                ordreItems[titre] = cles;
+            });
+            return { ordre: ordre, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems };
+        };
+        var estAdmin = !!(Usp.user && (Usp.user.roles || []).indexOf('ADMIN') !== -1);
         Ext.create('Ext.window.Window', {
-            title: 'Personnaliser le tableau de bord', width: 460,
+            // Assez large pour que tous les boutons du bas soient visibles sans coupe.
+            title: 'Personnaliser le tableau de bord', width: 640,
             height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: true, layout: 'fit',
             items: [tree],
             buttons: [
-                { text: 'Réinitialiser', handler: function (b) {
-                    Usp.ecrireDashPrefs({}); b.up('window').close(); rendre(_dernier); } },
+                { text: 'Revenir au défaut', tooltip: 'Efface votre personnalisation : la configuration par défaut (base) s\'applique',
+                  handler: function (b) {
+                    Usp.effacerDashPrefs(); b.up('window').close(); rendre(_dernier); } },
+                // ADMIN : enregistre cette configuration comme défaut pour TOUS (en base).
+                { text: '💾 Défaut (tous)', hidden: !estAdmin,
+                  tooltip: 'Enregistre cette configuration en base : appliquée à tous les utilisateurs sans personnalisation',
+                  handler: function (b) {
+                    var prefs = collecter();
+                    var win = b.up('window');
+                    Usp.ajax({ url: '/parametres/' + Usp.PARAM_DASH_DEFAUT, method: 'PUT',
+                        jsonData: { valeur: JSON.stringify(prefs),
+                            description: 'Configuration par défaut du tableau de bord', categorie: 'GENERAL' },
+                        success: function () {
+                            Usp._dashDefaut = prefs;
+                            win.close(); rendre(_dernier);
+                            Usp.toast('Configuration par défaut enregistrée pour tous les utilisateurs.');
+                        },
+                        failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                } },
                 '->',
-                { text: 'Enregistrer', handler: function (b) {
-                    var ordre = [], caches = {}, cachesItems = {}, ordreItems = {};
-                    tree.getStore().getRootNode().eachChild(function (sec) {
-                        var titre = sec.get('titre');
-                        ordre.push(titre);
-                        if (!sec.get('checked')) { caches[titre] = true; }
-                        var cles = [];
-                        sec.eachChild(function (it) {
-                            cles.push(it.get('cle'));
-                            if (!it.get('checked')) { cachesItems[it.get('cle')] = true; }
-                        });
-                        ordreItems[titre] = cles;
-                    });
-                    Usp.ecrireDashPrefs({ ordre: ordre, caches: caches, cachesItems: cachesItems, ordreItems: ordreItems });
+                { text: 'Enregistrer (pour moi)', handler: function (b) {
+                    Usp.ecrireDashPrefs(collecter());
                     b.up('window').close(); rendre(_dernier);
                 } }
             ]
         }).show();
     }
     function charger() {
-        Usp.ajax({
-            url: '/dashboard', method: 'GET',
-            success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
-            failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+        // Configuration par défaut (base) chargée d'abord, puis les indicateurs.
+        Usp.chargerDashDefaut(function () {
+            Usp.ajax({
+                url: '/dashboard', method: 'GET',
+                success: function (resp) { rendre(Ext.decode(resp.responseText) || {}); },
+                failure: function () { cartes.update('<div style="color:#a00">Indicateurs indisponibles.</div>'); }
+            });
         });
         if (graphe && graphe.serieStore) { graphe.serieStore.load(); }
     }
@@ -1583,6 +1673,9 @@ Usp.permBtn = function (menu, action, cfg) {
         cfg.tooltip = (cfg.tooltip ? cfg.tooltip + ' — ' : '') + 'Droit non accordé (' + action + ')';
         // Bloque l'action au clic et informe l'utilisateur (il ne peut pas poursuivre).
         cfg.handler = function () { Usp.refusPermission(); };
+    } else if (/➕|^Nouve(au|lle)/.test(cfg.text || '')) {
+        // Bouton principal de création : mise en avant (dégradé teal).
+        cfg.cls = (cfg.cls ? cfg.cls + ' ' : '') + 'usp-btn-pri';
     }
     return cfg;
 };
@@ -1680,7 +1773,7 @@ Usp.apropos = function () {
         Ext.Msg.show({
             title: 'À propos',
             msg: '<div style="padding:6px 2px;line-height:1.7">' +
-                 '<b>' + Ext.String.htmlEncode(a.application || 'UbiSenderPro') + '</b><br>' +
+                 '<b>' + Ext.String.htmlEncode(a.application || 'UbiSmartCRM Pro') + '</b><br>' +
                  'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
                  'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
                  'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b>' +
@@ -2191,6 +2284,11 @@ Usp.notifications.aller = function (vue) {
 };
 
 Usp.notifications.ouvrir = function () {
+    // Bascule : si le volet est déjà ouvert, un nouveau clic sur la cloche le ferme.
+    if (Usp.notifications._win) {
+        Usp.notifications._win.close();
+        return;
+    }
     var d = Usp.notifications._data || { groupes: [] };
     var fdate = function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; };
     // Dynamique : on n'affiche que les types ayant au moins un élément (pas de bloc vide).
@@ -2205,7 +2303,8 @@ Usp.notifications.ouvrir = function () {
                 (it.date ? ' <span style="color:#999">' + fdate(it.date) + '</span>' : '') + '</div>';
         }).join('') || '<div style="padding:6px;color:#999;font-size:12px">Aucun élément récent.</div>';
         return {
-            xtype: 'panel', collapsible: true, collapsed: false, titleCollapse: true, margin: '0 0 4 0',
+            // Sections repliées à l'ouverture : on déplie celle qu'on veut consulter.
+            xtype: 'panel', collapsible: true, collapsed: true, titleCollapse: true, margin: '0 0 4 0',
             title: g.titre + ' (' + (g.count || 0) + ')',
             tools: [{ type: 'right', tooltip: 'Ouvrir le menu', handler: function () { Usp.notifications.aller(g.vue); } }],
             items: [{ xtype: 'component', html: lignes }]
@@ -2217,11 +2316,18 @@ Usp.notifications.ouvrir = function () {
     }
     Usp.notifications._win = Ext.create('Ext.window.Window', {
         title: '🔔 Centre de notifications (' + (d.total || 0) + ')', width: 460,
-        height: Math.min(560, Ext.getBody().getViewSize().height - 60), modal: false, autoScroll: true,
+        height: Math.min(480, Ext.getBody().getViewSize().height - 80), modal: false, autoScroll: true,
         bodyPadding: 8, layout: 'anchor', defaults: { anchor: '100%' }, items: items,
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { Usp.notifications.rafraichir(); Usp.notifications._win.close(); Usp.notifications.ouvrir(); } }]
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { Usp.notifications.rafraichir(); Usp.notifications._win.close(); Usp.notifications.ouvrir(); } }],
+        // Référence nettoyée à la fermeture (croix, Échap ou re-clic sur la cloche).
+        listeners: { close: function () { Usp.notifications._win = null; } }
     });
     Usp.notifications._win.show();
+    // Positionne le volet juste SOUS la cloche (aligné à droite), pas au centre.
+    var cloche = Ext.ComponentQuery.query('#uspNotif')[0];
+    if (cloche && cloche.getEl()) {
+        Usp.notifications._win.alignTo(cloche.getEl(), 'tr-br', [0, 8]);
+    }
 };
 
 /* ---------- Viewport principal ---------- */
@@ -2266,7 +2372,7 @@ Usp.showMain = function () {
                 items: [
                     { xtype: 'tbtext', cls: 'usp-brand', text:
                         '<span class="usp-logo">' + Usp.LOGO + '</span>' +
-                        '<span class="usp-brand-text pl-animated-text--brand">UbiSenderPro</span>',
+                        '<span class="usp-brand-text pl-animated-text--brand">UbiSmartCRM Pro</span>',
                       listeners: { afterrender: function (c) {
                           // Même animation « vague » que l'accroche du login, appliquée au branding du header.
                           var el = c.getEl().dom.querySelector('.usp-brand-text');
@@ -2302,7 +2408,7 @@ Usp.showMain = function () {
             {
                 region: 'west',
                 title: 'Menu',
-                width: 220,
+                width: 236,
                 collapsible: true,
                 xtype: 'treepanel',
                 itemId: 'menuTree',

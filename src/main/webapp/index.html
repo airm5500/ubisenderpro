@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8"/>
-    <title>UbiSenderPro</title>
+    <title>UbiSmartCRM Pro</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2325d366'/%3E%3Ctext x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='white'%3EU%3C/text%3E%3C/svg%3E"/>
 
@@ -55,11 +55,11 @@
         @keyframes usp-escalade-pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
         .usp-escalade-badge { animation: usp-escalade-pulse 1.6s ease-in-out infinite; }
 
-        /* ===== Palette ubipharm (teal) — à valider ===== */
+        /* ===== Palette ubipharm — header bleu nuit (essai) ===== */
         .usp-header, .usp-header.x-toolbar-default {
-            background: #0a8f86 !important;
-            background-image: linear-gradient(180deg, #12a99e 0%, #0a8f86 100%) !important;
-            border-bottom: 2px solid #086d66 !important;
+            background: #05253d !important;
+            background-image: linear-gradient(180deg, #0a3a5e 0%, #05253d 100%) !important;
+            border-bottom: 2px solid #031a2c !important;
         }
         .usp-header .x-toolbar-text { color: #ffffff !important; }
         .usp-brand-text {
@@ -76,15 +76,108 @@
            (classe .pl-animated-text--brand, cf. app/login.css) appliquée au
            rendu — plus besoin du pulse d'opacité usp-fade. */
 
-        /* En-têtes de panneaux / grilles aux couleurs ubipharm */
-        .x-panel-header-default {
-            background: #0a8f86 !important;
+        /* ===== Barre latérale (menus) — Option C : teal assorti au header =====
+           Pur habillage du treepanel existant : la pastille animée (usp-pace),
+           la sélection et les permissions ne sont pas touchées. */
+        .usp-menu .x-panel-body,
+        .usp-menu .x-grid-view {
+            background: linear-gradient(180deg, #12a99e 0%, #0a8f86 60%, #087f77 100%) !important;
+            border: 0 !important;
+        }
+        .usp-menu .x-grid-cell {
+            background: transparent !important;
+            border-color: transparent !important;
+        }
+        .usp-menu .x-grid-cell-inner {
+            padding-top: 8px !important; padding-bottom: 8px !important;
+            transition: padding-left .12s ease;
+        }
+        .usp-menu .x-tree-node-text {
+            color: rgba(255,255,255,.92);
+            font-size: 13px;
+        }
+        /* Menu plat : on supprime l'indentation d'arbre (images « elbow ») pour
+           ramener les libellés vers la gauche et éviter la coupe des textes longs. */
+        .usp-menu .x-tree-elbow-img { display: none !important; width: 0 !important; }
+        /* Survol : voile blanc + léger décalage. */
+        .usp-menu .x-grid-row-over .x-grid-cell {
+            background: rgba(255,255,255,.14) !important;
+        }
+        .usp-menu .x-grid-row-over .x-grid-cell-inner { padding-left: 10px; }
+        /* Menu actif : carte blanche, texte teal en gras. */
+        .usp-menu .x-grid-row-selected .x-grid-cell,
+        .usp-menu .x-grid-row-focused .x-grid-cell {
+            background: #ffffff !important;
+            border-radius: 8px;
+        }
+        .usp-menu .x-grid-row-selected .x-tree-node-text,
+        .usp-menu .x-grid-row-focused .x-tree-node-text {
+            color: #0a8f86;
+            font-weight: bold;
+        }
+
+        /* ===== Fenêtres (Ext.window.Window) : bleu Neptune #3892d3 -> bleu ubipharm #05253d =====
+           Cadre + bandeau de titre des fenêtres (notifications, formulaires modaux,
+           boîtes de message). Pur habillage : icônes, tuiles et contenus inchangés. */
+        .x-window-default {
+            border-color: #05253d !important;
+            background: #05253d !important;
+        }
+        .x-window-header-default {
+            background: #05253d !important;
             background-image: none !important;
-            border-color: #086d66 !important;
+            border-color: #05253d !important;
+        }
+        .x-window-header-default .x-window-header-text-default,
+        .x-window-header-text-default { color: #ffffff !important; }
+        .x-window-body-default { border-color: #05253d !important; }
+
+        /* En-têtes de panneaux / grilles : bleu nuit ubipharm (assorti au header et aux fenêtres) */
+        .x-panel-header-default {
+            background: #05253d !important;
+            background-image: none !important;
+            border-color: #031a2c !important;
         }
         .x-panel-header-text-default, .x-panel-header-default .x-panel-header-text { color: #ffffff !important; }
+
+        /* ===== Onglets « dossier » (Option C) =====
+           Pur habillage des classes x-tab : la pastille ✳ animée (usp-pace-tab)
+           dans le libellé de l'onglet actif n'est pas touchée. */
+        .x-tab-bar-default { background: #d9e2ea !important; background-image: none !important; }
+        .x-tab-bar-strip-default { background: #ffffff !important; border-color: #d9e2ea !important; }
+        .x-tab-default {
+            background: #bfcedb !important; background-image: none !important;
+            border: 1px solid #a9bccb !important; border-bottom: 0 !important;
+            border-radius: 10px 10px 0 0 !important;
+            transition: background .12s ease;
+        }
+        .x-tab-default .x-tab-inner { color: #3f4e5c !important; font-weight: 600; }
+        .x-tab-default.x-tab-over { background: #d6e4ee !important; }
+        .x-tab-default.x-tab-over .x-tab-inner { color: #0a8f86 !important; }
+        .x-tab-default.x-tab-active {
+            background: #ffffff !important;
+            box-shadow: 0 -2px 6px rgba(0,0,0,.08);
+        }
+
+        /* Bouton principal (créations « ➕ Nouveau… ») : dégradé teal bien visible. */
+        .usp-btn-pri, .usp-btn-pri.x-btn-default-small, .usp-btn-pri.x-btn-default-toolbar-small {
+            background: #0a8f86 !important;
+            background-image: linear-gradient(135deg, #12a99e, #0a8f86) !important;
+            border-color: #087f77 !important;
+        }
+        .usp-btn-pri .x-btn-inner { color: #ffffff !important; font-weight: bold; }
+        .usp-btn-pri.x-btn-over { background-image: linear-gradient(135deg, #16bcb0, #0c9c92) !important; }
         /* Onglet actif aux couleurs ubipharm */
         .x-tab-active .x-tab-inner { color: #0a8f86 !important; font-weight: bold; }
+
+        /* Grilles : en-têtes de colonnes clairs + survol des lignes teinté teal léger
+           (le menu latéral garde son propre style, plus spécifique). */
+        .x-column-header, .x-column-header-default {
+            background: #f7f9fb !important; background-image: none !important;
+            border-bottom: 2px solid #e4e9ef !important;
+        }
+        .x-column-header-inner .x-column-header-text { color: #5a6573; font-weight: 600; }
+        .x-grid-row-over .x-grid-cell { background: #f2f7f6 !important; }
     </style>
 
     <script src="app/app.js"></script>

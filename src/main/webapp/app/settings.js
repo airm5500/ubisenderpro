@@ -32,7 +32,7 @@ Usp.settings.accountsPanel = function () {
               renderer: function (v) { return v ? '🧪 Oui' : 'Non'; } }
         ],
         tbar: [
-            { text: '➕ Nouveau compte', tooltip: 'Configurer un nouveau compte WhatsApp', handler: function () { Usp.settings.accountForm(store, null); } },
+            { text: '➕ Nouveau compte', cls: 'usp-btn-pri', tooltip: 'Configurer un nouveau compte WhatsApp', handler: function () { Usp.settings.accountForm(store, null); } },
             Usp.permBtn('settings', 'MODIFIER', { text: '✏️ Modifier', handler: function (b) {
                 var rec = b.up('grid').getSelectionModel().getSelection()[0];
                 if (!rec) { Ext.Msg.alert('Info', 'Sélectionnez un compte.'); return; }
@@ -133,7 +133,7 @@ Usp.settings.templatesPanel = function () {
               } }
         ],
         tbar: [
-            { text: '➕ Nouveau modèle', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } },
+            { text: '➕ Nouveau modèle', cls: 'usp-btn-pri', tooltip: 'Créer un nouveau modèle de message', handler: function () { Usp.settings.templateForm(store, null); } },
             { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer un .docx',
               listeners: { change: function (f) { Usp.settings.importerModeleDocx(f, store); } } }
         ],
@@ -632,7 +632,7 @@ Usp.settings.refGeoGrid = function (type, titre) {
               } }
         ],
         tbar: [
-            { text: '➕ Ajouter', handler: function () { form(null); } },
+            { text: '➕ Ajouter', cls: 'usp-btn-pri', handler: function () { form(null); } },
             '->',
             { text: '📥 Assistant d\'import', handler: function () { Usp.settings.importerRefGeo(type, store); } },
             { text: '🔄', tooltip: 'Rafraîchir', handler: function () { store.load(); } }
@@ -676,7 +676,7 @@ Usp.settings.importerModeleDocx = function (f, store) {
     var file = f.fileInputEl.dom.files[0];
     if (!file) { return; }
     if (!/\.docx$/i.test(file.name)) {
-        Ext.Msg.alert('Import', 'Veuillez choisir un fichier .docx exporté depuis UbiSenderPro.');
+        Ext.Msg.alert('Import', 'Veuillez choisir un fichier .docx exporté depuis UbiSmartCRM Pro.');
         f.reset();
         return;
     }
@@ -811,7 +811,7 @@ Usp.settings.botPanel = function () {
                   renderer: function () { return '<span class="faq-del" title="Supprimer" style="cursor:pointer;color:#c62828">🗑️</span>'; } }
               ],
               tbar: [
-                { text: '➕ Nouvelle entrée', tooltip: 'Ajouter une question/réponse', handler: function () { Usp.settings.faqForm(faqStore, null); } },
+                { text: '➕ Nouvelle entrée', cls: 'usp-btn-pri', tooltip: 'Ajouter une question/réponse', handler: function () { Usp.settings.faqForm(faqStore, null); } },
                 { text: '🔄 Rafraîchir', handler: function () { faqStore.load(); } }
               ],
               listeners: {
