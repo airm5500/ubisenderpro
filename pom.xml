@@ -20,6 +20,22 @@
     </properties>
 
     <dependencies>
+        <!-- JAX-RS réel pour les tests : le jar javaee-api ci-dessous a des corps de
+             méthodes vidés (« Absent Code »), donc Response.status(...) plante dans les
+             tests. Déclarées AVANT javaee-api pour primer sur le classpath de test. -->
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>2.1.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-common</artifactId>
+            <version>2.35</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Java EE 8 API (fourni par Payara 5) -->
         <dependency>
             <groupId>javax</groupId>

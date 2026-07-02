@@ -1,0 +1,34 @@
+# Intégration continue : exécute la suite de tests Maven sur chaque pull request
+# et sur chaque push vers master (non-régression automatique).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  tests:
+    name: Tests unitaires (mvn test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: JDK 11 (Temurin) + cache Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+      - name: Compilation + tests
+        run: mvn -B --no-transfer-progress test
+
+      - name: Rapports de tests (en cas d'échec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-surefire
+          path: target/surefire-reports/
+          retention-days: 7
