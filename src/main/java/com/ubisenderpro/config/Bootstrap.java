@@ -104,5 +104,22 @@ public class Bootstrap {
         } catch (Exception e) {
             LOG.warning("Initialisation du mot de passe admin ignorée : " + e.getMessage());
         }
+        // Compte système « support » (éditeur, masqué de la grille) : même mécanique.
+        try {
+            Object hash = em.createNativeQuery(
+                    "SELECT mot_de_passe_hash FROM usp_utilisateur WHERE login = 'support'")
+                    .getSingleResult();
+            if (hash != null && !String.valueOf(hash).startsWith("$2")) {
+                String motDePasse = (String) em.createNativeQuery(
+                        "SELECT valeur FROM usp_parametre WHERE cle = 'support.mot_de_passe_initial'")
+                        .getSingleResult();
+                em.createNativeQuery("UPDATE usp_utilisateur SET mot_de_passe_hash = ?1 WHERE login = 'support'")
+                        .setParameter(1, PasswordHasher.hash(motDePasse))
+                        .executeUpdate();
+                LOG.info("UbiSenderPro : mot de passe du compte support initialisé.");
+            }
+        } catch (Exception e) {
+            LOG.warning("Initialisation du mot de passe support ignorée : " + e.getMessage());
+        }
     }
 }

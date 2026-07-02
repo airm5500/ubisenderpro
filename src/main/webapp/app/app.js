@@ -1634,6 +1634,7 @@ Usp.MENU = [
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Suivi Relance et Recouvrements', view: 'recouvrement', icon: '💰', roles: ['ADMIN'] },
+    { text: 'Centre de support',   view: 'support',    icon: '🛟', roles: null },
     { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
     { text: 'Utilisateurs',        view: 'users',      icon: '👤', roles: ['ADMIN'] }
 ];
@@ -2235,6 +2236,7 @@ Usp.ouvrirVue = function (vue) {
         case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
         case 'users': Usp.loadCenter(Usp.users.panel()); break;
         case 'recouvrement': Usp.loadCenter(Usp.recouvrement.panel()); break;
+        case 'support': Usp.loadCenter(Usp.support.panel()); break;
         case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
         case 'import': Usp.showImport(); break;
         default: Usp.loadCenter(Usp.dashboardPanel());
@@ -2552,6 +2554,28 @@ Ext.override(Ext.window.Window, {
         }, 60);
     }
 });
+
+/* Capture des erreurs JavaScript -> journal du Centre de support.
+ * Throttlée côté client (max 5/min) et jamais bloquante ; le serveur dédoublonne
+ * par signature et throttle aussi. L'erreur reste visible en console (return false). */
+(function () {
+    var envois = 0, minute = 0;
+    window.onerror = function (msg, url, ligne, col, err) {
+        try {
+            if (!Usp.token) { return false; }
+            var m = Math.floor(Date.now() / 60000);
+            if (m !== minute) { minute = m; envois = 0; }
+            if (++envois > 5) { return false; }
+            Usp.ajax({ url: '/support/events', method: 'POST', jsonData: {
+                type: 'JS', niveau: 'ERROR',
+                message: String(msg || 'Erreur JavaScript'),
+                payload: err && err.stack ? String(err.stack).substring(0, 2000) : '',
+                url: String(url || '').split('/').pop() + ':' + (ligne || 0)
+            } });
+        } catch (e) { /* la capture ne doit jamais gêner l'application */ }
+        return false;
+    };
+})();
 
 Ext.onReady(function () {
     Ext.QuickTips.init();

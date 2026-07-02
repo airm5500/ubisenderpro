@@ -87,7 +87,7 @@ public class UserService {
     /** Liste des utilisateurs sans exposer le hash du mot de passe. */
     public List<Map<String, Object>> lister() {
         List<Utilisateur> users = em.createQuery(
-                "SELECT u FROM Utilisateur u ORDER BY u.login", Utilisateur.class).getResultList();
+                "SELECT u FROM Utilisateur u WHERE u.systeme = false ORDER BY u.login", Utilisateur.class).getResultList();
         return users.stream().map(this::toMap).collect(Collectors.toList());
     }
 
@@ -118,7 +118,7 @@ public class UserService {
 
     /** Liste légère des utilisateurs actifs (id + nom) pour l'affectation de discussions (#5). */
     public List<Map<String, Object>> listerAffectables() {
-        return em.createQuery("SELECT u FROM Utilisateur u WHERE u.actif = true ORDER BY u.nomComplet", Utilisateur.class)
+        return em.createQuery("SELECT u FROM Utilisateur u WHERE u.actif = true AND u.systeme = false ORDER BY u.nomComplet", Utilisateur.class)
                 .getResultList().stream()
                 .map(u -> {
                     Map<String, Object> m = new LinkedHashMap<>();

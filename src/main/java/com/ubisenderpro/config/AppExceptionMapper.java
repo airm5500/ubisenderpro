@@ -37,10 +37,26 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
 
     @EJB
     private AuditService auditService;
+    @EJB
+    private com.ubisenderpro.service.SupportEventService supportEventService;
     @Context
     private HttpHeaders headers;
     @Context
     private UriInfo uriInfo;
+
+    /** Alimente le journal du Centre de support (best-effort, jamais bloquant). */
+    private void capturer(String type, String chemin, String message, Throwable ex) {
+        try {
+            String payload = null;
+            if (ex != null) {
+                StringBuilder sb = new StringBuilder(ex.getClass().getName());
+                StackTraceElement[] st = ex.getStackTrace();
+                for (int i = 0; i < st.length && i < 8; i++) { sb.append("\n  at ").append(st[i]); }
+                payload = sb.toString();
+            }
+            supportEventService.collecter(type, libelleMenu(chemin), "ERROR", message, payload, null, "/" + chemin);
+        } catch (RuntimeException ignore) { /* la capture ne doit jamais gêner la réponse */ }
+    }
 
     @Override
     public Response toResponse(Throwable ex) {
@@ -101,6 +117,7 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
             String menu = libelleMenu(chemin);
             String message = traduireSql(sql, menu);
             LOG.warning("CONTRAINTE_BDD chemin=/" + chemin + " menu=\"" + menu + "\" : " + sql);
+            capturer("SQL", chemin, sql, null);
             auditService.tracer(auth, "ERREUR_SAISIE", menu, null, message);
             Map<String, Object> corps = new LinkedHashMap<>();
             corps.put("erreur", message);
@@ -112,6 +129,8 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
         // Erreur inattendue : trace complète côté serveur, message clair côté client.
         String menu = libelleMenu(chemin);
         LOG.log(Level.SEVERE, "ERREUR_SERVEUR chemin=/" + chemin + " menu=\"" + menu + "\" : " + ex.getMessage(), ex);
+        capturer("EXCEPTION_JAVA", chemin,
+                ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName(), ex);
         auditService.tracer(auth, "ERREUR_SERVEUR", menu, null,
                 "Erreur technique : " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
         Map<String, Object> body = new LinkedHashMap<>();

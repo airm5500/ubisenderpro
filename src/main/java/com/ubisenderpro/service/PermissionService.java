@@ -51,7 +51,8 @@ public class PermissionService {
             {"crm", "CRM / Opportunités"},
             {"settings", "Paramètres"},
             {"users", "Utilisateurs"},
-            {"recouvrement", "Suivi Relance et Recouvrements"}
+            {"recouvrement", "Suivi Relance et Recouvrements"},
+            {"support", "Centre de support"}
     };
 
     /** Libellés explicites des actions. */
@@ -76,7 +77,7 @@ public class PermissionService {
     }
 
     private static final List<String> ROLES =
-            Arrays.asList("ADMIN", "MARKETING", "SUPERVISEUR", "AGENT", "CATALOGUE", "LECTURE");
+            Arrays.asList("ADMIN", "MARKETING", "SUPERVISEUR", "AGENT", "CATALOGUE", "LECTURE", "SUPPORT");
 
     /** Actions disponibles pour un menu donné (VOIR toujours présent). */
     private static List<String> actionsDuMenu(String code) {
@@ -96,6 +97,7 @@ public class PermissionService {
         // Actions spécifiques (point 11 / 5).
         if ("catalogue".equals(code)) { a.add("AJUSTER_STOCK"); a.add("MAJ_PROMO"); }
         if ("inbox".equals(code)) { a.add("CREER"); a.add("VOIR_CONTENU"); }
+        if ("support".equals(code)) { a.add("CREER"); a.add("MODIFIER"); a.add("SUPPRIMER"); }
         if (Arrays.asList("campaigns", "waweb").contains(code)) { a.add("ENVOI_MASSE"); a.add("RENVOI_ECHECS"); }
         return a;
     }
@@ -118,6 +120,8 @@ public class PermissionService {
             case "settings": return Arrays.asList("ADMIN");
             case "users": return Arrays.asList("ADMIN");
             case "recouvrement": return Arrays.asList("ADMIN");
+            // Tickets internes : tout le monde peut contacter le support / ouvrir un ticket.
+            case "support": return ROLES;
             default: return Arrays.asList("ADMIN");
         }
     }
@@ -191,6 +195,17 @@ public class PermissionService {
                 for (String act : actionsDuMenu(code)) {
                     if ("LECTURE".equals(role) && !"VOIR".equals(act)) { continue; }
                     em.persist(new RolePermission(role, code, act));
+                }
+            }
+        }
+        // Centre de support : tickets internes ouverts à tous — les rôles déjà
+        // initialisés (donc ignorés ci-dessus) reçoivent VOIR + CREER sur le
+        // menu support, de façon idempotente.
+        for (String role : ROLES) {
+            if (ADMIN.equals(role)) { continue; }
+            for (String act : new String[]{"VOIR", "CREER"}) {
+                if (!permExiste(role, "support", act)) {
+                    em.persist(new RolePermission(role, "support", act));
                 }
             }
         }
