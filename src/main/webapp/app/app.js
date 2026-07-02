@@ -1635,6 +1635,7 @@ Usp.MENU = [
     { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Suivi Relance et Recouvrements', view: 'recouvrement', icon: '💰', roles: ['ADMIN'] },
     { text: 'Centre de support',   view: 'support',    icon: '🛟', roles: null },
+    { text: 'Licence',             view: 'licence',    icon: '🔑', roles: ['ADMIN', 'SUPPORT'] },
     { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
     { text: 'Utilisateurs',        view: 'users',      icon: '👤', roles: ['ADMIN'] }
 ];
@@ -2237,6 +2238,7 @@ Usp.ouvrirVue = function (vue) {
         case 'users': Usp.loadCenter(Usp.users.panel()); break;
         case 'recouvrement': Usp.loadCenter(Usp.recouvrement.panel()); break;
         case 'support': Usp.loadCenter(Usp.support.panel()); break;
+        case 'licence': Usp.loadCenter(Usp.licence.panel()); break;
         case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
         case 'import': Usp.showImport(); break;
         default: Usp.loadCenter(Usp.dashboardPanel());
@@ -2348,6 +2350,13 @@ Usp.showMain = function () {
         ['mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) {
             document.addEventListener(ev, function () { if (Usp.token) { Usp.marquerActivite(); } }, true);
         });
+    }
+    // Bandeau d'alerte licence (J-30/15/7/1, grâce, expiration) + revérification horaire.
+    Ext.defer(function () { if (Usp.licence && Usp.licence.majBandeau) { Usp.licence.majBandeau(); } }, 1500);
+    if (!Usp._licTimer) {
+        Usp._licTimer = Ext.TaskManager.start({ interval: 3600000, run: function () {
+            if (Usp.token && Usp.licence) { Usp.licence.majBandeau(); }
+        } });
     }
     // Horloge de session : ping serveur tant qu'on est actif ; déconnexion locale
     // dès que le délai d'inactivité configuré est dépassé.

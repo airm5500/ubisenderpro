@@ -16,6 +16,14 @@ import java.util.logging.Logger;
 @Startup
 public class RecouvrementScheduler {
 
+    @javax.ejb.EJB
+    private LicenceService licenceService;
+
+    /** Licence expirée/absente (mode obligatoire) : les automatisations sont suspendues. */
+    private boolean suspenduParLicence() {
+        try { return licenceService.envoisBloques(); } catch (RuntimeException e) { return false; }
+    }
+
     private static final Logger LOG = Logger.getLogger(RecouvrementScheduler.class.getName());
 
     @EJB
@@ -23,6 +31,7 @@ public class RecouvrementScheduler {
 
     @Schedule(hour = "6", minute = "30", persistent = false)
     public void tickPropositions() {
+        if (suspenduParLicence()) { return; }
         try {
             int n = assistantService.genererPropositions();
             if (n > 0) { LOG.info("Recouvrement : " + n + " proposition(s) de relance générée(s)."); }

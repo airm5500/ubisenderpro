@@ -41,6 +41,24 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
     @Inject
     private PermissionService permissionService;
 
+    @javax.ejb.EJB
+    private com.ubisenderpro.service.LicenceService licenceService;
+
+    /** Préfixes de chemins « sous licence » : envois, automatisations, imports de masse. */
+    private static final String[] CHEMINS_SOUS_LICENCE = {
+            "campaigns/", "wa-bulk", "recouvrement/envois", "recouvrement/campagnes/envoyer",
+            "imports", "propositions/", "recouvrement/propositions", "infos/", "dispo-evenements/"
+    };
+
+    /** Vrai si ce chemin+méthode est une fonction bloquée quand la licence est expirée. */
+    private static boolean fonctionSousLicence(String methode, String chemin) {
+        if (!"POST".equals(methode) && !"PUT".equals(methode)) { return false; }
+        for (String p : CHEMINS_SOUS_LICENCE) {
+            if (chemin.startsWith(p)) { return true; }
+        }
+        return false;
+    }
+
     @Override
     public void filter(ContainerRequestContext requestContext) {
         String header = requestContext.getHeaderString("Authorization");
@@ -74,6 +92,18 @@ public class AuthenticationFilter implements ContainerRequestFilter, ContainerRe
                                 + " sur " + perm.menu() + "\"}").build());
                 return;
             }
+        }
+
+        // Verrou de licence : fonctions d'envoi / automatisation / import bloquées
+        // quand la licence (obligatoire) est absente, invalide ou expirée au-delà
+        // de la grâce. La consultation et l'écran Licence restent accessibles.
+        String chemin = requestContext.getUriInfo().getPath();
+        if (fonctionSousLicence(requestContext.getMethod(), chemin)
+                && !chemin.startsWith("licence") && licenceService.envoisBloques()) {
+            requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
+                    .entity("{\"erreur\":\"Licence expirée ou absente : les envois, automatisations et "
+                            + "imports sont désactivés. Renouvelez la licence (menu Licence).\"}").build());
+            return;
         }
 
         capturerContexte();
