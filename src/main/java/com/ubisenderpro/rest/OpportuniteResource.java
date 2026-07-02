@@ -34,12 +34,14 @@ public class OpportuniteResource {
     }
 
     @POST
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
     public Response creer(Opportunite o) {
         return Response.status(Response.Status.CREATED).entity(opportuniteService.creer(o)).build();
     }
 
     @PUT
     @Path("/{id}")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
     public Response modifier(@PathParam("id") Long id, Opportunite o) {
         o.setId(id);
         return Response.ok(opportuniteService.modifier(o)).build();
@@ -47,6 +49,7 @@ public class OpportuniteResource {
 
     @POST
     @Path("/{id}/status")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT", "MARKETING"})
     public Response changerStatut(@PathParam("id") Long id, Map<String, Object> body) {
         String statut = String.valueOf(body.get("statut"));
         Opportunite o = opportuniteService.changerStatut(id, statut);

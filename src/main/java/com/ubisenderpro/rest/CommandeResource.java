@@ -45,22 +45,27 @@ public class CommandeResource {
 
     @POST
     @Path("/{id}/confirm")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT"})
     public Response confirmer(@PathParam("id") Long id) { return statut(id, "CONFIRMEE"); }
 
     @POST
     @Path("/{id}/prepare")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT"})
     public Response preparer(@PathParam("id") Long id) { return statut(id, "EN_PREPARATION"); }
 
     @POST
     @Path("/{id}/ready")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT"})
     public Response prete(@PathParam("id") Long id) { return statut(id, "PRETE"); }
 
     @POST
     @Path("/{id}/deliver")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT"})
     public Response livrer(@PathParam("id") Long id) { return statut(id, "LIVREE"); }
 
     @POST
     @Path("/{id}/cancel")
+    @Secured(roles = {"ADMIN", "SUPERVISEUR", "AGENT"})
     public Response annuler(@PathParam("id") Long id) { return statut(id, "ANNULEE"); }
 
     private Response statut(Long id, String statut) {

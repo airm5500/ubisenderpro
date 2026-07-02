@@ -40,7 +40,14 @@ public class WhatsappService {
     public WhatsappAccount creerCompte(WhatsappAccount a) { em.persist(a); return a; }
     public WhatsappAccount modifierCompte(WhatsappAccount a) {
         WhatsappAccount ex = em.find(WhatsappAccount.class, a.getId());
-        if (ex != null) { a.setCreatedAt(ex.getCreatedAt()); }
+        if (ex != null) {
+            a.setCreatedAt(ex.getCreatedAt());
+            // Le jeton n'est jamais renvoyé au navigateur (WRITE_ONLY) : un champ
+            // laissé vide à la modification signifie « conserver le jeton actuel ».
+            if (a.getAccessToken() == null || a.getAccessToken().trim().isEmpty()) {
+                a.setAccessToken(ex.getAccessToken());
+            }
+        }
         a.setUpdatedAt(LocalDateTime.now());
         return em.merge(a);
     }
