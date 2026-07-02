@@ -51,6 +51,22 @@ de la santé de l'application et FAQ.
 - La capture est **best-effort** : elle ne peut jamais faire échouer
   l'opération métier ni bloquer l'utilisateur.
 
+### 1.3 bis — Auto-ticket (anticipation des bugs)
+
+À la **première occurrence** d'une erreur inattendue (nouvelle signature de
+type `EXCEPTION_JAVA` ou `JS`, niveau ERROR/FATAL), le système :
+
+1. ouvre **automatiquement un ticket BUG** (sujet préfixé `[AUTO]`, priorité
+   HAUTE, auteur « systeme »), lié à l'événement du journal ;
+2. envoie un **e-mail de notification** à `support.email` (si SMTP configuré) —
+   l'éditeur est prévenu **avant** que l'utilisateur n'appelle.
+
+Garde-fous : 1 seul ticket par signature (les répétitions incrémentent le
+compteur de l'événement), plafond quotidien (`support.auto_ticket_max_jour`,
+défaut 10) contre les tempêtes d'erreurs, les erreurs `SQL` (souvent liées à
+la saisie) restent au journal sans ticket, et l'auto-ticket est désactivable
+(`support.auto_ticket=false`). Jamais bloquant pour l'application.
+
 ### 1.4 Données (tables isolées, additives)
 
 `usp_support_demande`, `usp_support_ticket`, `usp_support_ticket_message`,
@@ -133,3 +149,5 @@ le bot** et s'édite dans **Paramètres → Bot** (une seule source de vérité)
 | `support.email` | *(vide)* | Destinataire des demandes « Me contacter » |
 | `support.retention_jours` | `90` | Rétention du journal d'erreurs |
 | `support.mot_de_passe_initial` | `Support@2026` | Mot de passe initial du compte `support` (haché au 1er démarrage) |
+| `support.auto_ticket` | `true` | Ticket BUG automatique à la 1ʳᵉ occurrence d'une erreur inattendue |
+| `support.auto_ticket_max_jour` | `10` | Plafond quotidien d'auto-tickets (anti-tempête) |

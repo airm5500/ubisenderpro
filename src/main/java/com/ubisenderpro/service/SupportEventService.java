@@ -41,6 +41,14 @@ public class SupportEventService {
 
     @EJB
     private ParametreService parametreService;
+    @EJB
+    private SupportService supportService;
+    @EJB
+    private MailService mailService;
+
+    /** Plafond d'auto-tickets par jour (compteur en mémoire) : [jourEpoch, compteur]. */
+    private static final java.util.concurrent.atomic.AtomicReference<long[]> AUTO_TICKETS_JOUR =
+            new java.util.concurrent.atomic.AtomicReference<>(new long[]{0, 0});
 
     /**
      * Collecte un événement (nouvelle transaction : ne participe jamais au
@@ -81,6 +89,10 @@ public class SupportEventService {
             e.setUrlOuEcran(tronquer(urlOuEcran, 255));
             e.setPayloadJson(tronquer(payload, MAX_PAYLOAD));
             em.persist(e);
+
+            // Anticipation : un BUG jamais vu (nouvelle signature) ouvre
+            // automatiquement un ticket + notification e-mail au support.
+            autoTicket(e);
 
             purgerSiNecessaire();
             return e;
@@ -129,6 +141,73 @@ public class SupportEventService {
                 .setParameter("n", niveau)
                 .setParameter("d", LocalDateTime.now().minusHours(heures))
                 .getSingleResult();
+    }
+
+    /* --------------------- Auto-ticket (anticipation) --------------------- */
+
+    /**
+     * Crée automatiquement un ticket BUG pour une erreur inattendue jamais vue.
+     * Critères : type EXCEPTION_JAVA ou JS (les erreurs SQL — souvent liées à la
+     * saisie — restent au journal), niveau ERROR/FATAL, 1re occurrence
+     * (nouvelle signature). Garde-fous : paramètre support.auto_ticket,
+     * plafond quotidien, jamais bloquant.
+     */
+    private void autoTicket(com.ubisenderpro.entity.ApplicationEvent e) {
+        try {
+            if (!"true".equalsIgnoreCase(parametreService.valeur("support.auto_ticket", "true"))) { return; }
+            String t = e.getType();
+            if (!"EXCEPTION_JAVA".equals(t) && !"JS".equals(t)) { return; }
+            if (!"ERROR".equals(e.getNiveau()) && !"FATAL".equals(e.getNiveau())) { return; }
+            if (!capJournalierOk()) { return; }
+
+            String msg = e.getMessageCourt() == null ? "Erreur applicative" : e.getMessageCourt();
+            com.ubisenderpro.entity.SupportTicket tk = new com.ubisenderpro.entity.SupportTicket();
+            tk.setType("BUG");
+            tk.setPriorite("HAUTE");
+            tk.setModule(e.getModule());
+            tk.setSujet(tronquer("[AUTO] " + msg, 250));
+            tk.setDescription("Ticket créé automatiquement à la première occurrence de cette erreur.\n"
+                    + "Type : " + t + " — Niveau : " + e.getNiveau() + "\n"
+                    + "Écran/URL : " + (e.getUrlOuEcran() == null ? "—" : e.getUrlOuEcran()) + "\n"
+                    + "Signature : " + e.getSignature() + "\n\n"
+                    + (e.getPayloadJson() == null ? "" : e.getPayloadJson()));
+            tk.setEventSignature(e.getSignature());
+            com.ubisenderpro.entity.SupportTicket cree = supportService.creerTicket(tk, "systeme");
+            e.setTicketId(cree.getId());
+            notifierAutoTicket(cree, e);
+        } catch (RuntimeException ignore) {
+            // L'anticipation ne doit jamais gêner la collecte ni l'application.
+        }
+    }
+
+    /** Plafond quotidien d'auto-tickets (support.auto_ticket_max_jour, défaut 10). */
+    private boolean capJournalierOk() {
+        int max = 10;
+        try { max = Integer.parseInt(parametreService.valeur("support.auto_ticket_max_jour", "10").trim()); }
+        catch (RuntimeException ignore) { }
+        long jour = System.currentTimeMillis() / 86_400_000L;
+        long[] etat = AUTO_TICKETS_JOUR.updateAndGet(v ->
+                v[0] != jour ? new long[]{jour, 1} : new long[]{jour, v[1] + 1});
+        return etat[1] <= max;
+    }
+
+    /** Notification e-mail (asynchrone, best-effort) au support éditeur. */
+    private void notifierAutoTicket(com.ubisenderpro.entity.SupportTicket t,
+                                    com.ubisenderpro.entity.ApplicationEvent e) {
+        try {
+            String dest = parametreService.valeur("support.email", "");
+            if (dest == null || dest.trim().isEmpty()) { return; }
+            String corps = "Un bug vient d'être détecté et un ticket a été ouvert automatiquement.\n\n"
+                    + "Ticket   : " + t.getNumero() + " (priorité " + t.getPriorite() + ")\n"
+                    + "Module   : " + (t.getModule() == null ? "—" : t.getModule()) + "\n"
+                    + "Type     : " + e.getType() + " — Niveau : " + e.getNiveau() + "\n"
+                    + "Message  : " + (e.getMessageCourt() == null ? "—" : e.getMessageCourt()) + "\n"
+                    + "Écran/URL: " + (e.getUrlOuEcran() == null ? "—" : e.getUrlOuEcran()) + "\n"
+                    + "Signature: " + e.getSignature() + "\n\n"
+                    + "Consultez Centre de support > Tous les tickets / Diagnostic & bugs.";
+            mailService.envoyerAvecPieces(java.util.Collections.singletonList(dest.trim()),
+                    "[Support] Bug détecté — " + t.getNumero(), corps, null);
+        } catch (RuntimeException ignore) { }
     }
 
     /* ------------------------------ interne ------------------------------ */
