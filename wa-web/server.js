@@ -14,6 +14,11 @@
  *   POST   /sessions/:id/check-numbers-> {numbers:[...]} -> [{number, exists, jid}]
  *
  * Statuts de session : DECONNECTE | CONNEXION | QR | CONNECTE
+ * Santé de réception (indépendante du statut) : OK | DEGRADED
+ *   DEGRADED = socket ouvert (l'envoi marche) mais des messages entrants
+ *   arrivent illisibles (session de chiffrement désynchronisée après une
+ *   coupure) → les réponses des clients se perdent, il faut reconnecter.
+ *   Remontée via le callback /status ({status, health, reason}).
  */
 'use strict';
 
@@ -123,8 +128,39 @@ async function resolveJid(sock, numero) {
 }
 
 function publicState(s) {
-  return s ? { status: s.status, qr: s.qr || null, me: s.me || null }
-           : { status: 'DECONNECTE', qr: null, me: null };
+  return s ? { status: s.status, health: s.health || 'OK', reason: s.degradedReason || null,
+               qr: s.qr || null, me: s.me || null,
+               lastInboundAt: s.lastInboundAt || null, undecipherable: s.undecipherable || 0 }
+           : { status: 'DECONNECTE', health: 'OK', reason: null, qr: null, me: null,
+               lastInboundAt: null, undecipherable: 0 };
+}
+
+/**
+ * Passe la session en « dégradée » : le socket est ouvert (l'envoi marche) mais
+ * des messages entrants arrivent illisibles → les réponses des clients sont
+ * silencieusement perdues, la session doit être reconnectée (rescan du QR).
+ * Ne notifie qu'au basculement OK -> DEGRADED (évite le flood).
+ */
+function marquerDegrade(id, s, raison) {
+  if (!s) { return; }
+  s.undecipherable = (s.undecipherable || 0) + 1;
+  if (s.health === 'DEGRADED') { return; }
+  s.health = 'DEGRADED';
+  s.degradedReason = raison;
+  logger.warn({ id, undecipherable: s.undecipherable }, 'Session dégradée : messages entrants illisibles');
+  postCallback('/status', { sessionId: id, status: s.status, health: 'DEGRADED', reason: raison });
+}
+
+/** Réception saine : la session reçoit à nouveau des messages lisibles. */
+function marquerSain(id, s) {
+  if (!s) { return; }
+  s.lastInboundAt = Date.now();
+  if (s.health === 'DEGRADED') {
+    s.health = 'OK';
+    s.degradedReason = null;
+    logger.info({ id }, 'Session rétablie : réception de nouveau lisible');
+    postCallback('/status', { sessionId: id, status: s.status, health: 'OK', reason: null });
+  }
 }
 
 /** Démarre (ou relance) une session Baileys et câble les événements. */
@@ -203,6 +239,16 @@ async function startSession(id) {
       const k = m.key;
       const jid = k.remoteJid || '';
       if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) { continue; } // ignore groupes/diffusions
+      // Message entrant NON déchiffrable (m.message absent) : après une longue
+      // coupure, la session de chiffrement peut être désynchronisée — le socket
+      // reste « ouvert » mais les réponses arrivent illisibles et se perdent.
+      // On ne les jette plus en silence : on bascule la session en « dégradée »
+      // pour avertir l'utilisateur (bannière « à reconnecter »).
+      if (!m.message) {
+        marquerDegrade(id, sessions.get(id), 'Messages entrants illisibles (session de chiffrement désynchronisée) — reconnectez le compte.');
+        logger.warn({ id, key: k, stub: m.messageStubType }, 'Entrant illisible (déchiffrement échoué)');
+        continue;
+      }
       const phone = phoneFromKey(k);
       if (!phone) {
         // Numéro introuvable (souvent @lid) : on logue la clé pour localiser le champ.
@@ -211,6 +257,7 @@ async function startSession(id) {
       }
       const contenu = texteMessage(m);
       if (!contenu) { continue; }
+      marquerSain(id, sessions.get(id)); // réception lisible : la session va bien
       logger.info({ id, from: phone, type: contenu.type }, 'Message entrant');
       postCallback('/message', {
         sessionId: id, from: phone, name: m.pushName || null,
@@ -229,9 +276,13 @@ async function startSession(id) {
     if (connection === 'open') {
       s.status = 'CONNECTE';
       s.qr = null;
+      // Nouvelle connexion (ou rescan) : la santé repart de zéro.
+      s.health = 'OK';
+      s.degradedReason = null;
+      s.undecipherable = 0;
       s.me = sock.user ? { id: sock.user.id, name: sock.user.name } : null;
       logger.info({ id, me: s.me }, 'Session connectée');
-      postCallback('/status', { sessionId: id, status: 'CONNECTE' });
+      postCallback('/status', { sessionId: id, status: 'CONNECTE', health: 'OK', reason: null });
     }
     if (connection === 'close') {
       const code = lastDisconnect && lastDisconnect.error
@@ -240,8 +291,10 @@ async function startSession(id) {
       s.sock = null; // libère le socket fermé (sinon la garde anti-doublon bloque la reconnexion)
       s.status = loggedOut ? 'DECONNECTE' : 'CONNEXION';
       s.qr = null;
+      s.health = 'OK'; // hors connexion, la « santé de réception » n'a plus de sens
+      s.degradedReason = null;
       logger.warn({ id, code, loggedOut }, 'Connexion fermée');
-      postCallback('/status', { sessionId: id, status: s.status });
+      postCallback('/status', { sessionId: id, status: s.status, health: 'OK', reason: null });
       if (!loggedOut) {
         setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 2000);
       } else {

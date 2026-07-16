@@ -117,6 +117,8 @@ Légende priorité : 🔴 bloquant · 🟠 majeur · 🟢 confort
 | 9.3 | 🟠 | Historique des envois : filtre Statut + Rafraîchir | Filtre appliqué ; icône ↻ tourne pendant le chargement | | |
 | 9.4 | 🟢 | Vérification de numéros | Chargement fichier + « Exporter un exemplaire » | | |
 | 9.5 | 🟠 | Paramètres → Référentiels : Assistant d'import | Mapping colonnes + rapport lues/créées/ignorées | | |
+| 9.6 | 🔴 | **Session WhatsApp Web « zombie »** : après une longue coupure, une réponse client arrive illisible (déchiffrement échoué) | Le statut reste « Connecté » MAIS la colonne Réception passe **⚠ À reconnecter** ; une **bannière rouge** s'affiche partout avec « Reconnecter maintenant » → déconnexion + QR ; après rescan, la réception revient et la bannière disparaît | | |
+| 9.7 | 🟢 | Session WhatsApp Web saine | Colonne Réception « ✔ OK · reçu il y a X » ; carte Santé WhatsApp Web verte (aucune session dégradée) | | |
 
 ---
 

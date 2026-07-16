@@ -37,3 +37,14 @@ Définir ces variables d'environnement côté Payara :
 | POST | `/sessions/:id/check-numbers` | `{numbers:[...]}` |
 
 Statuts : `DECONNECTE` · `CONNEXION` · `QR` · `CONNECTE`.
+
+**Santé de réception** (`health`, indépendante du statut) : `OK` · `DEGRADED`.
+Après une longue coupure, la session de chiffrement peut se désynchroniser : le
+socket reste « ouvert » (l'envoi fonctionne) mais les messages entrants
+arrivent **illisibles** et les réponses des clients se perdent silencieusement.
+Le service détecte ces entrants non déchiffrables, bascule la session en
+`DEGRADED` et le signale à UbiSmartCRM Pro via le callback `/status`
+(`{status, health, reason}`). L'application affiche alors une bannière
+« session à reconnecter » avec accès direct au QR. Une réception lisible (ou un
+rescan du QR) rétablit `OK`. Le champ `lastInboundAt` horodate la dernière
+réception saine (exposé par `GET /sessions/:id/status`).

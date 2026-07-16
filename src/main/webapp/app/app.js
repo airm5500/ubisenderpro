@@ -2358,6 +2358,15 @@ Usp.showMain = function () {
             if (Usp.token && Usp.licence) { Usp.licence.majBandeau(); }
         } });
     }
+    // Bandeau « session WhatsApp Web à reconnecter » (santé DEGRADED) : les
+    // réponses des clients n'arrivent plus alors que le statut reste « connecté ».
+    // Sondage plus fréquent (les sessions changent d'état vite).
+    Ext.defer(function () { if (Usp.waweb && Usp.waweb.majBandeau) { Usp.waweb.majBandeau(); } }, 2500);
+    if (!Usp._waTimer) {
+        Usp._waTimer = Ext.TaskManager.start({ interval: 60000, run: function () {
+            if (Usp.token && Usp.waweb && Usp.waweb.majBandeau) { Usp.waweb.majBandeau(); }
+        } });
+    }
     // Horloge de session : ping serveur tant qu'on est actif ; déconnexion locale
     // dès que le délai d'inactivité configuré est dépassé.
     if (!Usp._heartbeat) {

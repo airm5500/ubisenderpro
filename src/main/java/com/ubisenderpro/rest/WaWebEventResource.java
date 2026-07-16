@@ -42,6 +42,9 @@ public class WaWebEventResource {
         String text = str(body.get("text"));
         String id = str(body.get("id"));
         Conversation conv = journal.enregistrerEntrant(sid, from, name, type, text, id);
+        // Trace de réception : horodate le dernier entrant et lève l'état « dégradé »
+        // (la session reçoit à nouveau des messages lisibles).
+        sessionService.marquerEntrant(sid);
         // Réponse automatique du bot (messages texte uniquement, hors doublons).
         if (conv != null && ("TEXTE".equalsIgnoreCase(type) || type == null) && !text.trim().isEmpty()) {
             botService.traiterEntrant(conv.getId(), text);
@@ -55,7 +58,11 @@ public class WaWebEventResource {
         if (!tokenOk(token)) { return Response.status(Response.Status.UNAUTHORIZED).build(); }
         Long sid = sessionId(str(body.get("sessionId")));
         String statut = str(body.get("status"));
-        if (sid != null && !statut.isEmpty()) { sessionService.enregistrerStatut(sid, statut); }
+        String sante = str(body.get("health"));   // OK | DEGRADED (session « zombie »)
+        String detail = str(body.get("reason"));
+        if (sid != null && (!statut.isEmpty() || !sante.isEmpty())) {
+            sessionService.enregistrerEtat(sid, statut, sante, detail);
+        }
         return Response.ok().build();
     }
 

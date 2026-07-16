@@ -58,7 +58,7 @@ Usp.waweb.insertVar = function (token, btn, fallbackName) {
 /* ---------- Comptes WhatsApp Web ---------- */
 Usp.waweb.sessionStore = function () {
     return Ext.create('Ext.data.Store', {
-        fields: ['id', 'libelle', 'numero', 'statut', 'actif'],
+        fields: ['id', 'libelle', 'numero', 'statut', 'sante', 'santeDetail', 'dernierEntrantLe', 'actif'],
         proxy: { type: 'ajax', url: Usp.apiBase + '/wa-web/sessions',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
         autoLoad: true
@@ -76,13 +76,27 @@ Usp.waweb.sessionsPanel = function () {
         columns: [
             { text: 'Libellé', dataIndex: 'libelle', flex: 1 },
             { text: 'Numéro', dataIndex: 'numero', width: 160 },
-            { text: 'Statut', dataIndex: 'statut', width: 120, renderer: function (v) {
+            { text: 'Statut', dataIndex: 'statut', width: 110, renderer: function (v) {
                 var c = v === 'CONNECTE' ? '#2e7d32' : (v === 'QR' ? '#ef6c00' : '#999');
                 return '<span style="color:' + c + '">' + (v || '') + '</span>';
             } },
-            { text: 'Actions', width: 160, sortable: false, menuDisabled: true, dataIndex: 'id',
-              renderer: function () {
-                  return ico('connect', 'Connecter (scanner le QR)', '🔗') +
+            { text: 'Réception', dataIndex: 'sante', width: 150, renderer: function (v, meta, rec) {
+                if (rec.get('statut') !== 'CONNECTE') { return '<span style="color:#999">—</span>'; }
+                if (v === 'DEGRADED') {
+                    meta.tdAttr = 'data-qtip="' + Ext.String.htmlEncode(rec.get('santeDetail') ||
+                        'Messages entrants illisibles : reconnectez le compte.') + '"';
+                    return '<span style="color:#c62828;font-weight:bold">⚠ À reconnecter</span>';
+                }
+                var d = rec.get('dernierEntrantLe');
+                return '<span style="color:#2e7d32">✔ OK</span>' +
+                    (d ? '<span style="color:#888;font-size:11px"> · reçu ' + Usp.waweb.depuis(d) + '</span>' : '');
+            } },
+            { text: 'Actions', width: 175, sortable: false, menuDisabled: true, dataIndex: 'id',
+              renderer: function (v, meta, rec) {
+                  var reco = rec.get('statut') === 'CONNECTE' && rec.get('sante') === 'DEGRADED'
+                      ? ico('reconnect', 'Reconnecter (rescanner le QR)', '♻️') : '';
+                  return reco +
+                         ico('connect', 'Connecter (scanner le QR)', '🔗') +
                          ico('warmup', 'Réchauffeur (warming)', '🔥') +
                          ico('logout', 'Déconnecter', '⏏️') +
                          ico('delete', 'Supprimer', '🗑️');
@@ -106,6 +120,8 @@ Usp.waweb.sessionsPanel = function () {
                 var act = el.getAttribute('data-act');
                 if (act === 'connect') {
                     Usp.waweb.connect(rec.get('id'), store);
+                } else if (act === 'reconnect') {
+                    Usp.waweb.reconnecter(rec.get('id'), rec.get('libelle'), store);
                 } else if (act === 'warmup') {
                     Usp.waweb.warmup(rec.get('id'), rec.get('libelle'));
                 } else if (act === 'logout') {
@@ -169,6 +185,79 @@ Usp.waweb.connect = function (id, store) {
     Usp.ajax({ url: '/wa-web/sessions/' + id + '/start', method: 'POST',
         success: function (resp) { render(Ext.decode(resp.responseText)); },
         failure: function () { zone.update('<div style="color:#a00">Service WhatsApp Web injoignable.</div>'); } });
+};
+
+/* Ancienneté lisible d'une date ISO (ex. « il y a 5 min », « il y a 2 h »). */
+Usp.waweb.depuis = function (iso) {
+    if (!iso) { return ''; }
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) { return ''; }
+    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 60) { return 'à l\'instant'; }
+    var m = Math.round(s / 60);
+    if (m < 60) { return 'il y a ' + m + ' min'; }
+    var h = Math.round(m / 60);
+    if (h < 24) { return 'il y a ' + h + ' h'; }
+    return 'il y a ' + Math.round(h / 24) + ' j';
+};
+
+/* Reconnexion d'une session « dégradée » : déconnecte (oublie les clés de
+ * chiffrement désynchronisées) puis rouvre la fenêtre QR pour rescanner. */
+Usp.waweb.reconnecter = function (id, libelle, store) {
+    Ext.Msg.confirm('Reconnecter', 'La session « ' + Ext.String.htmlEncode(libelle || ('compte ' + id)) +
+        ' » reçoit des messages illisibles. On la déconnecte puis vous rescannez le QR pour rétablir la réception. Continuer ?',
+        function (btn) {
+            if (btn !== 'yes') { return; }
+            Usp.ajax({ url: '/wa-web/sessions/' + id + '/logout', method: 'POST',
+                callback: function () {
+                    Usp.waweb.connect(id, store);
+                    Usp.waweb.majBandeau();
+                } });
+        });
+};
+
+/* Bannière d'alerte « session à reconnecter » (santé DEGRADED), affichée
+ * partout dans l'application avec accès direct au QR. */
+Usp.waweb.majBandeau = function () {
+    if (!Usp.token || !(Usp.can && Usp.can('waweb', 'VOIR'))) { return; }
+    Usp.ajax({ url: '/wa-web/sessions', method: 'GET', success: function (resp) {
+        var list = []; try { list = Ext.decode(resp.responseText) || []; } catch (e) {}
+        var degradees = list.filter(function (s) { return s.statut === 'CONNECTE' && s.sante === 'DEGRADED'; });
+        var existant = document.getElementById('usp-wa-bandeau');
+        if (!degradees.length) { if (existant) { existant.parentNode.removeChild(existant); } return; }
+        var s0 = degradees[0];
+        var noms = degradees.map(function (s) { return s.libelle || ('compte ' + s.id); }).join(', ');
+        var texte = degradees.length > 1
+            ? (degradees.length + ' comptes WhatsApp Web (' + noms + ') reçoivent des messages illisibles')
+            : ('Le compte WhatsApp Web « ' + noms + ' » reçoit des messages illisibles');
+        var html = '⚠️ ' + Ext.String.htmlEncode(texte) +
+            ' : les réponses des clients n\'arrivent plus. ' +
+            '<a href="#" onclick="Usp.waweb.reconnecterDepuisBandeau(' + s0.id + ',this);return false"' +
+            ' style="color:#fff;text-decoration:underline;font-weight:bold">Reconnecter maintenant</a>';
+        // Empile sous la bannière licence si elle est présente (évite le chevauchement).
+        var haut = document.getElementById('usp-lic-bandeau') ? 84 : 54;
+        if (existant) { existant.innerHTML = html; existant.style.top = haut + 'px'; return; }
+        var div = document.createElement('div');
+        div.id = 'usp-wa-bandeau';
+        div.style.cssText = 'position:fixed;top:' + haut + 'px;left:0;right:0;z-index:9998;background:#c62828;' +
+            'color:#fff;font:12px "Segoe UI",sans-serif;padding:6px 14px;text-align:center;' +
+            'box-shadow:0 2px 6px rgba(0,0,0,.25)';
+        div.innerHTML = html;
+        document.body.appendChild(div);
+    } });
+};
+
+/* Reconnexion déclenchée depuis la bannière : récupère le libellé puis délègue. */
+Usp.waweb.reconnecterDepuisBandeau = function (id) {
+    Usp.ajax({ url: '/wa-web/sessions', method: 'GET', callback: function (o, ok, resp) {
+        var libelle = 'compte ' + id;
+        try {
+            var l = Ext.decode(resp.responseText) || [];
+            var m = l.filter(function (s) { return s.id === id; })[0];
+            if (m) { libelle = m.libelle || libelle; }
+        } catch (e) {}
+        Usp.waweb.reconnecter(id, libelle, null);
+    } });
 };
 
 /* ---------- Réchauffeur (warming) ---------- */

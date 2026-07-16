@@ -65,9 +65,14 @@ public class SupportSanteService {
                 total += c;
                 if ("CONNECTE".equals(String.valueOf(r[0]))) { connectees += c; }
             }
+            // Sessions « dégradées » : ouvertes mais réception illisible (à reconnecter).
+            long degradees = ((Number) em.createNativeQuery(
+                    "SELECT COUNT(*) FROM usp_wa_web_session WHERE sante = 'DEGRADED'")
+                    .getSingleResult()).longValue();
             waweb.put("sessions", total);
             waweb.put("connectees", connectees);
-            waweb.put("ok", total == 0 || connectees > 0);
+            waweb.put("degradees", degradees);
+            waweb.put("ok", (total == 0 || connectees > 0) && degradees == 0);
         } catch (RuntimeException e) { waweb.put("ok", false); }
         s.put("whatsappWeb", waweb);
 
