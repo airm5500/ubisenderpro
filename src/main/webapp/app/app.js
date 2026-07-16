@@ -181,6 +181,74 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Progression d'un envoi de masse (barre % + k/n) ----------
+ * Les envois sont asynchrones (schedulers) : on sonde régulièrement l'état et
+ * on affiche l'avancement en direct jusqu'à la fin. Réutilisable (campagnes,
+ * envoi en masse WhatsApp Web, recouvrement…).
+ *   cfg.titre    : titre de la fenêtre
+ *   cfg.url      : endpoint GET à sonder (renvoie l'état de l'envoi)
+ *   cfg.lire(d)  : -> { total, envoyes, echoues, statut }  (mapping selon l'API)
+ *   cfg.onFin(d) : optionnel, à la fin de l'envoi (ex. recharger une grille)
+ *   cfg.onClose(): optionnel, à la fermeture de la fenêtre
+ */
+Usp.progressionEnvoi = function (cfg) {
+    var TERMINAUX = ['TERMINEE', 'TERMINE', 'ANNULEE', 'ECHOUEE'];
+    var fini = false, timer = null;
+    var win = Ext.create('Ext.window.Window', {
+        title: cfg.titre || 'Envoi en cours', width: 460, modal: true, closable: false,
+        bodyPadding: 18, layout: 'anchor',
+        items: [
+            { xtype: 'progressbar', itemId: 'bar', height: 26, anchor: '100%', value: 0, text: 'Préparation…' },
+            { xtype: 'component', itemId: 'detail', anchor: '100%',
+              style: 'margin-top:12px;text-align:center;color:#555;font-size:12px' }
+        ],
+        buttons: ['->',
+            { text: 'Continuer en arrière-plan', itemId: 'btn', handler: function () { win.close(); } }],
+        listeners: { close: function () {
+            fini = true; if (timer) { clearTimeout(timer); }
+            if (cfg.onClose) { try { cfg.onClose(); } catch (e) {} }
+        } }
+    });
+    win.show();
+    var bar = win.down('#bar'), detail = win.down('#detail'), btn = win.down('#btn');
+
+    var rendu = function (data) {
+        if (fini) { return; }
+        var e = cfg.lire ? (cfg.lire(data) || {}) : data;
+        var total = e.total || 0;
+        var faits = (e.envoyes || 0) + (e.echoues || 0);
+        var statut = e.statut || '';
+        var ratio = total > 0 ? Math.min(1, faits / total) : 0;
+        var pct = Math.round(ratio * 100);
+        bar.updateProgress(ratio, pct + ' %   —   ' + faits + ' / ' + total);
+        var d = '✅ ' + (e.envoyes || 0) + ' envoyé(s)' + (e.echoues ? '   ·   ❌ ' + e.echoues + ' échec(s)' : '');
+        var termine = TERMINAUX.indexOf(statut) !== -1 || (total > 0 && faits >= total);
+        var suspendu = statut === 'SUSPENDUE';
+        if (termine || suspendu) {
+            fini = true; if (timer) { clearTimeout(timer); }
+            bar.updateProgress(termine ? 1 : ratio, (termine ? 100 : pct) + ' %   —   ' + faits + ' / ' + total);
+            detail.update((suspendu ? '⏸ Envoi suspendu — ' : '🏁 Terminé — ') + d);
+            btn.setText('Fermer');
+            if (termine && cfg.onFin) { try { cfg.onFin(data); } catch (ex) {} }
+        } else {
+            detail.update(d + (statut ? '   ·   ' + statut : ''));
+        }
+    };
+
+    var poll = function () {
+        if (fini) { return; }
+        Usp.ajax({ url: cfg.url, method: 'GET',
+            success: function (resp) {
+                var data = {}; try { data = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                rendu(data);
+                if (!fini) { timer = setTimeout(poll, 1500); }
+            },
+            failure: function () { if (!fini) { timer = setTimeout(poll, 3000); } } });
+    };
+    poll();
+    return win;
+};
+
 /* ---------- Session persistante (localStorage) + expiration par inactivité ----------
  * Le jeton est conservé dans localStorage : il survit au rafraîchissement (F5) et est
  * partagé entre onglets dupliqués. Une horloge d'inactivité déconnecte après

@@ -446,7 +446,24 @@ Usp.waweb.bulkPanel = function () {
                             fini('Planifié', 'Envoi planifié (' + job.total + ' destinataires) pour le ' + v.dateProgrammee + '.');
                         } else {
                             Usp.ajax({ url: '/wa-bulk/' + job.id + '/launch', method: 'POST',
-                                success: function () { fini('Lancé', 'Envoi démarré (' + job.total + ' destinataires).'); },
+                                success: function () {
+                                    formPanel.setLoading(false);
+                                    // Barre de progression en direct (% + envoyés/total).
+                                    Usp.progressionEnvoi({
+                                        titre: 'Envoi en masse' + (v.nom ? ' — ' + v.nom : ''),
+                                        url: '/wa-bulk/' + job.id,
+                                        lire: function (d) {
+                                            return { total: d.total, envoyes: d.envoyes, echoues: d.echoues, statut: d.statut };
+                                        },
+                                        onFin: function () { if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); } },
+                                        onClose: function () {
+                                            if (Usp.waweb._jobStore) { Usp.waweb._jobStore.load(); }
+                                            Ext.Msg.confirm('Réinitialiser', 'Réinitialiser la vue d\'envoi ?', function (b) {
+                                                if (b === 'yes') { f.reset(); medias.length = 0; Usp.waweb.majPjList(formPanel, medias); }
+                                            });
+                                        }
+                                    });
+                                },
                                 failure: function (r) { echec(r, 'Lancement impossible.'); } });
                         }
                     },

@@ -63,7 +63,8 @@ Légende priorité : 🔴 bloquant · 🟠 majeur · 🟢 confort
 | # | P | Scénario | Résultat attendu | OK/KO | Anomalie |
 |---|---|---|---|---|---|
 | 5.1 | 🔴 | Nouvelle campagne (wizard) | Bouton **Annuler** présent ; si brouillon déjà créé, proposition de le supprimer | | |
-| 5.2 | 🔴 | Construire + Lancer une campagne (WA Web) | Destinataires calculés ; envoi progresse ; grille rafraîchie | | |
+| 5.2 | 🔴 | Construire + Lancer une campagne (WA Web) | Destinataires calculés ; **barre de progression en direct** (% + « k / n ») jusqu'à 100 % ; « Continuer en arrière-plan » possible ; grille rafraîchie | | |
+| 5.2b | 🟠 | Envoi en masse WhatsApp Web (immédiat) | Même **barre de progression** (% + envoyés/total, échecs en rouge) ; à la fermeture, proposition de réinitialiser la vue | | |
 | 5.3 | 🟠 | Grille Campagnes | Bandeau KPI en cartes encadrées au-dessus | | |
 | 5.4 | 🟠 | Promotions : créer sans dates | Refus clair « champs obligatoires (*) » — pas d'« erreur technique » | | |
 | 5.5 | 🟠 | Promotions : code auto | Code 4 chiffres pré-rempli, modifiable ; Responsable en bleu | | |

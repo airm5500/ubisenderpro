@@ -223,15 +223,23 @@ Usp.campaign.build = function (wizard) {
 
 Usp.campaign.launch = function (wizard) {
     if (!wizard.campagneId) { return; }
+    var id = wizard.campagneId;
     Usp.ajax({
-        url: '/campaigns/' + wizard.campagneId + '/launch', method: 'POST',
+        url: '/campaigns/' + id + '/launch', method: 'POST',
         success: function () {
             var store = wizard.refreshStore;
             wizard.close();
-            // Actualise la grille des campagnes dès le clic sur « OK » (#5).
-            Ext.Msg.alert('Campagne lancée',
-                'L\'envoi progresse en arrière-plan. Suivez les statuts dans le menu Campagnes.',
-                function () { if (store) { store.load(); } });
+            if (store) { store.load(); } // actualise la grille dès le lancement (#5)
+            // Barre de progression en direct (% + envoyés/total).
+            Usp.progressionEnvoi({
+                titre: 'Envoi de la campagne',
+                url: '/campaigns/' + id + '/statistics',
+                lire: function (d) {
+                    return { total: d.destinataires, envoyes: d.envoyes, echoues: d.echoues, statut: d.statut };
+                },
+                onFin: function () { if (store) { store.load(); } },
+                onClose: function () { if (store) { store.load(); } }
+            });
         },
         failure: function (resp) {
             Ext.Msg.alert('Erreur', 'Lancement impossible : ' + (resp.responseText || ''));
