@@ -40,6 +40,9 @@ public class Bootstrap {
     @EJB
     private PermissionService permissionService;
 
+    @EJB
+    private com.ubisenderpro.service.RapportService rapportService;
+
     @PostConstruct
     public void init() {
         runMigrations();
@@ -56,6 +59,13 @@ public class Bootstrap {
             if (menus > 0) { LOG.info("UbiSenderPro : " + menus + " menu(s) et permissions par défaut initialisés."); }
         } catch (Exception e) {
             LOG.warning("Initialisation des permissions ignorée : " + e.getMessage());
+        }
+        // Dépose les modèles .jrxml embarqués dans le répertoire des rapports
+        // (D:\REPORTS par défaut) pour qu'ils soient visibles et modifiables.
+        try {
+            rapportService.deployerModeles();
+        } catch (Exception e) {
+            LOG.warning("Dépôt des modèles de rapport ignoré : " + e.getMessage());
         }
     }
 

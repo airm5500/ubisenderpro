@@ -64,9 +64,10 @@ Usp.importer.estExcel = function (nom) {
     return /\.xlsx?$/i.test(String(nom || ''));
 };
 
-/* Pré-remplit les listes de correspondance : pour chaque champ de
- * l'application, cherche une colonne du fichier dont l'intitulé correspond au
- * nom technique OU au libellé affiché (accents, casse et séparateurs ignorés).
+/* Pré-remplit les correspondances : pour chaque champ de l'application,
+ * cherche une colonne du fichier dont l'intitulé correspond au nom technique
+ * OU au libellé affiché (accents, casse et séparateurs ignorés). Un champ
+ * reconnu est automatiquement COCHÉ et sa colonne sélectionnée.
  * Renvoie le nombre de correspondances trouvées. */
 Usp.importer.preRemplir = function (win, champs, colonnes) {
     var index = {};
@@ -76,39 +77,54 @@ Usp.importer.preRemplir = function (win, champs, colonnes) {
     });
     var trouves = 0;
     champs.forEach(function (c) {
-        var field = win.down('[name=map_' + c[0] + ']');
-        if (!field) { return; }
+        var combo = win.down('[name=map_' + c[0] + ']');
+        var caseImp = win.down('[name=imp_' + c[0] + ']');
+        if (!combo) { return; }
         // Le libellé peut porter une étoile (champ obligatoire) ou une précision
         // entre parenthèses : on ne compare que sa partie signifiante.
         var libelle = String(c[1]).replace(/\*/g, '').replace(/\(.*\)/, '');
         var col = index[Usp.importer.normaliser(c[0])] || index[Usp.importer.normaliser(libelle)];
-        if (col) { field.setValue(col); trouves++; }
+        if (col) {
+            if (caseImp && !caseImp.getValue()) { caseImp.setValue(true); }
+            combo.setDisabled(false);
+            combo.setValue(col);
+            trouves++;
+        }
     });
     return trouves;
 };
 
+/* Vrai si le champ est obligatoire (libellé marqué d'une étoile). */
+Usp.importer.estObligatoire = function (champ) { return String(champ[1]).indexOf('*') >= 0; };
+
 Usp.importer.show = function (type, url, onDone) {
     var champs = Usp.importer.CHAMPS[type] || [];
-    var colStore = Ext.create('Ext.data.Store', { fields: ['col', 'exemples'], data: [] });
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col'], data: [] });
     var fileData = { base64: null, nom: null };
 
-    // Combos de mapping : un par champ logique. La liste déroulante affiche
-    // l'intitulé de la colonne ET ses premières valeurs : c'est souvent le
-    // contenu, plus que l'intitulé, qui permet de reconnaître la bonne colonne.
-    var listConfig = {
-        getInnerTpl: function () {
-            return '<div><b>{col}</b>'
-                + '<tpl if="exemples"><div style="color:#888;font-size:11px">{exemples}</div></tpl></div>';
-        }
-    };
+    // Une ligne par champ de l'application : une CASE à cocher (« je récupère
+    // ce champ ») et la liste des colonnes du fichier (noms seuls). Les champs
+    // obligatoires sont cochés d'office et ne peuvent pas être décochés : si le
+    // fichier a moins de colonnes que l'application n'en connaît, on ne coche
+    // que ce qu'on veut récupérer.
     var mappingItems = champs.map(function (c) {
-        return {
-            xtype: 'combobox', name: 'map_' + c[0], fieldLabel: c[1],
-            store: colStore, valueField: 'col', displayField: 'col',
-            queryMode: 'local', editable: true, forceSelection: false, anchor: '100%',
-            listConfig: listConfig,
-            emptyText: '— aucune colonne (champ non importé) —'
-        };
+        var obligatoire = Usp.importer.estObligatoire(c);
+        return { xtype: 'fieldcontainer', fieldLabel: c[1], layout: 'hbox',
+            items: [
+                { xtype: 'checkbox', name: 'imp_' + c[0], checked: obligatoire,
+                  disabled: obligatoire, margin: '0 6 0 0',
+                  tooltip: obligatoire ? 'Champ obligatoire' : 'Cocher pour récupérer ce champ',
+                  listeners: { change: function (cb, coche) {
+                      var combo = cb.up('fieldcontainer').down('combobox');
+                      combo.setDisabled(!coche);
+                      if (!coche) { combo.setValue(null); }
+                  } } },
+                { xtype: 'combobox', name: 'map_' + c[0], flex: 1,
+                  store: colStore, valueField: 'col', displayField: 'col',
+                  queryMode: 'local', editable: false, forceSelection: true,
+                  disabled: !obligatoire,
+                  emptyText: 'Choisir la colonne du fichier…' }
+            ] };
     });
 
     // Modèles de mapping sauvegardés.
@@ -145,16 +161,11 @@ Usp.importer.show = function (type, url, onDone) {
                         + (Usp.importer.estExcel(fileData.nom) ? '' : ', et le séparateur choisi') + '.</span>');
                     return;
                 }
-                colStore.loadData(cols.map(function (c) {
-                    var vals = (r.exemples || []).map(function (l) { return l[c]; })
-                        .filter(function (v) { return v !== null && v !== undefined && v !== ''; });
-                    return { col: c, exemples: vals.slice(0, 3).join(' · ') };
-                }));
+                colStore.loadData(cols.map(function (c) { return { col: c }; }));
                 var apparies = Usp.importer.preRemplir(win, champs, cols);
-                etat.setValue('<span style="color:#2e7d32">' + cols.length + ' colonne(s) détectée(s), '
-                    + (r.totalLignes || 0) + ' ligne(s) de données — ' + apparies
-                    + ' correspondance(s) trouvée(s) automatiquement.</span> '
-                    + '<span style="color:#888">Vérifiez la correspondance ci-dessous.</span>');
+                etat.setValue('<span style="color:#2e7d32">' + cols.length + ' colonne(s) lue(s)'
+                    + (apparies ? ', ' + apparies + ' reconnue(s) automatiquement' : '') + '.</span> '
+                    + '<span style="color:#888">Cochez les champs à récupérer et choisissez leur colonne.</span>');
             },
             failure: function (resp) {
                 etat.setValue('<span style="color:#c62828">'
@@ -207,8 +218,15 @@ Usp.importer.show = function (type, url, onDone) {
                       try {
                           var m = Ext.decode(rec.get('mappingJson'));
                           Ext.Object.each(m, function (k, v) {
-                              var field = win.down('[name=map_' + k + ']');
-                              if (field) { field.setValue(v); }
+                              var combo = win.down('[name=map_' + k + ']');
+                              var caseImp = win.down('[name=imp_' + k + ']');
+                              if (!combo) { return; }
+                              if (caseImp && !caseImp.getValue()) { caseImp.setValue(true); }
+                              combo.setDisabled(false);
+                              // La colonne du modèle peut être absente de CE fichier :
+                              // on l'ajoute à la liste pour ne pas perdre le réglage.
+                              if (colStore.findExact('col', v) < 0) { colStore.add({ col: v }); }
+                              combo.setValue(v);
                           });
                       } catch (e) { }
                   } } },
@@ -251,13 +269,29 @@ Usp.importer.exempleCsv = function (type, champs, sep) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
 };
 
+/* Correspondance retenue : uniquement les champs COCHÉS dont une colonne est
+ * choisie. Un champ décoché est ignoré même si une colonne restait affichée. */
 Usp.importer.collecterMapping = function (win, champs) {
     var mapping = {};
     champs.forEach(function (c) {
+        var caseImp = win.down('[name=imp_' + c[0] + ']');
+        if (caseImp && !caseImp.getValue()) { return; }
         var v = win.down('[name=map_' + c[0] + ']').getValue();
         if (v) { mapping[c[0]] = v; }
     });
     return mapping;
+};
+
+/* Champs obligatoires sans colonne choisie (liste de libellés, vide si OK). */
+Usp.importer.obligatoiresManquants = function (win, champs) {
+    var manquants = [];
+    champs.forEach(function (c) {
+        if (!Usp.importer.estObligatoire(c)) { return; }
+        if (!win.down('[name=map_' + c[0] + ']').getValue()) {
+            manquants.push(String(c[1]).replace(/\s*\*\s*$/, ''));
+        }
+    });
+    return manquants;
 };
 
 Usp.importer.saveMapping = function (win, type, champs, mappingStore) {
@@ -278,6 +312,15 @@ Usp.importer.saveMapping = function (win, type, champs, mappingStore) {
 
 Usp.importer.run = function (win, type, url, champs, fileData, onDone) {
     if (!fileData.base64) { Ext.Msg.alert('Erreur', 'Sélectionnez un fichier.'); return; }
+    // Les champs obligatoires doivent avoir leur colonne AVANT de lancer :
+    // mieux vaut un message immédiat que des lignes rejetées en bout de course.
+    var manquants = Usp.importer.obligatoiresManquants(win, champs);
+    if (manquants.length) {
+        Ext.Msg.alert('Champs obligatoires',
+            'Choisissez la colonne du fichier pour : <b>'
+            + manquants.map(Ext.String.htmlEncode).join('</b>, <b>') + '</b>.');
+        return;
+    }
     var payload = {
         nomFichier: fileData.nom,
         separateur: win.down('[name=separateur]').getValue(),

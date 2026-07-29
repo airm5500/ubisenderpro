@@ -47,6 +47,16 @@ public class RapportService {
     /** Noms de modèles admissibles : pas de traversée de répertoire possible. */
     private static final Pattern NOM_VALIDE = Pattern.compile("[a-z0-9_\\-]+");
 
+    /** Répertoire des modèles si le paramètre n'est pas renseigné. */
+    public static final String REPERTOIRE_DEFAUT = "D:\\REPORTS";
+
+    /**
+     * Modèles embarqués dans le livrable (src/main/resources/reports). Ils sont
+     * déposés dans le répertoire des rapports au démarrage s'ils n'y figurent
+     * pas déjà : l'exploitant les retrouve en clair et peut les personnaliser.
+     */
+    public static final String[] MODELES_EMBARQUES = { "clients" };
+
     private static final Pattern MEDIA_ID = Pattern.compile("/media/(\\d+)\\b");
 
     /** Cache des modèles compilés, partagé entre instances du bean. */
@@ -157,12 +167,49 @@ public class RapportService {
         return rapport;
     }
 
+    /** Répertoire configuré des modèles (D:\REPORTS à défaut). */
+    private String repertoire() {
+        String dir = parametreService.valeur("rapports.repertoire", REPERTOIRE_DEFAUT);
+        return (dir == null || dir.trim().isEmpty()) ? REPERTOIRE_DEFAUT : dir.trim();
+    }
+
     /** Fichier {repertoire}/{nom}.jrxml s'il existe et se lit, sinon null. */
     private File fichierExterne(String nom) {
-        String dir = parametreService.valeur("rapports.repertoire", "");
-        if (dir == null || dir.trim().isEmpty()) { return null; }
-        File f = new File(dir.trim(), nom + ".jrxml");
+        File f = new File(repertoire(), nom + ".jrxml");
         return f.isFile() && f.canRead() ? f : null;
+    }
+
+    /**
+     * Dépose dans le répertoire des rapports les modèles embarqués qui n'y
+     * figurent pas encore (jamais d'écrasement : une personnalisation est
+     * conservée). Best-effort : sur un serveur sans ce disque, on journalise et
+     * l'application fonctionne sur les modèles embarqués.
+     *
+     * @return nombre de modèles déposés
+     */
+    public int deployerModeles() {
+        File dir = new File(repertoire());
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            LOG.info("Rapports : répertoire " + dir.getPath()
+                    + " inaccessible — modèles embarqués utilisés.");
+            return 0;
+        }
+        int copies = 0;
+        for (String nom : MODELES_EMBARQUES) {
+            File cible = new File(dir, nom + ".jrxml");
+            if (cible.exists()) { continue; }
+            try (InputStream in = getClass().getResourceAsStream("/reports/" + nom + ".jrxml")) {
+                if (in == null) { continue; }
+                java.nio.file.Files.copy(in, cible.toPath());
+                copies++;
+            } catch (Exception e) {
+                LOG.warning("Rapports : dépôt de " + cible.getPath() + " impossible : " + e.getMessage());
+            }
+        }
+        if (copies > 0) {
+            LOG.info("Rapports : " + copies + " modèle(s) .jrxml déposé(s) dans " + dir.getPath());
+        }
+        return copies;
     }
 
     /* ------------------------------------------------------------------ */

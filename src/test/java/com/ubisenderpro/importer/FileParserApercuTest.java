@@ -98,6 +98,37 @@ class FileParserApercuTest {
         assertEquals(1, exemples.size());
     }
 
+    /**
+     * Fichier ANSI (windows-1252), le format habituel des exports Excel
+     * francais : les accents doivent survivre. Lu de force en UTF-8, chaque
+     * accent devenait un caractere de remplacement (« Num�ro client »).
+     */
+    @Test
+    void csvWindows1252Accentue() throws Exception {
+        byte[] f = "Numéro client;Modifié le\nC001;2026-07-29\n"
+                .getBytes(java.nio.charset.Charset.forName("windows-1252"));
+        List<String> cols = FileParser.entetes(f, "clients.csv", ';');
+        assertEquals(java.util.Arrays.asList("Numéro client", "Modifié le"), cols);
+        assertEquals("C001", FileParser.parse(f, "clients.csv", ';').get(0).get("Numéro client"));
+    }
+
+    @Test
+    void csvUtf8AccentueIntact() throws Exception {
+        byte[] f = "Numéro client;Téléphone\nC001;07\n".getBytes(StandardCharsets.UTF_8);
+        assertEquals(java.util.Arrays.asList("Numéro client", "Téléphone"),
+                FileParser.entetes(f, "clients.csv", ';'));
+    }
+
+    @Test
+    void csvUtf8AvecBom() throws Exception {
+        byte[] corps = "code;nom\nC001;POLAP\n".getBytes(StandardCharsets.UTF_8);
+        byte[] f = new byte[corps.length + 3];
+        f[0] = (byte) 0xEF; f[1] = (byte) 0xBB; f[2] = (byte) 0xBF;
+        System.arraycopy(corps, 0, f, 3, corps.length);
+        // Sans retrait du BOM, la premiere colonne s'appellerait "﻿code".
+        assertEquals(java.util.Arrays.asList("code", "nom"), FileParser.entetes(f, "clients.csv", ';'));
+    }
+
     @Test
     void reconnaissanceDuFormatExcel() {
         assertTrue(FileParser.estExcel("liste.xlsx"));

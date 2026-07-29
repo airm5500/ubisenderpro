@@ -1126,8 +1126,8 @@ Usp.majSelectivePanel = function () {
     // Une case à cocher par champ : elle seule décide si le champ est appliqué.
     // La valeur vide est permise (ex. retirer la tournée de comptes cochés).
     var ligneChamp = function (caseId, caseLabel, combo) {
-        return { xtype: 'fieldcontainer', layout: 'hbox', margin: '0 0 4 0', items: [
-            { xtype: 'checkbox', itemId: caseId, boxLabel: caseLabel, width: 130 },
+        return { xtype: 'fieldcontainer', layout: 'hbox', margin: '0 0 8 0', items: [
+            { xtype: 'checkbox', itemId: caseId, boxLabel: caseLabel, width: 110 },
             combo
         ] };
     };
@@ -1172,29 +1172,49 @@ Usp.majSelectivePanel = function () {
                 { text: 'Tout cocher (résultat)', handler: function () { sm.selectAll(); } },
                 { text: 'Tout décocher', handler: function () { sm.deselectAll(); } }
               ],
-              listeners: { afterrender: chargerTournees }
+              listeners: { afterrender: function (g) {
+                  chargerTournees();
+                  // Compteur vivant : on sait toujours combien de comptes
+                  // recevront la modification avant de cliquer sur Appliquer.
+                  sm.on('selectionchange', function (s, recs) {
+                      var c = g.up('panel').down('#msCompteur');
+                      if (c) {
+                          c.setValue(recs.length
+                              ? '<b style="color:#1976d2">' + recs.length + ' compte(s) coché(s).</b>'
+                              : '<span style="color:#888">Aucun compte coché.</span>');
+                      }
+                  });
+              } }
             },
-            { region: 'south', xtype: 'form', bodyPadding: 10, border: false, height: 175,
-              title: 'Nouvelles valeurs (appliquées aux comptes cochés)',
+            // Volet de droite : en bas d'écran, les derniers champs sortaient de
+            // la zone visible (rien après « Agence » sur un petit écran). À
+            // droite, les quatre champs et le bouton restent toujours visibles,
+            // la grille garde la hauteur entière pour cocher les comptes.
+            { region: 'east', xtype: 'form', bodyPadding: 12, width: 340, split: true,
+              autoScroll: true,
+              title: 'Nouvelles valeurs (comptes cochés)',
+              defaults: { anchor: '100%' },
               items: [
-                { xtype: 'displayfield', hideLabel: true, margin: '0 0 6 0',
+                { xtype: 'displayfield', hideLabel: true, margin: '0 0 10 0',
                   value: '<span style="color:#888">Cochez le ou les champs à changer. Un champ non coché '
                       + 'n\'est pas touché ; un champ coché laissé vide est effacé sur les comptes choisis.</span>' },
-                ligneChamp('msCaseSeg', 'Segmentation', Ext.apply({ itemId: 'msSeg', width: 260,
+                ligneChamp('msCaseSeg', 'Segmentation', Ext.apply({ itemId: 'msSeg', flex: 1,
                     xtype: 'combobox', store: segStore, valueField: 'id', displayField: 'libelle',
                     queryMode: 'local', editable: false, emptyText: 'Choisir…' })),
-                ligneChamp('msCaseAgence', 'Agence', { xtype: 'combobox', itemId: 'msAgence', width: 260,
+                ligneChamp('msCaseAgence', 'Agence', { xtype: 'combobox', itemId: 'msAgence', flex: 1,
                     store: refStore('AGENCE'), valueField: 'libelle', displayField: 'libelle',
                     queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
-                ligneChamp('msCaseRegion', 'Région', { xtype: 'combobox', itemId: 'msRegion', width: 260,
+                ligneChamp('msCaseRegion', 'Région', { xtype: 'combobox', itemId: 'msRegion', flex: 1,
                     store: refStore('REGION'), valueField: 'libelle', displayField: 'libelle',
                     queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
-                ligneChamp('msCaseTournee', 'Tournée', { xtype: 'combobox', itemId: 'msTournee', width: 260,
+                ligneChamp('msCaseTournee', 'Tournée', { xtype: 'combobox', itemId: 'msTournee', flex: 1,
                     store: tourneeStore, valueField: 'v', displayField: 'v',
                     queryMode: 'local', forceSelection: false,
-                    emptyText: 'Choisir ou saisir une nouvelle tournée…' })
+                    emptyText: 'Choisir ou saisir…' }),
+                { xtype: 'displayfield', itemId: 'msCompteur', hideLabel: true, margin: '6 0 0 0',
+                  value: '<span style="color:#888">Aucun compte coché.</span>' }
               ],
-              bbar: ['->', { text: '✅ Appliquer aux comptes cochés',
+              bbar: ['->', { text: '✅ Appliquer', tooltip: 'Appliquer aux comptes cochés',
                   handler: function (b) { appliquer(b.up('panel').up('panel')); } }]
             }
         ]
