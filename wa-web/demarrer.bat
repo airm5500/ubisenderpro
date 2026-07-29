@@ -46,7 +46,9 @@ if errorlevel 1 goto ECHEC_NPM
 :DEMARRER
 echo.
 echo  Demarrage du service... (laissez cette fenetre OUVERTE)
-echo  Pour arreter le service : Ctrl+C, ou fermez cette fenetre.
+echo  Pour ARRETER le service : appuyez sur Ctrl+C (arret propre).
+echo  Evitez de fermer la fenetre d'un coup : les cles de chiffrement
+echo  risquent d'etre a demi ecrites (messages illisibles ensuite).
 echo.
 node server.js
 echo.

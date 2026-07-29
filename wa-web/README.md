@@ -33,6 +33,29 @@ connexion par **QR**, envoi **texte/média**, **filtre de numéros**.
 | `WA_WEB_DATA` | non | Dossier des sessions (défaut `./data`) |
 | `LOG_LEVEL` | non | `info` (défaut), `debug`, `warn`, `error` |
 
+### « En attente de ce message. Ceci pourrait prendre un moment »
+
+Message affiché **sur le téléphone du destinataire** : il a bien reçu le
+message mais n'a pas pu le **déchiffrer**, et il en redemande une copie
+(*retry receipt*). Le service la renvoie automatiquement — d'où le délai avant
+l'affichage.
+
+Causes fréquentes, par ordre d'importance :
+
+1. **Ré-appairage récent** (déconnexion + nouveau scan du QR). Chaque nouveau
+   scan crée un nouvel appareil (`:18`, `:19`, `:20`…) et **réinitialise les
+   sessions de chiffrement avec tous les contacts** : les premiers messages
+   vers chaque contact demandent alors une reprise. C'est le facteur n°1 —
+   évitez de rescanner sans nécessité, cela se stabilise ensuite.
+2. **Arrêt brutal du service** (fenêtre fermée d'un coup) : l'état de
+   chiffrement peut rester à demi écrit. **Arrêtez toujours avec Ctrl+C.**
+3. Premier échange avec un contact, ou contact resté longtemps sans échange.
+
+Ce que fait le service pour limiter le problème : cache mémoire des clés
+Signal, réponse automatique aux *retry receipts*, **cache des messages envoyés
+persisté sur disque** (`messages-envoyes.json`, 300 derniers) — donc une reprise
+reste possible même après un redémarrage — et **arrêt propre** sur Ctrl+C.
+
 ## Lancer (Docker)
 
 ```bash

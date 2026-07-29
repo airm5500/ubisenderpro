@@ -129,20 +129,59 @@ function phoneFromKey(k) {
   return null;
 }
 
+/** Nombre de messages envoyés conservés sur disque (réponse aux retry receipts). */
+const MAX_SENT = 300;
+
+function fichierSent(id) { return path.join(sessionDir(id), 'messages-envoyes.json'); }
+
+/**
+ * Recharge le cache des messages envoyés. Sans lui, un destinataire qui
+ * redemande un message après un redémarrage du service resterait bloqué sur
+ * « En attente de ce message… » : nous serions incapables de le renvoyer.
+ */
+function chargerSent(id) {
+  const m = new Map();
+  try {
+    const f = fichierSent(id);
+    if (!fs.existsSync(f)) { return m; }
+    const brut = JSON.parse(fs.readFileSync(f, 'utf8'), (cle, val) =>
+      (val && typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data))
+        ? Buffer.from(val.data) : val);
+    for (const [k, v] of Object.entries(brut || {})) { m.set(k, v); }
+    logger.info({ id, messages: m.size }, 'Cache des messages envoyés rechargé');
+  } catch (e) {
+    logger.warn({ id }, 'Cache des messages envoyés illisible : ' + (e.message || e));
+  }
+  return m;
+}
+
+/** Écriture différée (regroupe les envois rapprochés en une seule écriture). */
+function planifierSauvegardeSent(id, s) {
+  if (!s || s.sentTimer) { return; }
+  s.sentTimer = setTimeout(() => {
+    s.sentTimer = null;
+    try {
+      fs.mkdirSync(sessionDir(id), { recursive: true });
+      fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+    } catch (e) { logger.warn({ id }, 'Sauvegarde du cache impossible : ' + (e.message || e)); }
+  }, 2000);
+}
+
+/** Mémorise un message envoyé (pour répondre aux retry receipts). Borne la taille. */
+function rememberSent(s, r, id) {
+  if (!s || !s.sent || !r || !r.key || !r.key.id || !r.message) { return; }
+  s.sent.set(r.key.id, r.message);
+  while (s.sent.size > MAX_SENT) {
+    const first = s.sent.keys().next().value;
+    s.sent.delete(first);
+  }
+  planifierSauvegardeSent(id, s);
+}
+
 /**
  * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
  * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
  */
-/** Mémorise un message envoyé (pour répondre aux retry receipts). Borne la taille. */
-function rememberSent(s, r) {
-  if (!s || !s.sent || !r || !r.key || !r.key.id || !r.message) { return; }
-  s.sent.set(r.key.id, r.message);
-  if (s.sent.size > 1000) {
-    const first = s.sent.keys().next().value;
-    s.sent.delete(first);
-  }
-}
-
 async function resolveJid(sock, numero) {
   const clean = String(numero).replace(/[^0-9]/g, '');
   if (clean.length < 6) { return null; }
@@ -237,7 +276,7 @@ async function startSession(id) {
 
   // Cache des messages envoyés : indispensable pour répondre aux « retry receipts »
   // (sinon le destinataire reste bloqué sur « En attente de ce message… »).
-  if (!s.sent) { s.sent = new Map(); }
+  if (!s.sent) { s.sent = chargerSent(id); }
   if (!s.retryCache) {
     s.retryCache = {
       _m: new Map(),
@@ -427,7 +466,7 @@ app.post('/sessions/:id/send', async (req, res) => {
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
-    rememberSent(s, r);
+    rememberSent(s, r, req.params.id);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -440,7 +479,7 @@ app.post('/sessions/:id/send-media', async (req, res) => {
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
-    rememberSent(s, r);
+    rememberSent(s, r, req.params.id);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -541,6 +580,35 @@ function verifierConfiguration() {
   }
 }
 
+/**
+ * Arrêt propre : ferme les sockets SANS délier l'appareil, et laisse le temps
+ * aux écritures de clés de chiffrement de se terminer. Une coupure brutale
+ * (fenêtre fermée d'un coup) peut laisser l'état Signal à demi écrit — ce qui
+ * provoque ensuite des messages illisibles et des « En attente de ce message ».
+ */
+let arretEnCours = false;
+function arretPropre(signal) {
+  if (arretEnCours) { return; }
+  arretEnCours = true;
+  logger.info('Arrêt demandé (' + signal + ') : fermeture propre des sessions…');
+  for (const [id, s] of sessions) {
+    try {
+      // Sauvegarde immédiate du cache des messages envoyés (timer différé annulé).
+      if (s && s.sentTimer) { clearTimeout(s.sentTimer); s.sentTimer = null; }
+      if (s && s.sent && s.sent.size) {
+        fs.mkdirSync(sessionDir(id), { recursive: true });
+        fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+      }
+      // end() ferme la connexion en conservant l'appairage (à l'inverse de logout()).
+      if (s && s.sock) { s.sock.end(undefined); }
+      logger.info({ id }, 'Session fermée proprement');
+    } catch (e) { /* on continue : l'arrêt ne doit jamais bloquer */ }
+  }
+  setTimeout(() => process.exit(0), 900);
+}
+process.on('SIGINT', () => arretPropre('SIGINT'));
+process.on('SIGTERM', () => arretPropre('SIGTERM'));
+
 app.listen(PORT, () => {
   verifierConfiguration();
   restoreSessions();
@@ -548,6 +616,6 @@ app.listen(PORT, () => {
   console.log('\n' + '='.repeat(72));
   console.log('  SERVICE DEMARRE — en ecoute sur http://localhost:' + PORT);
   console.log('  Verification : ouvrez http://localhost:' + PORT + '/health');
-  console.log('  Laissez cette fenetre OUVERTE (Ctrl+C pour arreter).');
+  console.log('  Laissez cette fenetre OUVERTE. Arret propre : Ctrl+C');
   console.log('='.repeat(72) + '\n');
 });
