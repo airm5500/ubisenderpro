@@ -606,7 +606,10 @@ public class EnvoiProposeService {
 
         Campagne c = new Campagne();
         c.setNom(e.getTitre());
-        c.setDescription(corps);
+        // Résumé court : recopier tout le message ici rendait le champ
+        // « Description » illisible dans le formulaire. Le texte réellement
+        // envoyé vit dans le modèle (et lui seul est utilisé à l'envoi).
+        c.setDescription(resumeCampagne(objectif, e.getTitre()));
         c.setObjectif(objectif);
         c.setCategorie(categorie);
         c.setStatut("BROUILLON");
@@ -948,6 +951,20 @@ public class EnvoiProposeService {
 
     private String fdate(LocalDateTime d) { return d == null ? "" : d.toLocalDate().format(DF); }
     private String nz(String s) { return s == null ? "" : s.trim(); }
+
+    /**
+     * Résumé court porté par la campagne générée : rappelle l'origine et la date
+     * de génération. Le message complet reste dans le modèle associé — le
+     * recopier ici rendait le champ « Description » du formulaire illisible.
+     */
+    static String resumeCampagne(String objectif, String titre) {
+        String o = (objectif == null || objectif.trim().isEmpty()) ? "Envoi" : objectif.trim();
+        String t = (titre == null || titre.trim().isEmpty()) ? "" : " « " + titre.trim() + " »";
+        String resume = o + t + " — générée automatiquement le "
+                + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " depuis une proposition d'envoi. Le message se trouve dans le modèle associé.";
+        return resume.length() <= 500 ? resume : resume.substring(0, 500);
+    }
 
     private String tronquer(String s, int max) {
         if (s == null) { return null; }

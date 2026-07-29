@@ -6,6 +6,7 @@
 Ext.define('Usp.campaign', { singleton: true });
 
 Usp.campaign.combo = function (url, root, valueField, displayField, cfg) {
+    cfg = cfg || {};
     var store = Ext.create('Ext.data.Store', {
         fields: [valueField, displayField],
         proxy: {
@@ -15,11 +16,36 @@ Usp.campaign.combo = function (url, root, valueField, displayField, cfg) {
         },
         autoLoad: true
     });
-    return Ext.apply({
+    var conf = Ext.apply({
         xtype: 'combobox', store: store, queryMode: 'local',
         valueField: valueField, displayField: displayField,
         anchor: '100%', editable: false
-    }, cfg || {});
+    }, cfg);
+    // Le magasin se charge en asynchrone : une valeur posée avant l'arrivée des
+    // données ne trouve pas sa correspondance et le champ paraît VIDE (ou affiche
+    // l'identifiant brut). On la réapplique donc une fois les données chargées.
+    if (cfg.value !== undefined && cfg.value !== null && cfg.value !== '') {
+        conf.listeners = { afterrender: function (c) {
+            Usp.campaign.appliquerValeurCombo(c, store, valueField, cfg.value);
+        } };
+    }
+    return conf;
+};
+
+/**
+ * Applique une valeur à une liste déroulante en tolérant l'écart de type :
+ * l'identifiant peut être numérique côté magasin et texte côté enregistrement
+ * (c'est le cas de la session WhatsApp Web, stockée en texte).
+ */
+Usp.campaign.appliquerValeurCombo = function (combo, store, valueField, valeur) {
+    var appliquer = function () {
+        var i = store.findBy(function (r) {
+            return String(r.get(valueField)) === String(valeur);
+        });
+        if (i >= 0) { combo.setValue(store.getAt(i).get(valueField)); }
+    };
+    if (store.getCount() > 0) { appliquer(); }
+    else { store.on('load', appliquer, null, { single: true }); }
 };
 
 Usp.campaign.show = function (store) {
@@ -273,6 +299,66 @@ Usp.campaign.launch = function (wizard) {
     });
 };
 
+/**
+ * Lance une campagne EXISTANTE au statut BROUILLON (créée par l'assistant, ou
+ * générée automatiquement depuis une proposition d'envoi validée).
+ *
+ * Sans ce chemin, une campagne issue d'une proposition restait bloquée : le
+ * bouton « Lancer » n'existait que dans l'assistant de création.
+ *
+ * Enchaîne : calcul des destinataires -> confirmation avec le nombre réel ->
+ * envoi -> barre de progression.
+ */
+Usp.campaign.lancerExistante = function (rec, store, onLance) {
+    if (!Usp.can('campaigns', 'CREER')) { Usp.refusPermission(); return; }
+    var id = rec.get ? rec.get('id') : rec.id;
+    var nom = (rec.get ? rec.get('nom') : rec.nom) || ('campagne ' + id);
+
+    var envoyer = function () {
+        Usp.ajax({ url: '/campaigns/' + id + '/launch', method: 'POST',
+            success: function () {
+                if (store) { store.load(); }
+                if (onLance) { onLance(); }
+                Usp.progressionEnvoi({
+                    titre: 'Envoi de la campagne — ' + nom,
+                    url: '/campaigns/' + id + '/statistics',
+                    lire: function (d) {
+                        return { total: d.destinataires, envoyes: d.envoyes, echoues: d.echoues, statut: d.statut };
+                    },
+                    onFin: function () { if (store) { store.load(); } },
+                    onClose: function () { if (store) { store.load(); } }
+                });
+            },
+            failure: function (resp) {
+                Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Lancement impossible.'));
+            } });
+    };
+
+    // Les destinataires sont recalculés juste avant l'envoi : le ciblage a pu
+    // changer depuis la création (liste de diffusion modifiée, par exemple).
+    Usp.ajax({ url: '/campaigns/' + id + '/recipients', method: 'POST',
+        success: function (resp) {
+            var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+            var n = r.nbDestinataires || 0;
+            if (store) { store.load(); }
+            if (n === 0) {
+                Ext.Msg.alert('Aucun destinataire',
+                    'Cette campagne ne cible <b>aucun destinataire</b>.<br/><br/>' +
+                    'Vérifiez, via ✏️ Modifier :<br/>' +
+                    '&nbsp;• qu\'une liste de diffusion, une segmentation ou un segment est sélectionné ;<br/>' +
+                    '&nbsp;• que ces clients ont un numéro <b>coché « WhatsApp »</b> ;<br/>' +
+                    '&nbsp;• qu\'ils ne sont pas désabonnés.');
+                return;
+            }
+            Ext.Msg.confirm('Lancer la campagne',
+                'Envoyer « ' + Ext.String.htmlEncode(nom) + ' » à <b>' + n + '</b> destinataire(s) ?',
+                function (btn) { if (btn === 'yes') { envoyer(); } });
+        },
+        failure: function (resp) {
+            Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Calcul des destinataires impossible.'));
+        } });
+};
+
 /* Couleurs des statuts de campagne (#5) : EN_COURS orange, distribué bleu,
    lu vert, échoué rouge, terminé gris. */
 Usp.campaign.COULEUR_STATUT = {
@@ -365,8 +451,16 @@ Usp.campaign.listPanel = function () {
             { text: 'Par', dataIndex: 'createurNom', width: 110 },
             { text: 'Actions', width: 260, sortable: false, menuDisabled: true, dataIndex: 'id',
               renderer: function (v, m, rec) {
-                  var s = '<span class="camp-details" title="Voir les destinataires" ' +
-                          'style="cursor:pointer;color:#1976d2">🔍 Détails</span>';
+                  var s = '';
+                  // Une campagne au brouillon (assistant ou proposition validée)
+                  // doit pouvoir être lancée depuis la liste : sans cela, celles
+                  // issues d'une proposition restaient sans aucun moyen d'envoi.
+                  if (rec.get('statut') === 'BROUILLON') {
+                      s += '<span class="camp-launch" title="Calculer les destinataires et lancer l\'envoi" ' +
+                           'style="cursor:pointer;color:#2e7d32;font-weight:bold">▶ Lancer</span> &nbsp;';
+                  }
+                  s += '<span class="camp-details" title="Voir les destinataires" ' +
+                       'style="cursor:pointer;color:#1976d2">🔍 Détails</span>';
                   if ((rec.get('nbEchoues') || 0) > 0) {
                       s += ' &nbsp;<span class="camp-relance" title="Relancer les envois en échec" ' +
                            'style="cursor:pointer;color:#c62828">↻ Relance</span>';
@@ -389,7 +483,10 @@ Usp.campaign.listPanel = function () {
         })).concat(Usp.export.boutons('Campagnes')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
-                if (e.getTarget('.camp-details')) {
+                if (e.getTarget('.camp-launch')) {
+                    Usp.campaign.lancerExistante(rec, store);
+                }
+                else if (e.getTarget('.camp-details')) {
                     if (!Usp.can('campaigns', 'VOIR_DETAILS')) { Usp.refusPermission(); return; }
                     Usp.campaign.details(rec);
                 }
@@ -428,9 +525,21 @@ Usp.campaign.editForm = function (rec, store) {
                   } },
                 Usp.campaign.combo('/whatsapp/accounts', '', 'id', 'libelle',
                     { name: 'whatsappAccountId', itemId: 'fAccount', fieldLabel: 'Compte WhatsApp', value: camp.whatsappAccountId }),
-                { xtype: 'combobox', name: 'waWebSessionId', itemId: 'fWebSession', fieldLabel: 'Session WhatsApp Web',
-                  anchor: '100%', queryMode: 'local', editable: false, hidden: true, value: camp.waWebSessionId,
-                  store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle' },
+                (function () {
+                    // Session WhatsApp Web : l'identifiant est stocké en TEXTE (« 2 »)
+                    // alors que la liste expose un id NUMÉRIQUE — sans réapplication
+                    // après chargement, le champ affichait « 2 » au lieu du libellé.
+                    var stSession = Usp.waweb.sessionComboStore();
+                    return { xtype: 'combobox', name: 'waWebSessionId', itemId: 'fWebSession',
+                        fieldLabel: 'Session WhatsApp Web', anchor: '100%', queryMode: 'local',
+                        editable: false, hidden: true, value: camp.waWebSessionId,
+                        store: stSession, valueField: 'id', displayField: 'libelle',
+                        listeners: { afterrender: function (c) {
+                            if (camp.waWebSessionId) {
+                                Usp.campaign.appliquerValeurCombo(c, stSession, 'id', camp.waWebSessionId);
+                            }
+                        } } };
+                })(),
                 Usp.campaign.combo('/templates', '', 'id', 'nom',
                     { name: 'modeleId', fieldLabel: 'Modèle de message', value: camp.modeleId }),
                 { xtype: 'displayfield', value: '<span style="color:#888">Ciblage (les destinataires seront recalculés) :</span>' },
@@ -446,39 +555,60 @@ Usp.campaign.editForm = function (rec, store) {
                        '(nom, objectif, description) sont modifiables.</span>' });
         }
 
-        var win = Ext.create('Ext.window.Window', {
+        var win;
+        /** Enregistre le formulaire ; enchaîne le lancement si demandé. */
+        var enregistrer = function (b, puisLancer) {
+            var f = b.up('window').down('form').getForm();
+            if (!f.isValid()) { return; }
+            var v = f.getValues();
+            camp.nom = v.nom; camp.objectif = v.objectif; camp.description = v.description;
+            if (complet) {
+                camp.canal = v.canal;
+                camp.whatsappAccountId = (v.canal === 'WEB') ? null : (v.whatsappAccountId || null);
+                camp.waWebSessionId = (v.canal === 'WEB') ? (v.waWebSessionId || null) : null;
+                camp.modeleId = v.modeleId || null;
+                camp.segmentationId = v.segmentationId || null;
+                camp.listeId = v.listeId || null;
+                camp.segmentId = v.segmentId || null;
+                if (!camp.modeleId) { Ext.Msg.alert('Champ requis', 'Le modèle de message est obligatoire.'); return; }
+                if (v.canal === 'WEB' && !camp.waWebSessionId) { Ext.Msg.alert('Champ requis', 'Choisissez la session WhatsApp Web.'); return; }
+                if (v.canal !== 'WEB' && !camp.whatsappAccountId) { Ext.Msg.alert('Champ requis', 'Choisissez le compte WhatsApp.'); return; }
+            }
+            Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
+                success: function () {
+                    if (puisLancer) {
+                        // lancerExistante recalcule déjà les destinataires : on ferme
+                        // et on lui laisse la main (confirmation + barre de progression).
+                        win.close();
+                        store.load();
+                        Usp.campaign.lancerExistante(rec, store);
+                        return;
+                    }
+                    var fin = function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); };
+                    // Recalcule les destinataires si le ciblage a pu changer (campagne non lancée).
+                    if (complet) {
+                        Usp.ajax({ url: '/campaigns/' + rec.get('id') + '/recipients', method: 'POST',
+                            success: fin, failure: fin });
+                    } else { fin(); }
+                },
+                failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
+        };
+
+        var boutons = [];
+        // Campagne au brouillon : on peut enregistrer ET lancer dans la foulée.
+        if (complet && Usp.can('campaigns', 'CREER')) {
+            boutons.push({ text: '▶ Enregistrer et lancer', cls: 'usp-btn-pri', formBind: true,
+                handler: function (b) { enregistrer(b, true); } });
+        }
+        boutons.push({ text: 'Enregistrer', formBind: true,
+            handler: function (b) { enregistrer(b, false); } });
+
+        win = Ext.create('Ext.window.Window', {
             title: 'Modifier la campagne' + (complet ? '' : ' (lancée)'),
             width: 560, modal: true, bodyPadding: 12, autoScroll: true,
             maxHeight: Ext.getBody().getViewSize().height - 40,
             items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 160 }, items: items }],
-            buttons: [{ text: 'Enregistrer', formBind: true, handler: function (b) {
-                var f = b.up('window').down('form').getForm();
-                if (!f.isValid()) { return; }
-                var v = f.getValues();
-                camp.nom = v.nom; camp.objectif = v.objectif; camp.description = v.description;
-                if (complet) {
-                    camp.canal = v.canal;
-                    camp.whatsappAccountId = (v.canal === 'WEB') ? null : (v.whatsappAccountId || null);
-                    camp.waWebSessionId = (v.canal === 'WEB') ? (v.waWebSessionId || null) : null;
-                    camp.modeleId = v.modeleId || null;
-                    camp.segmentationId = v.segmentationId || null;
-                    camp.listeId = v.listeId || null;
-                    camp.segmentId = v.segmentId || null;
-                    if (!camp.modeleId) { Ext.Msg.alert('Champ requis', 'Le modèle de message est obligatoire.'); return; }
-                    if (v.canal === 'WEB' && !camp.waWebSessionId) { Ext.Msg.alert('Champ requis', 'Choisissez la session WhatsApp Web.'); return; }
-                    if (v.canal !== 'WEB' && !camp.whatsappAccountId) { Ext.Msg.alert('Champ requis', 'Choisissez le compte WhatsApp.'); return; }
-                }
-                Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
-                    success: function () {
-                        var fin = function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); };
-                        // Recalcule les destinataires si le ciblage a pu changer (campagne non lancée).
-                        if (complet) {
-                            Usp.ajax({ url: '/campaigns/' + rec.get('id') + '/recipients', method: 'POST',
-                                success: fin, failure: fin });
-                        } else { fin(); }
-                    },
-                    failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
-            } }]
+            buttons: boutons
         });
         win.show();
     }, failure: function () { Ext.Msg.alert('Erreur', 'Chargement de la campagne impossible.'); } });
