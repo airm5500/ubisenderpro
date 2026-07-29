@@ -77,6 +77,23 @@
             <version>1.3.30</version>
         </dependency>
 
+        <!-- Rapports PDF sur modèles .jrxml (impressions : listes, états).
+             JasperReports 6.20 s'appuie sur un OpenPDF « 1.3.30.jaspersoft.3 »
+             publié uniquement sur le dépôt Jaspersoft : on l'exclut au profit de
+             l'OpenPDF 1.3.30 standard ci-dessus (même API), déjà utilisé par le
+             relevé de compte — un seul jar com.lowagie dans le livrable. -->
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+            <version>6.20.6</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.github.librepdf</groupId>
+                    <artifactId>openpdf</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Import CSV -->
         <dependency>
             <groupId>org.apache.commons</groupId>

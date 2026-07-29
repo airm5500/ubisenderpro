@@ -407,6 +407,13 @@ Usp.settings.generalPanel = function () {
             { xtype: 'textfield', name: 'adresse', itemId: 'adresseField',
               fieldLabel: 'Adresse société', width: 520,
               emptyText: 'Ex. 01 BP 1234 Abidjan 01 — figure en en-tête des impressions PDF' },
+            { xtype: 'textfield', name: 'rapportsDir', itemId: 'rapportsDirField',
+              fieldLabel: 'Modèles de rapport (.jrxml)', width: 520,
+              emptyText: 'Répertoire serveur des modèles personnalisés — vide = modèles embarqués' },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Les impressions PDF sont générées à partir de modèles ' +
+                     'JasperReports (.jrxml). Un fichier du même nom déposé dans ce répertoire du serveur ' +
+                     'remplace le modèle embarqué (ex. <b>clients.jrxml</b>), sans redéploiement.</span>' },
             { xtype: 'textfield', name: 'site', itemId: 'siteField',
               fieldLabel: 'Lien du site société', width: 520,
               emptyText: 'https://… (variable [SITE])' },
@@ -458,6 +465,7 @@ Usp.settings.generalPanel = function () {
             var societe = p.down('#societeField').getValue() || '';
             var societeTel = p.down('#societeTelField').getValue() || '';
             var adresse = p.down('#adresseField').getValue() || '';
+            var rapportsDir = (p.down('#rapportsDirField').getValue() || '').trim();
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
             var urlBase = (p.down('#urlBaseField').getValue() || '').trim();
@@ -476,6 +484,7 @@ Usp.settings.generalPanel = function () {
                     put('app.societe', societe)(function () {
                     put('app.societe_tel', societeTel)(function () {
                     put('app.adresse', adresse)(function () {
+                    put('rapports.repertoire', rapportsDir)(function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.url_base', urlBase)(function () {
@@ -488,6 +497,7 @@ Usp.settings.generalPanel = function () {
                             });
                             });
                         });
+                    });
                     });
                     });
                 });
@@ -506,6 +516,7 @@ Usp.settings.generalPanel = function () {
         charger('app.societe', 'societeField', '');
         charger('app.societe_tel', 'societeTelField', '');
         charger('app.adresse', 'adresseField', '');
+        charger('rapports.repertoire', 'rapportsDirField', '');
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
         charger('app.url_base', 'urlBaseField', '');

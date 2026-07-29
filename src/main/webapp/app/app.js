@@ -619,12 +619,54 @@ Usp.export.recuperer = function (grid, cb) {
     });
 };
 
-/* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille. */
+/* Édition PDF générée par le serveur (modèle JasperReports .jrxml).
+ * nomRapport : nom du modèle (ex. 'clients') ; params : filtres transmis tels
+ * quels — le document imprime ce que la grille affiche. La fenêtre est ouverte
+ * PENDANT le clic (sinon le navigateur la bloque comme pop-up), puis reçoit le
+ * PDF quand il arrive. */
+Usp.rapportPdf = function (nomRapport, params) {
+    var w = window.open('', '_blank');
+    if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
+    try { w.document.write('<title>Génération du PDF…</title><p style="font-family:sans-serif;color:#666">Génération du PDF…</p>'); } catch (e) {}
+    var qs = [];
+    Ext.Object.each(params || {}, function (k, v) {
+        if (v !== null && v !== undefined && v !== '') { qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); }
+    });
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', Usp.apiBase + '/rapports/' + nomRapport + (qs.length ? '?' + qs.join('&') : ''), true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    xhr.responseType = 'blob';
+    xhr.onload = function () {
+        if (xhr.status === 200) {
+            w.location = window.URL.createObjectURL(xhr.response);
+        } else {
+            w.close();
+            var lire = new FileReader();
+            lire.onload = function () {
+                var msg = 'Génération du PDF impossible.';
+                try { msg = (JSON.parse(lire.result) || {}).erreur || msg; } catch (e) {}
+                Ext.Msg.alert('Erreur', msg);
+            };
+            try { lire.readAsText(xhr.response); } catch (e) { Ext.Msg.alert('Erreur', 'Génération du PDF impossible.'); }
+        }
+    };
+    xhr.onerror = function () { w.close(); Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };
+    xhr.send();
+};
+
+/* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille.
+ * Si la grille déclare « rapportPdf » ({ nom, params() }), le PDF est produit
+ * par le serveur sur modèle .jrxml ; sinon, repli sur l'impression navigateur. */
 Usp.export.boutons = function (titre) {
     var btn;
     var faire = function (format) {
         var grid = btn ? btn.up('grid') : null;
         if (!grid) { return; }
+        if (format === 'pdf' && grid.rapportPdf) {
+            Usp.rapportPdf(grid.rapportPdf.nom,
+                grid.rapportPdf.params ? grid.rapportPdf.params() : null);
+            return;
+        }
         Usp.export.recuperer(grid, function (recs) {
             var cols = Usp.export.colonnes(grid);
             if (format === 'csv') { Usp.export.csv(titre, cols, recs); } else { Usp.export.pdf(titre, cols, recs); }
@@ -953,6 +995,9 @@ Usp.clientsGrid = function (actif) {
         title: actif ? '👥 Liste des Clients' : '🚫 Clients désactivés',
         store: store,
         exportColonnes: exportColonnes,
+        // PDF : édition JasperReports côté serveur (modèle reports/clients.jrxml),
+        // avec les filtres courants de la grille. Le CSV reste produit ici.
+        rapportPdf: { nom: 'clients', params: function () { return store.getProxy().extraParams; } },
         columns: [
             { text: 'Code client', dataIndex: 'numeroClient', width: 100, renderer: tip },
             { text: 'Nom client', dataIndex: 'nomCompte', flex: 1, renderer: tip },
