@@ -51,6 +51,16 @@ call npm install
 if errorlevel 1 goto ECHEC_NPM
 
 :DEMARRER
+REM --- Le port est-il deja occupe par une autre instance ? ---
+set "PORT=3000"
+for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env") do (
+    if /i "%%a"=="PORT" set "PORT=%%b"
+)
+if defined PORT set PORT=%PORT:"=%
+for /f "tokens=* delims= " %%p in ("%PORT%") do set "PORT=%%p"
+powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/health' -TimeoutSec 3 | Out-Null;exit 0}catch{exit 1}"
+if not errorlevel 1 goto DEJA_LANCE
+
 echo.
 echo  Demarrage du service... (laissez cette fenetre OUVERTE)
 echo  Pour ARRETER le service : appuyez sur Ctrl+C (arret propre).
@@ -60,6 +70,17 @@ echo.
 node server.js
 echo.
 echo  ** Le service s'est arrete. **
+goto FIN
+
+:DEJA_LANCE
+echo.
+echo  ** Le service tourne DEJA sur le port %PORT%. **
+echo.
+echo  Il n'y a rien a relancer : la fenetre du service est deja ouverte
+echo  quelque part. Verifiez : http://localhost:%PORT%/health
+echo.
+echo  Pour le REMPLACER : lancez arreter.bat, attendez quelques
+echo  secondes, puis relancez ce script.
 goto FIN
 
 :PAS_DE_NODE

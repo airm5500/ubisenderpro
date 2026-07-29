@@ -25,6 +25,24 @@ connexion par **QR**, envoi **texte/média**, **filtre de numéros**.
 > le jeton) : il sauvegarde ses caches, ferme les sessions **sans délier
 > l'appareil** (aucun QR à rescanner), puis s'arrête.
 
+### « address already in use » (EADDRINUSE) au démarrage
+
+Le port est encore tenu par une instance précédente. Les scripts gèrent ce cas :
+
+- **`demarrer.bat`** teste le port avant de lancer : si le service répond déjà,
+  il le dit au lieu de laisser Node planter.
+- **`arreter.bat`** vérifie le port **même quand le service ne répond plus** :
+  s'il reste occupé, il identifie le processus (`netstat`), confirme qu'il
+  s'agit bien de `node.exe`, et propose de le terminer. Si c'est une **autre**
+  application, il refuse de la tuer et conseille de changer `PORT` dans `.env`.
+
+Diagnostic manuel équivalent :
+
+```cmd
+netstat -ano | findstr :3000
+tasklist /fi "PID eq <le PID affiche>"
+```
+
 > ⚠️ **Piège classique à éviter :** un `set UBISENDER_CALLBACK=...` en invite de
 > commandes ne vaut **que pour la fenêtre en cours**. En rouvrant une invite, la
 > variable est perdue : le service reçoit alors les messages mais **ne les

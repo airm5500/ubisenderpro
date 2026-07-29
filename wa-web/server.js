@@ -738,7 +738,7 @@ function arretPropre(signal) {
 process.on('SIGINT', () => arretPropre('SIGINT'));
 process.on('SIGTERM', () => arretPropre('SIGTERM'));
 
-app.listen(PORT, () => {
+const serveur = app.listen(PORT, () => {
   verifierConfiguration();
   restoreSessions();
   // Repère visuel net : tant que cette banniere est affichee, le service tourne.
@@ -747,4 +747,25 @@ app.listen(PORT, () => {
   console.log('  Verification : ouvrez http://localhost:' + PORT + '/health');
   console.log('  Laissez cette fenetre OUVERTE. Arret propre : Ctrl+C');
   console.log('='.repeat(72) + '\n');
+});
+
+/**
+ * Port déjà occupé : cas courant quand une instance precedente tourne encore.
+ * Sans ce traitement, Node affiche une trace technique illisible (EADDRINUSE).
+ */
+serveur.on('error', (e) => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.error('\n' + '='.repeat(72));
+    console.error('  LE PORT ' + PORT + ' EST DEJA UTILISE.');
+    console.error('  Une autre instance du service tourne probablement deja.');
+    console.error('');
+    console.error('  1) Verifiez : ouvrez http://localhost:' + PORT + '/health');
+    console.error('     Si vous voyez {"ok":true}, le service tourne : rien a relancer.');
+    console.error('  2) Pour le remplacer : lancez arreter.bat, attendez, puis relancez.');
+    console.error('  3) Sinon, changez PORT dans le fichier .env.');
+    console.error('='.repeat(72) + '\n');
+    process.exit(1);
+  }
+  console.error('Erreur du serveur HTTP : ' + (e && e.message ? e.message : e));
+  process.exit(1);
 });
