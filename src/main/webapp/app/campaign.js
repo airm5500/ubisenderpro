@@ -33,6 +33,49 @@ Usp.campaign.combo = function (url, root, valueField, displayField, cfg) {
 };
 
 /**
+ * Liste des modèles de message, avec distinction visuelle des GABARITS
+ * génériques (livrés avec l'application, reconnaissables à leur clé système).
+ *
+ * Un gabarit contient des variables ({{date_debut}}, {{liste_produits}}…) qui
+ * ne sont remplies QU'À la génération d'une proposition. L'affecter directement
+ * à une campagne produit un message amputé : les variables non résolues sont
+ * effacées à l'envoi. On les marque donc clairement pour éviter la confusion
+ * avec le modèle dédié créé lors de la validation d'une proposition.
+ */
+Usp.campaign.comboModele = function (cfg) {
+    cfg = cfg || {};
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'nom', 'cleSysteme',
+            { name: 'libelle', convert: function (v, rec) {
+                var d = (rec && rec.raw) ? rec.raw : ((rec && rec.data) ? rec.data : {});
+                var nom = d.nom || '';
+                return d.cleSysteme ? '⚙ ' + nom + '  — gabarit générique' : nom;
+            } }],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/templates',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } },
+        autoLoad: true
+    });
+    var conf = Ext.apply({
+        xtype: 'combobox', store: store, queryMode: 'local',
+        valueField: 'id', displayField: 'libelle',
+        anchor: '100%', editable: false
+    }, cfg);
+    conf.listeners = { afterrender: function (c) {
+        if (cfg.value !== undefined && cfg.value !== null && cfg.value !== '') {
+            Usp.campaign.appliquerValeurCombo(c, store, 'id', cfg.value);
+        }
+    } };
+    return conf;
+};
+
+/** Vrai si le modèle sélectionné est un gabarit générique (clé système). */
+Usp.campaign.estGabarit = function (combo, id) {
+    if (!combo || !id) { return false; }
+    var rec = combo.findRecordByValue ? combo.findRecordByValue(id) : null;
+    return !!(rec && rec.get('cleSysteme'));
+};
+
+/**
  * Applique une valeur à une liste déroulante en tolérant l'écart de type :
  * l'identifiant peut être numérique côté magasin et texte côté enregistrement
  * (c'est le cas de la session WhatsApp Web, stockée en texte).
@@ -72,7 +115,7 @@ Usp.campaign.show = function (store) {
             { xtype: 'combobox', name: 'waWebSessionId', itemId: 'fWebSession', fieldLabel: 'Session WhatsApp Web',
               anchor: '100%', queryMode: 'local', editable: false, hidden: true, allowBlank: true,
               store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle' },
-            Usp.campaign.combo('/templates', '', 'id', 'nom',
+            Usp.campaign.comboModele(
                 { name: 'modeleId', fieldLabel: 'Modèle de message', allowBlank: false })
         ]
     };
@@ -540,8 +583,9 @@ Usp.campaign.editForm = function (rec, store) {
                             }
                         } } };
                 })(),
-                Usp.campaign.combo('/templates', '', 'id', 'nom',
-                    { name: 'modeleId', fieldLabel: 'Modèle de message', value: camp.modeleId }),
+                Usp.campaign.comboModele(
+                    { name: 'modeleId', itemId: 'fModele', fieldLabel: 'Modèle de message',
+                      value: camp.modeleId }),
                 { xtype: 'displayfield', value: '<span style="color:#888">Ciblage (les destinataires seront recalculés) :</span>' },
                 Usp.campaign.combo('/segmentations', '', 'id', 'libelle',
                     { name: 'segmentationId', fieldLabel: 'Segmentation client', value: camp.segmentationId }),
@@ -561,6 +605,27 @@ Usp.campaign.editForm = function (rec, store) {
             var f = b.up('window').down('form').getForm();
             if (!f.isValid()) { return; }
             var v = f.getValues();
+            /** Enregistrement effectif (apres les controles et l'eventuel avertissement). */
+            var poursuivre = function () {
+                Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
+                    success: function () {
+                        if (puisLancer) {
+                            // lancerExistante recalcule deja les destinataires : on ferme
+                            // et on lui laisse la main (confirmation + barre de progression).
+                            win.close();
+                            store.load();
+                            Usp.campaign.lancerExistante(rec, store);
+                            return;
+                        }
+                        var fin = function () { win.close(); store.load(); Usp.toastEnregistre('Campagne \u00ab ' + v.nom + ' \u00bb', true); };
+                        // Recalcule les destinataires si le ciblage a pu changer (campagne non lancee).
+                        if (complet) {
+                            Usp.ajax({ url: '/campaigns/' + rec.get('id') + '/recipients', method: 'POST',
+                                success: fin, failure: fin });
+                        } else { fin(); }
+                    },
+                    failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
+            };
             camp.nom = v.nom; camp.objectif = v.objectif; camp.description = v.description;
             if (complet) {
                 camp.canal = v.canal;
@@ -573,26 +638,28 @@ Usp.campaign.editForm = function (rec, store) {
                 if (!camp.modeleId) { Ext.Msg.alert('Champ requis', 'Le modèle de message est obligatoire.'); return; }
                 if (v.canal === 'WEB' && !camp.waWebSessionId) { Ext.Msg.alert('Champ requis', 'Choisissez la session WhatsApp Web.'); return; }
                 if (v.canal !== 'WEB' && !camp.whatsappAccountId) { Ext.Msg.alert('Champ requis', 'Choisissez le compte WhatsApp.'); return; }
+                // Garde-fou : un gabarit générique ne porte aucune valeur (dates,
+                // produits, avantage) ni pièce jointe. L'affecter à une campagne
+                // aboutit à un message amputé, sans aucune erreur visible.
+                var cbModele = b.up('window').down('#fModele');
+                if (Usp.campaign.estGabarit(cbModele, camp.modeleId)) {
+                    Ext.Msg.show({
+                        title: 'Gabarit générique sélectionné',
+                        msg: 'Le modèle choisi est un <b>gabarit générique</b> : ses variables ' +
+                             '(dates, produits, avantage) ne sont <b>pas renseignées</b> et il n\'a ' +
+                             '<b>aucune pièce jointe</b>.<br/><br/>' +
+                             'Le message envoyé sera incomplet.<br/><br/>' +
+                             'Préférez le modèle portant le <b>titre de la proposition</b>, créé ' +
+                             'automatiquement à sa validation.<br/><br/>Enregistrer quand même ?',
+                        width: 480, buttons: Ext.Msg.YESNO, icon: Ext.Msg.WARNING,
+                        fn: function (btn) { if (btn === 'yes') { poursuivre(); } }
+                    });
+                    return;
+                }
             }
-            Usp.ajax({ url: '/campaigns/' + rec.get('id'), method: 'PUT', jsonData: camp,
-                success: function () {
-                    if (puisLancer) {
-                        // lancerExistante recalcule déjà les destinataires : on ferme
-                        // et on lui laisse la main (confirmation + barre de progression).
-                        win.close();
-                        store.load();
-                        Usp.campaign.lancerExistante(rec, store);
-                        return;
-                    }
-                    var fin = function () { win.close(); store.load(); Usp.toastEnregistre('Campagne « ' + v.nom + ' »', true); };
-                    // Recalcule les destinataires si le ciblage a pu changer (campagne non lancée).
-                    if (complet) {
-                        Usp.ajax({ url: '/campaigns/' + rec.get('id') + '/recipients', method: 'POST',
-                            success: fin, failure: fin });
-                    } else { fin(); }
-                },
-                failure: function () { Ext.Msg.alert('Erreur', 'Modification impossible.'); } });
+            poursuivre();
         };
+
 
         var boutons = [];
         // Campagne au brouillon : on peut enregistrer ET lancer dans la foulée.
