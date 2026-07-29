@@ -26,28 +26,25 @@ public class AboutResource {
     /** E-mail de contact du développeur. */
     public static final String EMAIL = "nzifranck13@gmail.com";
 
-    @javax.ws.rs.core.Context
-    private javax.servlet.ServletContext servletContext;
-
     /**
-     * Horodatage de compilation du livrable, lu dans le MANIFEST du WAR
-     * (attribut {@code Build-Time} pose par Maven). Permet de verifier d'un
-     * coup d'oeil qu'un WAR fraichement construit a bien ete redeploye —
-     * un ancien WAR encore en place explique des correctifs « sans effet ».
+     * Horodatage de compilation du livrable, lu dans {@code build.properties}
+     * genere par Maven (filtrage de ressources). Permet de verifier d'un coup
+     * d'oeil qu'un WAR fraichement construit a bien ete redeploye — un ancien
+     * WAR encore en place explique des correctifs restes « sans effet ».
      *
-     * <p>Lecture via le ServletContext : elle vise le manifeste DU WAR. Un
-     * simple getResourceAsStream sur le chargeur de classes pourrait renvoyer
-     * le manifeste d'une bibliotheque embarquee, donc une date sans rapport.</p>
+     * <p>Une ressource qui nous appartient (WEB-INF/classes) est lue ici plutot
+     * que le MANIFEST : ce dernier n'est pas expose de la meme facon selon le
+     * serveur, et un chargeur de classes peut renvoyer celui d'une
+     * bibliotheque embarquee — donc une date sans aucun rapport.</p>
      */
     private String compileLe() {
-        try {
-            if (servletContext != null) {
-                try (java.io.InputStream in = servletContext.getResourceAsStream("/META-INF/MANIFEST.MF")) {
-                    if (in != null) {
-                        String v = new java.util.jar.Manifest(in).getMainAttributes().getValue("Build-Time");
-                        if (v != null && !v.trim().isEmpty()) { return v.trim(); }
-                    }
-                }
+        try (java.io.InputStream in = AboutResource.class.getResourceAsStream("/build.properties")) {
+            if (in != null) {
+                java.util.Properties p = new java.util.Properties();
+                p.load(in);
+                String v = p.getProperty("build.time");
+                // Si le filtrage n'a pas eu lieu, la valeur brute reste « ${...} ».
+                if (v != null && !v.trim().isEmpty() && !v.contains("${")) { return v.trim(); }
             }
         } catch (Exception ignore) { /* information de confort : jamais bloquante */ }
         return "inconnu";

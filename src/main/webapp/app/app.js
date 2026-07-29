@@ -1884,9 +1884,14 @@ Usp.apropos = function () {
                  'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
                  'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b><br>' +
                  // Repère de déploiement : si cet horodatage est ancien après une
-                 // mise à jour, c'est que le WAR n'a pas été redéployé.
-                 '<span style="color:#888;font-size:11px">Livrable compilé le ' +
-                 Ext.String.htmlEncode(a.compileLe || 'inconnu') + '</span>' +
+                 // mise à jour, c'est que le WAR n'a pas été redéployé. L'absence
+                 // du champ (et non « inconnu ») signale un livrable antérieur à
+                 // cette fonction — les deux cas ne doivent pas se confondre.
+                 '<span style="color:#888;font-size:11px">' +
+                 (a.compileLe
+                    ? 'Livrable compilé le ' + Ext.String.htmlEncode(a.compileLe)
+                    : '⚠️ Livrable ANTÉRIEUR à cette version (à redéployer)') +
+                 '</span>' +
                  '</div>',
             buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 380
         });

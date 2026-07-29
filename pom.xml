@@ -17,8 +17,12 @@
         <maven.compiler.target>11</maven.compiler.target>
         <jackson.version>2.13.4</jackson.version>
         <flyway.version>7.15.0</flyway.version>
-        <!-- Format lisible de l'horodatage de compilation (expose par /about). -->
+        <!-- Format lisible de l'horodatage de compilation (expose par /about).
+             Le passage par une propriete intermediaire est necessaire :
+             ${maven.build.timestamp} n'est pas substitue directement lors du
+             filtrage des ressources. -->
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
+        <buildTime>${maven.build.timestamp}</buildTime>
     </properties>
 
     <dependencies>
@@ -110,6 +114,24 @@
 
     <build>
         <finalName>ubisenderpro</finalName>
+        <resources>
+            <!-- Seul build.properties est filtre : les migrations SQL et la cle
+                 publique ne doivent surtout pas voir leur contenu substitue. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>build.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
