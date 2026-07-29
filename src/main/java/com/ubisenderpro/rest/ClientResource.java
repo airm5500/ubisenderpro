@@ -32,14 +32,16 @@ public class ClientResource {
                                      @QueryParam("agence") String agence,
                                      @QueryParam("region") String region,
                                      @QueryParam("commune") String commune,
+                                     @QueryParam("tournee") String tournee,
                                      @QueryParam("segmentationId") Long segmentationId,
                                      @QueryParam("actif") Boolean actif,
                                      @QueryParam("start") @DefaultValue("0") int start,
                                      @QueryParam("limit") @DefaultValue("25") int limit) {
-        return clientService.rechercher(recherche, agence, region, commune, segmentationId, actif, start, limit);
+        return clientService.rechercher(recherche, agence, region, commune, tournee, segmentationId,
+                actif, start, limit);
     }
 
-    /** Valeurs distinctes pour alimenter les filtres (agences/régions/communes). */
+    /** Valeurs distinctes pour alimenter les filtres (agences/régions/communes/tournées). */
     @GET
     @Path("/facettes")
     public java.util.Map<String, java.util.List<String>> facettes() {

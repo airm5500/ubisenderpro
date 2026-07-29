@@ -454,16 +454,36 @@ Usp.expirerSession = function () {
 /* ---------- Export CSV / PDF (réutilisable, sans dépendance) ---------- */
 Usp.export = {};
 
-/* Colonnes exportables d'une grille (avec dataIndex et libellé, hors colonnes d'action). */
+/* Colonnes exportables d'une grille.
+ *
+ * Une grille peut imposer ses colonnes d'export via « exportColonnes » :
+ *   [{ d: 'segmentationId', t: 'Segmentation', f: function (v, rec) { … } }]
+ * C'est indispensable dès que l'affichage diffère de la donnée brute (un
+ * identifiant de segmentation n'a aucun sens dans un fichier remis à un tiers)
+ * ou qu'on veut exporter une donnée absente de la grille.
+ *
+ * À défaut, on déduit les colonnes de la grille, en écartant :
+ *   - la colonne « Actions », qui exportait jusqu'ici l'identifiant technique
+ *     sous un intitulé trompeur ;
+ *   - toute colonne portant exportable:false.
+ */
 Usp.export.colonnes = function (grid) {
+    if (grid.exportColonnes) {
+        return Ext.isFunction(grid.exportColonnes) ? grid.exportColonnes() : grid.exportColonnes;
+    }
     return grid.columns.filter(function (c) {
-        return c.dataIndex && c.text && !c.hidden;
+        if (!c.dataIndex || !c.text || c.hidden || c.exportable === false) { return false; }
+        return Ext.String.trim(Ext.util.Format.stripTags(String(c.text))).toLowerCase() !== 'actions';
     }).map(function (c) {
         return { d: c.dataIndex, t: Ext.String.trim(Ext.util.Format.stripTags(String(c.text))) || c.dataIndex };
     });
 };
 
-Usp.export.valeur = function (rec, d) {
+Usp.export.valeur = function (rec, d, formateur) {
+    if (formateur) {
+        var brut = formateur(rec.get(d), rec);
+        return brut === null || brut === undefined ? '' : String(brut);
+    }
     var v = rec.get(d);
     if (v === null || v === undefined) { return ''; }
     if (v === true) { return 'Oui'; }
@@ -480,7 +500,7 @@ Usp.export.valeur = function (rec, d) {
 
 Usp.export.lignes = function (cols, records) {
     return records.map(function (r) {
-        return cols.map(function (c) { return Usp.export.valeur(r, c.d); });
+        return cols.map(function (c) { return Usp.export.valeur(r, c.d, c.f); });
     });
 };
 
@@ -496,18 +516,84 @@ Usp.export.csv = function (titre, cols, records) {
     URL.revokeObjectURL(a.href);
 };
 
-/* "PDF" via la boîte d'impression du navigateur (Enregistrer au format PDF). */
+/* Coordonnées de la société pour l'en-tête des impressions.
+ * Chargées à la demande puis mises en cache : inutile d'alourdir le démarrage
+ * de l'application pour une information qui ne sert qu'à l'impression. */
+Usp.societeInfos = function (cb) {
+    if (Usp._societeInfos) { cb(Usp._societeInfos); return; }
+    var cles = { nom: 'app.societe', tel: 'app.societe_tel', adresse: 'app.adresse',
+                 site: 'app.site', logo: 'app.logo' };
+    var infos = {}, reste = 0;
+    Ext.Object.each(cles, function () { reste++; });
+    var fini = function () {
+        if (--reste > 0) { return; }
+        Usp._societeInfos = infos;
+        cb(infos);
+    };
+    Ext.Object.each(cles, function (champ, cle) {
+        Usp.ajax({ url: '/parametres/' + cle, method: 'GET',
+            success: function (r) {
+                try { infos[champ] = (Ext.decode(r.responseText) || {}).valeur || ''; } catch (e) { infos[champ] = ''; }
+                fini();
+            },
+            // Un paramètre absent ne doit pas empêcher l'impression.
+            failure: function () { infos[champ] = ''; fini(); } });
+    });
+};
+
+/* En-tête HTML de l'impression : logo + coordonnées de la société. */
+Usp.export.enTeteSociete = function (s) {
+    if (!s || (!s.nom && !s.logo && !s.tel && !s.adresse && !s.site)) { return ''; }
+    var e = Ext.String.htmlEncode;
+    var lignes = [];
+    if (s.adresse) { lignes.push(e(s.adresse)); }
+    if (s.tel) { lignes.push('Tél. ' + e(s.tel)); }
+    if (s.site) { lignes.push(e(s.site)); }
+    var logo = s.logo ? '<img src="' + e(s.logo) + '" class="lg" alt="">' : '';
+    return '<div class="ent">' + logo +
+        '<div class="soc"><div class="nom">' + e(s.nom || '') + '</div>' +
+        (lignes.length ? '<div class="coord">' + lignes.join(' &nbsp;·&nbsp; ') + '</div>' : '') +
+        '</div></div>';
+};
+
+/* "PDF" via la boîte d'impression du navigateur (Enregistrer au format PDF).
+ *
+ * L'impression porte l'en-tête de la société (logo + coordonnées) : le document
+ * est destiné à circuler hors de l'application. La police et les marges
+ * s'adaptent au nombre de colonnes, et le format passe en paysage au-delà de
+ * 7 colonnes : une liste de comptes clients dépasse sinon la largeur de la page
+ * et les dernières colonnes sont tronquées à l'impression. */
 Usp.export.pdf = function (titre, cols, records) {
+    Usp.societeInfos(function (s) { Usp.export.imprimer(titre, cols, records, s); });
+};
+
+Usp.export.imprimer = function (titre, cols, records, societe) {
     var th = cols.map(function (c) { return '<th>' + Ext.String.htmlEncode(c.t) + '</th>'; }).join('');
     var trs = Usp.export.lignes(cols, records).map(function (row) {
         return '<tr>' + row.map(function (v) { return '<td>' + Ext.String.htmlEncode(v) + '</td>'; }).join('') + '</tr>';
     }).join('');
+    var n = cols.length;
+    var paysage = n > 7;
+    var police = n > 12 ? 7 : (n > 9 ? 8 : (n > 6 ? 9 : 10));
     var html = '<html><head><meta charset="utf-8"><title>' + Ext.String.htmlEncode(titre) + '</title>' +
-        '<style>body{font-family:Arial,sans-serif;font-size:12px;margin:18px}h2{color:#1976d2;margin:0 0 4px}' +
-        'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}' +
-        'th{background:#1976d2;color:#fff}tr:nth-child(even){background:#f4f6f8}</style></head><body>' +
+        '<style>@page{size:A4 ' + (paysage ? 'landscape' : 'portrait') + ';margin:10mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:' + police + 'px;margin:0;color:#222}' +
+        '.ent{display:flex;align-items:center;border-bottom:2px solid #1976d2;padding-bottom:6px;margin-bottom:8px}' +
+        '.lg{max-height:46px;max-width:150px;margin-right:12px}' +
+        '.soc .nom{font-size:' + (police + 5) + 'px;font-weight:bold;color:#1976d2}' +
+        '.soc .coord{font-size:' + (police + 1) + 'px;color:#555}' +
+        'h2{font-size:' + (police + 4) + 'px;margin:0 0 2px}' +
+        '.meta{color:#666;font-size:' + police + 'px;margin-bottom:6px}' +
+        'table{border-collapse:collapse;width:100%;table-layout:fixed}' +
+        'th,td{border:1px solid #bbb;padding:2px 4px;text-align:left;' +
+        'word-wrap:break-word;overflow-wrap:break-word}' +
+        'th{background:#1976d2;color:#fff;font-weight:bold}' +
+        'tbody tr:nth-child(even){background:#f4f6f8}' +
+        'thead{display:table-header-group}tr{page-break-inside:avoid}' +
+        '</style></head><body>' +
+        Usp.export.enTeteSociete(societe) +
         '<h2>' + Ext.String.htmlEncode(titre) + '</h2>' +
-        '<div style="color:#666;margin-bottom:8px">' + records.length + ' ligne(s) — ' + new Date().toLocaleString() + '</div>' +
+        '<div class="meta">' + records.length + ' ligne(s) — édité le ' + new Date().toLocaleString() + '</div>' +
         '<table><thead><tr>' + th + '</tr></thead><tbody>' + trs + '</tbody></table>' +
         '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>';
     var w = window.open('', '_blank');
@@ -764,6 +850,12 @@ Usp.clientsGrid = function (actif) {
     var comboRegion = { xtype: 'combobox', itemId: 'fRegion', emptyText: 'Région', width: 130,
         queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
         store: refFilterStore('REGION'), listeners: autoFiltre };
+    // Tournée : pas de référentiel dédié, la valeur est saisie sur la fiche
+    // client — le filtre est donc alimenté par les valeurs réellement utilisées.
+    var tourneeStore = Ext.create('Ext.data.Store', { fields: ['v'] });
+    var comboTournee = { xtype: 'combobox', itemId: 'fTournee', emptyText: 'Tournée', width: 130,
+        queryMode: 'local', editable: false, valueField: 'v', displayField: 'v',
+        store: tourneeStore, listeners: autoFiltre };
 
     var appliquer = function (tb) {
         var p = { actif: actif };
@@ -771,10 +863,12 @@ Usp.clientsGrid = function (actif) {
         var seg = tb.down('#fSeg').getValue();
         var ag = tb.down('#fAgence').getValue();
         var reg = tb.down('#fRegion').getValue();
+        var tr = tb.down('#fTournee').getValue();
         if (q) { p.q = q; }
         if (seg) { p.segmentationId = seg; }
         if (ag) { p.agence = ag; }
         if (reg) { p.region = reg; }
+        if (tr) { p.tournee = tr; }
         store.getProxy().extraParams = p;
         store.loadPage(1);
     };
@@ -810,25 +904,52 @@ Usp.clientsGrid = function (actif) {
               // Recherche pendant la saisie (anti-rebond) + Entrée conservée.
               change: { buffer: 400, fn: function (f) { appliquer(f.up('toolbar')); } },
               specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
-        comboSeg, comboAgence, comboRegion,
+        comboSeg, comboAgence, comboRegion, comboTournee,
         { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
             var tb = b.up('toolbar');
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
             tb.down('#fAgence').setValue(null); tb.down('#fRegion').setValue(null);
+            tb.down('#fTournee').setValue(null);
             store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
         } });
 
-    // Info-bulle (survol) sur code / nom / entreprise : segmentation + e-mail.
+    // Info-bulle (survol) sur code / nom / entreprise : segmentation, e-mail et
+    // tournée. La tournée est mise en évidence (bleu, gras) : c'est l'information
+    // que le commercial cherche en premier sans ouvrir la fiche.
     var tip = function (v, meta, rec) {
+        var e = Ext.String.htmlEncode;
         var seg = segLib(rec.get('segmentationId')) || '—';
         var email = rec.get('emailPrincipal') || '—';
-        meta.tdAttr = 'data-qtip="' + Ext.String.htmlEncode('Segmentation : ' + seg + ' &#10; E-mail : ' + email) + '"';
-        return Ext.String.htmlEncode(v || '');
+        var tournee = rec.get('tournee') || '—';
+        var html = 'Segmentation : ' + e(seg) + '<br>E-mail : ' + e(email)
+            + '<br>Tournée : <b style=\'color:#1976d2\'>' + e(tournee) + '</b>';
+        // Le qtip accepte du HTML : on encode l'attribut, pas le contenu.
+        meta.tdAttr = 'data-qtip="' + html.replace(/"/g, '&quot;') + '"';
+        return e(v || '');
     };
+    // Colonnes de l'export CSV / PDF. Elles diffèrent volontairement de la grille :
+    //  - « Segmentation » exporte le LIBELLÉ (la grille porte l'identifiant, qui
+    //    n'a aucun sens dans un fichier remis à un tiers) ;
+    //  - « E-mail » et « Tournée » sont exportés bien qu'absents de la grille ;
+    //  - « Actions » et « Statut » sont exclus : l'un est un artefact d'écran,
+    //    l'autre est déjà porté par l'onglet (actifs / désactivés).
+    var exportColonnes = [
+        { d: 'numeroClient', t: 'Code client' },
+        { d: 'nomCompte', t: 'Nom client' },
+        { d: 'entreprise', t: 'Entreprise' },
+        { d: 'telephonePrincipal', t: 'Téléphone' },
+        { d: 'emailPrincipal', t: 'E-mail' },
+        { d: 'segmentationId', t: 'Segmentation', f: function (v) { return segLib(v); } },
+        { d: 'agence', t: 'Agence' },
+        { d: 'region', t: 'Région' },
+        { d: 'tournee', t: 'Tournée' }
+    ];
+
     return {
         xtype: 'grid',
         title: actif ? '👥 Liste des Clients' : '🚫 Clients désactivés',
         store: store,
+        exportColonnes: exportColonnes,
         columns: [
             { text: 'Code client', dataIndex: 'numeroClient', width: 100, renderer: tip },
             { text: 'Nom client', dataIndex: 'nomCompte', flex: 1, renderer: tip },
@@ -838,6 +959,7 @@ Usp.clientsGrid = function (actif) {
               renderer: function (v) { return Usp.segmentationBadge(segLib(v)); } },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
+            { text: 'Tournée', dataIndex: 'tournee', width: 120 },
             { text: 'Statut', dataIndex: 'statut', width: 90,
               renderer: function (v) {
                   return '<span style="color:' + (actif ? '#2e7d32' : '#c62828') + ';font-weight:bold">'
@@ -848,7 +970,15 @@ Usp.clientsGrid = function (actif) {
         tbar: tbar.concat(Usp.export.boutons(actif ? 'Comptes clients' : 'Clients désactivés')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
-            // Filtres Agence/Région désormais alimentés par les référentiels (autoLoad).
+            // Filtres Agence/Région alimentés par les référentiels (autoLoad) ;
+            // les tournées viennent des facettes, chargées à l'affichage.
+            afterrender: function () {
+                Usp.ajax({ url: '/clients/facettes', method: 'GET', success: function (resp) {
+                    var d = {};
+                    try { d = Ext.decode(resp.responseText) || {}; } catch (e) { d = {}; }
+                    tourneeStore.loadData((d.tournees || []).map(function (v) { return { v: v }; }));
+                } });
+            },
             itemdblclick: function (g, rec) { if (actif) { Usp.clientForm(store, rec); } },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.cli-detail')) { Usp.clientDetail(rec.get('id'), segLib); return; }

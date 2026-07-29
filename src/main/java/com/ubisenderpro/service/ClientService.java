@@ -23,6 +23,12 @@ public class ClientService {
 
     public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
                                          Long segmentationId, Boolean actif, int offset, int limit) {
+        return rechercher(recherche, agence, region, commune, null, segmentationId, actif, offset, limit);
+    }
+
+    public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
+                                         String tournee, Long segmentationId, Boolean actif,
+                                         int offset, int limit) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object[]> params = new ArrayList<>();
         if (recherche != null && !recherche.isEmpty()) {
@@ -40,6 +46,10 @@ public class ClientService {
         if (commune != null && !commune.isEmpty()) {
             where.append(" AND c.commune = :commune");
             params.add(new Object[]{"commune", commune});
+        }
+        if (tournee != null && !tournee.isEmpty()) {
+            where.append(" AND c.tournee = :tournee");
+            params.add(new Object[]{"tournee", tournee});
         }
         if (segmentationId != null) {
             where.append(" AND c.segmentationId = :seg");
@@ -311,6 +321,10 @@ public class ClientService {
         m.put("agences", distinct("agence"));
         m.put("regions", distinct("region"));
         m.put("communes", distinct("commune"));
+        // Tournées : alimente le filtre de la liste des comptes et la mise à jour
+        // sélective. Les tournées ne vivent pas dans un référentiel dédié, la
+        // valeur est saisie sur la fiche : on lit donc les valeurs distinctes.
+        m.put("tournees", distinct("tournee"));
         return m;
     }
 

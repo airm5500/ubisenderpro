@@ -404,6 +404,9 @@ Usp.settings.generalPanel = function () {
             { xtype: 'textfield', name: 'societeTel', itemId: 'societeTelField',
               fieldLabel: 'Téléphone(s) société', width: 520,
               emptyText: 'Si plusieurs numéros, séparés par ; (variable [TEL_SOCIETE])' },
+            { xtype: 'textfield', name: 'adresse', itemId: 'adresseField',
+              fieldLabel: 'Adresse société', width: 520,
+              emptyText: 'Ex. 01 BP 1234 Abidjan 01 — figure en en-tête des impressions PDF' },
             { xtype: 'textfield', name: 'site', itemId: 'siteField',
               fieldLabel: 'Lien du site société', width: 520,
               emptyText: 'https://… (variable [SITE])' },
@@ -454,6 +457,7 @@ Usp.settings.generalPanel = function () {
             var prefixe = (p.down('#prefixeField').getValue() || '').replace(/[^0-9]/g, '');
             var societe = p.down('#societeField').getValue() || '';
             var societeTel = p.down('#societeTelField').getValue() || '';
+            var adresse = p.down('#adresseField').getValue() || '';
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
             var urlBase = (p.down('#urlBaseField').getValue() || '').trim();
@@ -471,6 +475,7 @@ Usp.settings.generalPanel = function () {
                     Usp.prefixe = prefixe;
                     put('app.societe', societe)(function () {
                     put('app.societe_tel', societeTel)(function () {
+                    put('app.adresse', adresse)(function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.url_base', urlBase)(function () {
@@ -483,6 +488,7 @@ Usp.settings.generalPanel = function () {
                             });
                             });
                         });
+                    });
                     });
                 });
                 });
@@ -499,6 +505,7 @@ Usp.settings.generalPanel = function () {
         charger('whatsapp.prefixe_pays', 'prefixeField', '225');
         charger('app.societe', 'societeField', '');
         charger('app.societe_tel', 'societeTelField', '');
+        charger('app.adresse', 'adresseField', '');
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
         charger('app.url_base', 'urlBaseField', '');

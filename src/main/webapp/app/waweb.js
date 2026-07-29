@@ -659,24 +659,35 @@ Usp.waweb.filterPanel = function () {
     return {
         xtype: 'panel', title: '🔢 Vérification de numéros', layout: 'border',
         items: [
+            // Le panneau de gauche fait 340 px : les deux boutons d'import placés
+            // côte à côte débordaient et « Télécharger un modèle » sortait du
+            // cadre. Ils vivent désormais dans la barre du bas, avec « Vérifier » :
+            // toujours visibles, quelle que soit la hauteur de l'écran, sans que
+            // la zone de saisie des numéros ait à être réduite.
             { region: 'west', width: 340, xtype: 'form', bodyPadding: 10, border: false,
+              layout: 'anchor',
               defaults: { anchor: '100%' },
               items: [
                 { xtype: 'combobox', name: 'sessionId', itemId: 'fSession', fieldLabel: 'Compte', allowBlank: false,
                   store: Usp.waweb.sessionComboStore(), valueField: 'id', displayField: 'libelle',
                   queryMode: 'local', editable: false },
-                { xtype: 'fieldcontainer', fieldLabel: 'Importer', layout: 'hbox', items: [
-                    { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: 'Charger un fichier (.csv/.xlsx)…',
-                      listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } },
-                    { xtype: 'button', text: '📄 Exemplaire', margin: '0 0 0 8',
-                      tooltip: 'Télécharger un modèle CSV (un numéro par ligne)',
-                      handler: function () { Usp.telechargerCsv('modele_numeros.csv', 'numero\n2250700000000\n2250500000000\n'); } }
-                  ] },
-                { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', height: 300,
-                  emptyText: 'Un numéro par ligne (format international)\nou chargez un fichier ci-dessus' }
+                { xtype: 'textareafield', name: 'numeros', fieldLabel: 'Numéros', anchor: '100% -30',
+                  emptyText: 'Un numéro par ligne (format international)\n'
+                      + 'ou utilisez « Charger un fichier » en bas de ce panneau' }
               ],
-              bbar: ['->', { text: 'Vérifier', handler: function (b) {
-                  var p = b.up('panel'); var f = p.down('form').getForm();
+              bbar: [
+                { xtype: 'filefield', buttonOnly: true, hideLabel: true,
+                  buttonText: '📂 Charger un fichier',
+                  buttonConfig: { tooltip: 'Importer les numéros depuis un fichier .csv ou .xlsx' },
+                  listeners: { change: function (f) { Usp.waweb.chargerNumerosFichier(f); } } },
+                { xtype: 'button', text: '📄 Modèle',
+                  tooltip: 'Télécharger un modèle CSV (un numéro par ligne)',
+                  handler: function () { Usp.telechargerCsv('modele_numeros.csv', 'numero\n2250700000000\n2250500000000\n'); } },
+                '->', { text: 'Vérifier', handler: function (b) {
+                  // Le formulaire est l'ancêtre direct : on le vise explicitement
+                  // (up('panel') remonterait sur ce même formulaire, et down('form')
+                  // ne se trouve pas lui-même).
+                  var p = b.up('form'); var f = p.getForm();
                   var sid = p.down('#fSession').getValue();
                   if (!sid) { Ext.Msg.alert('Info', 'Choisissez un compte.'); return; }
                   var nums = (f.findField('numeros').getValue() || '').split(/\r?\n/)
