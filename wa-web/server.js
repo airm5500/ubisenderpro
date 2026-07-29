@@ -49,7 +49,7 @@ const DisconnectReason = baileys.DisconnectReason || {};
 if (typeof makeWASocket !== 'function') {
   console.error('\nERREUR : fabrique de connexion introuvable dans @whiskeysockets/baileys.');
   console.error('La version installee expose une API incompatible. Reinstallez avec :');
-  console.error('    npm install @whiskeysockets/baileys@6.17.16\n');
+  console.error('    npm install @whiskeysockets/baileys@6.7.24\n');
   process.exit(1);
 }
 
@@ -129,16 +129,81 @@ function jidOf(numero) {
   return clean + '@s.whatsapp.net';
 }
 
-/**
- * Extrait le numéro de téléphone d'une clé de message. WhatsApp peut adresser
- * en @lid (numéro masqué) ; le vrai numéro (@s.whatsapp.net) est alors dans un
- * champ alternatif (remoteJidAlt, senderPn, participant…).
+/* ------------------- Correspondance LID <-> numéro -------------------
+ * WhatsApp adresse de plus en plus les contacts par un identifiant masqué
+ * (« LID », ex. 253270027194615@lid) au lieu du numéro. Quand la clé d'un
+ * message entrant ne porte QUE ce LID, le numéro est introuvable et la réponse
+ * du client serait perdue. On mémorise donc la correspondance chaque fois que
+ * les deux apparaissent ensemble (clé de message, ou résolution d'un numéro
+ * avant envoi), et on la réutilise ensuite. La table est persistée par session.
  */
-function phoneFromKey(k) {
+
+function fichierLid(id) { return path.join(sessionDir(id), 'lid-numeros.json'); }
+
+function chargerLid(id) {
+  const m = new Map();
+  try {
+    const f = fichierLid(id);
+    if (!fs.existsSync(f)) { return m; }
+    for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(f, 'utf8')) || {})) { m.set(k, v); }
+    if (m.size) { logger.info({ id, correspondances: m.size }, 'Correspondances LID rechargées'); }
+  } catch (e) { logger.warn({ id }, 'Table LID illisible : ' + (e.message || e)); }
+  return m;
+}
+
+function planifierSauvegardeLid(id, s) {
+  if (!s || s.lidTimer) { return; }
+  s.lidTimer = setTimeout(() => {
+    s.lidTimer = null;
+    try {
+      fs.mkdirSync(sessionDir(id), { recursive: true });
+      fs.writeFileSync(fichierLid(id), JSON.stringify(Object.fromEntries(s.lidNumeros)), 'utf8');
+    } catch (e) { logger.warn({ id }, 'Sauvegarde de la table LID impossible : ' + (e.message || e)); }
+  }, 2000);
+}
+
+/** Mémorise « ce LID correspond à ce numéro ». */
+function apprendreLid(id, s, lid, numero) {
+  if (!s || !lid || !numero) { return; }
+  if (!s.lidNumeros) { s.lidNumeros = new Map(); }
+  if (s.lidNumeros.get(lid) === numero) { return; }
+  s.lidNumeros.set(lid, numero);
+  logger.info({ id, lid, numero }, 'Correspondance LID apprise');
+  planifierSauvegardeLid(id, s);
+}
+
+/** Identifiant LID porté par une clé de message, s'il y en a un. */
+function lidFromKey(k) {
+  if (!k) { return null; }
+  for (const c of [k.remoteJid, k.senderLid, k.participant, k.lidJid]) {
+    if (c && typeof c === 'string' && c.endsWith('@lid')) { return c.split('@')[0]; }
+  }
+  return null;
+}
+
+/**
+ * Extrait le numéro de téléphone d'une clé de message. Le vrai numéro
+ * (@s.whatsapp.net) peut se trouver dans un champ alternatif (remoteJidAlt,
+ * senderPn, participant…) ; à défaut, on retombe sur la correspondance LID
+ * apprise précédemment.
+ */
+function phoneFromKey(k, id, s) {
   if (!k) { return null; }
   const cands = [k.remoteJid, k.remoteJidAlt, k.senderPn, k.participantPn, k.participant, k.participantAlt];
   for (const c of cands) {
-    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) { return c.split('@')[0]; }
+    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) {
+      const numero = c.split('@')[0];
+      const lid = lidFromKey(k);
+      if (lid) { apprendreLid(id, s, lid, numero); } // les deux sont là : on apprend
+      return numero;
+    }
+  }
+  // Seule l'adresse masquée est disponible : on tente la correspondance connue.
+  const lid = lidFromKey(k);
+  if (lid && s && s.lidNumeros && s.lidNumeros.has(lid)) {
+    const numero = s.lidNumeros.get(lid);
+    logger.info({ id, lid, numero }, 'Numéro retrouvé via la correspondance LID');
+    return numero;
   }
   return null;
 }
@@ -196,12 +261,20 @@ function rememberSent(s, r, id) {
  * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
  * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
  */
-async function resolveJid(sock, numero) {
+async function resolveJid(sock, numero, id, s) {
   const clean = String(numero).replace(/[^0-9]/g, '');
   if (clean.length < 6) { return null; }
   try {
     const r = await sock.onWhatsApp(clean);
-    if (r && r[0] && r[0].exists) { return r[0].jid; }
+    if (r && r[0] && r[0].exists) {
+      // La résolution renvoie aussi le LID du contact : occasion d'apprendre la
+      // correspondance, pour reconnaître ses futures réponses adressées en @lid.
+      if (r[0].lid) {
+        const lid = String(r[0].lid).split('@')[0];
+        apprendreLid(id, s, lid, String(r[0].jid).split('@')[0]);
+      }
+      return r[0].jid;
+    }
   } catch (e) { /* ignore */ }
   return null;
 }
@@ -291,6 +364,7 @@ async function startSession(id) {
   // Cache des messages envoyés : indispensable pour répondre aux « retry receipts »
   // (sinon le destinataire reste bloqué sur « En attente de ce message… »).
   if (!s.sent) { s.sent = chargerSent(id); }
+  if (!s.lidNumeros) { s.lidNumeros = chargerLid(id); }
   if (!s.retryCache) {
     s.retryCache = {
       _m: new Map(),
@@ -364,7 +438,7 @@ async function startSession(id) {
         logger.warn({ id, key: k, stub: m.messageStubType }, 'Entrant illisible (déchiffrement échoué)');
         continue;
       }
-      const phone = phoneFromKey(k);
+      const phone = phoneFromKey(k, id, s);
       if (!phone) {
         // Numéro introuvable (souvent @lid) : on logue la clé pour localiser le champ.
         logger.warn({ id, key: k }, 'Entrant sans numéro résolu');
@@ -490,7 +564,7 @@ function requireConnected(req, res) {
 app.post('/sessions/:id/send', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
-    const jid = await resolveJid(s.sock, req.body.to);
+    const jid = await resolveJid(s.sock, req.body.to, req.params.id, s);
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
@@ -502,7 +576,7 @@ app.post('/sessions/:id/send', async (req, res) => {
 app.post('/sessions/:id/send-media', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
-    const jid = await resolveJid(s.sock, req.body.to);
+    const jid = await resolveJid(s.sock, req.body.to, req.params.id, s);
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi média');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
@@ -632,9 +706,15 @@ function arretPropre(signal) {
     try {
       // Sauvegarde immédiate du cache des messages envoyés (timer différé annulé).
       if (s && s.sentTimer) { clearTimeout(s.sentTimer); s.sentTimer = null; }
-      if (s && s.sent && s.sent.size) {
+      if (s && s.lidTimer) { clearTimeout(s.lidTimer); s.lidTimer = null; }
+      if (s && ((s.sent && s.sent.size) || (s.lidNumeros && s.lidNumeros.size))) {
         fs.mkdirSync(sessionDir(id), { recursive: true });
-        fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+        if (s.sent && s.sent.size) {
+          fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+        }
+        if (s.lidNumeros && s.lidNumeros.size) {
+          fs.writeFileSync(fichierLid(id), JSON.stringify(Object.fromEntries(s.lidNumeros)), 'utf8');
+        }
       }
       // end() ferme la connexion en conservant l'appairage (à l'inverse de logout()).
       if (s && s.sock) { s.sock.end(undefined); }
