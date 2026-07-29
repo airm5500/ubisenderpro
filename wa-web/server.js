@@ -42,6 +42,32 @@ const DisconnectReason = baileys.DisconnectReason || {};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Charge un fichier `.env` posé à côté de server.js (sans dépendance externe).
+ * Évite le piège classique : sous Windows, un `set VAR=...` ne vaut que pour la
+ * fenêtre courante — rouvrir une invite fait perdre la configuration et les
+ * messages entrants ne sont alors plus transmis à l'application.
+ * Une vraie variable d'environnement reste prioritaire sur le fichier.
+ */
+function chargerEnvFichier() {
+  const f = path.join(__dirname, '.env');
+  if (!fs.existsSync(f)) { return false; }
+  for (const ligne of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
+    const t = ligne.trim();
+    if (!t || t.startsWith('#')) { continue; }
+    const i = t.indexOf('=');
+    if (i <= 0) { continue; }
+    const cle = t.slice(0, i).trim();
+    let val = t.slice(i + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (!process.env[cle]) { process.env[cle] = val; }
+  }
+  return true;
+}
+const ENV_FICHIER = chargerEnvFichier();
+
 const PORT = process.env.PORT || 3000;
 const API_TOKEN = process.env.WA_WEB_TOKEN || '';
 const DATA_DIR = process.env.WA_WEB_DATA || path.join(__dirname, 'data');
@@ -135,19 +161,40 @@ function publicState(s) {
                lastInboundAt: null, undecipherable: 0 };
 }
 
+/** Échecs de déchiffrement consécutifs avant de déclarer la session dégradée. */
+const SEUIL_ECHECS = 3;
+/** Délai sans AUCUNE réception lisible avant de pouvoir déclarer la session dégradée. */
+const DELAI_SANS_RECEPTION_MS = 60000;
+
 /**
  * Passe la session en « dégradée » : le socket est ouvert (l'envoi marche) mais
  * des messages entrants arrivent illisibles → les réponses des clients sont
  * silencieusement perdues, la session doit être reconnectée (rescan du QR).
+ *
+ * Tolérance aux incidents passagers : WhatsApp re-livre souvent un message
+ * illisible une seconde plus tard, et il arrive alors correctement. On ne
+ * déclare donc « dégradé » qu'après plusieurs échecs CONSÉCUTIFS (compteur
+ * remis à zéro à chaque réception lisible) ET en l'absence de toute réception
+ * saine récente — le cas réel de la session « zombie », où plus rien n'arrive.
  * Ne notifie qu'au basculement OK -> DEGRADED (évite le flood).
  */
 function marquerDegrade(id, s, raison) {
   if (!s) { return; }
   s.undecipherable = (s.undecipherable || 0) + 1;
+  s.echecsConsecutifs = (s.echecsConsecutifs || 0) + 1;
   if (s.health === 'DEGRADED') { return; }
+
+  const depuisReception = Date.now() - (s.lastInboundAt || 0);
+  if (s.echecsConsecutifs < SEUIL_ECHECS || depuisReception < DELAI_SANS_RECEPTION_MS) {
+    // Incident probablement passager : on trace sans alerter l'utilisateur.
+    logger.info({ id, echecsConsecutifs: s.echecsConsecutifs },
+      'Entrant illisible (incident passager, pas d\'alerte)');
+    return;
+  }
   s.health = 'DEGRADED';
   s.degradedReason = raison;
-  logger.warn({ id, undecipherable: s.undecipherable }, 'Session dégradée : messages entrants illisibles');
+  logger.warn({ id, undecipherable: s.undecipherable, echecsConsecutifs: s.echecsConsecutifs },
+    'Session dégradée : messages entrants illisibles');
   postCallback('/status', { sessionId: id, status: s.status, health: 'DEGRADED', reason: raison });
 }
 
@@ -155,6 +202,7 @@ function marquerDegrade(id, s, raison) {
 function marquerSain(id, s) {
   if (!s) { return; }
   s.lastInboundAt = Date.now();
+  s.echecsConsecutifs = 0; // la réception fonctionne : la série d'échecs est rompue
   if (s.health === 'DEGRADED') {
     s.health = 'OK';
     s.degradedReason = null;
@@ -280,6 +328,7 @@ async function startSession(id) {
       s.health = 'OK';
       s.degradedReason = null;
       s.undecipherable = 0;
+      s.echecsConsecutifs = 0;
       s.me = sock.user ? { id: sock.user.id, name: sock.user.name } : null;
       logger.info({ id, me: s.me }, 'Session connectée');
       postCallback('/status', { sessionId: id, status: 'CONNECTE', health: 'OK', reason: null });
@@ -465,7 +514,35 @@ function restoreSessions() {
   } catch (e) { logger.warn(String(e.message || e)); }
 }
 
+/**
+ * Contrôle de configuration au démarrage, affiché en clair : sans
+ * UBISENDER_CALLBACK, les messages entrants sont reçus mais JAMAIS transmis à
+ * l'application (les réponses n'apparaissent pas dans les Discussions).
+ */
+function verifierConfiguration() {
+  logger.info('Configuration : ' + (ENV_FICHIER ? 'fichier .env chargé' : 'aucun fichier .env (variables d\'environnement seules)'));
+  if (!CALLBACK) {
+    console.error('\n' + '='.repeat(72));
+    console.error('  ERREUR DE CONFIGURATION : UBISENDER_CALLBACK n\'est pas defini.');
+    console.error('  Les reponses des clients seront RECUES mais NON transmises a');
+    console.error('  l\'application : elles n\'apparaitront PAS dans les Discussions.');
+    console.error('');
+    console.error('  Corrigez en creant un fichier .env a cote de server.js :');
+    console.error('      UBISENDER_CALLBACK=http://localhost:8080/ubisenderpro');
+    console.error('      WA_WEB_TOKEN=un-secret-partage');
+    console.error('  (ou lancez le service avec demarrer.bat)');
+    console.error('='.repeat(72) + '\n');
+  } else {
+    logger.info('Callback UbiSmartCRM Pro : ' + CALLBACK);
+  }
+  if (!API_TOKEN) {
+    logger.warn('WA_WEB_TOKEN non defini : l\'API interne est OUVERTE et les callbacks '
+      + 'partent sans jeton (l\'application peut les refuser).');
+  }
+}
+
 app.listen(PORT, () => {
   logger.info('UbiSenderPro WA-Web sur le port ' + PORT);
+  verifierConfiguration();
   restoreSessions();
 });

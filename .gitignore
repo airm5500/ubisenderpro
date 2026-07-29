@@ -9,3 +9,9 @@ target/
 .factorypath
 src/main/webapp/ext/
 *.log
+
+# Service compagnon WhatsApp Web : dépendances, sessions et configuration
+# locale (le .env contient le jeton partagé — ne jamais le versionner).
+wa-web/node_modules/
+wa-web/data/
+wa-web/.env
