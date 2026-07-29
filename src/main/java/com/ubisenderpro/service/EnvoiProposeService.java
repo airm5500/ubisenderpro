@@ -618,6 +618,14 @@ public class EnvoiProposeService {
         // Messages riches (texte libre + emojis + pièce jointe) : canal WhatsApp Web
         // par défaut ; l'opérateur peut basculer sur Cloud API avant l'envoi.
         c.setCanal("WEB");
+        // Sécurité : une campagne sans modèle est inutilisable (elle ne peut ni
+        // s'afficher ni se lancer). Mieux vaut refuser la validation avec un
+        // message clair que de laisser un brouillon impossible à envoyer.
+        if (modele == null || modele.getId() == null) {
+            throw new ValidationException("modele",
+                    "Le modèle de message n'a pas pu être créé. Réessayez ; "
+                    + "si le problème persiste, contactez l'administrateur.");
+        }
         c.setModeleId(modele.getId());
         // Audience (§16) : mémorise le ciblage et les segmentations résolues.
         if (audienceCampagne != null && !audienceCampagne.isEmpty()) {

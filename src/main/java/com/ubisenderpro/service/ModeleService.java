@@ -80,7 +80,16 @@ public class ModeleService {
 
     public Optional<ModeleMessage> parId(Long id) { return Optional.ofNullable(em.find(ModeleMessage.class, id)); }
 
-    public ModeleMessage creer(ModeleMessage m) { em.persist(m); return m; }
+    public ModeleMessage creer(ModeleMessage m) {
+        em.persist(m);
+        // Génère l'identifiant (IDENTITY) immédiatement : l'appelant s'en sert
+        // aussitôt comme clé étrangère. Sans ce flush, la validation d'une
+        // proposition créait une campagne dont le modèle restait NUL — d'où
+        // « Modèle de message non défini » au lancement et un champ vide à
+        // l'écran, qui poussait à choisir un gabarit générique.
+        em.flush();
+        return m;
+    }
     public ModeleMessage modifier(ModeleMessage m) {
         ModeleMessage ex = em.find(ModeleMessage.class, m.getId());
         if (ex != null) { m.setCreatedAt(ex.getCreatedAt()); }
