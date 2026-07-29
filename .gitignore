@@ -15,3 +15,6 @@ src/main/webapp/ext/
 wa-web/node_modules/
 wa-web/data/
 wa-web/.env
+# Verrou de dependances : non suivi (il depend de la plateforme d'installation).
+# La reproductibilite est assuree par la version EPINGLEE dans package.json.
+wa-web/package-lock.json
