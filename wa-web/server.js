@@ -32,12 +32,26 @@ import { fileURLToPath } from 'url';
 import * as baileys from '@whiskeysockets/baileys';
 
 // Destructuration tolérante (l'API Baileys évolue selon les versions).
-const makeWASocket = baileys.default || baileys.makeWASocket;
+// Attention : selon la version, `default` est soit la fabrique elle-même
+// (6.7.x), soit un objet qui la contient (6.17.x). On retient donc le premier
+// candidat réellement APPELABLE, sinon le service planterait au démarrage.
+const makeWASocket = [
+  baileys.makeWASocket,
+  baileys.default && baileys.default.default,
+  baileys.default
+].find((c) => typeof c === 'function');
 const useMultiFileAuthState = baileys.useMultiFileAuthState;
 const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
 const makeInMemoryStore = baileys.makeInMemoryStore; // peut être absent
 const makeCacheableSignalKeyStore = baileys.makeCacheableSignalKeyStore; // peut être absent
 const DisconnectReason = baileys.DisconnectReason || {};
+
+if (typeof makeWASocket !== 'function') {
+  console.error('\nERREUR : fabrique de connexion introuvable dans @whiskeysockets/baileys.');
+  console.error('La version installee expose une API incompatible. Reinstallez avec :');
+  console.error('    npm install @whiskeysockets/baileys@6.17.16\n');
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
