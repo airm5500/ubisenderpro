@@ -15,6 +15,15 @@ connexion par **QR**, envoi **texte/média**, **filtre de numéros**.
    ```
 2. **Démarrer** : double-cliquer sur **`demarrer.bat`** (il installe les
    dépendances au premier lancement, puis démarre le service).
+3. **Arrêter** : double-cliquer sur **`arreter.bat`**, ou appuyer sur **Ctrl+C**
+   dans la fenêtre du service. Les deux font le même arrêt propre.
+
+> ⚠️ **N'arrêtez jamais le service avec `taskkill /F` ni en fermant la fenêtre
+> d'un coup** : le processus est coupé net et l'état de chiffrement peut rester
+> à demi écrit, ce qui provoque ensuite des messages illisibles.
+> `arreter.bat` demande l'arrêt au service (endpoint `POST /arret`, protégé par
+> le jeton) : il sauvegarde ses caches, ferme les sessions **sans délier
+> l'appareil** (aucun QR à rescanner), puis s'arrête.
 
 > ⚠️ **Piège classique à éviter :** un `set UBISENDER_CALLBACK=...` en invite de
 > commandes ne vaut **que pour la fenêtre en cours**. En rouvrant une invite, la
@@ -104,6 +113,7 @@ Définir ces variables d'environnement côté Payara :
 | POST | `/sessions/:id/send` | `{to, text}` |
 | POST | `/sessions/:id/send-media` | `{to, type, mediaUrl|mediaBase64, mimeType, fileName, caption}` |
 | POST | `/sessions/:id/check-numbers` | `{numbers:[...]}` |
+| POST | `/arret` | — *(arrêt propre du service, utilisé par `arreter.bat`)* |
 
 Statuts : `DECONNECTE` · `CONNEXION` · `QR` · `CONNECTE`.
 

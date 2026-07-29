@@ -533,6 +533,18 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+/**
+ * Arrêt propre demandé à distance (utilisé par arreter.bat).
+ * Sous Windows, un « taskkill » coupe brutalement le processus et peut laisser
+ * l'état de chiffrement à demi écrit ; passer par le service garantit le même
+ * traitement que Ctrl+C : sauvegarde des caches puis fermeture des sessions.
+ * Protégé par le jeton partagé, comme le reste de l'API.
+ */
+app.post('/arret', (req, res) => {
+  res.json({ ok: true, message: 'Arrêt propre en cours…' });
+  setTimeout(() => arretPropre('API'), 100); // laisse la réponse partir
+});
+
 app.post('/sessions/:id/start', async (req, res) => {
   try {
     const s = await startSession(req.params.id);
