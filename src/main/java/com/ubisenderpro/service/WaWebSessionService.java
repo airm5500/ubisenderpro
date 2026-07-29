@@ -46,6 +46,20 @@ public class WaWebSessionService {
     /** Identifiant de session côté service Node. */
     public static String nodeId(Long id) { return "acc-" + id; }
 
+    /**
+     * Identifiant Node à partir d'une valeur texte : le ciblage d'une campagne
+     * stocke l'identifiant brut (« 2 »), alors que le service Node nomme ses
+     * sessions « acc-2 ». Sans cette conversion, l'appel vise une session
+     * inexistante et échoue en « Session non connectée ». Tolère une valeur
+     * déjà préfixée.
+     */
+    public static String nodeIdDepuisTexte(String valeur) {
+        if (valeur == null) { return null; }
+        String v = valeur.trim();
+        if (v.isEmpty()) { return null; }
+        return v.startsWith("acc-") ? v : "acc-" + v;
+    }
+
     /** Démarre/relance la session et met à jour le statut local. */
     public JsonNode demarrer(Long id) {
         WaWebSession s = em.find(WaWebSession.class, id);

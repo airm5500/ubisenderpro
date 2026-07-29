@@ -76,16 +76,21 @@ public class CampagneSenderTx {
                 success = false; erreur = "Session WhatsApp Web non définie pour la campagne";
             } else {
                 WaWebClient web = new WaWebClient();
+                // L'écran de campagne enregistre l'identifiant brut de la session
+                // (« 2 ») ; le service Node la connaît sous « acc-2 ». Sans cette
+                // conversion, tous les envois échouaient en « Session non connectée »
+                // alors que la session était bien connectée.
+                String sessionId = WaWebSessionService.nodeIdDepuisTexte(c.getWaWebSessionId());
                 String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
                 String texte = variablesContactService.personnaliser(corps, d.getNumeroWhatsapp(), d.getNomContact());
                 String mediaType = nz(modele.getEnteteMediaType());
                 String mediaUrl = nz(modele.getEnteteMediaUrl());
                 WaWebClient.SendResult res;
                 if (!mediaType.isEmpty() && !mediaUrl.isEmpty()) {
-                    res = web.sendMedia(c.getWaWebSessionId(), d.getNumeroWhatsapp(),
+                    res = web.sendMedia(sessionId, d.getNumeroWhatsapp(),
                             mediaType.toLowerCase(), mediaUrl, texte, null, nomMedia(mediaType));
                 } else {
-                    res = web.sendText(c.getWaWebSessionId(), d.getNumeroWhatsapp(), texte);
+                    res = web.sendText(sessionId, d.getNumeroWhatsapp(), texte);
                 }
                 success = res.success; waMessageId = res.id; erreur = res.erreur;
             }

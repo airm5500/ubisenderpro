@@ -564,10 +564,24 @@ app.post('/sessions/:id/logout', async (req, res) => {
   res.json({ status: 'DECONNECTE' });
 });
 
+/**
+ * Exige une session connectée. Distingue « identifiant inconnu » de « session
+ * connue mais hors ligne » : confondre les deux masquait un appel utilisant un
+ * mauvais identifiant (« 2 » au lieu de « acc-2 »), diagnostique a tort comme
+ * une session deconnectee alors qu'elle fonctionnait.
+ */
 function requireConnected(req, res) {
-  const s = sessions.get(req.params.id);
-  if (!s || s.status !== 'CONNECTE' || !s.sock) {
-    res.status(409).json({ erreur: 'Session non connectée' });
+  const id = req.params.id;
+  const s = sessions.get(id);
+  if (!s) {
+    const connues = Array.from(sessions.keys());
+    logger.warn({ id, connues }, 'Appel sur une session inconnue');
+    res.status(409).json({ erreur: 'Session « ' + id + ' » inconnue du service. '
+      + 'Sessions disponibles : ' + (connues.length ? connues.join(', ') : 'aucune') });
+    return null;
+  }
+  if (s.status !== 'CONNECTE' || !s.sock) {
+    res.status(409).json({ erreur: 'Session « ' + id + ' » non connectée (statut ' + s.status + ')' });
     return null;
   }
   return s;
