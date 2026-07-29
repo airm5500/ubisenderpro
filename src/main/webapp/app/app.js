@@ -181,6 +181,42 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Progression d'un envoi unitaire (1 message) ----------
+ * Un message unique n'a pas de progression intermédiaire (c'est tout ou rien) :
+ * on affiche donc un bandeau DISCRET et NON bloquant (pas de fenêtre modale,
+ * qui casserait la saisie en discussion) avec « 0 / 1 » pendant l'envoi puis
+ * « 1 / 1 · 100 % » au succès.
+ *   Usage : var p = Usp.progressionUnitaire('Relance'); ... p.succes() | p.echec()
+ */
+Usp.progressionUnitaire = function (libelle) {
+    var el = Ext.DomHelper.append(Ext.getBody(), {
+        tag: 'div',
+        style: 'position:fixed;z-index:99999;right:18px;bottom:18px;min-width:240px;background:#05253d;' +
+            'color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);' +
+            'font-family:sans-serif;font-size:12px;opacity:0;transition:opacity .2s ease'
+    }, true);
+    var peindre = function (pct, texte, couleur) {
+        el.dom.innerHTML =
+            '<div style="margin-bottom:6px">' + Ext.String.htmlEncode(libelle || 'Envoi') + ' — ' + texte + '</div>' +
+            '<div style="height:6px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden">' +
+            '<div style="height:6px;width:' + pct + '%;background:' + (couleur || '#12a99e') +
+            ';transition:width .3s ease"></div></div>';
+    };
+    peindre(8, 'envoi en cours… 0 / 1');
+    el.dom.offsetWidth;
+    el.setStyle({ opacity: 1 });
+    var fermer = function (delai) {
+        Ext.defer(function () {
+            el.setStyle({ opacity: 0 });
+            Ext.defer(function () { el.remove(); }, 250);
+        }, delai);
+    };
+    return {
+        succes: function () { peindre(100, '<b>100 %</b> — 1 / 1 ✅', '#2ecc9a'); fermer(1400); },
+        echec: function () { peindre(100, 'échec ❌ — 0 / 1', '#e57373'); fermer(1800); }
+    };
+};
+
 /* ---------- Progression d'un envoi de masse (barre % + k/n) ----------
  * Les envois sont asynchrones (schedulers) : on sonde régulièrement l'état et
  * on affiche l'avancement en direct jusqu'à la fin. Réutilisable (campagnes,

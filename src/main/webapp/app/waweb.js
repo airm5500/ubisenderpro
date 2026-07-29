@@ -612,7 +612,19 @@ Usp.waweb.relancerEchecs = function (jobId, store) {
     Ext.Msg.confirm('Renvoyer les échecs', 'Renvoyer uniquement les destinataires en échec de cet envoi ?', function (btn) {
         if (btn !== 'yes') { return; }
         Usp.ajax({ url: '/wa-bulk/' + jobId + '/relancer', method: 'POST',
-            success: function () { Ext.Msg.alert('OK', 'Renvoi des échecs lancé.'); if (store) { store.load(); } },
+            success: function () {
+                if (store) { store.load(); }
+                // Barre de progression en direct sur la reprise des échecs.
+                Usp.progressionEnvoi({
+                    titre: 'Renvoi des échecs',
+                    url: '/wa-bulk/' + jobId,
+                    lire: function (d) {
+                        return { total: d.total, envoyes: d.envoyes, echoues: d.echoues, statut: d.statut };
+                    },
+                    onFin: function () { if (store) { store.load(); } },
+                    onClose: function () { if (store) { store.load(); } }
+                });
+            },
             failure: function (r) { Ext.Msg.alert('Erreur', Usp.waweb.err(r, 'Renvoi impossible.')); } });
     });
 };

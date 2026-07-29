@@ -650,14 +650,15 @@ Usp.recouvrement.relanceForm = function (rec) {
             var v = f.getValues();
             v.clientId = rec.get('clientId');
             Usp.recouvrement.appliquerPiece(f, v);
+            var prog = Usp.progressionUnitaire('Relance');
             Usp.ajax({ url: '/recouvrement/envois', method: 'POST', jsonData: v,
                 success: function (resp) {
                     var e = Ext.decode(resp.responseText) || {};
                     win.close();
-                    if (e.statut === 'ENVOYE') { Usp.toast('Relance envoyée (' + e.canal + ').'); }
-                    else { Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
+                    if (e.statut === 'ENVOYE') { prog.succes(); Usp.toast('Relance envoyée (' + e.canal + ').'); }
+                    else { prog.echec(); Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
                 },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                failure: function (resp) { prog.echec(); Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
     });
     win.show();

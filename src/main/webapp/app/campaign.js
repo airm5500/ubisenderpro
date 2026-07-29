@@ -507,9 +507,17 @@ Usp.campaign.relance = function (rec, store) {
                 url: '/campaigns/' + rec.get('id') + '/relancer', method: 'POST',
                 success: function (resp) {
                     var r = Ext.decode(resp.responseText || '{}');
-                    Ext.Msg.alert('Relance',
-                        (r.relances || 0) + ' envoi(s) remis en file. Le traitement progresse en arrière-plan.',
-                        function () { if (store) { store.load(); } });
+                    if (store) { store.load(); }
+                    // Barre de progression en direct sur la reprise des échecs.
+                    Usp.progressionEnvoi({
+                        titre: 'Relance des échecs — ' + (rec.get('nom') || ''),
+                        url: '/campaigns/' + rec.get('id') + '/statistics',
+                        lire: function (d) {
+                            return { total: d.destinataires, envoyes: d.envoyes, echoues: d.echoues, statut: d.statut };
+                        },
+                        onFin: function () { if (store) { store.load(); } },
+                        onClose: function () { if (store) { store.load(); } }
+                    });
                 },
                 failure: function (resp) {
                     Ext.Msg.alert('Erreur', 'Relance impossible : ' + (resp.responseText || ''));
