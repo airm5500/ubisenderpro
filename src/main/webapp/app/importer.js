@@ -51,17 +51,63 @@ Usp.importer.CHAMPS = {
     ]
 };
 
+/* Compare deux intitulés en ignorant casse, accents, espaces et séparateurs :
+ * « Code client », « code_client » et « CODE-CLIENT » désignent la même colonne. */
+Usp.importer.normaliser = function (s) {
+    s = String(s == null ? '' : s).toLowerCase();
+    // Décomposition Unicode pour retirer les accents sans table de correspondance.
+    if (String.prototype.normalize) { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+    return s.replace(/[^a-z0-9]/g, '');
+};
+
+Usp.importer.estExcel = function (nom) {
+    return /\.xlsx?$/i.test(String(nom || ''));
+};
+
+/* Pré-remplit les listes de correspondance : pour chaque champ de
+ * l'application, cherche une colonne du fichier dont l'intitulé correspond au
+ * nom technique OU au libellé affiché (accents, casse et séparateurs ignorés).
+ * Renvoie le nombre de correspondances trouvées. */
+Usp.importer.preRemplir = function (win, champs, colonnes) {
+    var index = {};
+    colonnes.forEach(function (col) {
+        var k = Usp.importer.normaliser(col);
+        if (k && !index.hasOwnProperty(k)) { index[k] = col; }
+    });
+    var trouves = 0;
+    champs.forEach(function (c) {
+        var field = win.down('[name=map_' + c[0] + ']');
+        if (!field) { return; }
+        // Le libellé peut porter une étoile (champ obligatoire) ou une précision
+        // entre parenthèses : on ne compare que sa partie signifiante.
+        var libelle = String(c[1]).replace(/\*/g, '').replace(/\(.*\)/, '');
+        var col = index[Usp.importer.normaliser(c[0])] || index[Usp.importer.normaliser(libelle)];
+        if (col) { field.setValue(col); trouves++; }
+    });
+    return trouves;
+};
+
 Usp.importer.show = function (type, url, onDone) {
     var champs = Usp.importer.CHAMPS[type] || [];
-    var colStore = Ext.create('Ext.data.Store', { fields: ['col'], data: [] });
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col', 'exemples'], data: [] });
     var fileData = { base64: null, nom: null };
 
-    // Combos de mapping : un par champ logique.
+    // Combos de mapping : un par champ logique. La liste déroulante affiche
+    // l'intitulé de la colonne ET ses premières valeurs : c'est souvent le
+    // contenu, plus que l'intitulé, qui permet de reconnaître la bonne colonne.
+    var listConfig = {
+        getInnerTpl: function () {
+            return '<div><b>{col}</b>'
+                + '<tpl if="exemples"><div style="color:#888;font-size:11px">{exemples}</div></tpl></div>';
+        }
+    };
     var mappingItems = champs.map(function (c) {
         return {
             xtype: 'combobox', name: 'map_' + c[0], fieldLabel: c[1],
             store: colStore, valueField: 'col', displayField: 'col',
-            queryMode: 'local', editable: true, forceSelection: false, anchor: '100%'
+            queryMode: 'local', editable: true, forceSelection: false, anchor: '100%',
+            listConfig: listConfig,
+            emptyText: '— aucune colonne (champ non importé) —'
         };
     });
 
@@ -73,25 +119,48 @@ Usp.importer.show = function (type, url, onDone) {
         autoLoad: true
     });
 
-    var detecter = function (win) {
-        var sep = win.down('[name=separateur]').getValue() || ';';
-        var nom = (fileData.nom || '').toLowerCase();
-        if (nom.match(/\.xlsx?$/)) {
-            Ext.Msg.alert('Info', 'Détection automatique des colonnes disponible pour CSV. ' +
-                'Pour Excel, saisissez les noms de colonnes dans les listes de mapping.');
+    /* Détection des colonnes par le serveur : il sait lire le CSV comme le
+     * classeur Excel, alors que l'analyse faite ici même ne couvrait que le CSV
+     * — d'où l'ancien message invitant à SAISIR les noms de colonnes pour Excel.
+     * Les listes de correspondance sont ensuite alimentées avec les colonnes
+     * réelles du fichier et quelques valeurs d'exemple. */
+    var detecter = function (win, silencieux) {
+        if (!fileData.base64) {
+            if (!silencieux) { Ext.Msg.alert('Info', 'Choisissez d\'abord un fichier.'); }
             return;
         }
-        if (!fileData.text) { Ext.Msg.alert('Info', 'Choisissez d\'abord un fichier CSV.'); return; }
-        var firstLine = fileData.text.split(/\r?\n/)[0] || '';
-        var cols = firstLine.split(sep).map(function (s) { return s.trim().replace(/^"|"$/g, ''); });
-        colStore.loadData(cols.map(function (c) { return { col: c }; }));
-        // Pré-mapping automatique par nom identique.
-        champs.forEach(function (c) {
-            var field = win.down('[name=map_' + c[0] + ']');
-            var found = Ext.Array.findBy(cols, function (col) { return col.toLowerCase() === c[0].toLowerCase(); });
-            if (found) { field.setValue(found); }
+        var etat = win.down('#etatDetection');
+        etat.setValue('<span style="color:#888">Analyse du fichier…</span>');
+        Usp.ajax({
+            url: '/imports/colonnes', method: 'POST',
+            jsonData: { fichierBase64: fileData.base64, nomFichier: fileData.nom,
+                        separateur: win.down('[name=separateur]').getValue() || ';' },
+            success: function (resp) {
+                var r = {};
+                try { r = Ext.decode(resp.responseText) || {}; } catch (e) { r = {}; }
+                var cols = r.colonnes || [];
+                if (!cols.length) {
+                    etat.setValue('<span style="color:#c62828">Aucune colonne détectée. '
+                        + 'Vérifiez que la 1re ligne du fichier contient bien les intitulés'
+                        + (Usp.importer.estExcel(fileData.nom) ? '' : ', et le séparateur choisi') + '.</span>');
+                    return;
+                }
+                colStore.loadData(cols.map(function (c) {
+                    var vals = (r.exemples || []).map(function (l) { return l[c]; })
+                        .filter(function (v) { return v !== null && v !== undefined && v !== ''; });
+                    return { col: c, exemples: vals.slice(0, 3).join(' · ') };
+                }));
+                var apparies = Usp.importer.preRemplir(win, champs, cols);
+                etat.setValue('<span style="color:#2e7d32">' + cols.length + ' colonne(s) détectée(s), '
+                    + (r.totalLignes || 0) + ' ligne(s) de données — ' + apparies
+                    + ' correspondance(s) trouvée(s) automatiquement.</span> '
+                    + '<span style="color:#888">Vérifiez la correspondance ci-dessous.</span>');
+            },
+            failure: function (resp) {
+                etat.setValue('<span style="color:#c62828">'
+                    + Ext.String.htmlEncode(Usp.erreurServeur(resp)) + '</span>');
+            }
         });
-        Ext.Msg.alert('Colonnes détectées', cols.length + ' colonnes : ' + Ext.String.htmlEncode(cols.join(', ')));
     };
 
     var win = Ext.create('Ext.window.Window', {
@@ -103,7 +172,8 @@ Usp.importer.show = function (type, url, onDone) {
             xtype: 'form', border: false, autoScroll: true, bodyPadding: 12,
             defaults: { anchor: '100%' },
             items: [
-                { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier', buttonText: 'Parcourir...',
+                { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier (.csv / .xlsx)',
+                  buttonText: 'Parcourir...',
                   listeners: { change: function (f) {
                       var file = f.fileInputEl.dom.files[0];
                       if (!file) { return; }
@@ -111,17 +181,24 @@ Usp.importer.show = function (type, url, onDone) {
                       var reader = new FileReader();
                       reader.onload = function (e) {
                           fileData.base64 = e.target.result.split(',')[1];
-                          var txtReader = new FileReader();
-                          txtReader.onload = function (ev) { fileData.text = ev.target.result; };
-                          txtReader.readAsText(file);
+                          // Le séparateur n'a de sens que pour un CSV.
+                          var sepField = f.up('window').down('[name=separateur]');
+                          sepField.setDisabled(Usp.importer.estExcel(file.name));
+                          // Détection immédiate : l'utilisateur n'a plus à savoir
+                          // qu'il faut cliquer sur un bouton pour voir ses colonnes.
+                          detecter(f.up('window'), true);
                       };
                       reader.readAsDataURL(file);
                   } } },
                 { xtype: 'fieldcontainer', layout: 'hbox', items: [
                     { xtype: 'textfield', name: 'separateur', fieldLabel: 'Séparateur', value: ';', width: 160 },
-                    { xtype: 'button', text: 'Détecter les colonnes', margin: '0 0 0 10',
+                    { xtype: 'button', text: 'Relire les colonnes', margin: '0 0 0 10',
+                      tooltip: 'Relance la détection (après changement de séparateur)',
                       handler: function (b) { detecter(b.up('window')); } }
                 ] },
+                { xtype: 'displayfield', itemId: 'etatDetection', hideLabel: true,
+                  value: '<span style="color:#888">Choisissez un fichier : ses colonnes sont détectées '
+                      + 'automatiquement et proposées dans les listes de correspondance ci-dessous.</span>' },
                 { xtype: 'combobox', fieldLabel: 'Modèle de mapping', store: mappingStore,
                   valueField: 'id', displayField: 'nom', queryMode: 'local', editable: false,
                   emptyText: 'Aucun (mapping manuel)', name: 'mappingId',
@@ -135,7 +212,13 @@ Usp.importer.show = function (type, url, onDone) {
                           });
                       } catch (e) { }
                   } } },
-                { xtype: 'fieldset', title: 'Correspondance des colonnes', collapsible: true,
+                { xtype: 'displayfield', hideLabel: true,
+                  value: '<span style="color:#888">Un <b>modèle de mapping</b> mémorise la correspondance '
+                      + 'sous un nom : au prochain fichier de même structure, une seule sélection '
+                      + 'remplit toutes les listes ci-dessous.</span>' },
+                { xtype: 'fieldset',
+                  title: 'Correspondance des colonnes — à gauche le champ de l\'application, '
+                      + 'à droite VOTRE colonne', collapsible: true,
                   defaults: { labelWidth: 160, anchor: '100%' }, items: mappingItems },
                 { xtype: 'combobox', name: 'mode', fieldLabel: 'En cas de doublon', value: 'AJOUT_MAJ',
                   store: [['AJOUT_MAJ', 'Ajouter et mettre à jour'], ['IGNORER', 'Ignorer les doublons']],

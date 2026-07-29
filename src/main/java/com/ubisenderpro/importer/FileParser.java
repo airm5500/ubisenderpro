@@ -38,6 +38,62 @@ public final class FileParser {
         return parseCsv(contenu, separateur);
     }
 
+    /** Vrai si le nom de fichier désigne un classeur Excel. */
+    public static boolean estExcel(String nomFichier) {
+        String nom = nomFichier == null ? "" : nomFichier.toLowerCase();
+        return nom.endsWith(".xlsx") || nom.endsWith(".xls");
+    }
+
+    /**
+     * En-têtes du fichier, dans l'ordre des colonnes — y compris lorsque le
+     * fichier ne contient aucune ligne de données. Sert à l'assistant d'import,
+     * qui doit proposer les colonnes réelles du fichier et non les faire saisir.
+     */
+    public static List<String> entetes(byte[] contenu, String nomFichier, char separateur) throws Exception {
+        if (estExcel(nomFichier)) {
+            try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(contenu))) {
+                Sheet sheet = wb.getSheetAt(0);
+                Row headerRow = sheet.getRow(sheet.getFirstRowNum());
+                List<String> headers = new ArrayList<>();
+                if (headerRow != null) {
+                    DataFormatter formatter = new DataFormatter();
+                    for (Cell cell : headerRow) {
+                        headers.add(formatter.formatCellValue(cell).trim());
+                    }
+                }
+                return headers;
+            }
+        }
+        try (Reader reader = new InputStreamReader(new ByteArrayInputStream(contenu), StandardCharsets.UTF_8);
+             CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT
+                     .withDelimiter(separateur)
+                     .withFirstRecordAsHeader()
+                     .withIgnoreEmptyLines()
+                     .withTrim())) {
+            return new ArrayList<>(parser.getHeaderNames());
+        }
+    }
+
+    /**
+     * Aperçu d'un fichier : colonnes détectées, quelques lignes d'exemple et
+     * nombre total de lignes. Permet à l'utilisateur de reconnaître ses colonnes
+     * à leur contenu, et pas seulement à leur intitulé.
+     */
+    public static Map<String, Object> apercu(byte[] contenu, String nomFichier, char separateur,
+                                             int nbLignesExemple) throws Exception {
+        List<String> colonnes = entetes(contenu, nomFichier, separateur);
+        List<Map<String, String>> toutes = parse(contenu, nomFichier, separateur);
+        List<Map<String, String>> exemples = new ArrayList<>();
+        for (int i = 0; i < toutes.size() && i < nbLignesExemple; i++) {
+            exemples.add(toutes.get(i));
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("colonnes", colonnes);
+        r.put("exemples", exemples);
+        r.put("totalLignes", toutes.size());
+        return r;
+    }
+
     private static List<Map<String, String>> parseCsv(byte[] contenu, char separateur) throws Exception {
         List<Map<String, String>> lignes = new ArrayList<>();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(contenu), StandardCharsets.UTF_8);
