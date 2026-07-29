@@ -90,7 +90,8 @@ choice /c ON /n /m " L'arreter proprement et relancer maintenant ? (O/N) "
 if errorlevel 2 goto GARDER
 echo.
 echo  Arret propre de l'instance en cours...
-powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/arret' -Method Post -Headers @{'X-Api-Token'='%WA_WEB_TOKEN%'} -TimeoutSec 10 | Out-Null;exit 0}catch{exit 1}"
+powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/arret' -Method Post -Headers @{'X-Api-Token'='%WA_WEB_TOKEN%'} -TimeoutSec 10 | Out-Null;exit 0}catch{$c=$_.Exception.Response.StatusCode.value__;if($c -eq 404){exit 3};if($c -eq 401){exit 2};exit 1}"
+if errorlevel 3 goto ANCIENNE_INSTANCE
 if errorlevel 1 goto ARRET_KO
 powershell -NoProfile -Command "Start-Sleep -Seconds 5"
 powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/health' -TimeoutSec 3 | Out-Null;exit 0}catch{exit 1}"
@@ -101,6 +102,16 @@ goto LANCER
 :GARDER
 echo.
 echo  Instance en cours conservee. Rien n'a ete modifie.
+goto FIN
+
+:ANCIENNE_INSTANCE
+echo.
+echo  L'instance en cours est ANCIENNE : demarree avant la mise a jour,
+echo  elle ne connait pas encore la commande d'arret propre.
+echo.
+echo  Retrouvez sa fenetre (titre "Service WhatsApp Web") et appuyez
+echo  sur Ctrl+C dedans, puis relancez ce script.
+echo  Ou lancez arreter.bat : il proposera de terminer le processus.
 goto FIN
 
 :ARRET_KO

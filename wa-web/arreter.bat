@@ -39,7 +39,8 @@ powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PO
 if errorlevel 1 goto NE_REPOND_PAS
 
 echo  Demande d'arret propre en cours...
-powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/arret' -Method Post -Headers @{'X-Api-Token'='%WA_WEB_TOKEN%'} -TimeoutSec 10 | Out-Null;exit 0}catch{if($_.Exception.Response.StatusCode.value__ -eq 401){exit 2};exit 1}"
+powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/arret' -Method Post -Headers @{'X-Api-Token'='%WA_WEB_TOKEN%'} -TimeoutSec 10 | Out-Null;exit 0}catch{$c=$_.Exception.Response.StatusCode.value__;if($c -eq 404){exit 3};if($c -eq 401){exit 2};exit 1}"
+if errorlevel 3 goto ANCIENNE_INSTANCE
 if errorlevel 2 goto MAUVAIS_JETON
 if errorlevel 1 goto ECHEC
 
@@ -99,6 +100,20 @@ goto FIN
 echo  Ce processus n'est PAS node.exe : une autre application utilise le
 echo  port %PORT%. Ne la terminez pas a l'aveugle.
 echo  Solution : changez PORT dans le fichier .env.
+goto FIN
+
+:ANCIENNE_INSTANCE
+echo.
+echo  L'instance en cours est ANCIENNE : elle a ete demarree avant la
+echo  mise a jour et ne connait pas encore la commande d'arret propre.
+echo.
+echo  Le mieux : retrouvez sa fenetre (titre "Service WhatsApp Web")
+echo  et appuyez sur Ctrl+C dedans. C'est l'arret le plus sur.
+echo.
+echo  A defaut, ce script peut terminer le processus :
+call :PORT_OCCUPE
+if defined PIDPORT goto ENCORE_OCCUPE
+echo  (le port est deja libre : plus rien a arreter)
 goto FIN
 
 :MAUVAIS_JETON
