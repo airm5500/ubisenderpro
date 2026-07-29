@@ -187,7 +187,11 @@ Usp.campaign.build = function (wizard) {
         waWebSessionId: canal === 'WEB' ? (v.waWebSessionId || null) : null,
         modeleId: v.modeleId,
         listeId: v.listeId || null, segmentId: v.segmentId || null,
-        segmentationId: v.segmentationId || null,
+        // Ciblage par segmentations : l'assistant propose une sélection MULTIPLE
+        // (champ « segmentationIds », CSV). Envoyer « segmentationId » au
+        // singulier — qui n'existe pas dans ce formulaire — revenait à ne
+        // transmettre aucun ciblage : la campagne se construisait à 0 destinataire.
+        segmentationIds: v.segmentationIds || null,
         statut: 'BROUILLON'
     };
 
@@ -196,19 +200,41 @@ Usp.campaign.build = function (wizard) {
             url: '/campaigns/' + id + '/recipients', method: 'POST',
             success: function (resp) {
                 var r = Ext.decode(resp.responseText);
-                wizard.down('#recap').update(
-                    '<b>Campagne prête</b><hr/>' +
-                    'Destinataires valides : <b>' + r.nbDestinataires + '</b><br/>' +
-                    'Les désabonnés et numéros invalides ont été exclus.<br/><br/>' +
-                    'Cliquez sur « Lancer » pour démarrer l\'envoi en arrière-plan.');
-                wizard.down('#launch').setDisabled(r.nbDestinataires === 0);
+                var n = r.nbDestinataires || 0;
+                if (n === 0) {
+                    // Message explicite : sans cela, un « 0 » sec laisse l'utilisateur
+                    // sans piste (cause la plus fréquente : numéro non coché WhatsApp).
+                    wizard.down('#recap').update(
+                        '<b style="color:#c62828">Aucun destinataire</b><hr/>' +
+                        'Vérifiez, dans l\'ordre :<br/>' +
+                        '&nbsp;• une <b>segmentation</b> (ou liste / segment) est bien sélectionnée à l\'étape 2 ;<br/>' +
+                        '&nbsp;• les clients de cette segmentation ont un numéro <b>coché « WhatsApp »</b> ' +
+                        '(un numéro renseigné mais non coché n\'est pas ciblé) ;<br/>' +
+                        '&nbsp;• ces contacts ne sont pas <b>désabonnés</b>.');
+                } else {
+                    wizard.down('#recap').update(
+                        '<b>Campagne prête</b><hr/>' +
+                        'Destinataires valides : <b>' + n + '</b><br/>' +
+                        'Les désabonnés et numéros invalides ont été exclus.<br/><br/>' +
+                        'Cliquez sur « Lancer » pour démarrer l\'envoi en arrière-plan.');
+                }
+                wizard.down('#launch').setDisabled(n === 0);
             },
             failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Construction des destinataires impossible.')); }
         });
     };
 
     if (wizard.campagneId) {
-        finishBuild(wizard.campagneId);
+        // Le brouillon existe déjà (« Construire » cliqué une première fois) : le
+        // ciblage a pu être modifié depuis. Sans cette mise à jour, un nouveau clic
+        // recalculait sur l'ancien ciblage — donnant l'impression que le bouton
+        // « Construire » ne faisait rien.
+        payload.id = wizard.campagneId;
+        Usp.ajax({
+            url: '/campaigns/' + wizard.campagneId, method: 'PUT', jsonData: payload,
+            success: function () { finishBuild(wizard.campagneId); },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Mise à jour de la campagne impossible.')); }
+        });
     } else {
         Usp.ajax({
             url: '/campaigns', method: 'POST', jsonData: payload,
