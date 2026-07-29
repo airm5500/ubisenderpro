@@ -74,7 +74,7 @@ Usp.info.grille = function (filtre, libelleTab) {
     Usp.info._stores.push(store);
     var historique = !!filtre.historique;
     return {
-        xtype: 'grid', title: libelleTab, store: store,
+        xtype: 'grid', title: libelleTab, store: store, rapportNom: 'informations',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 120 },
             { text: 'Type', dataIndex: 'type', width: 180, renderer: Usp.info.typeLib },

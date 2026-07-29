@@ -151,7 +151,7 @@ Usp.marketing.grille = function (statut, libelleTab) {
     Usp.marketing._stores.push(store);
 
     return {
-        xtype: 'grid', title: libelleTab, store: store,
+        xtype: 'grid', title: libelleTab, store: store, rapportNom: 'promotions',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 120 },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },

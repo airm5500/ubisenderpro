@@ -539,7 +539,7 @@ Usp.campaign.listPanel = function () {
         listeners: { load: function (s) { Usp.campaign._majSynthese(s); } }
     });
     return {
-        xtype: 'grid', title: '🚀 Campagnes', store: store,
+        xtype: 'grid', title: '🚀 Campagnes', store: store, rapportNom: 'campagnes',
         dockedItems: [{ xtype: 'component', itemId: 'campSynthese', dock: 'top',
             style: 'padding:8px 4px;background:#fafafa;border-bottom:1px solid #eee', html: '' }],
         columns: [

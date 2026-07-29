@@ -83,6 +83,41 @@ public class RapportResource {
                 .build();
     }
 
+    /**
+     * Édition générique d'une liste : l'écran envoie le titre et les lignes
+     * telles qu'affichées (mêmes valeurs que l'export CSV), le serveur les
+     * coule dans le modèle .jrxml du même nom. Chaque écran garde ainsi son
+     * fichier de mise en page dédié, personnalisable dans le répertoire des
+     * rapports, sans qu'il faille un endpoint par écran.
+     */
+    @javax.ws.rs.POST
+    @Path("/liste/{nom}")
+    @javax.ws.rs.Consumes(javax.ws.rs.core.MediaType.APPLICATION_JSON)
+    public Response liste(@javax.ws.rs.PathParam("nom") String nom, Map<String, Object> body) {
+        Map<String, Object> params = new HashMap<>();
+        Object titre = body == null ? null : body.get("titre");
+        Object sousTitre = body == null ? null : body.get("sousTitre");
+        if (titre != null && !String.valueOf(titre).isEmpty()) { params.put("TITRE", String.valueOf(titre)); }
+        params.put("SOUS_TITRE", sousTitre == null ? "" : String.valueOf(sousTitre));
+
+        List<Map<String, ?>> lignes = new ArrayList<>();
+        Object brut = body == null ? null : body.get("lignes");
+        if (brut instanceof List) {
+            for (Object o : (List<?>) brut) {
+                if (!(o instanceof Map)) { continue; }
+                Map<String, Object> l = RapportService.ligne();
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) o).entrySet()) {
+                    l.put(String.valueOf(e.getKey()), texte(e.getValue()));
+                }
+                lignes.add(l);
+            }
+        }
+        byte[] pdf = rapportService.pdf(nom, params, lignes);
+        return Response.ok(pdf)
+                .header("Content-Disposition", "inline; filename=\"" + nom + ".pdf\"")
+                .build();
+    }
+
     /** Rappel des filtres appliqués, imprimé sous le titre (vide si aucun). */
     private String sousTitre(String q, String agence, String region, String tournee, String segmentation) {
         List<String> parts = new ArrayList<>();

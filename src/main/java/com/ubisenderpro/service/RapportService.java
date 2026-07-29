@@ -55,7 +55,13 @@ public class RapportService {
      * déposés dans le répertoire des rapports au démarrage s'ils n'y figurent
      * pas déjà : l'exploitant les retrouve en clair et peut les personnaliser.
      */
-    public static final String[] MODELES_EMBARQUES = { "clients" };
+    public static final String[] MODELES_EMBARQUES = {
+            "clients", "campagnes", "catalogue_articles", "promotions", "promotions_catalogue",
+            "disponibilites", "historique_envois", "informations",
+            "rec_agences", "rec_encours", "rec_historique",
+            "utilisateurs", "connexions", "journal_actions", "evolution",
+            "releve", "releve_creances", "releve_paiements"
+    };
 
     private static final Pattern MEDIA_ID = Pattern.compile("/media/(\\d+)\\b");
 
@@ -136,6 +142,26 @@ public class RapportService {
                     .orElse(null);
         } catch (RuntimeException e) {
             return null; // un logo illisible ne doit pas empêcher l'impression
+        }
+    }
+
+    /**
+     * Modèle compilé, pour servir de SOUS-RAPPORT à un autre modèle (ex. les
+     * tableaux du relevé de compte). Même résolution que les rapports :
+     * fichier du répertoire externe d'abord, modèle embarqué sinon.
+     */
+    public JasperReport modeleCompile(String nom) {
+        if (nom == null || !NOM_VALIDE.matcher(nom).matches()) {
+            throw new ValidationException("rapport", "Nom de rapport invalide.");
+        }
+        try {
+            return modele(nom);
+        } catch (ValidationException ve) {
+            throw ve;
+        } catch (Exception e) {
+            throw new ValidationException("rapport",
+                    "Compilation du modèle « " + nom + " » impossible : "
+                    + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
         }
     }
 

@@ -170,7 +170,7 @@ Usp.dispo.grille = function (filtre, libelleTab) {
 
     var historique = !!filtre.historique;
     return {
-        xtype: 'grid', title: libelleTab, store: store,
+        xtype: 'grid', title: libelleTab, store: store, rapportNom: 'disponibilites',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 120 },
             { text: 'Type', dataIndex: 'type', width: 150, renderer: Usp.dispo.typeRenderer },

@@ -625,16 +625,28 @@ Usp.export.recuperer = function (grid, cb) {
  * PENDANT le clic (sinon le navigateur la bloque comme pop-up), puis reçoit le
  * PDF quand il arrive. */
 Usp.rapportPdf = function (nomRapport, params) {
-    var w = window.open('', '_blank');
-    if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
-    try { w.document.write('<title>Génération du PDF…</title><p style="font-family:sans-serif;color:#666">Génération du PDF…</p>'); } catch (e) {}
     var qs = [];
     Ext.Object.each(params || {}, function (k, v) {
         if (v !== null && v !== undefined && v !== '') { qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); }
     });
+    Usp._rapportRequete('GET', '/rapports/' + nomRapport + (qs.length ? '?' + qs.join('&') : ''), null);
+};
+
+/* Variante générique : l'écran envoie lui-même les lignes (telles qu'exportées
+ * en CSV) au modèle .jrxml du même nom — voir POST /rapports/liste/{nom}. */
+Usp.rapportPdfPost = function (nomRapport, titre, lignes) {
+    Usp._rapportRequete('POST', '/rapports/liste/' + nomRapport,
+        JSON.stringify({ titre: titre || '', lignes: lignes || [] }));
+};
+
+Usp._rapportRequete = function (methode, chemin, corps) {
+    var w = window.open('', '_blank');
+    if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
+    try { w.document.write('<title>Génération du PDF…</title><p style="font-family:sans-serif;color:#666">Génération du PDF…</p>'); } catch (e) {}
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', Usp.apiBase + '/rapports/' + nomRapport + (qs.length ? '?' + qs.join('&') : ''), true);
+    xhr.open(methode, Usp.apiBase + chemin, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    if (corps) { xhr.setRequestHeader('Content-Type', 'application/json'); }
     xhr.responseType = 'blob';
     xhr.onload = function () {
         if (xhr.status === 200) {
@@ -651,12 +663,16 @@ Usp.rapportPdf = function (nomRapport, params) {
         }
     };
     xhr.onerror = function () { w.close(); Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };
-    xhr.send();
+    xhr.send(corps || null);
 };
 
 /* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille.
- * Si la grille déclare « rapportPdf » ({ nom, params() }), le PDF est produit
- * par le serveur sur modèle .jrxml ; sinon, repli sur l'impression navigateur. */
+ * PDF :
+ *  - « rapportPdf » ({ nom, params() }) : édition .jrxml remplie PAR LE SERVEUR
+ *    (il recharge les données avec les filtres) — cas des comptes clients ;
+ *  - « rapportNom » : édition .jrxml du même nom, remplie avec les lignes de la
+ *    grille (mêmes valeurs que l'export CSV) ;
+ *  - sinon : impression navigateur (repli). */
 Usp.export.boutons = function (titre) {
     var btn;
     var faire = function (format) {
@@ -669,7 +685,16 @@ Usp.export.boutons = function (titre) {
         }
         Usp.export.recuperer(grid, function (recs) {
             var cols = Usp.export.colonnes(grid);
-            if (format === 'csv') { Usp.export.csv(titre, cols, recs); } else { Usp.export.pdf(titre, cols, recs); }
+            if (format === 'csv') { Usp.export.csv(titre, cols, recs); return; }
+            if (grid.rapportNom) {
+                Usp.rapportPdfPost(grid.rapportNom, titre, recs.map(function (r) {
+                    var l = {};
+                    cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d, c.f); });
+                    return l;
+                }));
+                return;
+            }
+            Usp.export.pdf(titre, cols, recs);
         });
     };
     return [{
@@ -1893,7 +1918,12 @@ Usp.dashboardChart._build = function () {
             { text: 'Export CSV', handler: function () {
                 Usp.export.csv('evolution', Usp.dashboardChart.COLS, serieStore.getRange()); } },
             { text: 'Export PDF', handler: function () {
-                Usp.export.pdf('Évolution des envois', Usp.dashboardChart.COLS, serieStore.getRange()); } }
+                Usp.rapportPdfPost('evolution', 'Évolution des envois (30 jours)',
+                    serieStore.getRange().map(function (r) {
+                        var l = {};
+                        Usp.dashboardChart.COLS.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+                        return l;
+                    })); } }
         ],
         items: [{
             xtype: 'chart', store: serieStore, animate: true, shadow: false, insetPadding: 24,
