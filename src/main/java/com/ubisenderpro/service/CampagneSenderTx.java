@@ -82,6 +82,12 @@ public class CampagneSenderTx {
                 // alors que la session était bien connectée.
                 String sessionId = WaWebSessionService.nodeIdDepuisTexte(c.getWaWebSessionId());
                 String corps = modele.getCorps() != null ? modele.getCorps() : modele.getNom();
+                // Variables figées sur le modèle ({{liste_produits}}, {{agence}}…) :
+                // elles portent le contenu métier (produits en promotion ou
+                // disponibles). Sans cette étape, elles restaient non résolues et
+                // le filet anti-variable de personnaliser() les EFFAÇAIT — le bloc
+                // produit disparaissait du message reçu, le reste arrivant normalement.
+                corps = appliquerContexte(corps, contexteModele(modele));
                 String texte = variablesContactService.personnaliser(corps, d.getNumeroWhatsapp(), d.getNomContact());
                 String mediaType = nz(modele.getEnteteMediaType());
                 String mediaUrl = nz(modele.getEnteteMediaUrl());
@@ -149,6 +155,26 @@ public class CampagneSenderTx {
             String val = vars.get(raw.toUpperCase());
             if (val == null) { val = contexte.get(raw.toLowerCase()); }
             out.add(val == null ? "" : val);
+        }
+        return out;
+    }
+
+    /**
+     * Remplace dans le corps les variables de contexte figées sur le modèle.
+     * Accepte les deux écritures présentes dans les modèles : {@code {{cle}}} et
+     * {@code [CLE]}. Insensible à la casse de la clé.
+     */
+    static String appliquerContexte(String corps, java.util.Map<String, String> contexte) {
+        if (corps == null || contexte == null || contexte.isEmpty()) { return corps; }
+        String out = corps;
+        for (java.util.Map.Entry<String, String> e : contexte.entrySet()) {
+            if (e.getKey() == null) { continue; }
+            String cle = e.getKey().trim();
+            String val = e.getValue() == null ? "" : e.getValue();
+            out = out.replace("{{" + cle + "}}", val)
+                     .replace("{{" + cle.toLowerCase() + "}}", val)
+                     .replace("{{" + cle.toUpperCase() + "}}", val)
+                     .replace("[" + cle.toUpperCase() + "]", val);
         }
         return out;
     }
