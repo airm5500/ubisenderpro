@@ -26,6 +26,33 @@ public class AboutResource {
     /** E-mail de contact du développeur. */
     public static final String EMAIL = "nzifranck13@gmail.com";
 
+    @javax.ws.rs.core.Context
+    private javax.servlet.ServletContext servletContext;
+
+    /**
+     * Horodatage de compilation du livrable, lu dans le MANIFEST du WAR
+     * (attribut {@code Build-Time} pose par Maven). Permet de verifier d'un
+     * coup d'oeil qu'un WAR fraichement construit a bien ete redeploye —
+     * un ancien WAR encore en place explique des correctifs « sans effet ».
+     *
+     * <p>Lecture via le ServletContext : elle vise le manifeste DU WAR. Un
+     * simple getResourceAsStream sur le chargeur de classes pourrait renvoyer
+     * le manifeste d'une bibliotheque embarquee, donc une date sans rapport.</p>
+     */
+    private String compileLe() {
+        try {
+            if (servletContext != null) {
+                try (java.io.InputStream in = servletContext.getResourceAsStream("/META-INF/MANIFEST.MF")) {
+                    if (in != null) {
+                        String v = new java.util.jar.Manifest(in).getMainAttributes().getValue("Build-Time");
+                        if (v != null && !v.trim().isEmpty()) { return v.trim(); }
+                    }
+                }
+            }
+        } catch (Exception ignore) { /* information de confort : jamais bloquante */ }
+        return "inconnu";
+    }
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Map<String, Object> about() {
@@ -34,6 +61,7 @@ public class AboutResource {
         m.put("version", VERSION);
         m.put("developpeur", DEVELOPPEUR);
         m.put("email", EMAIL);
+        m.put("compileLe", compileLe());
         return m;
     }
 }

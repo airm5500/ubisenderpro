@@ -1882,9 +1882,13 @@ Usp.apropos = function () {
                  '<b>' + Ext.String.htmlEncode(a.application || 'UbiSmartCRM Pro') + '</b><br>' +
                  'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
                  'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
-                 'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b>' +
+                 'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b><br>' +
+                 // Repère de déploiement : si cet horodatage est ancien après une
+                 // mise à jour, c'est que le WAR n'a pas été redéployé.
+                 '<span style="color:#888;font-size:11px">Livrable compilé le ' +
+                 Ext.String.htmlEncode(a.compileLe || 'inconnu') + '</span>' +
                  '</div>',
-            buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 360
+            buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 380
         });
     }, failure: function () { Ext.Msg.alert('À propos', 'Informations indisponibles.'); } });
 };
