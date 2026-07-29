@@ -575,11 +575,18 @@ public class EnvoiProposeService {
             corps = construireMessage(e, p);
             verifierResidu(corps);
             contexte = variablesContextePromo(e, p);
-            // Pièce jointe .xlsx (produits de la promo) hébergée puis attachée en en-tête document.
-            byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
-            String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
-                    xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
-            modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
+            if (produitsDansMessage(p.getId())) {
+                // Les produits sont annoncés dans le texte : pas de pièce jointe,
+                // qui ferait doublon (règle : la liste OU le fichier).
+                modele = creerModele(e.getTitre(), corps, null, null, "PROMOTION", contexte);
+            } else {
+                // Trop de produits pour le message : ils partent en .xlsx héberge,
+                // attaché au modèle en en-tête document.
+                byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
+                String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
+                        xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
+                modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
+            }
         } else if ("ANNONCE_MENSUELLE".equals(e.getType())) {
             LocalDate premier = premierDuMois(e);
             List<Promotion> promos = promosDuMois(premier);
@@ -836,15 +843,24 @@ public class EnvoiProposeService {
         BigDecimal taux = maxTauxUg(p.getId());
         v.put("taux_ug_max", taux == null ? "" : taux.stripTrailingZeros().toPlainString());
         v.put("avantage_ug", avantageUg(taux));
-        // Peu de produits : on les liste dans le message (plus lisible et
-        // actionnable) ; au-delà du seuil, on renvoie vers le fichier Excel joint.
-        int nb = nbProduitsActifs(p.getId());
-        boolean listable = nb > 0 && nb <= seuilProduitsMessage();
+        // Soit la liste dans le message, soit le fichier joint — jamais les deux.
+        boolean listable = produitsDansMessage(p.getId());
         v.put("liste_produits", listable ? listeProduitsPromo(p.getId()) + "\n\n" : "");
         v.put("mention_fichier", listable ? ""
                 : "📎 Consultez le fichier Excel joint pour découvrir les produits "
                   + "et leurs conditions promotionnelles.\n\n");
         return v;
+    }
+
+    /**
+     * Vrai si les produits de la promotion sont annoncés DANS le message ; faux
+     * s'ils partent dans le fichier Excel joint. Règle métier : l'un ou l'autre,
+     * jamais les deux — un message qui liste les produits n'a pas de pièce
+     * jointe, et inversement.
+     */
+    private boolean produitsDansMessage(Long promotionId) {
+        int nb = nbProduitsActifs(promotionId);
+        return nb > 0 && nb <= seuilProduitsMessage();
     }
 
     /** Au-delà de ce nombre de produits, le message renvoie vers le fichier Excel. */

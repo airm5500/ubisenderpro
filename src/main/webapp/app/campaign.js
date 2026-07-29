@@ -377,8 +377,43 @@ Usp.campaign.lancerExistante = function (rec, store, onLance) {
             } });
     };
 
+    // Une campagne issue d'une proposition part en WhatsApp Web sans session
+    // désignée : on la complète ici plutôt que de renvoyer l'utilisateur dans
+    // l'écran de modification pour un seul champ.
+    var verifierSession = function (suite) {
+        Usp.ajax({ url: '/campaigns/' + id, method: 'GET', success: function (r) {
+            var camp = {}; try { camp = Ext.decode(r.responseText) || {}; } catch (e) {}
+            if (camp.canal !== 'WEB' || camp.waWebSessionId) { suite(); return; }
+            Usp.ajax({ url: '/wa-web/sessions', method: 'GET', success: function (rs) {
+                var l = []; try { l = Ext.decode(rs.responseText) || []; } catch (e) {}
+                if (!l.length) {
+                    Ext.Msg.alert('Session requise',
+                        'Aucun compte WhatsApp Web n\'est configuré.<br/><br/>' +
+                        'Ajoutez-en un dans <b>Paramètres → WhatsApp Web</b>, connectez-le, puis relancez.');
+                    return;
+                }
+                var affecter = function (sessionId) {
+                    camp.waWebSessionId = String(sessionId);
+                    Usp.ajax({ url: '/campaigns/' + id, method: 'PUT', jsonData: camp,
+                        success: function () { if (store) { store.load(); } suite(); },
+                        failure: function (resp) {
+                            Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Affectation de la session impossible.'));
+                        } });
+                };
+                // Une seule session : on l'utilise directement, sans question inutile.
+                if (l.length === 1) { affecter(l[0].id); return; }
+                Usp.campaign.choisirSession(l, affecter);
+            }, failure: function (resp) {
+                Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Comptes WhatsApp Web indisponibles.'));
+            } });
+        }, failure: function (resp) {
+            Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Chargement de la campagne impossible.'));
+        } });
+    };
+
     // Les destinataires sont recalculés juste avant l'envoi : le ciblage a pu
     // changer depuis la création (liste de diffusion modifiée, par exemple).
+    var calculerPuisConfirmer = function () {
     Usp.ajax({ url: '/campaigns/' + id + '/recipients', method: 'POST',
         success: function (resp) {
             var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
@@ -400,6 +435,36 @@ Usp.campaign.lancerExistante = function (rec, store, onLance) {
         failure: function (resp) {
             Ext.Msg.alert('Erreur', Usp.erreurServeur(resp, 'Calcul des destinataires impossible.'));
         } });
+    };
+
+    // Session d'abord (si necessaire), puis destinataires et confirmation.
+    verifierSession(calculerPuisConfirmer);
+};
+
+/** Choix rapide d'une session WhatsApp Web quand plusieurs sont disponibles. */
+Usp.campaign.choisirSession = function (sessions, onChoix) {
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'libelle', 'numero', 'statut'], data: sessions });
+    var win = Ext.create('Ext.window.Window', {
+        title: 'Choisir le compte WhatsApp Web', width: 460, modal: true, bodyPadding: 12,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
+            { xtype: 'displayfield', value: '<span style="color:#555">Plusieurs comptes sont '
+                + 'disponibles : indiquez celui qui doit envoyer cette campagne.</span>' },
+            { xtype: 'combobox', name: 'sessionId', fieldLabel: 'Compte', allowBlank: false,
+              store: store, valueField: 'id', displayField: 'libelle', queryMode: 'local',
+              editable: false, value: sessions[0] ? sessions[0].id : null }
+        ] }],
+        buttons: [
+            { text: 'Annuler', handler: function (b) { b.up('window').close(); } },
+            { text: 'Continuer', cls: 'usp-btn-pri', formBind: true, handler: function (b) {
+                var v = b.up('window').down('form').getForm().getValues();
+                if (!v.sessionId) { return; }
+                win.close();
+                onChoix(v.sessionId);
+            } }
+        ]
+    });
+    win.show();
 };
 
 /* Couleurs des statuts de campagne (#5) : EN_COURS orange, distribué bleu,
