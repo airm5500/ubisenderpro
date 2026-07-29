@@ -294,15 +294,29 @@ async function startSession(id) {
     logger: pino({ level: 'silent' }),
     browser: ['UbiSenderPro', 'Chrome', '1.0.0'],
     msgRetryCounterCache: s.retryCache,
-    // Permet à Baileys de ré-émettre un message qu'un destinataire n'a pas pu déchiffrer.
+    // Permet à Baileys de ré-émettre un message qu'un destinataire n'a pas pu
+    // déchiffrer (« En attente de ce message… » sur son téléphone). Journalisé :
+    // c'est le seul moyen de savoir si les demandes de renvoi arrivent bien et
+    // si nous sommes capables d'y répondre.
     getMessage: async (key) => {
       try {
-        if (key && key.id && s.sent.has(key.id)) { return s.sent.get(key.id); }
+        if (key && key.id && s.sent.has(key.id)) {
+          logger.info({ id, messageId: key.id, destinataire: key.remoteJid },
+            'Demande de renvoi : message retrouvé, renvoi en cours');
+          return s.sent.get(key.id);
+        }
         if (s.store && typeof s.store.loadMessage === 'function' && key) {
           const m = await s.store.loadMessage(key.remoteJid, key.id);
-          if (m && m.message) { return m.message; }
+          if (m && m.message) {
+            logger.info({ id, messageId: key.id }, 'Demande de renvoi : message retrouvé (store)');
+            return m.message;
+          }
         }
-      } catch (e) { /* ignore */ }
+        logger.warn({ id, messageId: key && key.id, enCache: s.sent.size },
+          'Demande de renvoi : message INTROUVABLE — le destinataire restera sur « En attente de ce message »');
+      } catch (e) {
+        logger.warn({ id }, 'Demande de renvoi en erreur : ' + (e.message || e));
+      }
       return undefined;
     }
   });
@@ -558,7 +572,16 @@ function restoreSessions() {
  * UBISENDER_CALLBACK, les messages entrants sont reçus mais JAMAIS transmis à
  * l'application (les réponses n'apparaissent pas dans les Discussions).
  */
+/** Version de la bibliothèque Baileys réellement installée (diagnostic). */
+function versionBaileys() {
+  try {
+    const p = path.join(__dirname, 'node_modules', '@whiskeysockets', 'baileys', 'package.json');
+    return JSON.parse(fs.readFileSync(p, 'utf8')).version || 'inconnue';
+  } catch (e) { return 'inconnue'; }
+}
+
 function verifierConfiguration() {
+  logger.info('Baileys version ' + versionBaileys() + ' — Node ' + process.version);
   logger.info('Configuration : ' + (ENV_FICHIER ? 'fichier .env chargé' : 'aucun fichier .env (variables d\'environnement seules)'));
   if (!CALLBACK) {
     console.error('\n' + '='.repeat(72));
