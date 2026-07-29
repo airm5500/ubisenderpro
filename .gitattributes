@@ -1,0 +1,9 @@
+# Normalisation des fins de ligne.
+# Les scripts Windows DOIVENT conserver des fins de ligne CRLF : avec des
+# fins de ligne Unix (LF), l'interpreteur de commandes Windows analyse mal
+# le script et la fenetre se referme aussitot.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Scripts shell : toujours en LF, meme sur Windows.
+*.sh text eol=lf

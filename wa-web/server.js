@@ -542,7 +542,12 @@ function verifierConfiguration() {
 }
 
 app.listen(PORT, () => {
-  logger.info('UbiSenderPro WA-Web sur le port ' + PORT);
   verifierConfiguration();
   restoreSessions();
+  // Repère visuel net : tant que cette banniere est affichee, le service tourne.
+  console.log('\n' + '='.repeat(72));
+  console.log('  SERVICE DEMARRE — en ecoute sur http://localhost:' + PORT);
+  console.log('  Verification : ouvrez http://localhost:' + PORT + '/health');
+  console.log('  Laissez cette fenetre OUVERTE (Ctrl+C pour arreter).');
+  console.log('='.repeat(72) + '\n');
 });
