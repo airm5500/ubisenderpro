@@ -53,14 +53,18 @@ if errorlevel 1 goto ECHEC_NPM
 :DEMARRER
 REM --- Le port est-il deja occupe par une autre instance ? ---
 set "PORT=3000"
+set "WA_WEB_TOKEN="
 for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env") do (
     if /i "%%a"=="PORT" set "PORT=%%b"
+    if /i "%%a"=="WA_WEB_TOKEN" set "WA_WEB_TOKEN=%%b"
 )
 if defined PORT set PORT=%PORT:"=%
+if defined WA_WEB_TOKEN set WA_WEB_TOKEN=%WA_WEB_TOKEN:"=%
 for /f "tokens=* delims= " %%p in ("%PORT%") do set "PORT=%%p"
 powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/health' -TimeoutSec 3 | Out-Null;exit 0}catch{exit 1}"
 if not errorlevel 1 goto DEJA_LANCE
 
+:LANCER
 echo.
 echo  Demarrage du service... (laissez cette fenetre OUVERTE)
 echo  Pour ARRETER le service : appuyez sur Ctrl+C (arret propre).
@@ -76,11 +80,39 @@ goto FIN
 echo.
 echo  ** Le service tourne DEJA sur le port %PORT%. **
 echo.
-echo  Il n'y a rien a relancer : la fenetre du service est deja ouverte
-echo  quelque part. Verifiez : http://localhost:%PORT%/health
+echo  (sa fenetre est ouverte quelque part sur ce poste)
 echo.
-echo  Pour le REMPLACER : lancez arreter.bat, attendez quelques
-echo  secondes, puis relancez ce script.
+echo  A savoir : cette instance execute le code charge a SON demarrage.
+echo  Apres un "git pull", il FAUT la relancer pour que les
+echo  modifications soient prises en compte.
+echo.
+choice /c ON /n /m " L'arreter proprement et relancer maintenant ? (O/N) "
+if errorlevel 2 goto GARDER
+echo.
+echo  Arret propre de l'instance en cours...
+powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/arret' -Method Post -Headers @{'X-Api-Token'='%WA_WEB_TOKEN%'} -TimeoutSec 10 | Out-Null;exit 0}catch{exit 1}"
+if errorlevel 1 goto ARRET_KO
+powershell -NoProfile -Command "Start-Sleep -Seconds 5"
+powershell -NoProfile -Command "try{Invoke-RestMethod -Uri 'http://localhost:%PORT%/health' -TimeoutSec 3 | Out-Null;exit 0}catch{exit 1}"
+if not errorlevel 1 goto ARRET_LENT
+echo  Instance precedente arretee.
+goto LANCER
+
+:GARDER
+echo.
+echo  Instance en cours conservee. Rien n'a ete modifie.
+goto FIN
+
+:ARRET_KO
+echo.
+echo  L'arret a echoue (jeton WA_WEB_TOKEN incorrect ?).
+echo  Utilisez arreter.bat, qui donne un diagnostic detaille.
+goto FIN
+
+:ARRET_LENT
+echo.
+echo  L'instance precedente repond encore. Patientez quelques
+echo  secondes puis relancez ce script.
 goto FIN
 
 :PAS_DE_NODE
