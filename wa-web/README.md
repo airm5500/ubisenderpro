@@ -56,6 +56,25 @@ Signal, réponse automatique aux *retry receipts*, **cache des messages envoyés
 persisté sur disque** (`messages-envoyes.json`, 300 derniers) — donc une reprise
 reste possible même après un redémarrage — et **arrêt propre** sur Ctrl+C.
 
+Le journal trace chaque demande de renvoi (`Demande de renvoi : message
+retrouvé…` / `INTROUVABLE`) : c'est le moyen de vérifier que le mécanisme
+fonctionne.
+
+### Version de Baileys : épinglée volontairement
+
+`package.json` fige **`6.17.16`** (sans `^`). Ce n'est pas un oubli : l'API
+change entre versions mineures de la branche 6.x — en 6.7.x l'export `default`
+**est** la fabrique de connexion, en 6.17.x c'est un **objet** qui la contient.
+Une plage `^6.x` pouvait donc faire planter le service au démarrage selon le
+moment de l'installation. (Le code retient désormais le premier candidat
+appelable, mais l'épinglage garantit une installation reproductible.)
+
+L'adressage **`@lid`** de WhatsApp — visible dans les journaux à la place du
+numéro (`@s.whatsapp.net`) — est la cause classique des « En attente de ce
+message » : sa prise en charge s'est nettement améliorée au fil des versions
+6.x. `demarrer.bat` compare la version installée à celle de `package.json` et
+relance `npm install` automatiquement en cas d'écart.
+
 ## Lancer (Docker)
 
 ```bash

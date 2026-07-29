@@ -36,7 +36,14 @@ echo.
 goto FIN
 
 :DEPENDANCES
-if exist "node_modules" goto DEMARRER
+if not exist "node_modules" goto INSTALLER
+REM --- Version de Baileys conforme a package.json ? ---
+node -e "var d=require('./package.json').dependencies['@whiskeysockets/baileys'];var i='';try{i=require('./node_modules/@whiskeysockets/baileys/package.json').version}catch(e){};if(d!==i){console.log(' Baileys installe : '+(i||'aucun')+'  /  attendu : '+d);process.exit(1)}"
+if errorlevel 1 goto INSTALLER
+echo  Dependances a jour.
+goto DEMARRER
+
+:INSTALLER
 echo.
 echo  Installation des dependances (premiere execution, patientez)...
 echo.
