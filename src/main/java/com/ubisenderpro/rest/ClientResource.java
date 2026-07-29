@@ -97,6 +97,36 @@ public class ClientResource {
         return Response.ok(c).build();
     }
 
+    /**
+     * Mise à jour sélective (onglet dédié) : déplace d'un coup les comptes
+     * cochés vers une segmentation / agence / région / tournée. Seuls les
+     * champs présents dans {@code champs} sont modifiés.
+     */
+    @POST
+    @Path("/maj-selective")
+    @Secured(menu = "clients")
+    public Response majSelective(java.util.Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        Object brut = body == null ? null : body.get("ids");
+        if (brut instanceof java.util.List) {
+            for (Object o : (java.util.List<?>) brut) {
+                if (o != null) { ids.add(Long.valueOf(String.valueOf(o))); }
+            }
+        }
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> champs = body == null ? null
+                : (body.get("champs") instanceof java.util.Map
+                    ? (java.util.Map<String, Object>) body.get("champs") : null);
+        int n = clientService.majSelective(ids, champs);
+        auditService.tracer(auth, "MODIFICATION", "Client", null,
+                "Mise à jour sélective de " + n + " compte(s) : "
+                + (champs == null ? "" : String.join(", ", champs.keySet())));
+        java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("modifies", n);
+        return Response.ok(r).build();
+    }
+
     @DELETE
     @Path("/{id}")
     @Secured(roles = {"ADMIN"})

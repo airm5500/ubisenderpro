@@ -813,6 +813,9 @@ Usp.clientsPanel = function () {
             Usp.segmentationsGrid(),
             // Gestion des listes de diffusion (création + membres).
             Usp.listesGrid(),
+            // Mise à jour sélective : déplacer d'un coup des comptes cochés
+            // vers une segmentation / agence / région / tournée.
+            Usp.majSelectivePanel(),
             // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
             // numéros vit désormais à côté de la liste des comptes clients.
             Usp.waweb.filterPanel()
@@ -988,6 +991,168 @@ Usp.clientsGrid = function (actif) {
                 if (e.getTarget('.cli-on')) { Usp.clientActif(rec, true); return; }
             }
         }
+    };
+};
+
+/* ---------- Mise à jour sélective des comptes clients ---------- */
+/* On coche des comptes (certains, tous...), on choisit le ou les champs à
+ * changer (segmentation, agence, région, tournée) et on applique en une fois.
+ * Seuls les champs cochés sont modifiés : le reste de la fiche est intact. */
+Usp.majSelectivePanel = function () {
+    // Toutes les lignes d'un coup (pas de pagination) : une sélection cochée
+    // ne doit pas se perdre en changeant de page.
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'numeroClient', 'nomCompte', 'entreprise', 'agence', 'region', 'tournee',
+                 'segmentationId'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/clients',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
+            reader: { type: 'json', root: 'data', totalProperty: 'total' },
+            extraParams: { actif: true, start: 0, limit: 100000 } },
+        autoLoad: true
+    });
+    var segStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var segLib = function (id) {
+        if (id === null || id === undefined || id === '') { return ''; }
+        var i = segStore.findExact('id', id); return i >= 0 ? segStore.getAt(i).get('libelle') : '';
+    };
+    var refStore = function (type) {
+        return Ext.create('Ext.data.Store', { fields: ['id', 'code', 'libelle'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    };
+    var tourneeStore = Ext.create('Ext.data.Store', { fields: ['v'] });
+    var chargerTournees = function () {
+        Usp.ajax({ url: '/clients/facettes', method: 'GET', success: function (resp) {
+            var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+            tourneeStore.loadData((d.tournees || []).map(function (v) { return { v: v }; }));
+        } });
+    };
+
+    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
+    var etat = { q: '', seg: '', agence: '', region: '', tournee: '' };
+    var charger = function () {
+        store.getProxy().extraParams = { actif: true, start: 0, limit: 100000,
+            q: etat.q, segmentationId: etat.seg, agence: etat.agence,
+            region: etat.region, tournee: etat.tournee };
+        store.load();
+    };
+
+    var appliquer = function (panel) {
+        if (!Usp.can('clients', 'MODIFIER')) { Usp.refusPermission(); return; }
+        var recs = sm.getSelection();
+        if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un compte client.'); return; }
+        var champs = {}, libelles = [];
+        var lire = function (caseId, comboId, cle, libelle, valeurLisible) {
+            if (!panel.down('#' + caseId).getValue()) { return; }
+            var v = panel.down('#' + comboId).getValue();
+            champs[cle] = v == null ? '' : v;
+            libelles.push(libelle + ' → « ' + (valeurLisible ? valeurLisible(v) : (v || '(vide)')) + ' »');
+        };
+        lire('msCaseSeg', 'msSeg', 'segmentationId', 'Segmentation',
+            function (v) { return v ? segLib(v) : '(vide)'; });
+        lire('msCaseAgence', 'msAgence', 'agence', 'Agence');
+        lire('msCaseRegion', 'msRegion', 'region', 'Région');
+        lire('msCaseTournee', 'msTournee', 'tournee', 'Tournée');
+        if (!libelles.length) {
+            Ext.Msg.alert('Info', 'Cochez au moins un champ à modifier (segmentation, agence, région ou tournée).');
+            return;
+        }
+        Ext.Msg.confirm('Mise à jour sélective',
+            'Appliquer à <b>' + recs.length + '</b> compte(s) :<br>• '
+            + libelles.map(Ext.String.htmlEncode).join('<br>• ')
+            + '<br><br>Les autres champs des fiches ne sont pas modifiés.',
+            function (btn) {
+                if (btn !== 'yes') { return; }
+                Usp.ajax({ url: '/clients/maj-selective', method: 'POST',
+                    jsonData: { ids: recs.map(function (r) { return r.get('id'); }), champs: champs },
+                    success: function (resp) {
+                        var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                        sm.deselectAll();
+                        charger(); chargerTournees();
+                        if (Usp._clientStores) { Usp.reloadClients(); }
+                        Usp.toast((r.modifies || 0) + ' compte(s) mis à jour.');
+                    },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            });
+    };
+
+    // Une case à cocher par champ : elle seule décide si le champ est appliqué.
+    // La valeur vide est permise (ex. retirer la tournée de comptes cochés).
+    var ligneChamp = function (caseId, caseLabel, combo) {
+        return { xtype: 'fieldcontainer', layout: 'hbox', margin: '0 0 4 0', items: [
+            { xtype: 'checkbox', itemId: caseId, boxLabel: caseLabel, width: 130 },
+            combo
+        ] };
+    };
+
+    return {
+        xtype: 'panel', title: '🔁 Mise à jour sélective', layout: 'border',
+        items: [
+            { region: 'center', xtype: 'grid', store: store, selModel: sm,
+              columns: [
+                { text: 'Code', dataIndex: 'numeroClient', width: 90 },
+                { text: 'Nom client', dataIndex: 'nomCompte', flex: 1 },
+                { text: 'Entreprise', dataIndex: 'entreprise', width: 150 },
+                { text: 'Segmentation', dataIndex: 'segmentationId', width: 120,
+                  renderer: function (v) { return Usp.segmentationBadge(segLib(v)); } },
+                { text: 'Agence', dataIndex: 'agence', width: 110 },
+                { text: 'Région', dataIndex: 'region', width: 110 },
+                { text: 'Tournée', dataIndex: 'tournee', width: 110 }
+              ],
+              tbar: [
+                { xtype: 'textfield', itemId: 'msQ', emptyText: '🔎 Rechercher…', width: 160,
+                  listeners: { change: { buffer: 400, fn: function (f, v) { etat.q = v || ''; charger(); } } } },
+                { xtype: 'combobox', emptyText: 'Segmentation', width: 140, store: segStore, valueField: 'id',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFSeg',
+                  listeners: { change: function (f, v) { etat.seg = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Agence', width: 120, store: refStore('AGENCE'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFAgence',
+                  listeners: { change: function (f, v) { etat.agence = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Région', width: 120, store: refStore('REGION'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFRegion',
+                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Tournée', width: 120, store: tourneeStore, valueField: 'v',
+                  displayField: 'v', queryMode: 'local', editable: false, itemId: 'msFTournee',
+                  listeners: { change: function (f, v) { etat.tournee = v || ''; charger(); } } },
+                { text: '♻️', tooltip: 'Effacer tous les filtres', handler: function (b) {
+                    var tb = b.up('toolbar');
+                    tb.down('#msQ').setValue(''); tb.down('#msFSeg').setValue(null);
+                    tb.down('#msFAgence').setValue(null); tb.down('#msFRegion').setValue(null);
+                    tb.down('#msFTournee').setValue(null);
+                } }
+              ],
+              bbar: ['->',
+                { text: 'Tout cocher (résultat)', handler: function () { sm.selectAll(); } },
+                { text: 'Tout décocher', handler: function () { sm.deselectAll(); } }
+              ],
+              listeners: { afterrender: chargerTournees }
+            },
+            { region: 'south', xtype: 'form', bodyPadding: 10, border: false, height: 175,
+              title: 'Nouvelles valeurs (appliquées aux comptes cochés)',
+              items: [
+                { xtype: 'displayfield', hideLabel: true, margin: '0 0 6 0',
+                  value: '<span style="color:#888">Cochez le ou les champs à changer. Un champ non coché '
+                      + 'n\'est pas touché ; un champ coché laissé vide est effacé sur les comptes choisis.</span>' },
+                ligneChamp('msCaseSeg', 'Segmentation', Ext.apply({ itemId: 'msSeg', width: 260,
+                    xtype: 'combobox', store: segStore, valueField: 'id', displayField: 'libelle',
+                    queryMode: 'local', editable: false, emptyText: 'Choisir…' })),
+                ligneChamp('msCaseAgence', 'Agence', { xtype: 'combobox', itemId: 'msAgence', width: 260,
+                    store: refStore('AGENCE'), valueField: 'libelle', displayField: 'libelle',
+                    queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
+                ligneChamp('msCaseRegion', 'Région', { xtype: 'combobox', itemId: 'msRegion', width: 260,
+                    store: refStore('REGION'), valueField: 'libelle', displayField: 'libelle',
+                    queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
+                ligneChamp('msCaseTournee', 'Tournée', { xtype: 'combobox', itemId: 'msTournee', width: 260,
+                    store: tourneeStore, valueField: 'v', displayField: 'v',
+                    queryMode: 'local', forceSelection: false,
+                    emptyText: 'Choisir ou saisir une nouvelle tournée…' })
+              ],
+              bbar: ['->', { text: '✅ Appliquer aux comptes cochés',
+                  handler: function (b) { appliquer(b.up('panel').up('panel')); } }]
+            }
+        ]
     };
 };
 
@@ -1231,8 +1396,27 @@ Usp.listeMembresWindow = function (rec) {
                     store.each(function (r) { if (r.get('id')) { dejaPresents.push(r.get('id')); } });
                     Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste',
                         exclureContactIds: dejaPresents, onValider: ajouterClients }); } },
-                { text: '📥 Importer des clients', tooltip: 'Importer des codes clients (un par ligne / CSV)', handler: function () {
-                    Usp.importerClientsListe(listeId, function () { store.load(); }); } }
+                { text: '📥 Importer des clients', tooltip: 'Importer un fichier de codes clients (.csv / .xlsx) avec choix de la colonne', handler: function () {
+                    Usp.listeImportAssistant(listeId, rec.get('nom'), function () { store.load(); }); } },
+                '->',
+                { text: '🗑️ Vider la liste', tooltip: 'Retirer TOUS les membres (la liste elle-même est conservée)',
+                  handler: function () {
+                    var n = store.getTotalCount ? (store.getTotalCount() || store.getCount()) : store.getCount();
+                    if (!n) { Ext.Msg.alert('Info', 'La liste est déjà vide.'); return; }
+                    Ext.Msg.confirm('Vider la liste',
+                        'Retirer les <b>' + n + '</b> membre(s) de « ' + Ext.String.htmlEncode(rec.get('nom')) +
+                        ' » ?<br>La liste elle-même est conservée ; les comptes clients ne sont pas touchés.',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/lists/' + listeId + '/contacts', method: 'DELETE',
+                                success: function (resp) {
+                                    var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                                    store.load();
+                                    Usp.toast((r.retires || 0) + ' membre(s) retiré(s) de la liste.');
+                                },
+                                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                        });
+                  } }
             ],
             listeners: { cellclick: function (g, td, ci, r, tr, ri, e) {
                 if (e.getTarget('.ldm-del')) {
@@ -1245,34 +1429,132 @@ Usp.listeMembresWindow = function (rec) {
     }).show();
 };
 
-/* Import de clients dans une liste de diffusion (codes clients, un par ligne ou .csv). */
-Usp.importerClientsListe = function (listeId, onDone) {
+/* Assistant d'import de clients dans une liste de diffusion.
+ *
+ * L'ancien écran demandait « un code client par ligne » : avec un fichier réel
+ * (plusieurs colonnes), il fallait d'abord isoler la colonne des codes à la
+ * main. L'assistant lit le fichier (.csv ou .xlsx), montre les colonnes
+ * détectées avec leurs premières valeurs, fait CHOISIR la colonne des codes,
+ * puis vérifie en simulation avant d'appliquer. Le collage direct de codes
+ * reste possible pour les cas simples. */
+Usp.listeImportAssistant = function (listeId, nomListe, onDone) {
+    var fileData = { base64: null, nom: null };
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col', 'exemples'] });
+
+    var detecter = function (win) {
+        if (!fileData.base64) { return; }
+        var etat = win.down('#liEtat');
+        etat.setValue('<span style="color:#888">Analyse du fichier…</span>');
+        Usp.ajax({ url: '/imports/colonnes', method: 'POST',
+            jsonData: { fichierBase64: fileData.base64, nomFichier: fileData.nom,
+                        separateur: win.down('[name=separateur]').getValue() || ';' },
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var cols = r.colonnes || [];
+                colStore.loadData(cols.map(function (c) {
+                    var vals = (r.exemples || []).map(function (l) { return l[c]; })
+                        .filter(function (v) { return v !== null && v !== undefined && v !== ''; });
+                    return { col: c, exemples: vals.slice(0, 3).join(' · ') };
+                }));
+                var combo = win.down('[name=colonne]');
+                combo.setValue(null);
+                // Pré-sélection : colonne dont l'intitulé évoque un code client.
+                var norm = Usp.importer ? Usp.importer.normaliser : function (s) { return String(s || '').toLowerCase(); };
+                var attendu = ['numero_client', 'code_client', 'code client', 'code', 'code ps'].map(norm);
+                Ext.Array.each(cols, function (c) {
+                    if (Ext.Array.contains(attendu, norm(c))) { combo.setValue(c); return false; }
+                });
+                etat.setValue(cols.length
+                    ? '<span style="color:#2e7d32">' + cols.length + ' colonne(s), ' + (r.totalLignes || 0)
+                        + ' ligne(s). Choisissez la colonne des codes clients.</span>'
+                    : '<span style="color:#c62828">Aucune colonne détectée : la 1re ligne du fichier doit '
+                        + 'porter les intitulés.</span>');
+            },
+            failure: function (resp) {
+                win.down('#liEtat').setValue('<span style="color:#c62828">'
+                    + Ext.String.htmlEncode(Usp.erreurServeur(resp)) + '</span>');
+            } });
+    };
+
+    var importer = function (win, simulation) {
+        var codesColles = (win.down('[name=codes]').getValue() || '').split(/\r?\n/)
+            .map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+        var payload = { simulation: simulation };
+        if (fileData.base64) {
+            var colonne = win.down('[name=colonne]').getValue();
+            if (!colonne) { Ext.Msg.alert('Info', 'Choisissez la colonne des codes clients.'); return; }
+            payload.fichierBase64 = fileData.base64;
+            payload.nomFichier = fileData.nom;
+            payload.separateur = win.down('[name=separateur]').getValue() || ';';
+            payload.colonne = colonne;
+        } else if (codesColles.length) {
+            payload.codes = codesColles;
+        } else {
+            Ext.Msg.alert('Info', 'Choisissez un fichier ou collez des codes clients.');
+            return;
+        }
+        Usp.ajax({ url: '/lists/' + listeId + '/import-codes', method: 'POST', jsonData: payload,
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var ex = (r.exemplesIntrouvables || []);
+                var html = (simulation ? '<b style="color:#1976d2">Simulation — rien n\'a été enregistré.</b><br><br>' : '')
+                    + 'Codes lus : <b>' + (r.lignesLues || 0) + '</b><br>'
+                    + (simulation ? 'Seraient ajoutés : ' : 'Ajoutés : ') + '<b>' + (r.ajoutes || 0) + '</b><br>'
+                    + (r.dejaPresents ? 'Déjà membres : ' + r.dejaPresents + '<br>' : '')
+                    + (r.introuvables ? '<span style="color:#c62828">Codes introuvables : ' + r.introuvables
+                        + (ex.length ? ' (ex. ' + Ext.String.htmlEncode(ex.slice(0, 5).join(', ')) + ')' : '')
+                        + '</span><br>' : '')
+                    + (r.sansContact ? 'Clients sans contact (ignorés) : ' + r.sansContact + '<br>' : '');
+                if (simulation) {
+                    Ext.Msg.alert('Vérification', html + '<br>Si le résultat convient, cliquez sur « Importer ».');
+                } else {
+                    win.close(); if (onDone) { onDone(); }
+                    Ext.Msg.alert('Import terminé', html);
+                }
+            },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
+
     var win = Ext.create('Ext.window.Window', {
-        title: 'Importer des clients dans la liste', width: 520, modal: true, bodyPadding: 12,
+        title: '📥 Importer des clients — ' + Ext.String.htmlEncode(nomListe || ''),
+        width: 560, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Un <b>code client</b> par ligne ' +
-                '(le contact principal de chaque client est ajouté). Fichier .csv accepté.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'C001\nC002\nC003' },
-            { xtype: 'filefield', fieldLabel: 'ou fichier .csv', msgTarget: 'side',
+            { xtype: 'displayfield', value: '<span style="color:#888">Le <b>contact principal</b> de chaque '
+                + 'client est ajouté à la liste. Les membres déjà présents ne sont pas dupliqués.</span>' },
+            { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier (.csv / .xlsx)', buttonText: 'Parcourir...',
               listeners: { change: function (f) {
                   var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  fileData.nom = file.name;
                   var reader = new FileReader();
-                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
-                  reader.readAsText(file);
-              } } }
+                  reader.onload = function (e) {
+                      fileData.base64 = e.target.result.split(',')[1];
+                      var w = f.up('window');
+                      w.down('[name=separateur]').setDisabled(/\.xlsx?$/i.test(file.name));
+                      detecter(w);
+                  };
+                  reader.readAsDataURL(file);
+              } } },
+            { xtype: 'textfield', name: 'separateur', fieldLabel: 'Séparateur (CSV)', value: ';', width: 220 },
+            { xtype: 'displayfield', itemId: 'liEtat', hideLabel: true,
+              value: '<span style="color:#888">Choisissez un fichier : ses colonnes sont détectées, '
+                  + 'puis désignez celle des codes clients.</span>' },
+            { xtype: 'combobox', name: 'colonne', fieldLabel: 'Colonne des codes clients',
+              store: colStore, valueField: 'col', displayField: 'col', queryMode: 'local',
+              editable: false, forceSelection: true, emptyText: 'Détectée depuis le fichier…',
+              listConfig: { getInnerTpl: function () {
+                  return '<div><b>{col}</b><tpl if="exemples">'
+                      + '<div style="color:#888;font-size:11px">{exemples}</div></tpl></div>';
+              } } },
+            { xtype: 'textareafield', name: 'codes', height: 90,
+              fieldLabel: 'ou collez des codes', emptyText: 'C001\nC002\nC003 (un par ligne — ignoré si un fichier est choisi)' }
         ] }],
-        buttons: [{ text: 'Importer', handler: function (b) {
-            var contenu = b.up('window').down('[name=contenu]').getValue();
-            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucun code client.'); return; }
-            Usp.ajax({ url: '/lists/' + listeId + '/import-clients', method: 'POST', jsonData: { contenu: contenu },
-                success: function (resp) {
-                    var r = Ext.decode(resp.responseText) || {};
-                    win.close(); if (onDone) { onDone(); }
-                    Usp.toast((r.ajoutes || 0) + ' ajouté(s), ' + (r.introuvables || 0) + ' introuvable(s), '
-                        + (r.sansContact || 0) + ' sans contact.');
-                },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-        } }, { text: 'Annuler', handler: function (b) { b.up('window').close(); } }]
+        buttons: [
+            { text: '🔍 Vérifier (simulation)', tooltip: 'Contrôle le fichier sans rien enregistrer',
+              handler: function (b) { importer(b.up('window'), true); } },
+            '->',
+            { text: 'Importer', handler: function (b) { importer(b.up('window'), false); } },
+            { text: 'Annuler', handler: function (b) { b.up('window').close(); } }
+        ]
     });
     win.show();
 };
@@ -2165,18 +2447,29 @@ Usp.clientPicker = function (cfg) {
                 { text: 'Téléphone', dataIndex: 'numero', width: 120 }
             ],
             tbar: [
-                { xtype: 'textfield', emptyText: '🔎 Rechercher…', width: 170,
+                { xtype: 'textfield', itemId: 'pkQ', emptyText: '🔎 Rechercher…', width: 170,
                   listeners: { change: { buffer: 350, fn: function (f, v) { etat.q = v || ''; charger(); } },
                       specialkey: function (f, e) { if (e.getKey() === e.ENTER) { etat.q = f.getValue() || ''; charger(); } } } },
-                { xtype: 'combobox', emptyText: 'Segmentation', width: 150, store: segStore, valueField: 'id',
+                { xtype: 'combobox', itemId: 'pkSeg', emptyText: 'Segmentation', width: 150, store: segStore, valueField: 'id',
                   displayField: 'libelle', queryMode: 'local', editable: false,
                   listeners: { change: function (f, v) { etat.seg = v || ''; charger(); } } },
-                { xtype: 'combobox', emptyText: 'Agence', width: 130, store: refStore('AGENCE'), valueField: 'libelle',
+                { xtype: 'combobox', itemId: 'pkAgence', emptyText: 'Agence', width: 130, store: refStore('AGENCE'), valueField: 'libelle',
                   displayField: 'libelle', queryMode: 'local', editable: false,
                   listeners: { change: function (f, v) { etat.agence = v || ''; charger(); } } },
-                { xtype: 'combobox', emptyText: 'Région', width: 130, store: refStore('REGION'), valueField: 'libelle',
+                { xtype: 'combobox', itemId: 'pkRegion', emptyText: 'Région', width: 130, store: refStore('REGION'), valueField: 'libelle',
                   displayField: 'libelle', queryMode: 'local', editable: false,
-                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } }
+                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } },
+                { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
+                    var tb = b.up('toolbar');
+                    // Chaque setValue déclenche son écouteur change : l'état est
+                    // remis à zéro par les écouteurs eux-mêmes, et les quelques
+                    // rechargements successifs restent sans effet visible (le
+                    // dernier gagne). On efface simplement les quatre champs.
+                    tb.down('#pkQ').setValue('');
+                    tb.down('#pkSeg').setValue(null);
+                    tb.down('#pkAgence').setValue(null);
+                    tb.down('#pkRegion').setValue(null);
+                } }
             ],
             bbar: ['->',
                 { text: 'Tout sélectionner (résultat)', handler: function () { sm.selectAll(); } },

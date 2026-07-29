@@ -57,6 +57,14 @@ Légende priorité : 🔴 bloquant · 🟠 majeur · 🟢 confort
 | 4.7 | 🟠 | Import clients (assistant) | Mapping colonnes ; une colonne à numéros multiples (a/b) crée un contact par numéro, 1er = principal WhatsApp ; **Exporter un exemplaire** disponible | | |
 | 4.8 | 🟠 | Liste de diffusion → Choisir des clients | Les membres déjà ajoutés n'apparaissent plus dans le sélecteur | | |
 | 4.9 | 🟠 | Segmentation (onglet) | Modifier **sur la ligne** ; libellés en pastilles colorées | | |
+| 4.10 | 🟠 | Liste des clients : filtre **Tournée** + survol d'un nom | Le filtre propose les tournées réellement saisies ; l'info-bulle montre Segmentation, E-mail et **Tournée en bleu et gras** | | |
+| 4.11 | 🔴 | Exporter (CSV puis PDF) la liste des clients | Segmentation en **libellé** (jamais un nombre) ; colonnes E-mail et Tournée présentes ; pas de colonne Actions ni Statut ; PDF avec **en-tête société** (logo/adresse/tél/site) et police réduite — aucune colonne tronquée | | |
+| 4.12 | 🟠 | Liste de diffusion → Membres → **🗑️ Vider la liste** | Confirmation avec le nombre de membres ; après accord la liste est vide ; les comptes clients ne sont pas touchés | | |
+| 4.13 | 🟠 | Membres → Choisir des clients → **♻️ Réinitialiser** | Les 4 filtres (recherche/segmentation/agence/région) s'effacent d'un coup et la liste complète revient | | |
+| 4.14 | 🔴 | Membres → **📥 Importer des clients** (fichier .xlsx multi-colonnes) | Colonnes détectées avec exemples ; choix de la **colonne des codes** ; « Vérifier (simulation) » donne lus/ajoutés/introuvables sans rien écrire ; « Importer » applique et les doublons sont comptés « déjà membres » | | |
+| 4.15 | 🔴 | Onglet **🔁 Mise à jour sélective** : cocher 3 comptes, cocher « Segmentation » + valeur, Appliquer | Confirmation récapitulative ; 3 fiches changent de segmentation, **aucun autre champ modifié** ; la liste principale reflète le changement | | |
+| 4.16 | 🟠 | Mise à jour sélective : cocher « Tournée » en laissant la valeur vide | La tournée des comptes cochés est **effacée** (comportement annoncé sous les cases) | | |
+| 4.17 | 🟠 | Assistant d'import clients : choisir un .xlsx | Les colonnes se détectent **automatiquement** au choix du fichier (plus de saisie manuelle) ; listes déroulantes avec 3 valeurs d'exemple ; correspondances évidentes pré-remplies | | |
 
 ## 5. Campagnes / Marketing / Promotions
 
