@@ -39,7 +39,7 @@ public class ModeleService {
             Long n = em.createQuery(
                     "SELECT COUNT(m) FROM ModeleMessage m WHERE m.cleSysteme = :c", Long.class)
                     .setParameter("c", cle).getSingleResult();
-            if (n != null && n > 0) { continue; }
+            if (n != null && n > 0) { rafraichirSiJamaisModifie(cle, entry.getValue()); continue; }
             ModeleMessage m = new ModeleMessage();
             m.setNom(noms.get(cle));
             m.setTypeModele(types.get(cle));
@@ -53,6 +53,29 @@ public class ModeleService {
             crees++;
         }
         return crees;
+    }
+
+    /**
+     * Aligne un modèle prédéfini sur sa version livrée, <b>uniquement s'il n'a
+     * jamais été modifié par un utilisateur</b> ({@code updatedAt} reste null
+     * tant que personne ne l'a édité — seul {@link #modifier} le renseigne).
+     *
+     * <p>Sans cela, l'amélioration d'un gabarit livré ne profitait qu'aux
+     * nouvelles installations : les bases existantes gardaient l'ancien texte,
+     * puisque le semis ignore les clés déjà présentes. Les modèles retouchés
+     * par le client ne sont jamais écrasés.</p>
+     */
+    private void rafraichirSiJamaisModifie(String cleSysteme, String corpsLivre) {
+        if (corpsLivre == null) { return; }
+        List<ModeleMessage> l = em.createQuery(
+                "SELECT m FROM ModeleMessage m WHERE m.cleSysteme = :c", ModeleMessage.class)
+                .setParameter("c", cleSysteme).setMaxResults(1).getResultList();
+        if (l.isEmpty()) { return; }
+        ModeleMessage m = l.get(0);
+        if (m.getUpdatedAt() != null) { return; }              // personnalisé : on n'y touche pas
+        if (corpsLivre.equals(m.getCorps())) { return; }       // déjà à jour
+        m.setCorps(corpsLivre);
+        em.merge(m);
     }
 
     public Optional<ModeleMessage> parId(Long id) { return Optional.ofNullable(em.find(ModeleMessage.class, id)); }

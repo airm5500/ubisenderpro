@@ -83,6 +83,8 @@ public class EnvoiProposeService {
     public static final String CLE_ANNIV_SANS_AVIS = "anniversaire.envoi_sans_avis";
     /** URL publique de base (pour joindre les pièces jointes en mode auto, hors contexte HTTP). */
     public static final String CLE_URL_BASE = "app.url_base";
+    /** Seuil au-delà duquel les produits d'une promotion ne sont plus listés dans le message. */
+    public static final String CLE_SEUIL_PRODUITS = "promo.max_produits_message";
     /** Audience virtuelle : contacts dont c'est l'anniversaire aujourd'hui. */
     public static final String AUDIENCE_ANNIVERSAIRE = "ANNIVERSAIRE_JOUR";
 
@@ -826,7 +828,49 @@ public class EnvoiProposeService {
         BigDecimal taux = maxTauxUg(p.getId());
         v.put("taux_ug_max", taux == null ? "" : taux.stripTrailingZeros().toPlainString());
         v.put("avantage_ug", avantageUg(taux));
+        // Peu de produits : on les liste dans le message (plus lisible et
+        // actionnable) ; au-delà du seuil, on renvoie vers le fichier Excel joint.
+        int nb = nbProduitsActifs(p.getId());
+        boolean listable = nb > 0 && nb <= seuilProduitsMessage();
+        v.put("liste_produits", listable ? listeProduitsPromo(p.getId()) + "\n\n" : "");
+        v.put("mention_fichier", listable ? ""
+                : "📎 Consultez le fichier Excel joint pour découvrir les produits "
+                  + "et leurs conditions promotionnelles.\n\n");
         return v;
+    }
+
+    /** Au-delà de ce nombre de produits, le message renvoie vers le fichier Excel. */
+    private int seuilProduitsMessage() {
+        try {
+            return Integer.parseInt(parametreService.valeur(CLE_SEUIL_PRODUITS, "10").trim());
+        } catch (RuntimeException e) {
+            return 10;
+        }
+    }
+
+    /**
+     * Liste lisible des produits d'une promotion, telle qu'elle apparaît dans le
+     * message : nom (ou CIP7 à défaut), quantité minimale et unités gratuites.
+     */
+    String listeProduitsPromo(Long promotionId) {
+        StringBuilder sb = new StringBuilder();
+        for (com.ubisenderpro.entity.PromotionProduit pp : promotionProduitService.lister(promotionId)) {
+            if (!pp.isActif()) { continue; }
+            if (sb.length() > 0) { sb.append('\n'); }
+            String nom = nz(pp.getNomProduit()).isEmpty() ? nz(pp.getCip7()) : nz(pp.getNomProduit());
+            sb.append("✅ ").append(nom);
+            List<String> details = new ArrayList<>();
+            if (pp.getQuantiteMinimale() != null && pp.getQuantiteMinimale() > 0) {
+                details.add("dès " + pp.getQuantiteMinimale() + " u.");
+            }
+            if (pp.getQuantiteUg() != null && pp.getQuantiteUg() > 0) {
+                details.add("+" + pp.getQuantiteUg() + " u. offerte(s)");
+            } else if (pp.getTauxUg() != null && pp.getTauxUg().signum() > 0) {
+                details.add("+" + pp.getTauxUg().stripTrailingZeros().toPlainString() + " %");
+            }
+            if (!details.isEmpty()) { sb.append("\n   ").append(String.join(" · ", details)); }
+        }
+        return sb.toString();
     }
 
     /** Formule d'avantage UG, jamais vide : « jusqu'à X % d'unités gratuites » ou « des unités gratuites ». */
