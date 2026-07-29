@@ -122,6 +122,8 @@ Légende priorité : 🔴 bloquant · 🟠 majeur · 🟢 confort
 | 9.5 | 🟠 | Paramètres → Référentiels : Assistant d'import | Mapping colonnes + rapport lues/créées/ignorées | | |
 | 9.6 | 🔴 | **Session WhatsApp Web « zombie »** : après une longue coupure, une réponse client arrive illisible (déchiffrement échoué) | Le statut reste « Connecté » MAIS la colonne Réception passe **⚠ À reconnecter** ; une **bannière rouge** s'affiche partout avec « Reconnecter maintenant » → déconnexion + QR ; après rescan, la réception revient et la bannière disparaît | | |
 | 9.7 | 🟢 | Session WhatsApp Web saine | Colonne Réception « ✔ OK · reçu il y a X » ; carte Santé WhatsApp Web verte (aucune session dégradée) | | |
+| 9.8 | 🔴 | **Informations Clients → Nouvelle information** : remplir uniquement Code / Type / Titre et laisser **toutes les dates vides** (Date d'envoi, Fin de validité, et les blocs Livraison / Garde repliés) | Enregistrement **réussi** ; les dates restent vides à la réouverture — jamais « L'opération a échoué pour une raison technique » | | |
+| 9.9 | 🟠 | Même écran, avec une seule date renseignée (ex. Date de livraison) | Enregistrée et réaffichée correctement ; les autres dates restent vides | | |
 
 ---
 
