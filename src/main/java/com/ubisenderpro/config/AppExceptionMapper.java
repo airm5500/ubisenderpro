@@ -170,7 +170,11 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
                     + "ou cet enregistrement est déjà utilisé ailleurs.";
         }
         if (sql.contains("Data too long")) {
-            return "Une valeur saisie est trop longue (" + menu + "). Raccourcissez le champ concerné.";
+            // Le message SQL porte le nom de la colonne : le citer evite de laisser
+            // l'utilisateur chercher quel champ raccourcir.
+            String col = entreApostrophes(sql);
+            return "Le champ « " + libelleColonne(col) + " » est trop long (" + menu
+                    + "). Raccourcissez-le.";
         }
         return "Saisie invalide (" + menu + "). Vérifiez les champs renseignés.";
     }
@@ -193,6 +197,10 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
             case "titre": return "Titre";
             case "code": return "Code";
             case "type": return "Type";
+            case "description": return "Description";
+            case "nom": return "Nom";
+            case "objectif": return "Objectif";
+            case "message": return "Message";
             default: return col == null ? "?" : col.replace('_', ' ');
         }
     }

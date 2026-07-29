@@ -11,10 +11,15 @@ public class Campagne {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "nom", nullable = false, length = 150)
+    /** Aligne sur usp_envoi_propose.titre (200) : la validation d'une
+     *  proposition recopie le titre ici (V58). */
+    @Column(name = "nom", nullable = false, length = 200)
     private String nom;
 
-    @Column(name = "description", length = 500)
+    /** Reçoit le corps du message lors d'une création automatique depuis une
+     *  proposition : un message de promotion depasse couramment 500 caracteres,
+     *  d'ou le passage en TEXT (V58). */
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Column(name = "objectif", length = 255)
