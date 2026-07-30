@@ -33,6 +33,8 @@ public class RapportResource {
     @EJB
     private RapportService rapportService;
     @EJB
+    private com.ubisenderpro.service.RapportExcelService rapportExcelService;
+    @EJB
     private ClientService clientService;
     @EJB
     private SegmentationService segmentationService;
@@ -115,6 +117,47 @@ public class RapportResource {
         byte[] pdf = rapportService.pdf(nom, params, lignes);
         return Response.ok(pdf)
                 .header("Content-Disposition", "inline; filename=\"" + nom + ".pdf\"")
+                .build();
+    }
+
+    /**
+     * Export Excel (.xlsx) générique : colonnes + lignes telles qu'affichées.
+     * Le classeur est archivé côté serveur (sous-dossier excel) puis renvoyé.
+     */
+    @javax.ws.rs.POST
+    @Path("/excel")
+    @javax.ws.rs.Consumes(javax.ws.rs.core.MediaType.APPLICATION_JSON)
+    @Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public Response excel(Map<String, Object> body) {
+        String titre = body == null || body.get("titre") == null ? "" : String.valueOf(body.get("titre"));
+        List<Map<String, String>> colonnes = new ArrayList<>();
+        Object bc = body == null ? null : body.get("colonnes");
+        if (bc instanceof List) {
+            for (Object o : (List<?>) bc) {
+                if (!(o instanceof Map)) { continue; }
+                Map<String, String> c = new HashMap<>();
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) o).entrySet()) {
+                    c.put(String.valueOf(e.getKey()), texte(e.getValue()));
+                }
+                colonnes.add(c);
+            }
+        }
+        List<Map<String, ?>> lignes = new ArrayList<>();
+        Object bl = body == null ? null : body.get("lignes");
+        if (bl instanceof List) {
+            for (Object o : (List<?>) bl) {
+                if (!(o instanceof Map)) { continue; }
+                Map<String, Object> l = RapportService.ligne();
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) o).entrySet()) {
+                    l.put(String.valueOf(e.getKey()), texte(e.getValue()));
+                }
+                lignes.add(l);
+            }
+        }
+        byte[] xlsx = rapportExcelService.xlsx(titre, colonnes, lignes);
+        return Response.ok(xlsx)
+                .header("Content-Disposition", "attachment; filename=\""
+                        + RapportService.nomArchive(titre, "xlsx") + "\"")
                 .build();
     }
 

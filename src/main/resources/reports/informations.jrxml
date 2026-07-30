@@ -138,42 +138,42 @@
             <frame>
                 <reportElement style="Zebra" stretchType="RelativeToBandHeight" x="0" y="0" width="802" height="14"/>
                 <box><bottomPen lineWidth="0.4" lineColor="#D5DEE8"/></box>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="3" y="1" width="73" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{code}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="83" y="1" width="113" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{type}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="203" y="1" width="233" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{titre}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="443" y="1" width="63" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{priorite}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="513" y="1" width="83" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{agence}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="603" y="1" width="63" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{dateEnvoi}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="673" y="1" width="73" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{statut}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="753" y="1" width="45" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{creePar}]]></textFieldExpression>

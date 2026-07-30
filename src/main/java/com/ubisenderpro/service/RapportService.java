@@ -50,6 +50,9 @@ public class RapportService {
     /** Répertoire des modèles si le paramètre n'est pas renseigné. */
     public static final String REPERTOIRE_DEFAUT = "D:\\REPORTS";
 
+    /** Répertoire d'archivage des documents générés si non paramétré. */
+    public static final String ARCHIVAGE_DEFAUT = "D:\\ARCHIVAGES";
+
     /**
      * Modèles embarqués dans le livrable (src/main/resources/reports). Ils sont
      * déposés dans le répertoire des rapports au démarrage s'ils n'y figurent
@@ -106,7 +109,10 @@ public class RapportService {
                     (lignes == null ? java.util.Collections.emptyList() : lignes);
             JasperPrint print = JasperFillManager.fillReport(rapport, p,
                     new JRMapCollectionDataSource(donnees));
-            return JasperExportManager.exportReportToPdf(print);
+            byte[] pdf = JasperExportManager.exportReportToPdf(print);
+            // Copie d'archive : le document reste consultable sans réimpression.
+            archiver("pdf", String.valueOf(p.getOrDefault("TITRE", nom)), "pdf", pdf);
+            return pdf;
         } catch (ValidationException ve) {
             throw ve;
         } catch (Exception e) {
@@ -236,6 +242,58 @@ public class RapportService {
             LOG.info("Rapports : " + copies + " modèle(s) .jrxml déposé(s) dans " + dir.getPath());
         }
         return copies;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Archivage des documents générés                                      */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Enregistre une copie du document dans le répertoire d'archivage
+     * ({@code archivage.repertoire}, D:\ARCHIVAGES par défaut), sous-dossier
+     * {@code pdf} ou {@code excel}, nommée {@code <menu>_<ddMMyyyy>_<HHmmssCC>.<ext>}.
+     * Best-effort : un disque absent ou plein ne doit jamais empêcher la
+     * remise du document à l'utilisateur.
+     *
+     * @return le nom du fichier archivé, ou null si l'archivage a échoué
+     */
+    public String archiver(String sousDossier, String nomMenu, String extension, byte[] contenu) {
+        if (contenu == null || contenu.length == 0) { return null; }
+        try {
+            String base = parametreService.valeur("archivage.repertoire", ARCHIVAGE_DEFAUT);
+            if (base == null || base.trim().isEmpty()) { base = ARCHIVAGE_DEFAUT; }
+            File dir = new File(base.trim(), sousDossier);
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                LOG.info("Archivage : répertoire " + dir.getPath() + " inaccessible — document non archivé.");
+                return null;
+            }
+            String nomFichier = nomArchive(nomMenu, extension);
+            java.nio.file.Files.write(new File(dir, nomFichier).toPath(), contenu);
+            return nomFichier;
+        } catch (Exception e) {
+            LOG.warning("Archivage impossible (" + nomMenu + ") : " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** {@code comptes_clients_29072026_23180023.pdf} : menu + date + heure au centième. */
+    public static String nomArchive(String nomMenu, String extension) {
+        long ms = System.currentTimeMillis();
+        String horodatage = new java.text.SimpleDateFormat("ddMMyyyy_HHmmss")
+                .format(new java.util.Date(ms))
+                + String.format("%02d", (ms % 1000) / 10);
+        return slug(nomMenu) + "_" + horodatage + "." + extension;
+    }
+
+    /** Nom de menu → identifiant de fichier : minuscules, sans accents, underscores. */
+    public static String slug(String s) {
+        if (s == null || s.trim().isEmpty()) { return "document"; }
+        String n = java.text.Normalizer.normalize(s.trim().toLowerCase(Locale.FRANCE),
+                java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        return n.isEmpty() ? "document" : n;
     }
 
     /* ------------------------------------------------------------------ */

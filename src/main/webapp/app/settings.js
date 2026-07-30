@@ -414,6 +414,13 @@ Usp.settings.generalPanel = function () {
               value: '<span style="color:#888">Les impressions PDF sont générées à partir de modèles ' +
                      'JasperReports (.jrxml). Un fichier du même nom déposé dans ce répertoire du serveur ' +
                      'remplace le modèle embarqué (ex. <b>clients.jrxml</b>), sans redéploiement.</span>' },
+            { xtype: 'textfield', name: 'archivageDir', itemId: 'archivageDirField',
+              fieldLabel: 'Archivage des documents', width: 520,
+              emptyText: 'D:\\ARCHIVAGES — chaque document généré y est conservé (pdf\\ et excel\\)' },
+            { xtype: 'displayfield',
+              value: '<span style="color:#888">Chaque PDF et chaque classeur Excel générés sont archivés ' +
+                     'dans ce répertoire (sous-dossiers <b>pdf</b> et <b>excel</b>), nommés ' +
+                     '<b>menu_date_heure</b> : on peut les reconsulter sans réimprimer.</span>' },
             { xtype: 'textfield', name: 'site', itemId: 'siteField',
               fieldLabel: 'Lien du site société', width: 520,
               emptyText: 'https://… (variable [SITE])' },
@@ -466,6 +473,7 @@ Usp.settings.generalPanel = function () {
             var societeTel = p.down('#societeTelField').getValue() || '';
             var adresse = p.down('#adresseField').getValue() || '';
             var rapportsDir = (p.down('#rapportsDirField').getValue() || '').trim();
+            var archivageDir = (p.down('#archivageDirField').getValue() || '').trim();
             var site = p.down('#siteField').getValue() || '';
             var lienCommande = p.down('#lienCommandeField').getValue() || '';
             var urlBase = (p.down('#urlBaseField').getValue() || '').trim();
@@ -485,6 +493,7 @@ Usp.settings.generalPanel = function () {
                     put('app.societe_tel', societeTel)(function () {
                     put('app.adresse', adresse)(function () {
                     put('rapports.repertoire', rapportsDir)(function () {
+                    put('archivage.repertoire', archivageDir)(function () {
                         put('app.site', site)(function () {
                             put('app.lien_commande', lienCommande)(function () {
                             put('app.url_base', urlBase)(function () {
@@ -497,6 +506,7 @@ Usp.settings.generalPanel = function () {
                             });
                             });
                         });
+                    });
                     });
                     });
                     });
@@ -517,6 +527,7 @@ Usp.settings.generalPanel = function () {
         charger('app.societe_tel', 'societeTelField', '');
         charger('app.adresse', 'adresseField', '');
         charger('rapports.repertoire', 'rapportsDirField', '');
+        charger('archivage.repertoire', 'archivageDirField', 'D:\\ARCHIVAGES');
         charger('app.site', 'siteField', '');
         charger('app.lien_commande', 'lienCommandeField', '');
         charger('app.url_base', 'urlBaseField', '');

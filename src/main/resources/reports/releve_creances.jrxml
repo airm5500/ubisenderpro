@@ -46,27 +46,27 @@
 
     <detail>
         <band height="16" splitType="Prevent">
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="0" y="0" width="130" height="16"/>
                 <textElement verticalAlignment="Middle"/>
                 <textFieldExpression><![CDATA[$F{numero}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="130" y="0" width="80" height="16"/>
                 <textElement verticalAlignment="Middle"/>
                 <textFieldExpression><![CDATA[$F{type}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="210" y="0" width="90" height="16"/>
                 <textElement verticalAlignment="Middle" textAlignment="Center"/>
                 <textFieldExpression><![CDATA[$F{emission}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="300" y="0" width="90" height="16"/>
                 <textElement verticalAlignment="Middle" textAlignment="Center"/>
                 <textFieldExpression><![CDATA[$F{echeance}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="390" y="0" width="125" height="16"/>
                 <textElement verticalAlignment="Middle" textAlignment="Right"/>
                 <textFieldExpression><![CDATA[$F{montant}]]></textFieldExpression>

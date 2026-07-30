@@ -123,27 +123,27 @@
             <frame>
                 <reportElement style="Zebra" stretchType="RelativeToBandHeight" x="0" y="0" width="555" height="14"/>
                 <box><bottomPen lineWidth="0.4" lineColor="#D5DEE8"/></box>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="3" y="1" width="104" height="12"/>
                     <textElement textAlignment="Left"/>
                     <textFieldExpression><![CDATA[$F{date}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="114" y="1" width="104" height="12"/>
                     <textElement textAlignment="Right"/>
                     <textFieldExpression><![CDATA[$F{campagnes}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="225" y="1" width="104" height="12"/>
                     <textElement textAlignment="Right"/>
                     <textFieldExpression><![CDATA[$F{waweb}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="336" y="1" width="104" height="12"/>
                     <textElement textAlignment="Right"/>
                     <textFieldExpression><![CDATA[$F{api}]]></textFieldExpression>
                 </textField>
-                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <textField textAdjust="CutText" isBlankWhenNull="true">
                     <reportElement style="Cellule" x="447" y="1" width="104" height="12"/>
                     <textElement textAlignment="Right"/>
                     <textFieldExpression><![CDATA[$F{discussions}]]></textFieldExpression>

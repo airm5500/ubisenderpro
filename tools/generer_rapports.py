@@ -363,7 +363,7 @@ def generer(nom, spec):
             '<text><![CDATA[%s]]></text>\n'
             '                </staticText>\n' % (x + 3, largeur - 7, align, xml_escape(libelle)))
         cellules.append(
-            '                <textField textAdjust="StretchHeight" isBlankWhenNull="true">\n'
+            '                <textField textAdjust="CutText" isBlankWhenNull="true">\n'
             '                    <reportElement style="Cellule" x="%d" y="1" width="%d" height="12"/>\n'
             '                    <textElement textAlignment="%s"/>\n'
             '                    <textFieldExpression><![CDATA[$F{%s}]]></textFieldExpression>\n'

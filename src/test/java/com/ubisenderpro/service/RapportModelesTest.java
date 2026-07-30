@@ -47,6 +47,17 @@ class RapportModelesTest {
         return p;
     }
 
+    /** Nommage des archives : menu_ddMMyyyy_HHmmssCC.ext, sans accents ni espaces. */
+    @Test
+    void nomArchiveEtSlug() {
+        assertEquals("comptes_clients", RapportService.slug("Comptes clients"));
+        assertEquals("evolution_des_envois_30_jours", RapportService.slug("Évolution des envois (30 jours)"));
+        assertEquals("document", RapportService.slug("   "));
+        String nom = RapportService.nomArchive("Comptes clients", "pdf");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                nom.matches("comptes_clients_\\d{8}_\\d{8}\\.pdf"), nom);
+    }
+
     /** Chaque modele de liste compile, se remplit (vide) et exporte un PDF. */
     @Test
     void tousLesModelesDeListeCompilentEtProduisentUnPdf() throws Exception {

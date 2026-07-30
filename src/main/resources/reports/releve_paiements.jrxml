@@ -43,22 +43,22 @@
 
     <detail>
         <band height="16" splitType="Prevent">
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="0" y="0" width="90" height="16"/>
                 <textElement verticalAlignment="Middle" textAlignment="Center"/>
                 <textFieldExpression><![CDATA[$F{date}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="90" y="0" width="110" height="16"/>
                 <textElement verticalAlignment="Middle"/>
                 <textFieldExpression><![CDATA[$F{mode}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="200" y="0" width="190" height="16"/>
                 <textElement verticalAlignment="Middle"/>
                 <textFieldExpression><![CDATA[$F{reference}]]></textFieldExpression>
             </textField>
-            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
                 <reportElement style="Cellule" x="390" y="0" width="125" height="16"/>
                 <textElement verticalAlignment="Middle" textAlignment="Right"/>
                 <textFieldExpression><![CDATA[$F{montant}]]></textFieldExpression>

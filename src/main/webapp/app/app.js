@@ -639,6 +639,44 @@ Usp.rapportPdfPost = function (nomRapport, titre, lignes) {
         JSON.stringify({ titre: titre || '', lignes: lignes || [] }));
 };
 
+/* Export Excel (.xlsx) : construit par le serveur (et archivé) puis téléchargé.
+ * cols = [{ d, t }] ; lignes = valeurs déjà mises en forme, indexées par d. */
+Usp.rapportExcel = function (titre, cols, lignes) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', Usp.apiBase + '/rapports/excel', true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.responseType = 'blob';
+    xhr.onload = function () {
+        if (xhr.status !== 200) {
+            var lire = new FileReader();
+            lire.onload = function () {
+                var msg = 'Export Excel impossible.';
+                try { msg = (JSON.parse(lire.result) || {}).erreur || msg; } catch (e) {}
+                Ext.Msg.alert('Erreur', msg);
+            };
+            try { lire.readAsText(xhr.response); } catch (e) { Ext.Msg.alert('Erreur', 'Export Excel impossible.'); }
+            return;
+        }
+        // Nom transmis par le serveur (identique à la copie archivée).
+        var nom = 'export.xlsx';
+        var cd = xhr.getResponseHeader('Content-Disposition') || '';
+        var m = cd.match(/filename="?([^";]+)"?/);
+        if (m) { nom = m[1]; }
+        var a = document.createElement('a');
+        a.href = window.URL.createObjectURL(xhr.response);
+        a.download = nom;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        window.URL.revokeObjectURL(a.href);
+    };
+    xhr.onerror = function () { Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };
+    xhr.send(JSON.stringify({
+        titre: titre || '',
+        colonnes: (cols || []).map(function (c) { return { d: c.d, t: c.t }; }),
+        lignes: lignes || []
+    }));
+};
+
 Usp._rapportRequete = function (methode, chemin, corps) {
     var w = window.open('', '_blank');
     if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
@@ -666,7 +704,7 @@ Usp._rapportRequete = function (methode, chemin, corps) {
     xhr.send(corps || null);
 };
 
-/* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille.
+/* Bouton unique « Exporter » (menu déroulant : Excel ou PDF) pour la tbar d'une grille.
  * PDF :
  *  - « rapportPdf » ({ nom, params() }) : édition .jrxml remplie PAR LE SERVEUR
  *    (il recharge les données avec les filtres) — cas des comptes clients ;
@@ -685,23 +723,23 @@ Usp.export.boutons = function (titre) {
         }
         Usp.export.recuperer(grid, function (recs) {
             var cols = Usp.export.colonnes(grid);
-            if (format === 'csv') { Usp.export.csv(titre, cols, recs); return; }
-            if (grid.rapportNom) {
-                Usp.rapportPdfPost(grid.rapportNom, titre, recs.map(function (r) {
-                    var l = {};
-                    cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d, c.f); });
-                    return l;
-                }));
-                return;
-            }
+            var lignes = recs.map(function (r) {
+                var l = {};
+                cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d, c.f); });
+                return l;
+            });
+            // Excel : classeur .xlsx construit et ARCHIVÉ par le serveur
+            // (répertoire d'archivage, sous-dossier excel).
+            if (format === 'xlsx') { Usp.rapportExcel(titre, cols, lignes); return; }
+            if (grid.rapportNom) { Usp.rapportPdfPost(grid.rapportNom, titre, lignes); return; }
             Usp.export.pdf(titre, cols, recs);
         });
     };
     return [{
-        text: '⬇️ Exporter', tooltip: 'Exporter « ' + titre + ' » (CSV ou PDF)',
+        text: '⬇️ Exporter', tooltip: 'Exporter « ' + titre + ' » (Excel ou PDF)',
         listeners: { afterrender: function (b) { btn = b; } },
         menu: [
-            { text: '📊 CSV (Excel)', handler: function () { faire('csv'); } },
+            { text: '📊 Excel (.xlsx)', handler: function () { faire('xlsx'); } },
             { text: '🖨️ PDF', handler: function () { faire('pdf'); } }
         ]
     }];
@@ -1915,8 +1953,13 @@ Usp.dashboardChart._build = function () {
                   serieStore.load();
               } } },
             '->',
-            { text: 'Export CSV', handler: function () {
-                Usp.export.csv('evolution', Usp.dashboardChart.COLS, serieStore.getRange()); } },
+            { text: 'Export Excel', handler: function () {
+                Usp.rapportExcel('Évolution des envois (30 jours)', Usp.dashboardChart.COLS,
+                    serieStore.getRange().map(function (r) {
+                        var l = {};
+                        Usp.dashboardChart.COLS.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+                        return l;
+                    })); } },
             { text: 'Export PDF', handler: function () {
                 Usp.rapportPdfPost('evolution', 'Évolution des envois (30 jours)',
                     serieStore.getRange().map(function (r) {
