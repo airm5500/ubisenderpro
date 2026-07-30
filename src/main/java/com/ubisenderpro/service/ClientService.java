@@ -23,6 +23,12 @@ public class ClientService {
 
     public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
                                          Long segmentationId, Boolean actif, int offset, int limit) {
+        return rechercher(recherche, agence, region, commune, null, segmentationId, actif, offset, limit);
+    }
+
+    public PageResult<Client> rechercher(String recherche, String agence, String region, String commune,
+                                         String tournee, Long segmentationId, Boolean actif,
+                                         int offset, int limit) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object[]> params = new ArrayList<>();
         if (recherche != null && !recherche.isEmpty()) {
@@ -40,6 +46,10 @@ public class ClientService {
         if (commune != null && !commune.isEmpty()) {
             where.append(" AND c.commune = :commune");
             params.add(new Object[]{"commune", commune});
+        }
+        if (tournee != null && !tournee.isEmpty()) {
+            where.append(" AND c.tournee = :tournee");
+            params.add(new Object[]{"tournee", tournee});
         }
         if (segmentationId != null) {
             where.append(" AND c.segmentationId = :seg");
@@ -306,11 +316,63 @@ public class ClientService {
     }
 
     /** Valeurs distinctes pour les filtres de tri (agences, régions, communes). */
+    /**
+     * Mise à jour sélective : applique aux comptes cochés uniquement les champs
+     * explicitement demandés (segmentation, agence, région, tournée) — les
+     * autres champs de la fiche ne sont pas touchés. Une valeur vide vide le
+     * champ (choix explicite de l'écran). Renvoie le nombre de comptes modifiés.
+     */
+    public int majSelective(List<Long> ids, java.util.Map<String, Object> champs) {
+        if (ids == null || ids.isEmpty()) {
+            throw new ValidationException("ids", "Cochez au moins un compte client.");
+        }
+        if (champs == null || champs.isEmpty()) {
+            throw new ValidationException("champs", "Choisissez au moins un champ à modifier.");
+        }
+        boolean majSeg = champs.containsKey("segmentationId");
+        boolean majAgence = champs.containsKey("agence");
+        boolean majRegion = champs.containsKey("region");
+        boolean majTournee = champs.containsKey("tournee");
+        if (!majSeg && !majAgence && !majRegion && !majTournee) {
+            throw new ValidationException("champs", "Choisissez au moins un champ à modifier.");
+        }
+        Long segId = null;
+        if (majSeg && champs.get("segmentationId") != null
+                && !String.valueOf(champs.get("segmentationId")).trim().isEmpty()) {
+            segId = Long.valueOf(String.valueOf(champs.get("segmentationId")).trim());
+        }
+        String agence = texteOuNull(champs.get("agence"));
+        String region = texteOuNull(champs.get("region"));
+        String tournee = texteOuNull(champs.get("tournee"));
+
+        int modifies = 0;
+        for (Long id : ids) {
+            Client c = em.find(Client.class, id);
+            if (c == null) { continue; }
+            if (majSeg) { c.setSegmentationId(segId); }
+            if (majAgence) { c.setAgence(agence); }
+            if (majRegion) { c.setRegion(region); }
+            if (majTournee) { c.setTournee(tournee); }
+            modifies++;
+        }
+        return modifies;
+    }
+
+    private static String texteOuNull(Object o) {
+        if (o == null) { return null; }
+        String s = String.valueOf(o).trim();
+        return s.isEmpty() ? null : s;
+    }
+
     public java.util.Map<String, List<String>> facettes() {
         java.util.Map<String, List<String>> m = new java.util.LinkedHashMap<>();
         m.put("agences", distinct("agence"));
         m.put("regions", distinct("region"));
         m.put("communes", distinct("commune"));
+        // Tournées : alimente le filtre de la liste des comptes et la mise à jour
+        // sélective. Les tournées ne vivent pas dans un référentiel dédié, la
+        // valeur est saisie sur la fiche : on lit donc les valeurs distinctes.
+        m.put("tournees", distinct("tournee"));
         return m;
     }
 

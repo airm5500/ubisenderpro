@@ -46,6 +46,20 @@ public class WaWebSessionService {
     /** Identifiant de session côté service Node. */
     public static String nodeId(Long id) { return "acc-" + id; }
 
+    /**
+     * Identifiant Node à partir d'une valeur texte : le ciblage d'une campagne
+     * stocke l'identifiant brut (« 2 »), alors que le service Node nomme ses
+     * sessions « acc-2 ». Sans cette conversion, l'appel vise une session
+     * inexistante et échoue en « Session non connectée ». Tolère une valeur
+     * déjà préfixée.
+     */
+    public static String nodeIdDepuisTexte(String valeur) {
+        if (valeur == null) { return null; }
+        String v = valeur.trim();
+        if (v.isEmpty()) { return null; }
+        return v.startsWith("acc-") ? v : "acc-" + v;
+    }
+
     /** Démarre/relance la session et met à jour le statut local. */
     public JsonNode demarrer(Long id) {
         WaWebSession s = em.find(WaWebSession.class, id);
@@ -66,8 +80,41 @@ public class WaWebSessionService {
 
     /** Met à jour le statut d'une session (appelé sur événement du service Node). */
     public void enregistrerStatut(Long id, String statut) {
+        enregistrerEtat(id, statut, null, null);
+    }
+
+    /**
+     * Met à jour statut ET santé de réception (appelé sur événement du service
+     * Node). La santé n'a de sens que « connecté » : hors connexion, on la
+     * remet à OK pour ne pas laisser une bannière d'alerte fantôme.
+     */
+    public void enregistrerEtat(Long id, String statut, String sante, String detail) {
         WaWebSession s = em.find(WaWebSession.class, id);
-        if (s != null) { s.setStatut(statut); s.setUpdatedAt(LocalDateTime.now()); em.merge(s); }
+        if (s == null) { return; }
+        if (statut != null && !statut.isEmpty()) { s.setStatut(statut); }
+        boolean connecte = "CONNECTE".equals(s.getStatut());
+        if (sante != null && !sante.isEmpty()) {
+            s.setSante(connecte ? sante.toUpperCase() : "OK");
+            s.setSanteDetail("OK".equalsIgnoreCase(s.getSante()) ? null : detail);
+        } else if (!connecte) {
+            s.setSante("OK");
+            s.setSanteDetail(null);
+        }
+        s.setUpdatedAt(LocalDateTime.now());
+        em.merge(s);
+    }
+
+    /**
+     * Trace un message entrant lisible : horodate la dernière réception et
+     * lève l'état « dégradé » (la réception fonctionne à nouveau).
+     */
+    public void marquerEntrant(Long id) {
+        WaWebSession s = em.find(WaWebSession.class, id);
+        if (s == null) { return; }
+        s.setDernierEntrantLe(LocalDateTime.now());
+        if (!"OK".equals(s.getSante())) { s.setSante("OK"); s.setSanteDetail(null); }
+        s.setUpdatedAt(LocalDateTime.now());
+        em.merge(s);
     }
 
     public void deconnecter(Long id) {
@@ -123,6 +170,16 @@ public class WaWebSessionService {
         if (node == null) return;
         String statut = node.path("status").asText(null);
         if (statut != null && !statut.isEmpty()) { s.setStatut(statut); }
+        // Santé de réception (OK/DEGRADED) : n'a de sens que connecté.
+        String sante = node.path("health").asText(null);
+        boolean connecte = "CONNECTE".equals(s.getStatut());
+        if (sante != null && !sante.isEmpty()) {
+            s.setSante(connecte ? sante.toUpperCase() : "OK");
+            s.setSanteDetail("OK".equalsIgnoreCase(s.getSante()) ? null : node.path("reason").asText(null));
+        } else if (!connecte) {
+            s.setSante("OK");
+            s.setSanteDetail(null);
+        }
         JsonNode me = node.path("me");
         if (me != null && me.has("id")) {
             String id = me.path("id").asText(null);

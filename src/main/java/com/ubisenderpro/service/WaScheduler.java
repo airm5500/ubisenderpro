@@ -17,6 +17,14 @@ import java.util.logging.Logger;
 @Startup
 public class WaScheduler {
 
+    @javax.ejb.EJB
+    private LicenceService licenceService;
+
+    /** Licence expirée/absente (mode obligatoire) : les automatisations sont suspendues. */
+    private boolean suspenduParLicence() {
+        try { return licenceService.envoisBloques(); } catch (RuntimeException e) { return false; }
+    }
+
     private static final Logger LOG = Logger.getLogger(WaScheduler.class.getName());
 
     @EJB
@@ -28,6 +36,7 @@ public class WaScheduler {
 
     @Schedule(hour = "*", minute = "*", persistent = false)
     public void tick() {
+        if (suspenduParLicence()) { return; }
         for (WaBulkJob j : bulkService.planifiesDus()) {
             if (WaBulkService.dansFenetre(j)) {
                 LOG.info("Planificateur : lancement de l'envoi " + j.getId());
@@ -39,6 +48,7 @@ public class WaScheduler {
     /** Réchauffeur : envoi progressif toutes les 3 minutes. */
     @Schedule(hour = "*", minute = "*/3", persistent = false)
     public void tickWarmup() {
+        if (suspenduParLicence()) { return; }
         warmupService.tick();
     }
 }

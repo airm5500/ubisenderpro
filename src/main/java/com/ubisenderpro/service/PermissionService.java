@@ -33,6 +33,9 @@ public class PermissionService {
     @PersistenceContext(unitName = "ubisenderproPU")
     private EntityManager em;
 
+    @javax.ejb.EJB
+    private LicenceService licenceService;
+
     public static final String ADMIN = "ADMIN";
 
     /** Menus (code, libellé) dans l'ordre d'affichage. */
@@ -51,7 +54,9 @@ public class PermissionService {
             {"crm", "CRM / Opportunités"},
             {"settings", "Paramètres"},
             {"users", "Utilisateurs"},
-            {"recouvrement", "Suivi Relance et Recouvrements"}
+            {"recouvrement", "Suivi Relance et Recouvrements"},
+            {"support", "Centre de support"},
+            {"licence", "Licence"}
     };
 
     /** Libellés explicites des actions. */
@@ -76,7 +81,7 @@ public class PermissionService {
     }
 
     private static final List<String> ROLES =
-            Arrays.asList("ADMIN", "MARKETING", "SUPERVISEUR", "AGENT", "CATALOGUE", "LECTURE");
+            Arrays.asList("ADMIN", "MARKETING", "SUPERVISEUR", "AGENT", "CATALOGUE", "LECTURE", "SUPPORT");
 
     /** Actions disponibles pour un menu donné (VOIR toujours présent). */
     private static List<String> actionsDuMenu(String code) {
@@ -96,6 +101,8 @@ public class PermissionService {
         // Actions spécifiques (point 11 / 5).
         if ("catalogue".equals(code)) { a.add("AJUSTER_STOCK"); a.add("MAJ_PROMO"); }
         if ("inbox".equals(code)) { a.add("CREER"); a.add("VOIR_CONTENU"); }
+        if ("support".equals(code)) { a.add("CREER"); a.add("MODIFIER"); a.add("SUPPRIMER"); }
+        if ("licence".equals(code)) { a.add("MODIFIER"); }
         if (Arrays.asList("campaigns", "waweb").contains(code)) { a.add("ENVOI_MASSE"); a.add("RENVOI_ECHECS"); }
         return a;
     }
@@ -118,6 +125,9 @@ public class PermissionService {
             case "settings": return Arrays.asList("ADMIN");
             case "users": return Arrays.asList("ADMIN");
             case "recouvrement": return Arrays.asList("ADMIN");
+            // Tickets internes : tout le monde peut contacter le support / ouvrir un ticket.
+            case "support": return ROLES;
+            case "licence": return Arrays.asList("ADMIN", "SUPPORT");
             default: return Arrays.asList("ADMIN");
         }
     }
@@ -194,6 +204,23 @@ public class PermissionService {
                 }
             }
         }
+        // Centre de support : tickets internes ouverts à tous — les rôles déjà
+        // initialisés (donc ignorés ci-dessus) reçoivent VOIR + CREER sur le
+        // menu support, de façon idempotente.
+        for (String role : ROLES) {
+            if (ADMIN.equals(role)) { continue; }
+            for (String act : new String[]{"VOIR", "CREER"}) {
+                if (!permExiste(role, "support", act)) {
+                    em.persist(new RolePermission(role, "support", act));
+                }
+            }
+        }
+        // Licence : le rôle SUPPORT (mode maintenance) garde l'accès, idempotent.
+        for (String act : new String[]{"VOIR", "MODIFIER"}) {
+            if (!permExiste("SUPPORT", "licence", act)) {
+                em.persist(new RolePermission("SUPPORT", "licence", act));
+            }
+        }
         return crees;
     }
 
@@ -242,13 +269,17 @@ public class PermissionService {
         return out;
     }
 
-    /** Permissions effectives d'un ensemble de rôles : menu -> actions (ADMIN = tout). */
+    /**
+     * Permissions effectives d'un ensemble de rôles : menu -> actions (ADMIN = tout),
+     * puis <b>intersection avec les modules de la licence</b> (un menu non licencié
+     * disparaît, sauf menus socle). Sans licence restrictive : inchangé.
+     */
     public Map<String, Set<String>> effectives(Collection<String> roles) {
         Map<String, Set<String>> map = new LinkedHashMap<>();
         boolean admin = roles != null && roles.contains(ADMIN);
         if (admin) {
             for (String[] mc : MENUS) { map.put(mc[0], new LinkedHashSet<>(actionsDuMenu(mc[0]))); }
-            return map;
+            return filtrerParLicence(map);
         }
         if (roles == null || roles.isEmpty()) { return map; }
         List<RolePermission> l = em.createQuery(
@@ -257,11 +288,22 @@ public class PermissionService {
         for (RolePermission p : l) {
             map.computeIfAbsent(p.getMenuCode(), k -> new LinkedHashSet<>()).add(p.getActionCode());
         }
+        return filtrerParLicence(map);
+    }
+
+    /** Retire les menus non couverts par la licence (droits RBAC ∩ modules licenciés). */
+    private Map<String, Set<String>> filtrerParLicence(Map<String, Set<String>> map) {
+        Set<String> autorises = licenceService.modulesAutorises();
+        if (autorises == null) { return map; } // pas de restriction
+        map.keySet().removeIf(menu -> !autorises.contains(menu));
         return map;
     }
 
-    /** Vrai si l'un des rôles autorise (menu, action). ADMIN autorisé d'office. */
+    /** Vrai si l'un des rôles autorise (menu, action). ADMIN autorisé d'office.
+     *  Un menu hors licence est refusé pour tous (y compris ADMIN). */
     public boolean autorise(Collection<String> roles, String menu, String action) {
+        Set<String> licencies = licenceService.modulesAutorises();
+        if (licencies != null && menu != null && !licencies.contains(menu)) { return false; }
         if (roles != null && roles.contains(ADMIN)) { return true; }
         if (roles == null || roles.isEmpty()) { return false; }
         Long n = em.createQuery(

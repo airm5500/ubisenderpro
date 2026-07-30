@@ -19,6 +19,14 @@ import javax.ejb.Startup;
 @Startup
 public class MarketingScheduler {
 
+    @javax.ejb.EJB
+    private LicenceService licenceService;
+
+    /** Licence expirée/absente (mode obligatoire) : les automatisations sont suspendues. */
+    private boolean suspenduParLicence() {
+        try { return licenceService.envoisBloques(); } catch (RuntimeException e) { return false; }
+    }
+
     @EJB
     private PromotionService promotionService;
     @EJB
@@ -27,12 +35,14 @@ public class MarketingScheduler {
     /** Recalcul des statuts de promotions (réactif). */
     @Schedule(hour = "*", minute = "*/15", persistent = false)
     public void tickStatuts() {
+        if (suspenduParLicence()) { return; }
         promotionService.rafraichirStatuts();
     }
 
     /** Génération quotidienne des propositions d'envoi (7h00). */
     @Schedule(hour = "7", minute = "0", persistent = false)
     public void tickPropositions() {
+        if (suspenduParLicence()) { return; }
         envoiProposeService.genererPropositions();
         envoiProposeService.expirerDepassees();
     }
@@ -40,6 +50,7 @@ public class MarketingScheduler {
     /** Traitement automatique des propositions rupture (§12) — inactif par défaut. */
     @Schedule(hour = "*", minute = "*/30", persistent = false)
     public void tickEnvoiAuto() {
+        if (suspenduParLicence()) { return; }
         envoiProposeService.traiterPropositionsAuto();
     }
 }

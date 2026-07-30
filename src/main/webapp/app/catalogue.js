@@ -31,7 +31,7 @@ Usp.catalogue.articlesPanel = function () {
     var prix = function (v) { return v ? Ext.util.Format.number(v, '0,000') + ' F' : ''; };
 
     return {
-        xtype: 'grid', title: '📦 Articles', store: store,
+        xtype: 'grid', title: '📦 Articles', store: store, rapportNom: 'catalogue_articles',
         columns: [
             { text: 'PS Code', dataIndex: 'pscode', width: 100 },
             { text: 'Désignation', dataIndex: 'designation', flex: 1 },
@@ -270,7 +270,7 @@ Usp.catalogue.promotionsPanel = function () {
     });
     var fdate = function (v) { return v ? String(v).substring(0, 10) : ''; };
     return {
-        xtype: 'grid', title: '🏷️ Promotions', store: store,
+        xtype: 'grid', title: '🏷️ Promotions', store: store, rapportNom: 'promotions_catalogue',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 110 },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },

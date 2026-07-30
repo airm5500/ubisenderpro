@@ -60,6 +60,38 @@ public class ImportResource {
         return Response.ok(rapport).build();
     }
 
+    /**
+     * Détection des colonnes d'un fichier avant l'import : intitulés réels et
+     * premières valeurs. Le CSV était analysé côté navigateur, ce qui laissait
+     * l'utilisateur d'un classeur Excel saisir lui-même les noms de colonnes ;
+     * l'analyse est ici faite par le serveur, qui sait lire les deux formats.
+     */
+    @POST
+    @Path("/colonnes")
+    public Response colonnes(java.util.Map<String, Object> body) {
+        String base64 = texte(body.get("fichierBase64"));
+        String nomFichier = texte(body.get("nomFichier"));
+        String sep = texte(body.get("separateur"));
+        if (base64 == null || base64.isEmpty()) {
+            throw new com.ubisenderpro.service.ValidationException("fichier", "Aucun fichier fourni.");
+        }
+        char separateur = (sep == null || sep.isEmpty()) ? ';' : sep.charAt(0);
+        try {
+            byte[] contenu = java.util.Base64.getDecoder().decode(base64);
+            return Response.ok(com.ubisenderpro.importer.FileParser.apercu(
+                    contenu, nomFichier, separateur, 3)).build();
+        } catch (IllegalArgumentException e) {
+            throw new com.ubisenderpro.service.ValidationException("fichier", "Fichier illisible (encodage).");
+        } catch (Exception e) {
+            throw new com.ubisenderpro.service.ValidationException("fichier",
+                    "Lecture du fichier impossible. Vérifiez qu'il s'agit bien d'un .csv ou d'un .xlsx"
+                    + (com.ubisenderpro.importer.FileParser.estExcel(nomFichier)
+                       ? " (les classeurs .xls anciens doivent être réenregistrés en .xlsx)." : "."));
+        }
+    }
+
+    private static String texte(Object o) { return o == null ? null : String.valueOf(o).trim(); }
+
     // ----- Modèles de correspondance (mappings sauvegardés) -----
 
     @GET

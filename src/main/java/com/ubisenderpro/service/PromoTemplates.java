@@ -58,7 +58,7 @@ public final class PromoTemplates {
                 + "La promotion {{nom_promotion}} commence aujourd'hui !\n\n"
                 + "📅 Offre valable du {{date_debut}} au {{date_fin}}.\n\n"
                 + "💥 Bénéficiez de {{avantage_ug}} sur {{nombre_produits}} produit(s) sélectionné(s).\n\n"
-                + "📎 Consultez le fichier Excel joint pour découvrir les produits et leurs conditions promotionnelles.\n\n"
+                + "{{liste_produits}}{{mention_fichier}}"
                 + "💻 Passez votre commande via EXTRANET pendant la période de validité de l'offre.\n\n"
                 + "Direction Commerciale");
 
@@ -68,7 +68,7 @@ public final class PromoTemplates {
                 + "L'offre d'unités gratuites « {{nom_promotion}} » arrive bientôt à expiration.\n\n"
                 + "📅 Date de fin : {{date_fin}} — il reste {{jours_restants}} jour(s).\n\n"
                 + "🎁 Profitez encore de {{avantage_ug}} sur {{nombre_produits}} produit(s).\n\n"
-                + "📎 Le fichier Excel joint présente les produits concernés et leurs conditions.\n\n"
+                + "{{liste_produits}}{{mention_fichier}}"
                 + "💻 Préparez votre commande et transmettez-la dès maintenant via EXTRANET.\n\n"
                 + "Ne laissez pas passer ces dernières opportunités !\n\n"
                 + "Direction Commerciale");
@@ -78,7 +78,8 @@ public final class PromoTemplates {
                 + "Cher(e) client(e) {{nom_contact}},\n\n"
                 + "La promotion {{nom_promotion}} prend fin le {{date_fin}}.\n\n"
                 + "Il ne vous reste plus que {{jours_restants}} jour(s) pour bénéficier de {{avantage_ug}} sur les produits concernés.\n\n"
-                + "📎 Consultez le fichier Excel joint et finalisez votre commande sur EXTRANET.\n\n"
+                + "{{liste_produits}}{{mention_fichier}}"
+                + "💻 Finalisez votre commande sur EXTRANET.\n\n"
                 + "Après cette date, les conditions promotionnelles ne seront plus applicables.\n\n"
                 + "Direction Commerciale");
     }

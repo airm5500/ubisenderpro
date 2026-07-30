@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UbiSenderPro — Relevé de compte client (recouvrement).
+
+  Rapport MAÎTRE : en-tête société, bloc client, synthèse de la situation,
+  puis deux sous-rapports (releve_creances.jrxml et releve_paiements.jrxml).
+  Personnalisable en copiant ces trois fichiers dans le répertoire des
+  rapports (D:\REPORTS par défaut).
+
+  Paramètres société standard + :
+    CLIENT_NOM / CLIENT_NUMERO / CLIENT_AGENCE
+    ENCOURS_INITIAL / TOTAL_FACTURES / TOTAL_AVOIRS / TOTAL_PAIEMENTS / SOLDE
+      (montants déjà mis en forme)
+    LIGNES_CREANCES / LIGNES_PAIEMENTS (java.util.Collection de Map)
+    SR_CREANCES / SR_PAIEMENTS (sous-rapports compilés, fournis par le serveur)
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="releve" language="java"
+              pageWidth="595" pageHeight="842" columnWidth="515"
+              leftMargin="40" rightMargin="40" topMargin="30" bottomMargin="30"
+              whenNoDataType="AllSectionsNoDetail" isSummaryNewPage="false">
+
+    <style name="Titre" fontName="SansSerif" fontSize="15" isBold="true" forecolor="#1A3E63"/>
+    <style name="Societe" fontName="SansSerif" fontSize="13" isBold="true" forecolor="#1976D2"/>
+    <style name="Discret" fontName="SansSerif" fontSize="8" forecolor="#666666"/>
+    <style name="Section" fontName="SansSerif" fontSize="11" isBold="true" forecolor="#1F2D3D"/>
+    <style name="Texte" fontName="SansSerif" fontSize="10" forecolor="#222222"/>
+
+    <parameter name="SOCIETE_NOM" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_ADRESSE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_TEL" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_SITE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="LOGO" class="java.io.InputStream" isForPrompting="false"/>
+    <parameter name="TITRE" class="java.lang.String"><defaultValueExpression><![CDATA["Relevé de compte"]]></defaultValueExpression></parameter>
+    <parameter name="SOUS_TITRE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="CLIENT_NOM" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="CLIENT_NUMERO" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="CLIENT_AGENCE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="ENCOURS_INITIAL" class="java.lang.String"><defaultValueExpression><![CDATA["0"]]></defaultValueExpression></parameter>
+    <parameter name="TOTAL_FACTURES" class="java.lang.String"><defaultValueExpression><![CDATA["0"]]></defaultValueExpression></parameter>
+    <parameter name="TOTAL_AVOIRS" class="java.lang.String"><defaultValueExpression><![CDATA["0"]]></defaultValueExpression></parameter>
+    <parameter name="TOTAL_PAIEMENTS" class="java.lang.String"><defaultValueExpression><![CDATA["0"]]></defaultValueExpression></parameter>
+    <parameter name="SOLDE" class="java.lang.String"><defaultValueExpression><![CDATA["0"]]></defaultValueExpression></parameter>
+    <parameter name="LIGNES_CREANCES" class="java.util.Collection" isForPrompting="false"/>
+    <parameter name="LIGNES_PAIEMENTS" class="java.util.Collection" isForPrompting="false"/>
+    <parameter name="SR_CREANCES" class="net.sf.jasperreports.engine.JasperReport" isForPrompting="false"/>
+    <parameter name="SR_PAIEMENTS" class="net.sf.jasperreports.engine.JasperReport" isForPrompting="false"/>
+
+    <title>
+        <band height="70" splitType="Stretch">
+            <image scaleImage="RetainShape" hAlign="Left" vAlign="Middle" onErrorType="Blank">
+                <reportElement x="0" y="2" width="100" height="42">
+                    <printWhenExpression><![CDATA[$P{LOGO} != null]]></printWhenExpression>
+                </reportElement>
+                <imageExpression><![CDATA[$P{LOGO}]]></imageExpression>
+            </image>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Societe" x="110" y="4" width="235" height="18"/>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_NOM}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="22" width="235" height="11"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_ADRESSE}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="33" width="235" height="11"/>
+                <textFieldExpression><![CDATA[($P{SOCIETE_TEL}.isEmpty() ? "" : "Tél. " + $P{SOCIETE_TEL})
+                    + (($P{SOCIETE_TEL}.isEmpty() || $P{SOCIETE_SITE}.isEmpty()) ? "" : "   ·   ")
+                    + $P{SOCIETE_SITE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Titre" x="345" y="4" width="170" height="20"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$P{TITRE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="345" y="26" width="170" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Édité le " + new java.text.SimpleDateFormat("dd/MM/yyyy").format(new java.util.Date())]]></textFieldExpression>
+            </textField>
+            <line>
+                <reportElement x="0" y="54" width="515" height="1" forecolor="#1976D2"/>
+                <graphicElement><pen lineWidth="1.6"/></graphicElement>
+            </line>
+        </band>
+    </title>
+
+    <pageFooter>
+        <band height="16">
+            <line>
+                <reportElement x="0" y="2" width="515" height="1" forecolor="#C9D4E0"/>
+                <graphicElement><pen lineWidth="0.5"/></graphicElement>
+            </line>
+            <textField>
+                <reportElement style="Discret" x="0" y="4" width="300" height="11"/>
+                <textFieldExpression><![CDATA["UbiSmartCRM Pro" + ($P{SOCIETE_NOM}.isEmpty() ? "" : " — " + $P{SOCIETE_NOM})]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="375" y="4" width="100" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER} + " /"]]></textFieldExpression>
+            </textField>
+            <textField evaluationTime="Report">
+                <reportElement style="Discret" x="477" y="4" width="38" height="11"/>
+                <textFieldExpression><![CDATA[" " + $V{PAGE_NUMBER}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageFooter>
+
+    <summary>
+        <band height="330" splitType="Stretch">
+            <!-- Bloc client -->
+            <staticText>
+                <reportElement style="Section" x="0" y="0" width="200" height="14"/>
+                <text><![CDATA[Client]]></text>
+            </staticText>
+            <textField>
+                <reportElement style="Texte" x="0" y="16" width="515" height="13"/>
+                <textFieldExpression><![CDATA[$P{CLIENT_NOM}
+                    + ($P{CLIENT_NUMERO}.isEmpty() ? "" : "  (N° " + $P{CLIENT_NUMERO} + ")")]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Texte" x="0" y="29" width="515" height="13">
+                    <printWhenExpression><![CDATA[!$P{CLIENT_AGENCE}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <textFieldExpression><![CDATA["Agence : " + $P{CLIENT_AGENCE}]]></textFieldExpression>
+            </textField>
+
+            <!-- Synthèse de la situation -->
+            <staticText>
+                <reportElement style="Section" x="0" y="50" width="200" height="14"/>
+                <text><![CDATA[Situation]]></text>
+            </staticText>
+            <frame>
+                <reportElement x="0" y="66" width="320" height="80"/>
+                <box><pen lineWidth="0.4" lineColor="#C9D4E0"/></box>
+                <staticText><reportElement style="Texte" x="6" y="2" width="180" height="15"/>
+                    <text><![CDATA[Encours initial]]></text></staticText>
+                <textField><reportElement style="Texte" x="190" y="2" width="124" height="15"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$P{ENCOURS_INITIAL}]]></textFieldExpression></textField>
+                <staticText><reportElement style="Texte" x="6" y="17" width="180" height="15"/>
+                    <text><![CDATA[Total factures]]></text></staticText>
+                <textField><reportElement style="Texte" x="190" y="17" width="124" height="15"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$P{TOTAL_FACTURES}]]></textFieldExpression></textField>
+                <staticText><reportElement style="Texte" x="6" y="32" width="180" height="15"/>
+                    <text><![CDATA[Total avoirs]]></text></staticText>
+                <textField><reportElement style="Texte" x="190" y="32" width="124" height="15"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$P{TOTAL_AVOIRS}]]></textFieldExpression></textField>
+                <staticText><reportElement style="Texte" x="6" y="47" width="180" height="15"/>
+                    <text><![CDATA[Total règlements]]></text></staticText>
+                <textField><reportElement style="Texte" x="190" y="47" width="124" height="15"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$P{TOTAL_PAIEMENTS}]]></textFieldExpression></textField>
+                <frame>
+                    <reportElement mode="Opaque" x="0" y="62" width="320" height="18" backcolor="#EEF3FB"/>
+                    <staticText><reportElement style="Texte" x="6" y="1" width="180" height="15"/>
+                        <textElement><font isBold="true"/></textElement>
+                        <text><![CDATA[Solde dû]]></text></staticText>
+                    <textField><reportElement style="Texte" x="190" y="1" width="124" height="15"/>
+                        <textElement textAlignment="Right"><font isBold="true"/></textElement>
+                        <textFieldExpression><![CDATA[$P{SOLDE}]]></textFieldExpression></textField>
+                </frame>
+            </frame>
+
+            <!-- Factures et avoirs -->
+            <staticText>
+                <reportElement style="Section" positionType="Float" x="0" y="156" width="300" height="16"/>
+                <text><![CDATA[Factures et avoirs]]></text>
+            </staticText>
+            <subreport>
+                <reportElement positionType="Float" x="0" y="174" width="515" height="20" isRemoveLineWhenBlank="true">
+                    <printWhenExpression><![CDATA[$P{LIGNES_CREANCES} != null && !$P{LIGNES_CREANCES}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($P{LIGNES_CREANCES})]]></dataSourceExpression>
+                <subreportExpression><![CDATA[$P{SR_CREANCES}]]></subreportExpression>
+            </subreport>
+            <staticText>
+                <reportElement style="Discret" positionType="Float" x="0" y="174" width="300" height="12" isRemoveLineWhenBlank="true">
+                    <printWhenExpression><![CDATA[$P{LIGNES_CREANCES} == null || $P{LIGNES_CREANCES}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <text><![CDATA[Aucune créance enregistrée.]]></text>
+            </staticText>
+
+            <!-- Règlements -->
+            <staticText>
+                <reportElement style="Section" positionType="Float" x="0" y="204" width="300" height="16"/>
+                <text><![CDATA[Règlements]]></text>
+            </staticText>
+            <subreport>
+                <reportElement positionType="Float" x="0" y="222" width="515" height="20" isRemoveLineWhenBlank="true">
+                    <printWhenExpression><![CDATA[$P{LIGNES_PAIEMENTS} != null && !$P{LIGNES_PAIEMENTS}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($P{LIGNES_PAIEMENTS})]]></dataSourceExpression>
+                <subreportExpression><![CDATA[$P{SR_PAIEMENTS}]]></subreportExpression>
+            </subreport>
+            <staticText>
+                <reportElement style="Discret" positionType="Float" x="0" y="222" width="300" height="12" isRemoveLineWhenBlank="true">
+                    <printWhenExpression><![CDATA[$P{LIGNES_PAIEMENTS} == null || $P{LIGNES_PAIEMENTS}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <text><![CDATA[Aucun règlement enregistré.]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement style="Discret" positionType="Float" x="0" y="252" width="515" height="14"/>
+                <text><![CDATA[Ce relevé est édité automatiquement. Pour toute question, contactez votre service recouvrement.]]></text>
+            </staticText>
+        </band>
+    </summary>
+
+</jasperReport>

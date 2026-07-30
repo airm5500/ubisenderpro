@@ -200,8 +200,12 @@ Usp.inbox.envoyer = function (field) {
     if (!conv) { Ext.Msg.alert('Info', 'Sélectionnez une conversation.'); return; }
     var texte = field.getValue();
     if (!texte) { return; }
-    var apres = function () { field.setValue(''); Usp.inbox.reloadMessages(); };
-    var echec = function () { Ext.Msg.alert('Erreur', 'Envoi impossible (compte/connexion ou fenêtre de 24h).'); };
+    var prog = Usp.progressionUnitaire('Message');
+    var apres = function () { prog.succes(); field.setValue(''); Usp.inbox.reloadMessages(); };
+    var echec = function () {
+        prog.echec();
+        Ext.Msg.alert('Erreur', 'Envoi impossible (compte/connexion ou fenêtre de 24h).');
+    };
     if (conv.get('canal') === 'WEB') {
         Usp.ajax({ url: '/wa-web/sessions/' + conv.get('waWebSessionId') + '/send', method: 'POST',
             jsonData: { numero: conv.get('numeroWhatsapp'), texte: texte },

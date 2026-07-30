@@ -151,7 +151,7 @@ Usp.marketing.grille = function (statut, libelleTab) {
     Usp.marketing._stores.push(store);
 
     return {
-        xtype: 'grid', title: libelleTab, store: store,
+        xtype: 'grid', title: libelleTab, store: store, rapportNom: 'promotions',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 120 },
             { text: 'Nom', dataIndex: 'nom', flex: 1 },
@@ -301,8 +301,27 @@ Usp.marketing.produitsGrid = function (promotionId) {
         ],
         tbar: [
             Usp.permBtn('promotions', 'CREER', { text: '➕ Ajouter un produit', handler: function () { Usp.marketing.produitForm(store, promotionId, null); } }),
-            { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer Excel',
-              listeners: { change: function (f) { Usp.marketing.importProduits(f, promotionId, store); } } }
+            { text: '📥 Importer Excel', tooltip: 'Assistant : choix des colonnes du fichier',
+              handler: function () {
+                  Usp.importer.mini({
+                      titre: 'Importer les produits de la promotion',
+                      url: '/promotions/' + promotionId + '/produits/import',
+                      accept: /\.xlsx?$/i,
+                      champs: [
+                    ['cip7', 'CIP7', false], ['cip13', 'CIP13', false],
+                    ['nom', 'Nom du produit', false],
+                    ['debut', 'Date d\u00e9but', false], ['fin', 'Date fin', false],
+                    ['taux', 'Taux max UG possible', false]
+                ],
+                      // La regle metier reste celle de la fiche : CIP7 OU CIP13.
+                      validation: function (m) {
+                          return (m.cip7 || m.cip13) ? null
+                              : 'Choisissez la colonne du CIP7 ou celle du CIP13.';
+                      },
+                      onDone: function () { store.load(); },
+                      onSuccess: Usp.marketing.rapportImport
+                  });
+              } }
         ],
         listeners: {
             itemdblclick: function (g, rec) { Usp.marketing.produitForm(store, promotionId, rec); },
@@ -425,30 +444,6 @@ Usp.marketing._verrouCatalogue = function (win, verrou) {
     });
 };
 
-/* Import Excel des produits + rapport. */
-Usp.marketing.importProduits = function (f, promotionId, store) {
-    var file = f.fileInputEl.dom.files[0];
-    if (!file) { return; }
-    if (!/\.xlsx?$/i.test(file.name)) { Ext.Msg.alert('Import', 'Choisissez un fichier Excel (.xlsx).'); f.reset(); return; }
-    var reader = new FileReader();
-    reader.onload = function (e) {
-        var b64 = (e.target.result || '').split(',')[1];
-        Usp.ajax({ url: '/promotions/' + promotionId + '/produits/import', method: 'POST',
-            jsonData: { fichierBase64: b64, nomFichier: file.name },
-            success: function (resp) {
-                var r = Ext.decode(resp.responseText) || {};
-                store.load();
-                f.reset();
-                Usp.marketing.rapportImport(r);
-            },
-            failure: function (resp) {
-                var m = 'Import impossible.';
-                try { m = Ext.decode(resp.responseText).erreur || m; } catch (ex) {}
-                Ext.Msg.alert('Erreur', m); f.reset();
-            } });
-    };
-    reader.readAsDataURL(file);
-};
 
 Usp.marketing.rapportImport = function (r) {
     var err = (r.erreurs || []);
@@ -743,7 +738,26 @@ Usp.marketing.performance = function () {
               store: [['', 'Toutes sources'], ['PROMOTION', 'Promotions'], ['DISPONIBILITE', 'Dispo / Ruptures'], ['INFORMATION', 'Informations']] },
             { text: '🔎 Appliquer', handler: function (b) { charger(b.up('panel')); } },
             '->',
-            { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } }
+            { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } },
+            // Éditions de l'onglet : PDF JasperReports (performance.jrxml) et
+            // classeur Excel — tous deux archivés côté serveur. Un élément de
+            // menu flotte hors de l'arbre des composants : le bouton mémorise
+            // sa grille au rendu (même approche que Usp.export.boutons).
+            (function () {
+                var grille = null;
+                return { text: '⬇️ Exporter',
+                    listeners: { afterrender: function (b) { grille = b.up('panel').down('grid'); } },
+                    menu: [
+                        { text: '📊 Excel (.xlsx)', handler: function () {
+                            if (!grille) { return; }
+                            Usp.rapportExcel('Performance des campagnes',
+                                Usp.export.colonnes(grille), Usp.marketing._perfLignes(grille)); } },
+                        { text: '🖨️ PDF', handler: function () {
+                            if (!grille) { return; }
+                            Usp.rapportPdfPost('performance', 'Performance des campagnes',
+                                Usp.marketing._perfLignes(grille)); } }
+                    ] };
+            })()
         ],
         items: [
             { xtype: 'component', itemId: 'perfSummary', style: 'padding:10px;background:#fafafa;border-bottom:1px solid #eee', html: '' },
@@ -765,6 +779,16 @@ Usp.marketing.performance = function () {
         ],
         listeners: { afterrender: function (p) { charger(p); } }
     };
+};
+
+/* Lignes de la grille Performance, prêtes pour une édition (Excel / PDF). */
+Usp.marketing._perfLignes = function (grid) {
+    var cols = Usp.export.colonnes(grid);
+    return grid.getStore().getRange().map(function (r) {
+        var l = {};
+        cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+        return l;
+    });
 };
 
 Usp.marketing._perfHtml = function (t) {

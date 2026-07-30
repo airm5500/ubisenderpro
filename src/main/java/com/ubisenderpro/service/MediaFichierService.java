@@ -23,6 +23,10 @@ public class MediaFichierService {
         mf.setNomFichier(nomFichier);
         mf.setTaille(contenu == null ? 0L : (long) contenu.length);
         em.persist(mf);
+        // Génère l'identifiant (IDENTITY) immédiatement : l'appelant construit
+        // aussitôt l'URL publique du fichier à partir de cet identifiant. Sans
+        // ce flush, l'URL de la pièce jointe pointait vers un identifiant nul.
+        em.flush();
         return mf;
     }
 

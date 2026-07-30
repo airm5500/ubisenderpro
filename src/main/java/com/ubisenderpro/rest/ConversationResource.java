@@ -47,6 +47,7 @@ public class ConversationResource {
     /** Indique, parmi les numéros donnés, lesquels sont des premiers contacts (aucune conversation). */
     @POST
     @Path("/premier-contact")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Map<String, Object> premierContact(Map<String, Object> body) {
         Object n = body == null ? null : body.get("numeros");
         List<String> numeros = new java.util.ArrayList<>();
@@ -69,6 +70,7 @@ public class ConversationResource {
 
     @POST
     @Path("/{id}/assign")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response affecter(@PathParam("id") Long id, Map<String, Object> body) {
         Long agentId = body.get("agentId") == null ? null : Long.valueOf(String.valueOf(body.get("agentId")));
         conversationService.affecter(id, agentId);
@@ -77,6 +79,7 @@ public class ConversationResource {
 
     @POST
     @Path("/{id}/close")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response fermer(@PathParam("id") Long id) {
         conversationService.changerStatut(id, "CLOTUREE");
         return Response.ok().build();
@@ -84,6 +87,7 @@ public class ConversationResource {
 
     @POST
     @Path("/{id}/reopen")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response rouvrir(@PathParam("id") Long id) {
         conversationService.changerStatut(id, "OUVERTE");
         return Response.ok().build();
@@ -91,6 +95,7 @@ public class ConversationResource {
 
     @POST
     @Path("/{id}/read")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response marquerLu(@PathParam("id") Long id) {
         conversationService.marquerLu(id);
         return Response.ok().build();
@@ -99,6 +104,7 @@ public class ConversationResource {
     /** Un humain reprend la main : le bot se tait sur cette discussion. */
     @POST
     @Path("/{id}/bot-off")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response botOff(@PathParam("id") Long id) {
         conversationService.definirBot(id, false);
         return Response.ok().build();
@@ -107,6 +113,7 @@ public class ConversationResource {
     /** Redonne la main au bot sur cette discussion. */
     @POST
     @Path("/{id}/bot-on")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response botOn(@PathParam("id") Long id) {
         conversationService.definirBot(id, true);
         return Response.ok().build();
@@ -114,6 +121,7 @@ public class ConversationResource {
 
     @POST
     @Path("/{id}/notes")
+    @Secured(roles = {"ADMIN", "MARKETING", "SUPERVISEUR", "AGENT"})
     public Response ajouterNote(@PathParam("id") Long id, Map<String, Object> body) {
         String note = String.valueOf(body.get("note"));
         return Response.ok(conversationService.ajouterNote(id, note, null)).build();

@@ -25,6 +25,21 @@ public class WaWebSession {
     @Column(name = "statut", nullable = false, length = 20)
     private String statut = "DECONNECTE";
 
+    /**
+     * Santé de réception, indépendante du statut : OK | DEGRADED.
+     * DEGRADED = session ouverte (l'envoi marche) mais des messages entrants
+     * arrivent illisibles → à reconnecter (rescan du QR).
+     */
+    @Column(name = "sante", nullable = false, length = 20)
+    private String sante = "OK";
+
+    @Column(name = "sante_detail", length = 255)
+    private String santeDetail;
+
+    /** Dernier message entrant lisible reçu (repère de confiance). */
+    @Column(name = "dernier_entrant_le")
+    private LocalDateTime dernierEntrantLe;
+
     @Column(name = "actif", nullable = false)
     private boolean actif = true;
 
@@ -45,6 +60,12 @@ public class WaWebSession {
     public void setNumero(String numero) { this.numero = numero; }
     public String getStatut() { return statut; }
     public void setStatut(String statut) { this.statut = statut; }
+    public String getSante() { return sante; }
+    public void setSante(String sante) { this.sante = sante; }
+    public String getSanteDetail() { return santeDetail; }
+    public void setSanteDetail(String santeDetail) { this.santeDetail = santeDetail; }
+    public LocalDateTime getDernierEntrantLe() { return dernierEntrantLe; }
+    public void setDernierEntrantLe(LocalDateTime dernierEntrantLe) { this.dernierEntrantLe = dernierEntrantLe; }
     public boolean isActif() { return actif; }
     public void setActif(boolean actif) { this.actif = actif; }
     public LocalDateTime getCreatedAt() { return createdAt; }

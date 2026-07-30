@@ -32,14 +32,16 @@ public class ClientResource {
                                      @QueryParam("agence") String agence,
                                      @QueryParam("region") String region,
                                      @QueryParam("commune") String commune,
+                                     @QueryParam("tournee") String tournee,
                                      @QueryParam("segmentationId") Long segmentationId,
                                      @QueryParam("actif") Boolean actif,
                                      @QueryParam("start") @DefaultValue("0") int start,
                                      @QueryParam("limit") @DefaultValue("25") int limit) {
-        return clientService.rechercher(recherche, agence, region, commune, segmentationId, actif, start, limit);
+        return clientService.rechercher(recherche, agence, region, commune, tournee, segmentationId,
+                actif, start, limit);
     }
 
-    /** Valeurs distinctes pour alimenter les filtres (agences/régions/communes). */
+    /** Valeurs distinctes pour alimenter les filtres (agences/régions/communes/tournées). */
     @GET
     @Path("/facettes")
     public java.util.Map<String, java.util.List<String>> facettes() {
@@ -93,6 +95,36 @@ public class ClientResource {
         Client c = clientService.modifier(client);
         auditService.tracer(auth, "MODIFICATION", "Client", id, c.getNomCompte());
         return Response.ok(c).build();
+    }
+
+    /**
+     * Mise à jour sélective (onglet dédié) : déplace d'un coup les comptes
+     * cochés vers une segmentation / agence / région / tournée. Seuls les
+     * champs présents dans {@code champs} sont modifiés.
+     */
+    @POST
+    @Path("/maj-selective")
+    @Secured(menu = "clients")
+    public Response majSelective(java.util.Map<String, Object> body,
+                                 @HeaderParam(HttpHeaders.AUTHORIZATION) String auth) {
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        Object brut = body == null ? null : body.get("ids");
+        if (brut instanceof java.util.List) {
+            for (Object o : (java.util.List<?>) brut) {
+                if (o != null) { ids.add(Long.valueOf(String.valueOf(o))); }
+            }
+        }
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> champs = body == null ? null
+                : (body.get("champs") instanceof java.util.Map
+                    ? (java.util.Map<String, Object>) body.get("champs") : null);
+        int n = clientService.majSelective(ids, champs);
+        auditService.tracer(auth, "MODIFICATION", "Client", null,
+                "Mise à jour sélective de " + n + " compte(s) : "
+                + (champs == null ? "" : String.join(", ", champs.keySet())));
+        java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("modifies", n);
+        return Response.ok(r).build();
     }
 
     @DELETE

@@ -84,7 +84,7 @@ Usp.history.panel = function () {
     };
 
     return {
-        xtype: 'grid', title: 'Historique des envois', store: store,
+        xtype: 'grid', title: 'Historique des envois', store: store, rapportNom: 'historique_envois',
         columns: [
             { text: 'Date', dataIndex: 'date', width: 130, renderer: Usp.history._fmtDate },
             { text: 'Canal', dataIndex: 'canal', width: 70, align: 'center',

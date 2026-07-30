@@ -40,6 +40,11 @@ public class Utilisateur {
     @Column(name = "actif", nullable = false)
     private boolean actif = true;
 
+    /** Compte système (ex. éditeur/support) : exclu de la grille Utilisateurs,
+     *  mais bien présent en base et dans l'audit. */
+    @Column(name = "systeme", nullable = false)
+    private boolean systeme = false;
+
     @Column(name = "derniere_connexion")
     private LocalDateTime derniereConnexion;
 
@@ -74,6 +79,8 @@ public class Utilisateur {
     public void setEmail(String email) { this.email = email; }
     public String getAgence() { return agence; }
     public void setAgence(String agence) { this.agence = agence; }
+    public boolean isSysteme() { return systeme; }
+    public void setSysteme(boolean systeme) { this.systeme = systeme; }
     public String getMotDePasseHash() { return motDePasseHash; }
     public void setMotDePasseHash(String motDePasseHash) { this.motDePasseHash = motDePasseHash; }
     public boolean isActif() { return actif; }

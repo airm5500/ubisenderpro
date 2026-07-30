@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UbiSenderPro — Recouvrement — clients & encours (impression PDF).
+
+  GÉNÉRÉ par tools/generer_rapports.py : pour changer les colonnes du modèle
+  standard, modifier le script puis le relancer. Pour une personnalisation
+  locale SANS redéploiement, copier ce fichier dans le répertoire des rapports
+  (paramètre « rapports.repertoire », D:\REPORTS par défaut) et l'éditer :
+  le fichier externe remplace celui-ci.
+
+  Paramètres fournis par l'application : SOCIETE_NOM / SOCIETE_ADRESSE /
+  SOCIETE_TEL / SOCIETE_SITE, LOGO (java.io.InputStream), TITRE, SOUS_TITRE.
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="rec_encours" language="java"
+              pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="802" leftMargin="20" rightMargin="20" topMargin="16" bottomMargin="16"
+              whenNoDataType="AllSectionsNoDetail" isSummaryNewPage="false">
+
+    <style name="Titre" fontName="SansSerif" fontSize="15" isBold="true" forecolor="#1A3E63"/>
+    <style name="Societe" fontName="SansSerif" fontSize="13" isBold="true" forecolor="#1976D2"/>
+    <style name="Discret" fontName="SansSerif" fontSize="7" forecolor="#666666"/>
+    <style name="Entete" fontName="SansSerif" fontSize="7" isBold="true" forecolor="#FFFFFF"/>
+    <style name="Cellule" fontName="SansSerif" fontSize="7" forecolor="#222222"/>
+    <style name="Zebra" mode="Transparent">
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 == 0]]></conditionExpression>
+            <style mode="Opaque" backcolor="#EFF4F9"/>
+        </conditionalStyle>
+    </style>
+
+    <parameter name="SOCIETE_NOM" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_ADRESSE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_TEL" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_SITE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="LOGO" class="java.io.InputStream" isForPrompting="false"/>
+    <parameter name="TITRE" class="java.lang.String"><defaultValueExpression><![CDATA["Recouvrement — clients & encours"]]></defaultValueExpression></parameter>
+    <parameter name="SOUS_TITRE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+
+    <field name="numeroClient" class="java.lang.String"/>
+    <field name="nomCompte" class="java.lang.String"/>
+    <field name="agence" class="java.lang.String"/>
+    <field name="segmentCommercial" class="java.lang.String"/>
+    <field name="profilPaiement" class="java.lang.String"/>
+    <field name="responsable" class="java.lang.String"/>
+    <field name="statut" class="java.lang.String"/>
+    <field name="encoursInitial" class="java.lang.String"/>
+    <field name="totalPaiements" class="java.lang.String"/>
+    <field name="solde" class="java.lang.String"/>
+
+    <title>
+        <band height="66" splitType="Stretch">
+            <image scaleImage="RetainShape" hAlign="Left" vAlign="Middle" onErrorType="Blank">
+                <reportElement x="0" y="2" width="100" height="42">
+                    <printWhenExpression><![CDATA[$P{LOGO} != null]]></printWhenExpression>
+                </reportElement>
+                <imageExpression><![CDATA[$P{LOGO}]]></imageExpression>
+            </image>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Societe" x="110" y="4" width="380" height="18"/>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_NOM}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="22" width="380" height="11"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_ADRESSE}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="33" width="380" height="11"/>
+                <textFieldExpression><![CDATA[($P{SOCIETE_TEL}.isEmpty() ? "" : "Tél. " + $P{SOCIETE_TEL})
+                    + (($P{SOCIETE_TEL}.isEmpty() || $P{SOCIETE_SITE}.isEmpty()) ? "" : "   ·   ")
+                    + $P{SOCIETE_SITE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Titre" x="490" y="4" width="312" height="20"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$P{TITRE}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="490" y="24" width="312" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$P{SOUS_TITRE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="490" y="35" width="312" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Édité le " + new java.text.SimpleDateFormat("dd/MM/yyyy 'à' HH:mm").format(new java.util.Date())]]></textFieldExpression>
+            </textField>
+            <line>
+                <reportElement x="0" y="52" width="802" height="1" forecolor="#1976D2"/>
+                <graphicElement><pen lineWidth="1.6"/></graphicElement>
+            </line>
+        </band>
+    </title>
+
+    <columnHeader>
+        <band height="18">
+            <frame>
+                <reportElement mode="Opaque" x="0" y="0" width="802" height="18" backcolor="#1F4E79"/>
+                <staticText>
+                    <reportElement style="Entete" x="3" y="0" width="63" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[N° client]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="73" y="0" width="143" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Client]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="223" y="0" width="73" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Agence]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="303" y="0" width="68" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Segment]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="378" y="0" width="73" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Profil paiement]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="458" y="0" width="73" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Responsable]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="538" y="0" width="65" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Statut]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="610" y="0" width="58" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Encours init.]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="675" y="0" width="58" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Réglé]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="740" y="0" width="58" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Solde]]></text>
+                </staticText>
+            </frame>
+        </band>
+    </columnHeader>
+
+    <detail>
+        <band height="14" splitType="Prevent">
+            <frame>
+                <reportElement style="Zebra" stretchType="RelativeToBandHeight" x="0" y="0" width="802" height="14"/>
+                <box><bottomPen lineWidth="0.4" lineColor="#D5DEE8"/></box>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="3" y="1" width="63" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{numeroClient}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="73" y="1" width="143" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{nomCompte}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="223" y="1" width="73" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{agence}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="303" y="1" width="68" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{segmentCommercial}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="378" y="1" width="73" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{profilPaiement}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="458" y="1" width="73" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{responsable}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="538" y="1" width="65" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{statut}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="610" y="1" width="58" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{encoursInitial}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="675" y="1" width="58" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{totalPaiements}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="740" y="1" width="58" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{solde}]]></textFieldExpression>
+                </textField>
+            </frame>
+        </band>
+    </detail>
+
+    <pageFooter>
+        <band height="16">
+            <line>
+                <reportElement x="0" y="2" width="802" height="1" forecolor="#C9D4E0"/>
+                <graphicElement><pen lineWidth="0.5"/></graphicElement>
+            </line>
+            <textField>
+                <reportElement style="Discret" x="0" y="4" width="300" height="11"/>
+                <textFieldExpression><![CDATA["UbiSmartCRM Pro" + ($P{SOCIETE_NOM}.isEmpty() ? "" : " — " + $P{SOCIETE_NOM})]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="662" y="4" width="100" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER} + " /"]]></textFieldExpression>
+            </textField>
+            <textField evaluationTime="Report">
+                <reportElement style="Discret" x="764" y="4" width="38" height="11"/>
+                <textElement textAlignment="Left"/>
+                <textFieldExpression><![CDATA[" " + $V{PAGE_NUMBER}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageFooter>
+
+    <summary>
+        <band height="18">
+            <textField>
+                <reportElement style="Cellule" x="0" y="4" width="400" height="12" forecolor="#1A3E63">
+                    <printWhenExpression><![CDATA[$V{REPORT_COUNT} > 0]]></printWhenExpression>
+                </reportElement>
+                <textElement><font isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Total : " + $V{REPORT_COUNT} + " ligne(s)"]]></textFieldExpression>
+            </textField>
+            <staticText>
+                <reportElement style="Cellule" x="0" y="4" width="400" height="12">
+                    <printWhenExpression><![CDATA[$V{REPORT_COUNT} == 0]]></printWhenExpression>
+                </reportElement>
+                <text><![CDATA[Aucune ligne à imprimer.]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

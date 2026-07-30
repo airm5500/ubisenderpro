@@ -111,7 +111,7 @@ Usp.recouvrement.dashboardPanel = function () {
         title: '📊 Tableau de bord', xtype: 'panel', layout: 'border', bodyPadding: 0,
         items: [
             { region: 'north', xtype: 'container', items: [kpi], height: 100, style: 'background:#f4f6f8;border-bottom:1px solid #ddd' },
-            { region: 'center', xtype: 'grid', store: agStore, title: 'Point par agence',
+            { region: 'center', xtype: 'grid', store: agStore, title: 'Point par agence', rapportNom: 'rec_agences',
               columns: [
                   { text: 'Agence', dataIndex: 'agence', flex: 1 },
                   { text: 'Encours', dataIndex: 'encours', width: 120, align: 'right', renderer: Usp.recouvrement.money },
@@ -162,7 +162,7 @@ Usp.recouvrement.fichesPanel = function () {
     store.on('load', appliquer);
 
     return {
-        xtype: 'grid', title: '💼 Clients & encours', store: store,
+        xtype: 'grid', title: '💼 Clients & encours', store: store, rapportNom: 'rec_encours',
         columns: [
             { text: 'N° client', dataIndex: 'numeroClient', width: 100 },
             { text: 'Client', dataIndex: 'nomCompte', flex: 1 },
@@ -650,14 +650,15 @@ Usp.recouvrement.relanceForm = function (rec) {
             var v = f.getValues();
             v.clientId = rec.get('clientId');
             Usp.recouvrement.appliquerPiece(f, v);
+            var prog = Usp.progressionUnitaire('Relance');
             Usp.ajax({ url: '/recouvrement/envois', method: 'POST', jsonData: v,
                 success: function (resp) {
                     var e = Ext.decode(resp.responseText) || {};
                     win.close();
-                    if (e.statut === 'ENVOYE') { Usp.toast('Relance envoyée (' + e.canal + ').'); }
-                    else { Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
+                    if (e.statut === 'ENVOYE') { prog.succes(); Usp.toast('Relance envoyée (' + e.canal + ').'); }
+                    else { prog.echec(); Ext.Msg.alert('Envoi en échec', e.erreur || 'Échec de l\'envoi.'); }
                 },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                failure: function (resp) { prog.echec(); Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
         } }]
     });
     win.show();
@@ -993,7 +994,7 @@ Usp.recouvrement.historiquePanel = function () {
         proxy: { type: 'ajax', url: Usp.apiBase + '/recouvrement/envois',
             headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
     return {
-        xtype: 'grid', title: '🗂️ Historique', store: store,
+        xtype: 'grid', title: '🗂️ Historique', store: store, rapportNom: 'rec_historique',
         columns: [
             { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: function (v) { return v ? String(v).replace('T', ' ').substring(0, 16) : ''; } },
             { text: 'Canal', dataIndex: 'canal', width: 90 },

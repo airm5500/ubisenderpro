@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UbiSenderPro — Relevé de compte : SOUS-RAPPORT « Factures et avoirs ».
+  Utilisé par releve.jrxml. Personnalisable comme les autres modèles en le
+  copiant dans le répertoire des rapports (D:\REPORTS par défaut).
+  Champs : numero, type, emission, echeance, montant (déjà mis en forme).
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="releve_creances" language="java"
+              pageWidth="515" pageHeight="842" columnWidth="515"
+              leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0"
+              whenNoDataType="AllSectionsNoDetail">
+
+    <style name="Entete" fontName="SansSerif" fontSize="9" isBold="true" forecolor="#FFFFFF"/>
+    <style name="Cellule" fontName="SansSerif" fontSize="9" forecolor="#222222">
+        <box leftPadding="4" rightPadding="4">
+            <pen lineWidth="0.4" lineColor="#C9D4E0"/>
+        </box>
+    </style>
+
+    <field name="numero" class="java.lang.String"/>
+    <field name="type" class="java.lang.String"/>
+    <field name="emission" class="java.lang.String"/>
+    <field name="echeance" class="java.lang.String"/>
+    <field name="montant" class="java.lang.String"/>
+
+    <columnHeader>
+        <band height="18">
+            <frame>
+                <reportElement mode="Opaque" x="0" y="0" width="515" height="18" backcolor="#2D6CDF"/>
+                <staticText><reportElement style="Entete" x="4" y="0" width="126" height="18"/>
+                    <textElement verticalAlignment="Middle"/><text><![CDATA[Numéro]]></text></staticText>
+                <staticText><reportElement style="Entete" x="134" y="0" width="76" height="18"/>
+                    <textElement verticalAlignment="Middle"/><text><![CDATA[Type]]></text></staticText>
+                <staticText><reportElement style="Entete" x="214" y="0" width="86" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Center"/><text><![CDATA[Émission]]></text></staticText>
+                <staticText><reportElement style="Entete" x="304" y="0" width="86" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Center"/><text><![CDATA[Échéance]]></text></staticText>
+                <staticText><reportElement style="Entete" x="394" y="0" width="117" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Montant]]></text></staticText>
+            </frame>
+        </band>
+    </columnHeader>
+
+    <detail>
+        <band height="16" splitType="Prevent">
+            <textField textAdjust="CutText" isBlankWhenNull="true">
+                <reportElement style="Cellule" x="0" y="0" width="130" height="16"/>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$F{numero}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="CutText" isBlankWhenNull="true">
+                <reportElement style="Cellule" x="130" y="0" width="80" height="16"/>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$F{type}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="CutText" isBlankWhenNull="true">
+                <reportElement style="Cellule" x="210" y="0" width="90" height="16"/>
+                <textElement verticalAlignment="Middle" textAlignment="Center"/>
+                <textFieldExpression><![CDATA[$F{emission}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="CutText" isBlankWhenNull="true">
+                <reportElement style="Cellule" x="300" y="0" width="90" height="16"/>
+                <textElement verticalAlignment="Middle" textAlignment="Center"/>
+                <textFieldExpression><![CDATA[$F{echeance}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="CutText" isBlankWhenNull="true">
+                <reportElement style="Cellule" x="390" y="0" width="125" height="16"/>
+                <textElement verticalAlignment="Middle" textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$F{montant}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+</jasperReport>

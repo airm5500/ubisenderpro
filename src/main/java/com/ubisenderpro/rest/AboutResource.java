@@ -26,6 +26,30 @@ public class AboutResource {
     /** E-mail de contact du développeur. */
     public static final String EMAIL = "nzifranck13@gmail.com";
 
+    /**
+     * Horodatage de compilation du livrable, lu dans {@code build.properties}
+     * genere par Maven (filtrage de ressources). Permet de verifier d'un coup
+     * d'oeil qu'un WAR fraichement construit a bien ete redeploye — un ancien
+     * WAR encore en place explique des correctifs restes « sans effet ».
+     *
+     * <p>Une ressource qui nous appartient (WEB-INF/classes) est lue ici plutot
+     * que le MANIFEST : ce dernier n'est pas expose de la meme facon selon le
+     * serveur, et un chargeur de classes peut renvoyer celui d'une
+     * bibliotheque embarquee — donc une date sans aucun rapport.</p>
+     */
+    private String compileLe() {
+        try (java.io.InputStream in = AboutResource.class.getResourceAsStream("/build.properties")) {
+            if (in != null) {
+                java.util.Properties p = new java.util.Properties();
+                p.load(in);
+                String v = p.getProperty("build.time");
+                // Si le filtrage n'a pas eu lieu, la valeur brute reste « ${...} ».
+                if (v != null && !v.trim().isEmpty() && !v.contains("${")) { return v.trim(); }
+            }
+        } catch (Exception ignore) { /* information de confort : jamais bloquante */ }
+        return "inconnu";
+    }
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Map<String, Object> about() {
@@ -34,6 +58,7 @@ public class AboutResource {
         m.put("version", VERSION);
         m.put("developpeur", DEVELOPPEUR);
         m.put("email", EMAIL);
+        m.put("compileLe", compileLe());
         return m;
     }
 }

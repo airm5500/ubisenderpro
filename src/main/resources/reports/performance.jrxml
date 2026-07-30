@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UbiSenderPro — Performance des campagnes (impression PDF).
+
+  GÉNÉRÉ par tools/generer_rapports.py : pour changer les colonnes du modèle
+  standard, modifier le script puis le relancer. Pour une personnalisation
+  locale SANS redéploiement, copier ce fichier dans le répertoire des rapports
+  (paramètre « rapports.repertoire », D:\REPORTS par défaut) et l'éditer :
+  le fichier externe remplace celui-ci.
+
+  Paramètres fournis par l'application : SOCIETE_NOM / SOCIETE_ADRESSE /
+  SOCIETE_TEL / SOCIETE_SITE, LOGO (java.io.InputStream), TITRE, SOUS_TITRE.
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="performance" language="java"
+              pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="802" leftMargin="20" rightMargin="20" topMargin="16" bottomMargin="16"
+              whenNoDataType="AllSectionsNoDetail" isSummaryNewPage="false">
+
+    <style name="Titre" fontName="SansSerif" fontSize="15" isBold="true" forecolor="#1A3E63"/>
+    <style name="Societe" fontName="SansSerif" fontSize="13" isBold="true" forecolor="#1976D2"/>
+    <style name="Discret" fontName="SansSerif" fontSize="7" forecolor="#666666"/>
+    <style name="Entete" fontName="SansSerif" fontSize="7" isBold="true" forecolor="#FFFFFF"/>
+    <style name="Cellule" fontName="SansSerif" fontSize="7" forecolor="#222222"/>
+    <style name="Zebra" mode="Transparent">
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 == 0]]></conditionExpression>
+            <style mode="Opaque" backcolor="#EFF4F9"/>
+        </conditionalStyle>
+    </style>
+
+    <parameter name="SOCIETE_NOM" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_ADRESSE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_TEL" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="SOCIETE_SITE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+    <parameter name="LOGO" class="java.io.InputStream" isForPrompting="false"/>
+    <parameter name="TITRE" class="java.lang.String"><defaultValueExpression><![CDATA["Performance des campagnes"]]></defaultValueExpression></parameter>
+    <parameter name="SOUS_TITRE" class="java.lang.String"><defaultValueExpression><![CDATA[""]]></defaultValueExpression></parameter>
+
+    <field name="nom" class="java.lang.String"/>
+    <field name="categorie" class="java.lang.String"/>
+    <field name="canal" class="java.lang.String"/>
+    <field name="nbDestinataires" class="java.lang.String"/>
+    <field name="nbEnvoyes" class="java.lang.String"/>
+    <field name="nbDistribues" class="java.lang.String"/>
+    <field name="nbLus" class="java.lang.String"/>
+    <field name="nbRepondus" class="java.lang.String"/>
+    <field name="nbEchoues" class="java.lang.String"/>
+    <field name="tauxDistribution" class="java.lang.String"/>
+    <field name="tauxLecture" class="java.lang.String"/>
+    <field name="tauxReponse" class="java.lang.String"/>
+
+    <title>
+        <band height="66" splitType="Stretch">
+            <image scaleImage="RetainShape" hAlign="Left" vAlign="Middle" onErrorType="Blank">
+                <reportElement x="0" y="2" width="100" height="42">
+                    <printWhenExpression><![CDATA[$P{LOGO} != null]]></printWhenExpression>
+                </reportElement>
+                <imageExpression><![CDATA[$P{LOGO}]]></imageExpression>
+            </image>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Societe" x="110" y="4" width="380" height="18"/>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_NOM}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="22" width="380" height="11"/>
+                <textFieldExpression><![CDATA[$P{SOCIETE_ADRESSE}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="110" y="33" width="380" height="11"/>
+                <textFieldExpression><![CDATA[($P{SOCIETE_TEL}.isEmpty() ? "" : "Tél. " + $P{SOCIETE_TEL})
+                    + (($P{SOCIETE_TEL}.isEmpty() || $P{SOCIETE_SITE}.isEmpty()) ? "" : "   ·   ")
+                    + $P{SOCIETE_SITE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Titre" x="490" y="4" width="312" height="20"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$P{TITRE}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Discret" x="490" y="24" width="312" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA[$P{SOUS_TITRE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="490" y="35" width="312" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Édité le " + new java.text.SimpleDateFormat("dd/MM/yyyy 'à' HH:mm").format(new java.util.Date())]]></textFieldExpression>
+            </textField>
+            <line>
+                <reportElement x="0" y="52" width="802" height="1" forecolor="#1976D2"/>
+                <graphicElement><pen lineWidth="1.6"/></graphicElement>
+            </line>
+        </band>
+    </title>
+
+    <columnHeader>
+        <band height="18">
+            <frame>
+                <reportElement mode="Opaque" x="0" y="0" width="802" height="18" backcolor="#1F4E79"/>
+                <staticText>
+                    <reportElement style="Entete" x="3" y="0" width="165" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Campagne]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="175" y="0" width="65" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Source]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="247" y="0" width="41" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Left"/><text><![CDATA[Canal]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="295" y="0" width="48" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Ciblés]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="350" y="0" width="48" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Envoyés]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="405" y="0" width="53" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Distribués]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="465" y="0" width="38" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Lus]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="510" y="0" width="48" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Réponses]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="565" y="0" width="48" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[Échoués]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="620" y="0" width="55" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[% Distrib.]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="682" y="0" width="55" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[% Lecture]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Entete" x="744" y="0" width="54" height="18"/>
+                    <textElement verticalAlignment="Middle" textAlignment="Right"/><text><![CDATA[% Réponse]]></text>
+                </staticText>
+            </frame>
+        </band>
+    </columnHeader>
+
+    <detail>
+        <band height="14" splitType="Prevent">
+            <frame>
+                <reportElement style="Zebra" stretchType="RelativeToBandHeight" x="0" y="0" width="802" height="14"/>
+                <box><bottomPen lineWidth="0.4" lineColor="#D5DEE8"/></box>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="3" y="1" width="165" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{nom}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="175" y="1" width="65" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{categorie}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="247" y="1" width="41" height="12"/>
+                    <textElement textAlignment="Left"/>
+                    <textFieldExpression><![CDATA[$F{canal}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="295" y="1" width="48" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbDestinataires}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="350" y="1" width="48" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbEnvoyes}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="405" y="1" width="53" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbDistribues}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="465" y="1" width="38" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbLus}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="510" y="1" width="48" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbRepondus}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="565" y="1" width="48" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{nbEchoues}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="620" y="1" width="55" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{tauxDistribution}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="682" y="1" width="55" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{tauxLecture}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="CutText" isBlankWhenNull="true">
+                    <reportElement style="Cellule" x="744" y="1" width="54" height="12"/>
+                    <textElement textAlignment="Right"/>
+                    <textFieldExpression><![CDATA[$F{tauxReponse}]]></textFieldExpression>
+                </textField>
+            </frame>
+        </band>
+    </detail>
+
+    <pageFooter>
+        <band height="16">
+            <line>
+                <reportElement x="0" y="2" width="802" height="1" forecolor="#C9D4E0"/>
+                <graphicElement><pen lineWidth="0.5"/></graphicElement>
+            </line>
+            <textField>
+                <reportElement style="Discret" x="0" y="4" width="300" height="11"/>
+                <textFieldExpression><![CDATA["UbiSmartCRM Pro" + ($P{SOCIETE_NOM}.isEmpty() ? "" : " — " + $P{SOCIETE_NOM})]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement style="Discret" x="662" y="4" width="100" height="11"/>
+                <textElement textAlignment="Right"/>
+                <textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER} + " /"]]></textFieldExpression>
+            </textField>
+            <textField evaluationTime="Report">
+                <reportElement style="Discret" x="764" y="4" width="38" height="11"/>
+                <textElement textAlignment="Left"/>
+                <textFieldExpression><![CDATA[" " + $V{PAGE_NUMBER}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageFooter>
+
+    <summary>
+        <band height="18">
+            <textField>
+                <reportElement style="Cellule" x="0" y="4" width="400" height="12" forecolor="#1A3E63">
+                    <printWhenExpression><![CDATA[$V{REPORT_COUNT} > 0]]></printWhenExpression>
+                </reportElement>
+                <textElement><font isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Total : " + $V{REPORT_COUNT} + " ligne(s)"]]></textFieldExpression>
+            </textField>
+            <staticText>
+                <reportElement style="Cellule" x="0" y="4" width="400" height="12">
+                    <printWhenExpression><![CDATA[$V{REPORT_COUNT} == 0]]></printWhenExpression>
+                </reportElement>
+                <text><![CDATA[Aucune ligne à imprimer.]]></text>
+            </staticText>
+        </band>
+    </summary>
+</jasperReport>

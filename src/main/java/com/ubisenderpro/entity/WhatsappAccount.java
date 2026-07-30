@@ -1,5 +1,7 @@
 package com.ubisenderpro.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import javax.persistence.*;
 import java.time.LocalDateTime;
 
@@ -23,6 +25,9 @@ public class WhatsappAccount {
     @Column(name = "numero_affiche", length = 30)
     private String numeroAffiche;
 
+    /** Jeton d'accès Meta : accepté en entrée mais jamais renvoyé dans le JSON
+     *  (il donne le contrôle total du numéro WhatsApp Business). */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "access_token", columnDefinition = "TEXT")
     private String accessToken;
 

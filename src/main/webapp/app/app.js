@@ -181,6 +181,110 @@ Usp.ajax = function (options) {
     Ext.Ajax.request(options);
 };
 
+/* ---------- Progression d'un envoi unitaire (1 message) ----------
+ * Un message unique n'a pas de progression intermédiaire (c'est tout ou rien) :
+ * on affiche donc un bandeau DISCRET et NON bloquant (pas de fenêtre modale,
+ * qui casserait la saisie en discussion) avec « 0 / 1 » pendant l'envoi puis
+ * « 1 / 1 · 100 % » au succès.
+ *   Usage : var p = Usp.progressionUnitaire('Relance'); ... p.succes() | p.echec()
+ */
+Usp.progressionUnitaire = function (libelle) {
+    var el = Ext.DomHelper.append(Ext.getBody(), {
+        tag: 'div',
+        style: 'position:fixed;z-index:99999;right:18px;bottom:18px;min-width:240px;background:#05253d;' +
+            'color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);' +
+            'font-family:sans-serif;font-size:12px;opacity:0;transition:opacity .2s ease'
+    }, true);
+    var peindre = function (pct, texte, couleur) {
+        el.dom.innerHTML =
+            '<div style="margin-bottom:6px">' + Ext.String.htmlEncode(libelle || 'Envoi') + ' — ' + texte + '</div>' +
+            '<div style="height:6px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden">' +
+            '<div style="height:6px;width:' + pct + '%;background:' + (couleur || '#12a99e') +
+            ';transition:width .3s ease"></div></div>';
+    };
+    peindre(8, 'envoi en cours… 0 / 1');
+    el.dom.offsetWidth;
+    el.setStyle({ opacity: 1 });
+    var fermer = function (delai) {
+        Ext.defer(function () {
+            el.setStyle({ opacity: 0 });
+            Ext.defer(function () { el.remove(); }, 250);
+        }, delai);
+    };
+    return {
+        succes: function () { peindre(100, '<b>100 %</b> — 1 / 1 ✅', '#2ecc9a'); fermer(1400); },
+        echec: function () { peindre(100, 'échec ❌ — 0 / 1', '#e57373'); fermer(1800); }
+    };
+};
+
+/* ---------- Progression d'un envoi de masse (barre % + k/n) ----------
+ * Les envois sont asynchrones (schedulers) : on sonde régulièrement l'état et
+ * on affiche l'avancement en direct jusqu'à la fin. Réutilisable (campagnes,
+ * envoi en masse WhatsApp Web, recouvrement…).
+ *   cfg.titre    : titre de la fenêtre
+ *   cfg.url      : endpoint GET à sonder (renvoie l'état de l'envoi)
+ *   cfg.lire(d)  : -> { total, envoyes, echoues, statut }  (mapping selon l'API)
+ *   cfg.onFin(d) : optionnel, à la fin de l'envoi (ex. recharger une grille)
+ *   cfg.onClose(): optionnel, à la fermeture de la fenêtre
+ */
+Usp.progressionEnvoi = function (cfg) {
+    var TERMINAUX = ['TERMINEE', 'TERMINE', 'ANNULEE', 'ECHOUEE'];
+    var fini = false, timer = null;
+    var win = Ext.create('Ext.window.Window', {
+        title: cfg.titre || 'Envoi en cours', width: 460, modal: true, closable: false,
+        bodyPadding: 18, layout: 'anchor',
+        items: [
+            { xtype: 'progressbar', itemId: 'bar', height: 26, anchor: '100%', value: 0, text: 'Préparation…' },
+            { xtype: 'component', itemId: 'detail', anchor: '100%',
+              style: 'margin-top:12px;text-align:center;color:#555;font-size:12px' }
+        ],
+        buttons: ['->',
+            { text: 'Continuer en arrière-plan', itemId: 'btn', handler: function () { win.close(); } }],
+        listeners: { close: function () {
+            fini = true; if (timer) { clearTimeout(timer); }
+            if (cfg.onClose) { try { cfg.onClose(); } catch (e) {} }
+        } }
+    });
+    win.show();
+    var bar = win.down('#bar'), detail = win.down('#detail'), btn = win.down('#btn');
+
+    var rendu = function (data) {
+        if (fini) { return; }
+        var e = cfg.lire ? (cfg.lire(data) || {}) : data;
+        var total = e.total || 0;
+        var faits = (e.envoyes || 0) + (e.echoues || 0);
+        var statut = e.statut || '';
+        var ratio = total > 0 ? Math.min(1, faits / total) : 0;
+        var pct = Math.round(ratio * 100);
+        bar.updateProgress(ratio, pct + ' %   —   ' + faits + ' / ' + total);
+        var d = '✅ ' + (e.envoyes || 0) + ' envoyé(s)' + (e.echoues ? '   ·   ❌ ' + e.echoues + ' échec(s)' : '');
+        var termine = TERMINAUX.indexOf(statut) !== -1 || (total > 0 && faits >= total);
+        var suspendu = statut === 'SUSPENDUE';
+        if (termine || suspendu) {
+            fini = true; if (timer) { clearTimeout(timer); }
+            bar.updateProgress(termine ? 1 : ratio, (termine ? 100 : pct) + ' %   —   ' + faits + ' / ' + total);
+            detail.update((suspendu ? '⏸ Envoi suspendu — ' : '🏁 Terminé — ') + d);
+            btn.setText('Fermer');
+            if (termine && cfg.onFin) { try { cfg.onFin(data); } catch (ex) {} }
+        } else {
+            detail.update(d + (statut ? '   ·   ' + statut : ''));
+        }
+    };
+
+    var poll = function () {
+        if (fini) { return; }
+        Usp.ajax({ url: cfg.url, method: 'GET',
+            success: function (resp) {
+                var data = {}; try { data = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                rendu(data);
+                if (!fini) { timer = setTimeout(poll, 1500); }
+            },
+            failure: function () { if (!fini) { timer = setTimeout(poll, 3000); } } });
+    };
+    poll();
+    return win;
+};
+
 /* ---------- Session persistante (localStorage) + expiration par inactivité ----------
  * Le jeton est conservé dans localStorage : il survit au rafraîchissement (F5) et est
  * partagé entre onglets dupliqués. Une horloge d'inactivité déconnecte après
@@ -350,16 +454,36 @@ Usp.expirerSession = function () {
 /* ---------- Export CSV / PDF (réutilisable, sans dépendance) ---------- */
 Usp.export = {};
 
-/* Colonnes exportables d'une grille (avec dataIndex et libellé, hors colonnes d'action). */
+/* Colonnes exportables d'une grille.
+ *
+ * Une grille peut imposer ses colonnes d'export via « exportColonnes » :
+ *   [{ d: 'segmentationId', t: 'Segmentation', f: function (v, rec) { … } }]
+ * C'est indispensable dès que l'affichage diffère de la donnée brute (un
+ * identifiant de segmentation n'a aucun sens dans un fichier remis à un tiers)
+ * ou qu'on veut exporter une donnée absente de la grille.
+ *
+ * À défaut, on déduit les colonnes de la grille, en écartant :
+ *   - la colonne « Actions », qui exportait jusqu'ici l'identifiant technique
+ *     sous un intitulé trompeur ;
+ *   - toute colonne portant exportable:false.
+ */
 Usp.export.colonnes = function (grid) {
+    if (grid.exportColonnes) {
+        return Ext.isFunction(grid.exportColonnes) ? grid.exportColonnes() : grid.exportColonnes;
+    }
     return grid.columns.filter(function (c) {
-        return c.dataIndex && c.text && !c.hidden;
+        if (!c.dataIndex || !c.text || c.hidden || c.exportable === false) { return false; }
+        return Ext.String.trim(Ext.util.Format.stripTags(String(c.text))).toLowerCase() !== 'actions';
     }).map(function (c) {
         return { d: c.dataIndex, t: Ext.String.trim(Ext.util.Format.stripTags(String(c.text))) || c.dataIndex };
     });
 };
 
-Usp.export.valeur = function (rec, d) {
+Usp.export.valeur = function (rec, d, formateur) {
+    if (formateur) {
+        var brut = formateur(rec.get(d), rec);
+        return brut === null || brut === undefined ? '' : String(brut);
+    }
     var v = rec.get(d);
     if (v === null || v === undefined) { return ''; }
     if (v === true) { return 'Oui'; }
@@ -376,7 +500,7 @@ Usp.export.valeur = function (rec, d) {
 
 Usp.export.lignes = function (cols, records) {
     return records.map(function (r) {
-        return cols.map(function (c) { return Usp.export.valeur(r, c.d); });
+        return cols.map(function (c) { return Usp.export.valeur(r, c.d, c.f); });
     });
 };
 
@@ -392,18 +516,84 @@ Usp.export.csv = function (titre, cols, records) {
     URL.revokeObjectURL(a.href);
 };
 
-/* "PDF" via la boîte d'impression du navigateur (Enregistrer au format PDF). */
+/* Coordonnées de la société pour l'en-tête des impressions.
+ * Chargées à la demande puis mises en cache : inutile d'alourdir le démarrage
+ * de l'application pour une information qui ne sert qu'à l'impression. */
+Usp.societeInfos = function (cb) {
+    if (Usp._societeInfos) { cb(Usp._societeInfos); return; }
+    var cles = { nom: 'app.societe', tel: 'app.societe_tel', adresse: 'app.adresse',
+                 site: 'app.site', logo: 'app.logo' };
+    var infos = {}, reste = 0;
+    Ext.Object.each(cles, function () { reste++; });
+    var fini = function () {
+        if (--reste > 0) { return; }
+        Usp._societeInfos = infos;
+        cb(infos);
+    };
+    Ext.Object.each(cles, function (champ, cle) {
+        Usp.ajax({ url: '/parametres/' + cle, method: 'GET',
+            success: function (r) {
+                try { infos[champ] = (Ext.decode(r.responseText) || {}).valeur || ''; } catch (e) { infos[champ] = ''; }
+                fini();
+            },
+            // Un paramètre absent ne doit pas empêcher l'impression.
+            failure: function () { infos[champ] = ''; fini(); } });
+    });
+};
+
+/* En-tête HTML de l'impression : logo + coordonnées de la société. */
+Usp.export.enTeteSociete = function (s) {
+    if (!s || (!s.nom && !s.logo && !s.tel && !s.adresse && !s.site)) { return ''; }
+    var e = Ext.String.htmlEncode;
+    var lignes = [];
+    if (s.adresse) { lignes.push(e(s.adresse)); }
+    if (s.tel) { lignes.push('Tél. ' + e(s.tel)); }
+    if (s.site) { lignes.push(e(s.site)); }
+    var logo = s.logo ? '<img src="' + e(s.logo) + '" class="lg" alt="">' : '';
+    return '<div class="ent">' + logo +
+        '<div class="soc"><div class="nom">' + e(s.nom || '') + '</div>' +
+        (lignes.length ? '<div class="coord">' + lignes.join(' &nbsp;·&nbsp; ') + '</div>' : '') +
+        '</div></div>';
+};
+
+/* "PDF" via la boîte d'impression du navigateur (Enregistrer au format PDF).
+ *
+ * L'impression porte l'en-tête de la société (logo + coordonnées) : le document
+ * est destiné à circuler hors de l'application. La police et les marges
+ * s'adaptent au nombre de colonnes, et le format passe en paysage au-delà de
+ * 7 colonnes : une liste de comptes clients dépasse sinon la largeur de la page
+ * et les dernières colonnes sont tronquées à l'impression. */
 Usp.export.pdf = function (titre, cols, records) {
+    Usp.societeInfos(function (s) { Usp.export.imprimer(titre, cols, records, s); });
+};
+
+Usp.export.imprimer = function (titre, cols, records, societe) {
     var th = cols.map(function (c) { return '<th>' + Ext.String.htmlEncode(c.t) + '</th>'; }).join('');
     var trs = Usp.export.lignes(cols, records).map(function (row) {
         return '<tr>' + row.map(function (v) { return '<td>' + Ext.String.htmlEncode(v) + '</td>'; }).join('') + '</tr>';
     }).join('');
+    var n = cols.length;
+    var paysage = n > 7;
+    var police = n > 12 ? 7 : (n > 9 ? 8 : (n > 6 ? 9 : 10));
     var html = '<html><head><meta charset="utf-8"><title>' + Ext.String.htmlEncode(titre) + '</title>' +
-        '<style>body{font-family:Arial,sans-serif;font-size:12px;margin:18px}h2{color:#1976d2;margin:0 0 4px}' +
-        'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}' +
-        'th{background:#1976d2;color:#fff}tr:nth-child(even){background:#f4f6f8}</style></head><body>' +
+        '<style>@page{size:A4 ' + (paysage ? 'landscape' : 'portrait') + ';margin:10mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:' + police + 'px;margin:0;color:#222}' +
+        '.ent{display:flex;align-items:center;border-bottom:2px solid #1976d2;padding-bottom:6px;margin-bottom:8px}' +
+        '.lg{max-height:46px;max-width:150px;margin-right:12px}' +
+        '.soc .nom{font-size:' + (police + 5) + 'px;font-weight:bold;color:#1976d2}' +
+        '.soc .coord{font-size:' + (police + 1) + 'px;color:#555}' +
+        'h2{font-size:' + (police + 4) + 'px;margin:0 0 2px}' +
+        '.meta{color:#666;font-size:' + police + 'px;margin-bottom:6px}' +
+        'table{border-collapse:collapse;width:100%;table-layout:fixed}' +
+        'th,td{border:1px solid #bbb;padding:2px 4px;text-align:left;' +
+        'word-wrap:break-word;overflow-wrap:break-word}' +
+        'th{background:#1976d2;color:#fff;font-weight:bold}' +
+        'tbody tr:nth-child(even){background:#f4f6f8}' +
+        'thead{display:table-header-group}tr{page-break-inside:avoid}' +
+        '</style></head><body>' +
+        Usp.export.enTeteSociete(societe) +
         '<h2>' + Ext.String.htmlEncode(titre) + '</h2>' +
-        '<div style="color:#666;margin-bottom:8px">' + records.length + ' ligne(s) — ' + new Date().toLocaleString() + '</div>' +
+        '<div class="meta">' + records.length + ' ligne(s) — édité le ' + new Date().toLocaleString() + '</div>' +
         '<table><thead><tr>' + th + '</tr></thead><tbody>' + trs + '</tbody></table>' +
         '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>';
     var w = window.open('', '_blank');
@@ -429,22 +619,127 @@ Usp.export.recuperer = function (grid, cb) {
     });
 };
 
-/* Bouton unique « Exporter » (menu déroulant : CSV ou PDF) pour la tbar d'une grille. */
+/* Édition PDF générée par le serveur (modèle JasperReports .jrxml).
+ * nomRapport : nom du modèle (ex. 'clients') ; params : filtres transmis tels
+ * quels — le document imprime ce que la grille affiche. La fenêtre est ouverte
+ * PENDANT le clic (sinon le navigateur la bloque comme pop-up), puis reçoit le
+ * PDF quand il arrive. */
+Usp.rapportPdf = function (nomRapport, params) {
+    var qs = [];
+    Ext.Object.each(params || {}, function (k, v) {
+        if (v !== null && v !== undefined && v !== '') { qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); }
+    });
+    Usp._rapportRequete('GET', '/rapports/' + nomRapport + (qs.length ? '?' + qs.join('&') : ''), null);
+};
+
+/* Variante générique : l'écran envoie lui-même les lignes (telles qu'exportées
+ * en CSV) au modèle .jrxml du même nom — voir POST /rapports/liste/{nom}. */
+Usp.rapportPdfPost = function (nomRapport, titre, lignes) {
+    Usp._rapportRequete('POST', '/rapports/liste/' + nomRapport,
+        JSON.stringify({ titre: titre || '', lignes: lignes || [] }));
+};
+
+/* Export Excel (.xlsx) : construit par le serveur (et archivé) puis téléchargé.
+ * cols = [{ d, t }] ; lignes = valeurs déjà mises en forme, indexées par d. */
+Usp.rapportExcel = function (titre, cols, lignes) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', Usp.apiBase + '/rapports/excel', true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.responseType = 'blob';
+    xhr.onload = function () {
+        if (xhr.status !== 200) {
+            var lire = new FileReader();
+            lire.onload = function () {
+                var msg = 'Export Excel impossible.';
+                try { msg = (JSON.parse(lire.result) || {}).erreur || msg; } catch (e) {}
+                Ext.Msg.alert('Erreur', msg);
+            };
+            try { lire.readAsText(xhr.response); } catch (e) { Ext.Msg.alert('Erreur', 'Export Excel impossible.'); }
+            return;
+        }
+        // Nom transmis par le serveur (identique à la copie archivée).
+        var nom = 'export.xlsx';
+        var cd = xhr.getResponseHeader('Content-Disposition') || '';
+        var m = cd.match(/filename="?([^";]+)"?/);
+        if (m) { nom = m[1]; }
+        var a = document.createElement('a');
+        a.href = window.URL.createObjectURL(xhr.response);
+        a.download = nom;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        window.URL.revokeObjectURL(a.href);
+    };
+    xhr.onerror = function () { Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };
+    xhr.send(JSON.stringify({
+        titre: titre || '',
+        colonnes: (cols || []).map(function (c) { return { d: c.d, t: c.t }; }),
+        lignes: lignes || []
+    }));
+};
+
+Usp._rapportRequete = function (methode, chemin, corps) {
+    var w = window.open('', '_blank');
+    if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
+    try { w.document.write('<title>Génération du PDF…</title><p style="font-family:sans-serif;color:#666">Génération du PDF…</p>'); } catch (e) {}
+    var xhr = new XMLHttpRequest();
+    xhr.open(methode, Usp.apiBase + chemin, true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
+    if (corps) { xhr.setRequestHeader('Content-Type', 'application/json'); }
+    xhr.responseType = 'blob';
+    xhr.onload = function () {
+        if (xhr.status === 200) {
+            w.location = window.URL.createObjectURL(xhr.response);
+        } else {
+            w.close();
+            var lire = new FileReader();
+            lire.onload = function () {
+                var msg = 'Génération du PDF impossible.';
+                try { msg = (JSON.parse(lire.result) || {}).erreur || msg; } catch (e) {}
+                Ext.Msg.alert('Erreur', msg);
+            };
+            try { lire.readAsText(xhr.response); } catch (e) { Ext.Msg.alert('Erreur', 'Génération du PDF impossible.'); }
+        }
+    };
+    xhr.onerror = function () { w.close(); Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };
+    xhr.send(corps || null);
+};
+
+/* Bouton unique « Exporter » (menu déroulant : Excel ou PDF) pour la tbar d'une grille.
+ * PDF :
+ *  - « rapportPdf » ({ nom, params() }) : édition .jrxml remplie PAR LE SERVEUR
+ *    (il recharge les données avec les filtres) — cas des comptes clients ;
+ *  - « rapportNom » : édition .jrxml du même nom, remplie avec les lignes de la
+ *    grille (mêmes valeurs que l'export CSV) ;
+ *  - sinon : impression navigateur (repli). */
 Usp.export.boutons = function (titre) {
     var btn;
     var faire = function (format) {
         var grid = btn ? btn.up('grid') : null;
         if (!grid) { return; }
+        if (format === 'pdf' && grid.rapportPdf) {
+            Usp.rapportPdf(grid.rapportPdf.nom,
+                grid.rapportPdf.params ? grid.rapportPdf.params() : null);
+            return;
+        }
         Usp.export.recuperer(grid, function (recs) {
             var cols = Usp.export.colonnes(grid);
-            if (format === 'csv') { Usp.export.csv(titre, cols, recs); } else { Usp.export.pdf(titre, cols, recs); }
+            var lignes = recs.map(function (r) {
+                var l = {};
+                cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d, c.f); });
+                return l;
+            });
+            // Excel : classeur .xlsx construit et ARCHIVÉ par le serveur
+            // (répertoire d'archivage, sous-dossier excel).
+            if (format === 'xlsx') { Usp.rapportExcel(titre, cols, lignes); return; }
+            if (grid.rapportNom) { Usp.rapportPdfPost(grid.rapportNom, titre, lignes); return; }
+            Usp.export.pdf(titre, cols, recs);
         });
     };
     return [{
-        text: '⬇️ Exporter', tooltip: 'Exporter « ' + titre + ' » (CSV ou PDF)',
+        text: '⬇️ Exporter', tooltip: 'Exporter « ' + titre + ' » (Excel ou PDF)',
         listeners: { afterrender: function (b) { btn = b; } },
         menu: [
-            { text: '📊 CSV (Excel)', handler: function () { faire('csv'); } },
+            { text: '📊 Excel (.xlsx)', handler: function () { faire('xlsx'); } },
             { text: '🖨️ PDF', handler: function () { faire('pdf'); } }
         ]
     }];
@@ -623,6 +918,9 @@ Usp.clientsPanel = function () {
             Usp.segmentationsGrid(),
             // Gestion des listes de diffusion (création + membres).
             Usp.listesGrid(),
+            // Mise à jour sélective : déplacer d'un coup des comptes cochés
+            // vers une segmentation / agence / région / tournée.
+            Usp.majSelectivePanel(),
             // Onglet déplacé depuis « WhatsApp Web » (#4) : la vérification de
             // numéros vit désormais à côté de la liste des comptes clients.
             Usp.waweb.filterPanel()
@@ -660,6 +958,12 @@ Usp.clientsGrid = function (actif) {
     var comboRegion = { xtype: 'combobox', itemId: 'fRegion', emptyText: 'Région', width: 130,
         queryMode: 'local', editable: false, valueField: 'libelle', displayField: 'libelle',
         store: refFilterStore('REGION'), listeners: autoFiltre };
+    // Tournée : pas de référentiel dédié, la valeur est saisie sur la fiche
+    // client — le filtre est donc alimenté par les valeurs réellement utilisées.
+    var tourneeStore = Ext.create('Ext.data.Store', { fields: ['v'] });
+    var comboTournee = { xtype: 'combobox', itemId: 'fTournee', emptyText: 'Tournée', width: 130,
+        queryMode: 'local', editable: false, valueField: 'v', displayField: 'v',
+        store: tourneeStore, listeners: autoFiltre };
 
     var appliquer = function (tb) {
         var p = { actif: actif };
@@ -667,10 +971,12 @@ Usp.clientsGrid = function (actif) {
         var seg = tb.down('#fSeg').getValue();
         var ag = tb.down('#fAgence').getValue();
         var reg = tb.down('#fRegion').getValue();
+        var tr = tb.down('#fTournee').getValue();
         if (q) { p.q = q; }
         if (seg) { p.segmentationId = seg; }
         if (ag) { p.agence = ag; }
         if (reg) { p.region = reg; }
+        if (tr) { p.tournee = tr; }
         store.getProxy().extraParams = p;
         store.loadPage(1);
     };
@@ -706,25 +1012,55 @@ Usp.clientsGrid = function (actif) {
               // Recherche pendant la saisie (anti-rebond) + Entrée conservée.
               change: { buffer: 400, fn: function (f) { appliquer(f.up('toolbar')); } },
               specialkey: function (f, e) { if (e.getKey() === e.ENTER) { appliquer(f.up('toolbar')); } } } },
-        comboSeg, comboAgence, comboRegion,
+        comboSeg, comboAgence, comboRegion, comboTournee,
         { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
             var tb = b.up('toolbar');
             tb.down('#fQ').setValue(''); tb.down('#fSeg').setValue(null);
             tb.down('#fAgence').setValue(null); tb.down('#fRegion').setValue(null);
+            tb.down('#fTournee').setValue(null);
             store.getProxy().extraParams = { actif: actif }; store.loadPage(1);
         } });
 
-    // Info-bulle (survol) sur code / nom / entreprise : segmentation + e-mail.
+    // Info-bulle (survol) sur code / nom / entreprise : segmentation, e-mail et
+    // tournée. La tournée est mise en évidence (bleu, gras) : c'est l'information
+    // que le commercial cherche en premier sans ouvrir la fiche.
     var tip = function (v, meta, rec) {
+        var e = Ext.String.htmlEncode;
         var seg = segLib(rec.get('segmentationId')) || '—';
         var email = rec.get('emailPrincipal') || '—';
-        meta.tdAttr = 'data-qtip="' + Ext.String.htmlEncode('Segmentation : ' + seg + ' &#10; E-mail : ' + email) + '"';
-        return Ext.String.htmlEncode(v || '');
+        var tournee = rec.get('tournee') || '—';
+        var html = 'Segmentation : ' + e(seg) + '<br>E-mail : ' + e(email)
+            + '<br>Tournée : <b style=\'color:#1976d2\'>' + e(tournee) + '</b>';
+        // Le qtip accepte du HTML : on encode l'attribut, pas le contenu.
+        meta.tdAttr = 'data-qtip="' + html.replace(/"/g, '&quot;') + '"';
+        return e(v || '');
     };
+    // Colonnes de l'export CSV / PDF. Elles diffèrent volontairement de la grille :
+    //  - « Segmentation » exporte le LIBELLÉ (la grille porte l'identifiant, qui
+    //    n'a aucun sens dans un fichier remis à un tiers) ;
+    //  - « E-mail » et « Tournée » sont exportés bien qu'absents de la grille ;
+    //  - « Actions » et « Statut » sont exclus : l'un est un artefact d'écran,
+    //    l'autre est déjà porté par l'onglet (actifs / désactivés).
+    var exportColonnes = [
+        { d: 'numeroClient', t: 'Code client' },
+        { d: 'nomCompte', t: 'Nom client' },
+        { d: 'entreprise', t: 'Entreprise' },
+        { d: 'telephonePrincipal', t: 'Téléphone' },
+        { d: 'emailPrincipal', t: 'E-mail' },
+        { d: 'segmentationId', t: 'Segmentation', f: function (v) { return segLib(v); } },
+        { d: 'agence', t: 'Agence' },
+        { d: 'region', t: 'Région' },
+        { d: 'tournee', t: 'Tournée' }
+    ];
+
     return {
         xtype: 'grid',
         title: actif ? '👥 Liste des Clients' : '🚫 Clients désactivés',
         store: store,
+        exportColonnes: exportColonnes,
+        // PDF : édition JasperReports côté serveur (modèle reports/clients.jrxml),
+        // avec les filtres courants de la grille. Le CSV reste produit ici.
+        rapportPdf: { nom: 'clients', params: function () { return store.getProxy().extraParams; } },
         columns: [
             { text: 'Code client', dataIndex: 'numeroClient', width: 100, renderer: tip },
             { text: 'Nom client', dataIndex: 'nomCompte', flex: 1, renderer: tip },
@@ -734,6 +1070,7 @@ Usp.clientsGrid = function (actif) {
               renderer: function (v) { return Usp.segmentationBadge(segLib(v)); } },
             { text: 'Agence', dataIndex: 'agence', width: 120 },
             { text: 'Région', dataIndex: 'region', width: 140 },
+            { text: 'Tournée', dataIndex: 'tournee', width: 120 },
             { text: 'Statut', dataIndex: 'statut', width: 90,
               renderer: function (v) {
                   return '<span style="color:' + (actif ? '#2e7d32' : '#c62828') + ';font-weight:bold">'
@@ -744,7 +1081,15 @@ Usp.clientsGrid = function (actif) {
         tbar: tbar.concat(Usp.export.boutons(actif ? 'Comptes clients' : 'Clients désactivés')),
         bbar: { xtype: 'pagingtoolbar', store: store, displayInfo: true },
         listeners: {
-            // Filtres Agence/Région désormais alimentés par les référentiels (autoLoad).
+            // Filtres Agence/Région alimentés par les référentiels (autoLoad) ;
+            // les tournées viennent des facettes, chargées à l'affichage.
+            afterrender: function () {
+                Usp.ajax({ url: '/clients/facettes', method: 'GET', success: function (resp) {
+                    var d = {};
+                    try { d = Ext.decode(resp.responseText) || {}; } catch (e) { d = {}; }
+                    tourneeStore.loadData((d.tournees || []).map(function (v) { return { v: v }; }));
+                } });
+            },
             itemdblclick: function (g, rec) { if (actif) { Usp.clientForm(store, rec); } },
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.cli-detail')) { Usp.clientDetail(rec.get('id'), segLib); return; }
@@ -754,6 +1099,211 @@ Usp.clientsGrid = function (actif) {
                 if (e.getTarget('.cli-on')) { Usp.clientActif(rec, true); return; }
             }
         }
+    };
+};
+
+/* ---------- Mise à jour sélective des comptes clients ---------- */
+/* On coche des comptes (certains, tous...), on choisit le ou les champs à
+ * changer (segmentation, agence, région, tournée) et on applique en une fois.
+ * Seuls les champs cochés sont modifiés : le reste de la fiche est intact. */
+Usp.majSelectivePanel = function () {
+    // Toutes les lignes d'un coup (pas de pagination) : une sélection cochée
+    // ne doit pas se perdre en changeant de page.
+    var store = Ext.create('Ext.data.Store', {
+        fields: ['id', 'numeroClient', 'nomCompte', 'entreprise', 'agence', 'region', 'tournee',
+                 'segmentationId'],
+        proxy: { type: 'ajax', url: Usp.apiBase + '/clients',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') },
+            reader: { type: 'json', root: 'data', totalProperty: 'total' },
+            extraParams: { actif: true, start: 0, limit: 100000 } },
+        autoLoad: true
+    });
+    var segStore = Ext.create('Ext.data.Store', { fields: ['id', 'libelle'], autoLoad: true,
+        proxy: { type: 'ajax', url: Usp.apiBase + '/segmentations',
+            headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    var segLib = function (id) {
+        if (id === null || id === undefined || id === '') { return ''; }
+        var i = segStore.findExact('id', id); return i >= 0 ? segStore.getAt(i).get('libelle') : '';
+    };
+    var refStore = function (type) {
+        return Ext.create('Ext.data.Store', { fields: ['id', 'code', 'libelle'], autoLoad: true,
+            proxy: { type: 'ajax', url: Usp.apiBase + '/referentiels/' + type,
+                headers: { 'Authorization': 'Bearer ' + (Usp.token || '') }, reader: { type: 'json' } } });
+    };
+    var tourneeStore = Ext.create('Ext.data.Store', { fields: ['v'] });
+    var chargerTournees = function () {
+        Usp.ajax({ url: '/clients/facettes', method: 'GET', success: function (resp) {
+            var d = {}; try { d = Ext.decode(resp.responseText) || {}; } catch (e) {}
+            tourneeStore.loadData((d.tournees || []).map(function (v) { return { v: v }; }));
+        } });
+    };
+
+    var sm = Ext.create('Ext.selection.CheckboxModel', { checkOnly: true });
+    var etat = { q: '', seg: '', agence: '', region: '', tournee: '' };
+    var charger = function () {
+        store.getProxy().extraParams = { actif: true, start: 0, limit: 100000,
+            q: etat.q, segmentationId: etat.seg, agence: etat.agence,
+            region: etat.region, tournee: etat.tournee };
+        store.load();
+    };
+
+    var appliquer = function (panel) {
+        if (!Usp.can('clients', 'MODIFIER')) { Usp.refusPermission(); return; }
+        var recs = sm.getSelection();
+        if (!recs.length) { Ext.Msg.alert('Info', 'Cochez au moins un compte client.'); return; }
+        var champs = {}, libelles = [];
+        var lire = function (caseId, comboId, cle, libelle, valeurLisible) {
+            if (!panel.down('#' + caseId).getValue()) { return; }
+            var v = panel.down('#' + comboId).getValue();
+            champs[cle] = v == null ? '' : v;
+            libelles.push(libelle + ' → « ' + (valeurLisible ? valeurLisible(v) : (v || '(vide)')) + ' »');
+        };
+        lire('msCaseSeg', 'msSeg', 'segmentationId', 'Segmentation',
+            function (v) { return v ? segLib(v) : '(vide)'; });
+        lire('msCaseAgence', 'msAgence', 'agence', 'Agence');
+        lire('msCaseRegion', 'msRegion', 'region', 'Région');
+        lire('msCaseTournee', 'msTournee', 'tournee', 'Tournée');
+        if (!libelles.length) {
+            Ext.Msg.alert('Info', 'Cochez au moins un champ à modifier (segmentation, agence, région ou tournée).');
+            return;
+        }
+        // Ext.Msg.confirm a une largeur par défaut trop étroite : le message
+        // était tronqué. Largeur explicite + hauteur libre.
+        Ext.Msg.show({
+            title: 'Mise à jour sélective', icon: Ext.Msg.QUESTION, buttons: Ext.Msg.YESNO,
+            width: 460, minHeight: 160,
+            msg: 'Appliquer à <b>' + recs.length + '</b> compte(s) :<br>• '
+                + libelles.map(Ext.String.htmlEncode).join('<br>• ')
+                + '<br><br>Les autres champs des fiches ne sont pas modifiés.',
+            fn: function (btn) {
+                if (btn !== 'yes') { return; }
+                Usp.ajax({ url: '/clients/maj-selective', method: 'POST',
+                    jsonData: { ids: recs.map(function (r) { return r.get('id'); }), champs: champs },
+                    success: function (resp) {
+                        var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                        sm.deselectAll();
+                        charger(); chargerTournees();
+                        if (Usp._clientStores) { Usp.reloadClients(); }
+                        Usp.toast((r.modifies || 0) + ' compte(s) mis à jour.');
+                        // Enchaîner sur un autre lot avec les mêmes valeurs est
+                        // fréquent : on demande avant de vider les champs.
+                        Ext.Msg.confirm('Champs de mise à jour',
+                            'Réinitialiser les champs « Nouvelles valeurs » ?',
+                            function (b2) {
+                                if (b2 !== 'yes') { return; }
+                                ['msCaseSeg', 'msCaseAgence', 'msCaseRegion', 'msCaseTournee'].forEach(function (id) {
+                                    var c = panel.down('#' + id);
+                                    if (c) { c.setValue(false); }
+                                });
+                                ['msSeg', 'msAgence', 'msRegion', 'msTournee'].forEach(function (id) {
+                                    var c = panel.down('#' + id);
+                                    if (c) { c.setValue(null); }
+                                });
+                            });
+                    },
+                    failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+            }
+        });
+    };
+
+    // Une case à cocher par champ : elle seule décide si le champ est appliqué.
+    // La valeur vide est permise (ex. retirer la tournée de comptes cochés).
+    var ligneChamp = function (caseId, caseLabel, combo) {
+        return { xtype: 'fieldcontainer', layout: 'hbox', margin: '0 0 8 0', items: [
+            { xtype: 'checkbox', itemId: caseId, boxLabel: caseLabel, width: 110 },
+            combo
+        ] };
+    };
+
+    return {
+        xtype: 'panel', title: '🔁 Mise à jour sélective', layout: 'border',
+        items: [
+            { region: 'center', xtype: 'grid', store: store, selModel: sm,
+              columns: [
+                { text: 'Code', dataIndex: 'numeroClient', width: 90 },
+                { text: 'Nom client', dataIndex: 'nomCompte', flex: 1 },
+                { text: 'Entreprise', dataIndex: 'entreprise', width: 150 },
+                { text: 'Segmentation', dataIndex: 'segmentationId', width: 120,
+                  renderer: function (v) { return Usp.segmentationBadge(segLib(v)); } },
+                { text: 'Agence', dataIndex: 'agence', width: 110 },
+                { text: 'Région', dataIndex: 'region', width: 110 },
+                { text: 'Tournée', dataIndex: 'tournee', width: 110 }
+              ],
+              tbar: [
+                { xtype: 'textfield', itemId: 'msQ', emptyText: '🔎 Rechercher…', width: 160,
+                  listeners: { change: { buffer: 400, fn: function (f, v) { etat.q = v || ''; charger(); } } } },
+                { xtype: 'combobox', emptyText: 'Segmentation', width: 140, store: segStore, valueField: 'id',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFSeg',
+                  listeners: { change: function (f, v) { etat.seg = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Agence', width: 120, store: refStore('AGENCE'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFAgence',
+                  listeners: { change: function (f, v) { etat.agence = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Région', width: 120, store: refStore('REGION'), valueField: 'libelle',
+                  displayField: 'libelle', queryMode: 'local', editable: false, itemId: 'msFRegion',
+                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } },
+                { xtype: 'combobox', emptyText: 'Tournée', width: 120, store: tourneeStore, valueField: 'v',
+                  displayField: 'v', queryMode: 'local', editable: false, itemId: 'msFTournee',
+                  listeners: { change: function (f, v) { etat.tournee = v || ''; charger(); } } },
+                { text: '♻️ Réinitialiser', tooltip: 'Effacer toutes les zones de filtre', handler: function (b) {
+                    var tb = b.up('toolbar');
+                    tb.down('#msQ').setValue(''); tb.down('#msFSeg').setValue(null);
+                    tb.down('#msFAgence').setValue(null); tb.down('#msFRegion').setValue(null);
+                    tb.down('#msFTournee').setValue(null);
+                } }
+              ],
+              bbar: ['->',
+                { text: 'Tout cocher (résultat)', handler: function () { sm.selectAll(); } },
+                { text: 'Tout décocher', handler: function () { sm.deselectAll(); } }
+              ],
+              listeners: { afterrender: function (g) {
+                  chargerTournees();
+                  // Compteur vivant : on sait toujours combien de comptes
+                  // recevront la modification avant de cliquer sur Appliquer.
+                  sm.on('selectionchange', function (s, recs) {
+                      var c = g.up('panel').down('#msCompteur');
+                      if (c) {
+                          c.setValue(recs.length
+                              ? '<b style="color:#1976d2">' + recs.length + ' compte(s) coché(s).</b>'
+                              : '<span style="color:#888">Aucun compte coché.</span>');
+                      }
+                  });
+              } }
+            },
+            // Volet de droite : en bas d'écran, les derniers champs sortaient de
+            // la zone visible (rien après « Agence » sur un petit écran). À
+            // droite, les quatre champs et le bouton restent toujours visibles,
+            // la grille garde la hauteur entière pour cocher les comptes.
+            { region: 'east', xtype: 'form', bodyPadding: 12, width: 340, split: true,
+              autoScroll: true,
+              title: 'Nouvelles valeurs (comptes cochés)',
+              defaults: { anchor: '100%' },
+              items: [
+                { xtype: 'displayfield', hideLabel: true, margin: '0 0 10 0',
+                  value: '<span style="color:#888">Cochez le ou les champs à changer. Un champ non coché '
+                      + 'n\'est pas touché ; un champ coché laissé vide est effacé sur les comptes choisis.</span>' },
+                ligneChamp('msCaseSeg', 'Segmentation', Ext.apply({ itemId: 'msSeg', flex: 1,
+                    xtype: 'combobox', store: segStore, valueField: 'id', displayField: 'libelle',
+                    queryMode: 'local', editable: false, emptyText: 'Choisir…' })),
+                ligneChamp('msCaseAgence', 'Agence', { xtype: 'combobox', itemId: 'msAgence', flex: 1,
+                    store: refStore('AGENCE'), valueField: 'libelle', displayField: 'libelle',
+                    queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
+                ligneChamp('msCaseRegion', 'Région', { xtype: 'combobox', itemId: 'msRegion', flex: 1,
+                    store: refStore('REGION'), valueField: 'libelle', displayField: 'libelle',
+                    queryMode: 'local', forceSelection: false, emptyText: 'Choisir ou saisir…' }),
+                ligneChamp('msCaseTournee', 'Tournée', { xtype: 'combobox', itemId: 'msTournee', flex: 1,
+                    store: tourneeStore, valueField: 'v', displayField: 'v',
+                    queryMode: 'local', forceSelection: false,
+                    emptyText: 'Choisir ou saisir…' }),
+                { xtype: 'displayfield', itemId: 'msCompteur', hideLabel: true, margin: '4 0 0 0',
+                  value: '<span style="color:#888">Aucun compte coché.</span>' },
+                // Bouton DANS le formulaire, sous le compteur : en barre du bas
+                // il chevauchait les info-bulles et pouvait sortir de l'écran.
+                { xtype: 'button', text: '✅ Appliquer aux comptes cochés', scale: 'medium',
+                  margin: '12 0 0 0', anchor: '100%',
+                  handler: function (b) { appliquer(b.up('panel').up('panel')); } }
+              ]
+            }
+        ]
     };
 };
 
@@ -997,8 +1547,27 @@ Usp.listeMembresWindow = function (rec) {
                     store.each(function (r) { if (r.get('id')) { dejaPresents.push(r.get('id')); } });
                     Usp.clientPicker({ title: 'Ajouter des clients à la liste', boutonValider: 'Ajouter à la liste',
                         exclureContactIds: dejaPresents, onValider: ajouterClients }); } },
-                { text: '📥 Importer des clients', tooltip: 'Importer des codes clients (un par ligne / CSV)', handler: function () {
-                    Usp.importerClientsListe(listeId, function () { store.load(); }); } }
+                { text: '📥 Importer des clients', tooltip: 'Importer un fichier de codes clients (.csv / .xlsx) avec choix de la colonne', handler: function () {
+                    Usp.listeImportAssistant(listeId, rec.get('nom'), function () { store.load(); }); } },
+                '->',
+                { text: '🗑️ Vider la liste', tooltip: 'Retirer TOUS les membres (la liste elle-même est conservée)',
+                  handler: function () {
+                    var n = store.getTotalCount ? (store.getTotalCount() || store.getCount()) : store.getCount();
+                    if (!n) { Ext.Msg.alert('Info', 'La liste est déjà vide.'); return; }
+                    Ext.Msg.confirm('Vider la liste',
+                        'Retirer les <b>' + n + '</b> membre(s) de « ' + Ext.String.htmlEncode(rec.get('nom')) +
+                        ' » ?<br>La liste elle-même est conservée ; les comptes clients ne sont pas touchés.',
+                        function (btn) {
+                            if (btn !== 'yes') { return; }
+                            Usp.ajax({ url: '/lists/' + listeId + '/contacts', method: 'DELETE',
+                                success: function (resp) {
+                                    var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                                    store.load();
+                                    Usp.toast((r.retires || 0) + ' membre(s) retiré(s) de la liste.');
+                                },
+                                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+                        });
+                  } }
             ],
             listeners: { cellclick: function (g, td, ci, r, tr, ri, e) {
                 if (e.getTarget('.ldm-del')) {
@@ -1011,34 +1580,124 @@ Usp.listeMembresWindow = function (rec) {
     }).show();
 };
 
-/* Import de clients dans une liste de diffusion (codes clients, un par ligne ou .csv). */
-Usp.importerClientsListe = function (listeId, onDone) {
+/* Assistant d'import de clients dans une liste de diffusion.
+ *
+ * L'ancien écran demandait « un code client par ligne » : avec un fichier réel
+ * (plusieurs colonnes), il fallait d'abord isoler la colonne des codes à la
+ * main. L'assistant lit le fichier (.csv ou .xlsx), montre les colonnes
+ * détectées avec leurs premières valeurs, fait CHOISIR la colonne des codes,
+ * puis vérifie en simulation avant d'appliquer. Le collage direct de codes
+ * reste possible pour les cas simples. */
+Usp.listeImportAssistant = function (listeId, nomListe, onDone) {
+    var fileData = { base64: null, nom: null };
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col'] });
+
+    var detecter = function (win) {
+        if (!fileData.base64) { return; }
+        var etat = win.down('#liEtat');
+        etat.setValue('<span style="color:#888">Analyse du fichier…</span>');
+        Usp.ajax({ url: '/imports/colonnes', method: 'POST',
+            jsonData: { fichierBase64: fileData.base64, nomFichier: fileData.nom,
+                        separateur: win.down('[name=separateur]').getValue() || ';' },
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var cols = r.colonnes || [];
+                colStore.loadData(cols.map(function (c) { return { col: c }; }));
+                var combo = win.down('[name=colonne]');
+                combo.setValue(null);
+                // Pré-sélection : colonne dont l'intitulé évoque un code client.
+                var norm = Usp.importer ? Usp.importer.normaliser : function (s) { return String(s || '').toLowerCase(); };
+                var attendu = ['numero_client', 'code_client', 'code client', 'code', 'code ps'].map(norm);
+                Ext.Array.each(cols, function (c) {
+                    if (Ext.Array.contains(attendu, norm(c))) { combo.setValue(c); return false; }
+                });
+                etat.setValue(cols.length
+                    ? '<span style="color:#2e7d32">' + cols.length + ' colonne(s), ' + (r.totalLignes || 0)
+                        + ' ligne(s). Choisissez la colonne des codes clients.</span>'
+                    : '<span style="color:#c62828">Aucune colonne détectée : la 1re ligne du fichier doit '
+                        + 'porter les intitulés.</span>');
+            },
+            failure: function (resp) {
+                win.down('#liEtat').setValue('<span style="color:#c62828">'
+                    + Ext.String.htmlEncode(Usp.erreurServeur(resp)) + '</span>');
+            } });
+    };
+
+    var importer = function (win, simulation) {
+        var codesColles = (win.down('[name=codes]').getValue() || '').split(/\r?\n/)
+            .map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+        var payload = { simulation: simulation };
+        if (fileData.base64) {
+            var colonne = win.down('[name=colonne]').getValue();
+            if (!colonne) { Ext.Msg.alert('Info', 'Choisissez la colonne des codes clients.'); return; }
+            payload.fichierBase64 = fileData.base64;
+            payload.nomFichier = fileData.nom;
+            payload.separateur = win.down('[name=separateur]').getValue() || ';';
+            payload.colonne = colonne;
+        } else if (codesColles.length) {
+            payload.codes = codesColles;
+        } else {
+            Ext.Msg.alert('Info', 'Choisissez un fichier ou collez des codes clients.');
+            return;
+        }
+        Usp.ajax({ url: '/lists/' + listeId + '/import-codes', method: 'POST', jsonData: payload,
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var ex = (r.exemplesIntrouvables || []);
+                var html = (simulation ? '<b style="color:#1976d2">Simulation — rien n\'a été enregistré.</b><br><br>' : '')
+                    + 'Codes lus : <b>' + (r.lignesLues || 0) + '</b><br>'
+                    + (simulation ? 'Seraient ajoutés : ' : 'Ajoutés : ') + '<b>' + (r.ajoutes || 0) + '</b><br>'
+                    + (r.dejaPresents ? 'Déjà membres : ' + r.dejaPresents + '<br>' : '')
+                    + (r.introuvables ? '<span style="color:#c62828">Codes introuvables : ' + r.introuvables
+                        + (ex.length ? ' (ex. ' + Ext.String.htmlEncode(ex.slice(0, 5).join(', ')) + ')' : '')
+                        + '</span><br>' : '')
+                    + (r.sansContact ? 'Clients sans contact (ignorés) : ' + r.sansContact + '<br>' : '');
+                if (simulation) {
+                    Ext.Msg.alert('Vérification', html + '<br>Si le résultat convient, cliquez sur « Importer ».');
+                } else {
+                    win.close(); if (onDone) { onDone(); }
+                    Ext.Msg.alert('Import terminé', html);
+                }
+            },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
+
     var win = Ext.create('Ext.window.Window', {
-        title: 'Importer des clients dans la liste', width: 520, modal: true, bodyPadding: 12,
+        title: '📥 Importer des clients — ' + Ext.String.htmlEncode(nomListe || ''),
+        width: 560, modal: true, bodyPadding: 12,
         items: [{ xtype: 'form', border: false, defaults: { anchor: '100%' }, items: [
-            { xtype: 'displayfield', value: '<span style="color:#888">Un <b>code client</b> par ligne ' +
-                '(le contact principal de chaque client est ajouté). Fichier .csv accepté.</span>' },
-            { xtype: 'textareafield', name: 'contenu', height: 180, emptyText: 'C001\nC002\nC003' },
-            { xtype: 'filefield', fieldLabel: 'ou fichier .csv', msgTarget: 'side',
+            { xtype: 'displayfield', value: '<span style="color:#888">Le <b>contact principal</b> de chaque '
+                + 'client est ajouté à la liste. Les membres déjà présents ne sont pas dupliqués.</span>' },
+            { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier (.csv / .xlsx)', buttonText: 'Parcourir...',
               listeners: { change: function (f) {
                   var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  fileData.nom = file.name;
                   var reader = new FileReader();
-                  reader.onload = function (e) { f.up('form').down('[name=contenu]').setValue(e.target.result); };
-                  reader.readAsText(file);
-              } } }
+                  reader.onload = function (e) {
+                      fileData.base64 = e.target.result.split(',')[1];
+                      var w = f.up('window');
+                      w.down('[name=separateur]').setDisabled(/\.xlsx?$/i.test(file.name));
+                      detecter(w);
+                  };
+                  reader.readAsDataURL(file);
+              } } },
+            { xtype: 'textfield', name: 'separateur', fieldLabel: 'Séparateur (CSV)', value: ';', width: 220 },
+            { xtype: 'displayfield', itemId: 'liEtat', hideLabel: true,
+              value: '<span style="color:#888">Choisissez un fichier : ses colonnes sont détectées, '
+                  + 'puis désignez celle des codes clients.</span>' },
+            { xtype: 'combobox', name: 'colonne', fieldLabel: 'Colonne des codes clients',
+              store: colStore, valueField: 'col', displayField: 'col', queryMode: 'local',
+              editable: false, forceSelection: true, emptyText: 'Détectée depuis le fichier…' },
+            { xtype: 'textareafield', name: 'codes', height: 90,
+              fieldLabel: 'ou collez des codes', emptyText: 'C001\nC002\nC003 (un par ligne — ignoré si un fichier est choisi)' }
         ] }],
-        buttons: [{ text: 'Importer', handler: function (b) {
-            var contenu = b.up('window').down('[name=contenu]').getValue();
-            if (!contenu || !contenu.trim()) { Ext.Msg.alert('Info', 'Aucun code client.'); return; }
-            Usp.ajax({ url: '/lists/' + listeId + '/import-clients', method: 'POST', jsonData: { contenu: contenu },
-                success: function (resp) {
-                    var r = Ext.decode(resp.responseText) || {};
-                    win.close(); if (onDone) { onDone(); }
-                    Usp.toast((r.ajoutes || 0) + ' ajouté(s), ' + (r.introuvables || 0) + ' introuvable(s), '
-                        + (r.sansContact || 0) + ' sans contact.');
-                },
-                failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-        } }, { text: 'Annuler', handler: function (b) { b.up('window').close(); } }]
+        buttons: [
+            { text: '🔍 Vérifier (simulation)', tooltip: 'Contrôle le fichier sans rien enregistrer',
+              handler: function (b) { importer(b.up('window'), true); } },
+            '->',
+            { text: 'Importer', handler: function (b) { importer(b.up('window'), false); } },
+            { text: 'Annuler', handler: function (b) { b.up('window').close(); } }
+        ]
     });
     win.show();
 };
@@ -1309,10 +1968,20 @@ Usp.dashboardChart._build = function () {
                   serieStore.load();
               } } },
             '->',
-            { text: 'Export CSV', handler: function () {
-                Usp.export.csv('evolution', Usp.dashboardChart.COLS, serieStore.getRange()); } },
+            { text: 'Export Excel', handler: function () {
+                Usp.rapportExcel('Évolution des envois (30 jours)', Usp.dashboardChart.COLS,
+                    serieStore.getRange().map(function (r) {
+                        var l = {};
+                        Usp.dashboardChart.COLS.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+                        return l;
+                    })); } },
             { text: 'Export PDF', handler: function () {
-                Usp.export.pdf('Évolution des envois', Usp.dashboardChart.COLS, serieStore.getRange()); } }
+                Usp.rapportPdfPost('evolution', 'Évolution des envois (30 jours)',
+                    serieStore.getRange().map(function (r) {
+                        var l = {};
+                        Usp.dashboardChart.COLS.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+                        return l;
+                    })); } }
         ],
         items: [{
             xtype: 'chart', store: serieStore, animate: true, shadow: false, insetPadding: 24,
@@ -1634,6 +2303,8 @@ Usp.MENU = [
     { text: 'Historique des envois', view: 'historique', icon: '🗂️', roles: ['ADMIN', 'MARKETING'] },
     { text: 'CRM / Opportunités',  view: 'crm',        icon: '🎯', roles: ['ADMIN', 'SUPERVISEUR', 'AGENT', 'MARKETING'] },
     { text: 'Suivi Relance et Recouvrements', view: 'recouvrement', icon: '💰', roles: ['ADMIN'] },
+    { text: 'Centre de support',   view: 'support',    icon: '🛟', roles: null },
+    { text: 'Licence',             view: 'licence',    icon: '🔑', roles: ['ADMIN', 'SUPPORT'] },
     { text: 'Paramètres',          view: 'settings',   icon: '⚙️', roles: ['ADMIN'] },
     { text: 'Utilisateurs',        view: 'users',      icon: '👤', roles: ['ADMIN'] }
 ];
@@ -1776,9 +2447,18 @@ Usp.apropos = function () {
                  '<b>' + Ext.String.htmlEncode(a.application || 'UbiSmartCRM Pro') + '</b><br>' +
                  'Version : <b>' + Ext.String.htmlEncode(a.version || '—') + '</b><br>' +
                  'Développeur : <b>' + Ext.String.htmlEncode(a.developpeur || '—') + '</b><br>' +
-                 'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b>' +
+                 'E-mail : <b>' + Ext.String.htmlEncode(a.email || '—') + '</b><br>' +
+                 // Repère de déploiement : si cet horodatage est ancien après une
+                 // mise à jour, c'est que le WAR n'a pas été redéployé. L'absence
+                 // du champ (et non « inconnu ») signale un livrable antérieur à
+                 // cette fonction — les deux cas ne doivent pas se confondre.
+                 '<span style="color:#888;font-size:11px">' +
+                 (a.compileLe
+                    ? 'Livrable compilé le ' + Ext.String.htmlEncode(a.compileLe)
+                    : '⚠️ Livrable ANTÉRIEUR à cette version (à redéployer)') +
+                 '</span>' +
                  '</div>',
-            buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 360
+            buttons: Ext.Msg.OK, icon: Ext.Msg.INFO, width: 380
         });
     }, failure: function () { Ext.Msg.alert('À propos', 'Informations indisponibles.'); } });
 };
@@ -1920,18 +2600,29 @@ Usp.clientPicker = function (cfg) {
                 { text: 'Téléphone', dataIndex: 'numero', width: 120 }
             ],
             tbar: [
-                { xtype: 'textfield', emptyText: '🔎 Rechercher…', width: 170,
+                { xtype: 'textfield', itemId: 'pkQ', emptyText: '🔎 Rechercher…', width: 170,
                   listeners: { change: { buffer: 350, fn: function (f, v) { etat.q = v || ''; charger(); } },
                       specialkey: function (f, e) { if (e.getKey() === e.ENTER) { etat.q = f.getValue() || ''; charger(); } } } },
-                { xtype: 'combobox', emptyText: 'Segmentation', width: 150, store: segStore, valueField: 'id',
+                { xtype: 'combobox', itemId: 'pkSeg', emptyText: 'Segmentation', width: 150, store: segStore, valueField: 'id',
                   displayField: 'libelle', queryMode: 'local', editable: false,
                   listeners: { change: function (f, v) { etat.seg = v || ''; charger(); } } },
-                { xtype: 'combobox', emptyText: 'Agence', width: 130, store: refStore('AGENCE'), valueField: 'libelle',
+                { xtype: 'combobox', itemId: 'pkAgence', emptyText: 'Agence', width: 130, store: refStore('AGENCE'), valueField: 'libelle',
                   displayField: 'libelle', queryMode: 'local', editable: false,
                   listeners: { change: function (f, v) { etat.agence = v || ''; charger(); } } },
-                { xtype: 'combobox', emptyText: 'Région', width: 130, store: refStore('REGION'), valueField: 'libelle',
+                { xtype: 'combobox', itemId: 'pkRegion', emptyText: 'Région', width: 130, store: refStore('REGION'), valueField: 'libelle',
                   displayField: 'libelle', queryMode: 'local', editable: false,
-                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } }
+                  listeners: { change: function (f, v) { etat.region = v || ''; charger(); } } },
+                { text: '♻️ Réinitialiser', tooltip: 'Effacer tous les filtres', handler: function (b) {
+                    var tb = b.up('toolbar');
+                    // Chaque setValue déclenche son écouteur change : l'état est
+                    // remis à zéro par les écouteurs eux-mêmes, et les quelques
+                    // rechargements successifs restent sans effet visible (le
+                    // dernier gagne). On efface simplement les quatre champs.
+                    tb.down('#pkQ').setValue('');
+                    tb.down('#pkSeg').setValue(null);
+                    tb.down('#pkAgence').setValue(null);
+                    tb.down('#pkRegion').setValue(null);
+                } }
             ],
             bbar: ['->',
                 { text: 'Tout sélectionner (résultat)', handler: function () { sm.selectAll(); } },
@@ -2235,6 +2926,8 @@ Usp.ouvrirVue = function (vue) {
         case 'clients': Usp.loadCenter(Usp.clientsPanel()); break;
         case 'users': Usp.loadCenter(Usp.users.panel()); break;
         case 'recouvrement': Usp.loadCenter(Usp.recouvrement.panel()); break;
+        case 'support': Usp.loadCenter(Usp.support.panel()); break;
+        case 'licence': Usp.loadCenter(Usp.licence.panel()); break;
         case 'dashboard': Usp.loadCenter(Usp.dashboardPanel()); break;
         case 'import': Usp.showImport(); break;
         default: Usp.loadCenter(Usp.dashboardPanel());
@@ -2346,6 +3039,22 @@ Usp.showMain = function () {
         ['mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) {
             document.addEventListener(ev, function () { if (Usp.token) { Usp.marquerActivite(); } }, true);
         });
+    }
+    // Bandeau d'alerte licence (J-30/15/7/1, grâce, expiration) + revérification horaire.
+    Ext.defer(function () { if (Usp.licence && Usp.licence.majBandeau) { Usp.licence.majBandeau(); } }, 1500);
+    if (!Usp._licTimer) {
+        Usp._licTimer = Ext.TaskManager.start({ interval: 3600000, run: function () {
+            if (Usp.token && Usp.licence) { Usp.licence.majBandeau(); }
+        } });
+    }
+    // Bandeau « session WhatsApp Web à reconnecter » (santé DEGRADED) : les
+    // réponses des clients n'arrivent plus alors que le statut reste « connecté ».
+    // Sondage plus fréquent (les sessions changent d'état vite).
+    Ext.defer(function () { if (Usp.waweb && Usp.waweb.majBandeau) { Usp.waweb.majBandeau(); } }, 2500);
+    if (!Usp._waTimer) {
+        Usp._waTimer = Ext.TaskManager.start({ interval: 60000, run: function () {
+            if (Usp.token && Usp.waweb && Usp.waweb.majBandeau) { Usp.waweb.majBandeau(); }
+        } });
     }
     // Horloge de session : ping serveur tant qu'on est actif ; déconnexion locale
     // dès que le délai d'inactivité configuré est dépassé.
@@ -2552,6 +3261,28 @@ Ext.override(Ext.window.Window, {
         }, 60);
     }
 });
+
+/* Capture des erreurs JavaScript -> journal du Centre de support.
+ * Throttlée côté client (max 5/min) et jamais bloquante ; le serveur dédoublonne
+ * par signature et throttle aussi. L'erreur reste visible en console (return false). */
+(function () {
+    var envois = 0, minute = 0;
+    window.onerror = function (msg, url, ligne, col, err) {
+        try {
+            if (!Usp.token) { return false; }
+            var m = Math.floor(Date.now() / 60000);
+            if (m !== minute) { minute = m; envois = 0; }
+            if (++envois > 5) { return false; }
+            Usp.ajax({ url: '/support/events', method: 'POST', jsonData: {
+                type: 'JS', niveau: 'ERROR',
+                message: String(msg || 'Erreur JavaScript'),
+                payload: err && err.stack ? String(err.stack).substring(0, 2000) : '',
+                url: String(url || '').split('/').pop() + ':' + (ligne || 0)
+            } });
+        } catch (e) { /* la capture ne doit jamais gêner l'application */ }
+        return false;
+    };
+})();
 
 Ext.onReady(function () {
     Ext.QuickTips.init();

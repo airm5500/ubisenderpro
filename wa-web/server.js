@@ -14,6 +14,11 @@
  *   POST   /sessions/:id/check-numbers-> {numbers:[...]} -> [{number, exists, jid}]
  *
  * Statuts de session : DECONNECTE | CONNEXION | QR | CONNECTE
+ * Santé de réception (indépendante du statut) : OK | DEGRADED
+ *   DEGRADED = socket ouvert (l'envoi marche) mais des messages entrants
+ *   arrivent illisibles (session de chiffrement désynchronisée après une
+ *   coupure) → les réponses des clients se perdent, il faut reconnecter.
+ *   Remontée via le callback /status ({status, health, reason}).
  */
 'use strict';
 
@@ -27,15 +32,55 @@ import { fileURLToPath } from 'url';
 import * as baileys from '@whiskeysockets/baileys';
 
 // Destructuration tolérante (l'API Baileys évolue selon les versions).
-const makeWASocket = baileys.default || baileys.makeWASocket;
+// Attention : selon la version, `default` est soit la fabrique elle-même
+// (6.7.x), soit un objet qui la contient (6.17.x). On retient donc le premier
+// candidat réellement APPELABLE, sinon le service planterait au démarrage.
+const makeWASocket = [
+  baileys.makeWASocket,
+  baileys.default && baileys.default.default,
+  baileys.default
+].find((c) => typeof c === 'function');
 const useMultiFileAuthState = baileys.useMultiFileAuthState;
 const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
 const makeInMemoryStore = baileys.makeInMemoryStore; // peut être absent
 const makeCacheableSignalKeyStore = baileys.makeCacheableSignalKeyStore; // peut être absent
 const DisconnectReason = baileys.DisconnectReason || {};
 
+if (typeof makeWASocket !== 'function') {
+  console.error('\nERREUR : fabrique de connexion introuvable dans @whiskeysockets/baileys.');
+  console.error('La version installee expose une API incompatible. Reinstallez avec :');
+  console.error('    npm install @whiskeysockets/baileys@6.7.24\n');
+  process.exit(1);
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Charge un fichier `.env` posé à côté de server.js (sans dépendance externe).
+ * Évite le piège classique : sous Windows, un `set VAR=...` ne vaut que pour la
+ * fenêtre courante — rouvrir une invite fait perdre la configuration et les
+ * messages entrants ne sont alors plus transmis à l'application.
+ * Une vraie variable d'environnement reste prioritaire sur le fichier.
+ */
+function chargerEnvFichier() {
+  const f = path.join(__dirname, '.env');
+  if (!fs.existsSync(f)) { return false; }
+  for (const ligne of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
+    const t = ligne.trim();
+    if (!t || t.startsWith('#')) { continue; }
+    const i = t.indexOf('=');
+    if (i <= 0) { continue; }
+    const cle = t.slice(0, i).trim();
+    let val = t.slice(i + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (!process.env[cle]) { process.env[cle] = val; }
+  }
+  return true;
+}
+const ENV_FICHIER = chargerEnvFichier();
 
 const PORT = process.env.PORT || 3000;
 const API_TOKEN = process.env.WA_WEB_TOKEN || '';
@@ -84,47 +129,212 @@ function jidOf(numero) {
   return clean + '@s.whatsapp.net';
 }
 
-/**
- * Extrait le numéro de téléphone d'une clé de message. WhatsApp peut adresser
- * en @lid (numéro masqué) ; le vrai numéro (@s.whatsapp.net) est alors dans un
- * champ alternatif (remoteJidAlt, senderPn, participant…).
+/* ------------------- Correspondance LID <-> numéro -------------------
+ * WhatsApp adresse de plus en plus les contacts par un identifiant masqué
+ * (« LID », ex. 253270027194615@lid) au lieu du numéro. Quand la clé d'un
+ * message entrant ne porte QUE ce LID, le numéro est introuvable et la réponse
+ * du client serait perdue. On mémorise donc la correspondance chaque fois que
+ * les deux apparaissent ensemble (clé de message, ou résolution d'un numéro
+ * avant envoi), et on la réutilise ensuite. La table est persistée par session.
  */
-function phoneFromKey(k) {
+
+function fichierLid(id) { return path.join(sessionDir(id), 'lid-numeros.json'); }
+
+function chargerLid(id) {
+  const m = new Map();
+  try {
+    const f = fichierLid(id);
+    if (!fs.existsSync(f)) { return m; }
+    for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(f, 'utf8')) || {})) { m.set(k, v); }
+    if (m.size) { logger.info({ id, correspondances: m.size }, 'Correspondances LID rechargées'); }
+  } catch (e) { logger.warn({ id }, 'Table LID illisible : ' + (e.message || e)); }
+  return m;
+}
+
+function planifierSauvegardeLid(id, s) {
+  if (!s || s.lidTimer) { return; }
+  s.lidTimer = setTimeout(() => {
+    s.lidTimer = null;
+    try {
+      fs.mkdirSync(sessionDir(id), { recursive: true });
+      fs.writeFileSync(fichierLid(id), JSON.stringify(Object.fromEntries(s.lidNumeros)), 'utf8');
+    } catch (e) { logger.warn({ id }, 'Sauvegarde de la table LID impossible : ' + (e.message || e)); }
+  }, 2000);
+}
+
+/** Mémorise « ce LID correspond à ce numéro ». */
+function apprendreLid(id, s, lid, numero) {
+  if (!s || !lid || !numero) { return; }
+  if (!s.lidNumeros) { s.lidNumeros = new Map(); }
+  if (s.lidNumeros.get(lid) === numero) { return; }
+  s.lidNumeros.set(lid, numero);
+  logger.info({ id, lid, numero }, 'Correspondance LID apprise');
+  planifierSauvegardeLid(id, s);
+}
+
+/** Identifiant LID porté par une clé de message, s'il y en a un. */
+function lidFromKey(k) {
+  if (!k) { return null; }
+  for (const c of [k.remoteJid, k.senderLid, k.participant, k.lidJid]) {
+    if (c && typeof c === 'string' && c.endsWith('@lid')) { return c.split('@')[0]; }
+  }
+  return null;
+}
+
+/**
+ * Extrait le numéro de téléphone d'une clé de message. Le vrai numéro
+ * (@s.whatsapp.net) peut se trouver dans un champ alternatif (remoteJidAlt,
+ * senderPn, participant…) ; à défaut, on retombe sur la correspondance LID
+ * apprise précédemment.
+ */
+function phoneFromKey(k, id, s) {
   if (!k) { return null; }
   const cands = [k.remoteJid, k.remoteJidAlt, k.senderPn, k.participantPn, k.participant, k.participantAlt];
   for (const c of cands) {
-    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) { return c.split('@')[0]; }
+    if (c && typeof c === 'string' && c.endsWith('@s.whatsapp.net')) {
+      const numero = c.split('@')[0];
+      const lid = lidFromKey(k);
+      if (lid) { apprendreLid(id, s, lid, numero); } // les deux sont là : on apprend
+      return numero;
+    }
+  }
+  // Seule l'adresse masquée est disponible : on tente la correspondance connue.
+  const lid = lidFromKey(k);
+  if (lid && s && s.lidNumeros && s.lidNumeros.has(lid)) {
+    const numero = s.lidNumeros.get(lid);
+    logger.info({ id, lid, numero }, 'Numéro retrouvé via la correspondance LID');
+    return numero;
   }
   return null;
+}
+
+/** Nombre de messages envoyés conservés sur disque (réponse aux retry receipts). */
+const MAX_SENT = 300;
+
+function fichierSent(id) { return path.join(sessionDir(id), 'messages-envoyes.json'); }
+
+/**
+ * Recharge le cache des messages envoyés. Sans lui, un destinataire qui
+ * redemande un message après un redémarrage du service resterait bloqué sur
+ * « En attente de ce message… » : nous serions incapables de le renvoyer.
+ */
+function chargerSent(id) {
+  const m = new Map();
+  try {
+    const f = fichierSent(id);
+    if (!fs.existsSync(f)) { return m; }
+    const brut = JSON.parse(fs.readFileSync(f, 'utf8'), (cle, val) =>
+      (val && typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data))
+        ? Buffer.from(val.data) : val);
+    for (const [k, v] of Object.entries(brut || {})) { m.set(k, v); }
+    logger.info({ id, messages: m.size }, 'Cache des messages envoyés rechargé');
+  } catch (e) {
+    logger.warn({ id }, 'Cache des messages envoyés illisible : ' + (e.message || e));
+  }
+  return m;
+}
+
+/** Écriture différée (regroupe les envois rapprochés en une seule écriture). */
+function planifierSauvegardeSent(id, s) {
+  if (!s || s.sentTimer) { return; }
+  s.sentTimer = setTimeout(() => {
+    s.sentTimer = null;
+    try {
+      fs.mkdirSync(sessionDir(id), { recursive: true });
+      fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+    } catch (e) { logger.warn({ id }, 'Sauvegarde du cache impossible : ' + (e.message || e)); }
+  }, 2000);
+}
+
+/** Mémorise un message envoyé (pour répondre aux retry receipts). Borne la taille. */
+function rememberSent(s, r, id) {
+  if (!s || !s.sent || !r || !r.key || !r.key.id || !r.message) { return; }
+  s.sent.set(r.key.id, r.message);
+  while (s.sent.size > MAX_SENT) {
+    const first = s.sent.keys().next().value;
+    s.sent.delete(first);
+  }
+  planifierSauvegardeSent(id, s);
 }
 
 /**
  * Résout le JID réel d'un numéro via WhatsApp. Renvoie null si le numéro
  * n'est pas sur WhatsApp (ou format invalide) — évite les faux « envoyés ».
  */
-/** Mémorise un message envoyé (pour répondre aux retry receipts). Borne la taille. */
-function rememberSent(s, r) {
-  if (!s || !s.sent || !r || !r.key || !r.key.id || !r.message) { return; }
-  s.sent.set(r.key.id, r.message);
-  if (s.sent.size > 1000) {
-    const first = s.sent.keys().next().value;
-    s.sent.delete(first);
-  }
-}
-
-async function resolveJid(sock, numero) {
+async function resolveJid(sock, numero, id, s) {
   const clean = String(numero).replace(/[^0-9]/g, '');
   if (clean.length < 6) { return null; }
   try {
     const r = await sock.onWhatsApp(clean);
-    if (r && r[0] && r[0].exists) { return r[0].jid; }
+    if (r && r[0] && r[0].exists) {
+      // La résolution renvoie aussi le LID du contact : occasion d'apprendre la
+      // correspondance, pour reconnaître ses futures réponses adressées en @lid.
+      if (r[0].lid) {
+        const lid = String(r[0].lid).split('@')[0];
+        apprendreLid(id, s, lid, String(r[0].jid).split('@')[0]);
+      }
+      return r[0].jid;
+    }
   } catch (e) { /* ignore */ }
   return null;
 }
 
 function publicState(s) {
-  return s ? { status: s.status, qr: s.qr || null, me: s.me || null }
-           : { status: 'DECONNECTE', qr: null, me: null };
+  return s ? { status: s.status, health: s.health || 'OK', reason: s.degradedReason || null,
+               qr: s.qr || null, me: s.me || null,
+               lastInboundAt: s.lastInboundAt || null, undecipherable: s.undecipherable || 0 }
+           : { status: 'DECONNECTE', health: 'OK', reason: null, qr: null, me: null,
+               lastInboundAt: null, undecipherable: 0 };
+}
+
+/** Échecs de déchiffrement consécutifs avant de déclarer la session dégradée. */
+const SEUIL_ECHECS = 3;
+/** Délai sans AUCUNE réception lisible avant de pouvoir déclarer la session dégradée. */
+const DELAI_SANS_RECEPTION_MS = 60000;
+
+/**
+ * Passe la session en « dégradée » : le socket est ouvert (l'envoi marche) mais
+ * des messages entrants arrivent illisibles → les réponses des clients sont
+ * silencieusement perdues, la session doit être reconnectée (rescan du QR).
+ *
+ * Tolérance aux incidents passagers : WhatsApp re-livre souvent un message
+ * illisible une seconde plus tard, et il arrive alors correctement. On ne
+ * déclare donc « dégradé » qu'après plusieurs échecs CONSÉCUTIFS (compteur
+ * remis à zéro à chaque réception lisible) ET en l'absence de toute réception
+ * saine récente — le cas réel de la session « zombie », où plus rien n'arrive.
+ * Ne notifie qu'au basculement OK -> DEGRADED (évite le flood).
+ */
+function marquerDegrade(id, s, raison) {
+  if (!s) { return; }
+  s.undecipherable = (s.undecipherable || 0) + 1;
+  s.echecsConsecutifs = (s.echecsConsecutifs || 0) + 1;
+  if (s.health === 'DEGRADED') { return; }
+
+  const depuisReception = Date.now() - (s.lastInboundAt || 0);
+  if (s.echecsConsecutifs < SEUIL_ECHECS || depuisReception < DELAI_SANS_RECEPTION_MS) {
+    // Incident probablement passager : on trace sans alerter l'utilisateur.
+    logger.info({ id, echecsConsecutifs: s.echecsConsecutifs },
+      'Entrant illisible (incident passager, pas d\'alerte)');
+    return;
+  }
+  s.health = 'DEGRADED';
+  s.degradedReason = raison;
+  logger.warn({ id, undecipherable: s.undecipherable, echecsConsecutifs: s.echecsConsecutifs },
+    'Session dégradée : messages entrants illisibles');
+  postCallback('/status', { sessionId: id, status: s.status, health: 'DEGRADED', reason: raison });
+}
+
+/** Réception saine : la session reçoit à nouveau des messages lisibles. */
+function marquerSain(id, s) {
+  if (!s) { return; }
+  s.lastInboundAt = Date.now();
+  s.echecsConsecutifs = 0; // la réception fonctionne : la série d'échecs est rompue
+  if (s.health === 'DEGRADED') {
+    s.health = 'OK';
+    s.degradedReason = null;
+    logger.info({ id }, 'Session rétablie : réception de nouveau lisible');
+    postCallback('/status', { sessionId: id, status: s.status, health: 'OK', reason: null });
+  }
 }
 
 /** Démarre (ou relance) une session Baileys et câble les événements. */
@@ -153,7 +363,8 @@ async function startSession(id) {
 
   // Cache des messages envoyés : indispensable pour répondre aux « retry receipts »
   // (sinon le destinataire reste bloqué sur « En attente de ce message… »).
-  if (!s.sent) { s.sent = new Map(); }
+  if (!s.sent) { s.sent = chargerSent(id); }
+  if (!s.lidNumeros) { s.lidNumeros = chargerLid(id); }
   if (!s.retryCache) {
     s.retryCache = {
       _m: new Map(),
@@ -171,15 +382,29 @@ async function startSession(id) {
     logger: pino({ level: 'silent' }),
     browser: ['UbiSenderPro', 'Chrome', '1.0.0'],
     msgRetryCounterCache: s.retryCache,
-    // Permet à Baileys de ré-émettre un message qu'un destinataire n'a pas pu déchiffrer.
+    // Permet à Baileys de ré-émettre un message qu'un destinataire n'a pas pu
+    // déchiffrer (« En attente de ce message… » sur son téléphone). Journalisé :
+    // c'est le seul moyen de savoir si les demandes de renvoi arrivent bien et
+    // si nous sommes capables d'y répondre.
     getMessage: async (key) => {
       try {
-        if (key && key.id && s.sent.has(key.id)) { return s.sent.get(key.id); }
+        if (key && key.id && s.sent.has(key.id)) {
+          logger.info({ id, messageId: key.id, destinataire: key.remoteJid },
+            'Demande de renvoi : message retrouvé, renvoi en cours');
+          return s.sent.get(key.id);
+        }
         if (s.store && typeof s.store.loadMessage === 'function' && key) {
           const m = await s.store.loadMessage(key.remoteJid, key.id);
-          if (m && m.message) { return m.message; }
+          if (m && m.message) {
+            logger.info({ id, messageId: key.id }, 'Demande de renvoi : message retrouvé (store)');
+            return m.message;
+          }
         }
-      } catch (e) { /* ignore */ }
+        logger.warn({ id, messageId: key && key.id, enCache: s.sent.size },
+          'Demande de renvoi : message INTROUVABLE — le destinataire restera sur « En attente de ce message »');
+      } catch (e) {
+        logger.warn({ id }, 'Demande de renvoi en erreur : ' + (e.message || e));
+      }
       return undefined;
     }
   });
@@ -203,7 +428,17 @@ async function startSession(id) {
       const k = m.key;
       const jid = k.remoteJid || '';
       if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) { continue; } // ignore groupes/diffusions
-      const phone = phoneFromKey(k);
+      // Message entrant NON déchiffrable (m.message absent) : après une longue
+      // coupure, la session de chiffrement peut être désynchronisée — le socket
+      // reste « ouvert » mais les réponses arrivent illisibles et se perdent.
+      // On ne les jette plus en silence : on bascule la session en « dégradée »
+      // pour avertir l'utilisateur (bannière « à reconnecter »).
+      if (!m.message) {
+        marquerDegrade(id, sessions.get(id), 'Messages entrants illisibles (session de chiffrement désynchronisée) — reconnectez le compte.');
+        logger.warn({ id, key: k, stub: m.messageStubType }, 'Entrant illisible (déchiffrement échoué)');
+        continue;
+      }
+      const phone = phoneFromKey(k, id, s);
       if (!phone) {
         // Numéro introuvable (souvent @lid) : on logue la clé pour localiser le champ.
         logger.warn({ id, key: k }, 'Entrant sans numéro résolu');
@@ -211,6 +446,7 @@ async function startSession(id) {
       }
       const contenu = texteMessage(m);
       if (!contenu) { continue; }
+      marquerSain(id, sessions.get(id)); // réception lisible : la session va bien
       logger.info({ id, from: phone, type: contenu.type }, 'Message entrant');
       postCallback('/message', {
         sessionId: id, from: phone, name: m.pushName || null,
@@ -229,9 +465,14 @@ async function startSession(id) {
     if (connection === 'open') {
       s.status = 'CONNECTE';
       s.qr = null;
+      // Nouvelle connexion (ou rescan) : la santé repart de zéro.
+      s.health = 'OK';
+      s.degradedReason = null;
+      s.undecipherable = 0;
+      s.echecsConsecutifs = 0;
       s.me = sock.user ? { id: sock.user.id, name: sock.user.name } : null;
       logger.info({ id, me: s.me }, 'Session connectée');
-      postCallback('/status', { sessionId: id, status: 'CONNECTE' });
+      postCallback('/status', { sessionId: id, status: 'CONNECTE', health: 'OK', reason: null });
     }
     if (connection === 'close') {
       const code = lastDisconnect && lastDisconnect.error
@@ -240,8 +481,10 @@ async function startSession(id) {
       s.sock = null; // libère le socket fermé (sinon la garde anti-doublon bloque la reconnexion)
       s.status = loggedOut ? 'DECONNECTE' : 'CONNEXION';
       s.qr = null;
+      s.health = 'OK'; // hors connexion, la « santé de réception » n'a plus de sens
+      s.degradedReason = null;
       logger.warn({ id, code, loggedOut }, 'Connexion fermée');
-      postCallback('/status', { sessionId: id, status: s.status });
+      postCallback('/status', { sessionId: id, status: s.status, health: 'OK', reason: null });
       if (!loggedOut) {
         setTimeout(() => { startSession(id).catch((e) => logger.error(e)); }, 2000);
       } else {
@@ -290,6 +533,18 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+/**
+ * Arrêt propre demandé à distance (utilisé par arreter.bat).
+ * Sous Windows, un « taskkill » coupe brutalement le processus et peut laisser
+ * l'état de chiffrement à demi écrit ; passer par le service garantit le même
+ * traitement que Ctrl+C : sauvegarde des caches puis fermeture des sessions.
+ * Protégé par le jeton partagé, comme le reste de l'API.
+ */
+app.post('/arret', (req, res) => {
+  res.json({ ok: true, message: 'Arrêt propre en cours…' });
+  setTimeout(() => arretPropre('API'), 100); // laisse la réponse partir
+});
+
 app.post('/sessions/:id/start', async (req, res) => {
   try {
     const s = await startSession(req.params.id);
@@ -309,10 +564,24 @@ app.post('/sessions/:id/logout', async (req, res) => {
   res.json({ status: 'DECONNECTE' });
 });
 
+/**
+ * Exige une session connectée. Distingue « identifiant inconnu » de « session
+ * connue mais hors ligne » : confondre les deux masquait un appel utilisant un
+ * mauvais identifiant (« 2 » au lieu de « acc-2 »), diagnostique a tort comme
+ * une session deconnectee alors qu'elle fonctionnait.
+ */
 function requireConnected(req, res) {
-  const s = sessions.get(req.params.id);
-  if (!s || s.status !== 'CONNECTE' || !s.sock) {
-    res.status(409).json({ erreur: 'Session non connectée' });
+  const id = req.params.id;
+  const s = sessions.get(id);
+  if (!s) {
+    const connues = Array.from(sessions.keys());
+    logger.warn({ id, connues }, 'Appel sur une session inconnue');
+    res.status(409).json({ erreur: 'Session « ' + id + ' » inconnue du service. '
+      + 'Sessions disponibles : ' + (connues.length ? connues.join(', ') : 'aucune') });
+    return null;
+  }
+  if (s.status !== 'CONNECTE' || !s.sock) {
+    res.status(409).json({ erreur: 'Session « ' + id + ' » non connectée (statut ' + s.status + ')' });
     return null;
   }
   return s;
@@ -321,11 +590,11 @@ function requireConnected(req, res) {
 app.post('/sessions/:id/send', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
-    const jid = await resolveJid(s.sock, req.body.to);
+    const jid = await resolveJid(s.sock, req.body.to, req.params.id, s);
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi texte');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const r = await s.sock.sendMessage(jid, { text: String(req.body.text || '') });
-    rememberSent(s, r);
+    rememberSent(s, r, req.params.id);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi texte échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -333,12 +602,12 @@ app.post('/sessions/:id/send', async (req, res) => {
 app.post('/sessions/:id/send-media', async (req, res) => {
   const s = requireConnected(req, res); if (!s) { return; }
   try {
-    const jid = await resolveJid(s.sock, req.body.to);
+    const jid = await resolveJid(s.sock, req.body.to, req.params.id, s);
     logger.info({ id: req.params.id, to: req.body.to, resolved: jid }, 'Envoi média');
     if (!jid) { return res.json({ success: false, erreur: 'Numéro absent de WhatsApp ou format invalide (attendu : international, ex. 22501020304)' }); }
     const buffer = await bufferFromMedia(req.body);
     const r = await s.sock.sendMessage(jid, contenuMedia(req.body.type, buffer, req.body));
-    rememberSent(s, r);
+    rememberSent(s, r, req.params.id);
     res.json({ success: true, id: r && r.key ? r.key.id : null, waNumber: jid.split('@')[0] });
   } catch (e) { logger.warn('Envoi média échec : ' + (e.message || e)); res.status(502).json({ success: false, erreur: String(e.message || e) }); }
 });
@@ -412,7 +681,105 @@ function restoreSessions() {
   } catch (e) { logger.warn(String(e.message || e)); }
 }
 
-app.listen(PORT, () => {
-  logger.info('UbiSenderPro WA-Web sur le port ' + PORT);
+/**
+ * Contrôle de configuration au démarrage, affiché en clair : sans
+ * UBISENDER_CALLBACK, les messages entrants sont reçus mais JAMAIS transmis à
+ * l'application (les réponses n'apparaissent pas dans les Discussions).
+ */
+/** Version de la bibliothèque Baileys réellement installée (diagnostic). */
+function versionBaileys() {
+  try {
+    const p = path.join(__dirname, 'node_modules', '@whiskeysockets', 'baileys', 'package.json');
+    return JSON.parse(fs.readFileSync(p, 'utf8')).version || 'inconnue';
+  } catch (e) { return 'inconnue'; }
+}
+
+function verifierConfiguration() {
+  logger.info('Baileys version ' + versionBaileys() + ' — Node ' + process.version);
+  logger.info('Configuration : ' + (ENV_FICHIER ? 'fichier .env chargé' : 'aucun fichier .env (variables d\'environnement seules)'));
+  if (!CALLBACK) {
+    console.error('\n' + '='.repeat(72));
+    console.error('  ERREUR DE CONFIGURATION : UBISENDER_CALLBACK n\'est pas defini.');
+    console.error('  Les reponses des clients seront RECUES mais NON transmises a');
+    console.error('  l\'application : elles n\'apparaitront PAS dans les Discussions.');
+    console.error('');
+    console.error('  Corrigez en creant un fichier .env a cote de server.js :');
+    console.error('      UBISENDER_CALLBACK=http://localhost:8080/ubisenderpro');
+    console.error('      WA_WEB_TOKEN=un-secret-partage');
+    console.error('  (ou lancez le service avec demarrer.bat)');
+    console.error('='.repeat(72) + '\n');
+  } else {
+    logger.info('Callback UbiSmartCRM Pro : ' + CALLBACK);
+  }
+  if (!API_TOKEN) {
+    logger.warn('WA_WEB_TOKEN non defini : l\'API interne est OUVERTE et les callbacks '
+      + 'partent sans jeton (l\'application peut les refuser).');
+  }
+}
+
+/**
+ * Arrêt propre : ferme les sockets SANS délier l'appareil, et laisse le temps
+ * aux écritures de clés de chiffrement de se terminer. Une coupure brutale
+ * (fenêtre fermée d'un coup) peut laisser l'état Signal à demi écrit — ce qui
+ * provoque ensuite des messages illisibles et des « En attente de ce message ».
+ */
+let arretEnCours = false;
+function arretPropre(signal) {
+  if (arretEnCours) { return; }
+  arretEnCours = true;
+  logger.info('Arrêt demandé (' + signal + ') : fermeture propre des sessions…');
+  for (const [id, s] of sessions) {
+    try {
+      // Sauvegarde immédiate du cache des messages envoyés (timer différé annulé).
+      if (s && s.sentTimer) { clearTimeout(s.sentTimer); s.sentTimer = null; }
+      if (s && s.lidTimer) { clearTimeout(s.lidTimer); s.lidTimer = null; }
+      if (s && ((s.sent && s.sent.size) || (s.lidNumeros && s.lidNumeros.size))) {
+        fs.mkdirSync(sessionDir(id), { recursive: true });
+        if (s.sent && s.sent.size) {
+          fs.writeFileSync(fichierSent(id), JSON.stringify(Object.fromEntries(s.sent)), 'utf8');
+        }
+        if (s.lidNumeros && s.lidNumeros.size) {
+          fs.writeFileSync(fichierLid(id), JSON.stringify(Object.fromEntries(s.lidNumeros)), 'utf8');
+        }
+      }
+      // end() ferme la connexion en conservant l'appairage (à l'inverse de logout()).
+      if (s && s.sock) { s.sock.end(undefined); }
+      logger.info({ id }, 'Session fermée proprement');
+    } catch (e) { /* on continue : l'arrêt ne doit jamais bloquer */ }
+  }
+  setTimeout(() => process.exit(0), 900);
+}
+process.on('SIGINT', () => arretPropre('SIGINT'));
+process.on('SIGTERM', () => arretPropre('SIGTERM'));
+
+const serveur = app.listen(PORT, () => {
+  verifierConfiguration();
   restoreSessions();
+  // Repère visuel net : tant que cette banniere est affichee, le service tourne.
+  console.log('\n' + '='.repeat(72));
+  console.log('  SERVICE DEMARRE — en ecoute sur http://localhost:' + PORT);
+  console.log('  Verification : ouvrez http://localhost:' + PORT + '/health');
+  console.log('  Laissez cette fenetre OUVERTE. Arret propre : Ctrl+C');
+  console.log('='.repeat(72) + '\n');
+});
+
+/**
+ * Port déjà occupé : cas courant quand une instance precedente tourne encore.
+ * Sans ce traitement, Node affiche une trace technique illisible (EADDRINUSE).
+ */
+serveur.on('error', (e) => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.error('\n' + '='.repeat(72));
+    console.error('  LE PORT ' + PORT + ' EST DEJA UTILISE.');
+    console.error('  Une autre instance du service tourne probablement deja.');
+    console.error('');
+    console.error('  1) Verifiez : ouvrez http://localhost:' + PORT + '/health');
+    console.error('     Si vous voyez {"ok":true}, le service tourne : rien a relancer.');
+    console.error('  2) Pour le remplacer : lancez arreter.bat, attendez, puis relancez.');
+    console.error('  3) Sinon, changez PORT dans le fichier .env.');
+    console.error('='.repeat(72) + '\n');
+    process.exit(1);
+  }
+  console.error('Erreur du serveur HTTP : ' + (e && e.message ? e.message : e));
+  process.exit(1);
 });

@@ -62,6 +62,16 @@ public class ListeResource {
         return Response.noContent().build();
     }
 
+    /** Retire tous les membres de la liste (la liste elle-même est conservée). */
+    @DELETE
+    @Path("/{id}/contacts")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response vider(@PathParam("id") Long id) {
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("retires", listeService.vider(id));
+        return Response.ok(r).build();
+    }
+
     /** Importe des clients dans la liste (un code client par ligne). */
     @POST
     @Path("/{id}/import-clients")
@@ -69,5 +79,48 @@ public class ListeResource {
     public Response importerClients(@PathParam("id") Long id, Map<String, Object> body) {
         String contenu = body == null ? null : (String) body.get("contenu");
         return Response.ok(listeService.importerClients(id, contenu)).build();
+    }
+
+    /**
+     * Import assisté : l'écran a fait choisir, dans le fichier, la colonne qui
+     * porte les codes clients ; le serveur extrait cette colonne (CSV ou Excel)
+     * et ajoute le contact principal de chaque client. En simulation, rien
+     * n'est écrit — le rapport sert à contrôler le fichier avant de l'appliquer.
+     * À défaut de fichier, une liste de codes déjà extraits est acceptée
+     * (codes collés au clavier).
+     */
+    @POST
+    @Path("/{id}/import-codes")
+    @Secured(roles = {"ADMIN", "MARKETING"})
+    public Response importerCodes(@PathParam("id") Long id, Map<String, Object> body) {
+        boolean simulation = body != null && Boolean.parseBoolean(String.valueOf(body.get("simulation")));
+        List<String> codes = new java.util.ArrayList<>();
+
+        String base64 = body == null || body.get("fichierBase64") == null
+                ? null : String.valueOf(body.get("fichierBase64"));
+        if (base64 != null && !base64.isEmpty()) {
+            String colonne = body.get("colonne") == null ? "" : String.valueOf(body.get("colonne"));
+            if (colonne.trim().isEmpty()) {
+                throw new com.ubisenderpro.service.ValidationException("colonne",
+                        "Choisissez la colonne du fichier qui contient les codes clients.");
+            }
+            String nomFichier = body.get("nomFichier") == null ? "" : String.valueOf(body.get("nomFichier"));
+            String sep = body.get("separateur") == null ? ";" : String.valueOf(body.get("separateur"));
+            try {
+                List<Map<String, String>> lignes = com.ubisenderpro.importer.FileParser.parse(
+                        java.util.Base64.getDecoder().decode(base64), nomFichier,
+                        sep.isEmpty() ? ';' : sep.charAt(0));
+                for (Map<String, String> l : lignes) { codes.add(l.get(colonne)); }
+            } catch (Exception e) {
+                throw new com.ubisenderpro.service.ValidationException("fichier",
+                        "Lecture du fichier impossible. Vérifiez qu'il s'agit bien d'un .csv ou d'un .xlsx.");
+            }
+        } else {
+            Object brut = body == null ? null : body.get("codes");
+            if (brut instanceof List) {
+                for (Object o : (List<?>) brut) { codes.add(o == null ? "" : String.valueOf(o)); }
+            }
+        }
+        return Response.ok(listeService.ajouterParCodes(id, codes, simulation)).build();
     }
 }

@@ -74,7 +74,7 @@ Usp.info.grille = function (filtre, libelleTab) {
     Usp.info._stores.push(store);
     var historique = !!filtre.historique;
     return {
-        xtype: 'grid', title: libelleTab, store: store,
+        xtype: 'grid', title: libelleTab, store: store, rapportNom: 'informations',
         columns: [
             { text: 'Code', dataIndex: 'code', width: 120 },
             { text: 'Type', dataIndex: 'type', width: 180, renderer: Usp.info.typeLib },
@@ -204,7 +204,10 @@ Usp.info.form = function (store, rec, typeParDefaut) {
             { text: 'Enregistrer', handler: function (b) {
                 var form = b.up('window').down('form').getForm();
                 if (!form.isValid()) { return; }
-                var v = form.getValues();
+                // Chaînes vides -> null : les dates et nombres non renseignés ne
+                // partent plus sous la forme "" (le serveur les tolère désormais,
+                // mais un corps propre évite tout aller-retour inutile).
+                var v = Usp.compact(form.getValues());
                 // listeId / segmentationId : null si non choisi (évite l'échec de désérialisation Long).
                 if (v.listeId === '' || v.listeId == null) { delete v.listeId; } else { v.listeId = Number(v.listeId); }
                 if (v.segmentationId === '' || v.segmentationId == null) { delete v.segmentationId; } else { v.segmentationId = Number(v.segmentationId); }

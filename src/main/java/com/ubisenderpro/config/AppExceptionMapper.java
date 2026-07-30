@@ -37,10 +37,26 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
 
     @EJB
     private AuditService auditService;
+    @EJB
+    private com.ubisenderpro.service.SupportEventService supportEventService;
     @Context
     private HttpHeaders headers;
     @Context
     private UriInfo uriInfo;
+
+    /** Alimente le journal du Centre de support (best-effort, jamais bloquant). */
+    private void capturer(String type, String chemin, String message, Throwable ex) {
+        try {
+            String payload = null;
+            if (ex != null) {
+                StringBuilder sb = new StringBuilder(ex.getClass().getName());
+                StackTraceElement[] st = ex.getStackTrace();
+                for (int i = 0; i < st.length && i < 8; i++) { sb.append("\n  at ").append(st[i]); }
+                payload = sb.toString();
+            }
+            supportEventService.collecter(type, libelleMenu(chemin), "ERROR", message, payload, null, "/" + chemin);
+        } catch (RuntimeException ignore) { /* la capture ne doit jamais gêner la réponse */ }
+    }
 
     @Override
     public Response toResponse(Throwable ex) {
@@ -94,6 +110,28 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
                     .type(MediaType.APPLICATION_JSON).entity(corpsJson).build();
         }
 
+        // Même erreur de format, mais côté JSON-B (Yasson) : c'est ce fournisseur —
+        // et non Jackson — que Payara utilise pour lire les corps de requête, donc
+        // le cas se présente réellement en production. Le message de Yasson porte le
+        // nom de la propriété fautive : on le cite plutôt que de renvoyer un 500 opaque.
+        String jsonb = messageJsonb(ex);
+        if (jsonb != null) {
+            String champ = entreApostrophes(jsonb);
+            if ("?".equals(champ)) { champ = null; }
+            String message = champ != null
+                    ? "La valeur saisie pour « " + libelleColonne(champ) + " » n'est pas au bon format "
+                      + "(nombre ou date attendu)."
+                    : "Le format des données envoyées est invalide. Vérifiez les champs numériques et les dates.";
+            LOG.warning("FORMAT_KO chemin=/" + chemin + (champ != null ? " champ=" + champ : "")
+                    + " : " + jsonb);
+            auditService.tracer(auth, "VALIDATION_REFUS", "Saisie", null, message);
+            Map<String, Object> corpsJson = new LinkedHashMap<>();
+            corpsJson.put("erreur", message);
+            if (champ != null) { corpsJson.put("champ", champ); }
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .type(MediaType.APPLICATION_JSON).entity(corpsJson).build();
+        }
+
         // Violation de contrainte BDD (NOT NULL, doublon, clé étrangère) : message clair
         // adapté au menu + log précis, plutôt qu'un message technique opaque.
         String sql = messageSql(ex);
@@ -101,6 +139,7 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
             String menu = libelleMenu(chemin);
             String message = traduireSql(sql, menu);
             LOG.warning("CONTRAINTE_BDD chemin=/" + chemin + " menu=\"" + menu + "\" : " + sql);
+            capturer("SQL", chemin, sql, null);
             auditService.tracer(auth, "ERREUR_SAISIE", menu, null, message);
             Map<String, Object> corps = new LinkedHashMap<>();
             corps.put("erreur", message);
@@ -112,6 +151,8 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
         // Erreur inattendue : trace complète côté serveur, message clair côté client.
         String menu = libelleMenu(chemin);
         LOG.log(Level.SEVERE, "ERREUR_SERVEUR chemin=/" + chemin + " menu=\"" + menu + "\" : " + ex.getMessage(), ex);
+        capturer("EXCEPTION_JAVA", chemin,
+                ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName(), ex);
         auditService.tracer(auth, "ERREUR_SERVEUR", menu, null,
                 "Erreur technique : " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
         Map<String, Object> body = new LinkedHashMap<>();
@@ -137,6 +178,24 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
         return null;
     }
 
+    /**
+     * Recherche dans la chaîne des causes un échec de <em>lecture</em> JSON-B.
+     * On exige la mention « deserialize » pour ne pas transformer en 400 une
+     * erreur survenue à l'écriture de la réponse (qui, elle, relève du 500).
+     */
+    static String messageJsonb(Throwable ex) {
+        Throwable c = ex;
+        int garde = 0;
+        while (c != null && garde++ < 15) {
+            String m = c.getMessage();
+            if (m != null && m.contains("deserialize") && c instanceof javax.json.bind.JsonbException) {
+                return m;
+            }
+            c = c.getCause();
+        }
+        return null;
+    }
+
     /** Traduit un message SQL technique en message utilisateur explicite. */
     private String traduireSql(String sql, String menu) {
         if (sql.contains("cannot be null")) {
@@ -151,7 +210,11 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
                     + "ou cet enregistrement est déjà utilisé ailleurs.";
         }
         if (sql.contains("Data too long")) {
-            return "Une valeur saisie est trop longue (" + menu + "). Raccourcissez le champ concerné.";
+            // Le message SQL porte le nom de la colonne : le citer evite de laisser
+            // l'utilisateur chercher quel champ raccourcir.
+            String col = entreApostrophes(sql);
+            return "Le champ « " + libelleColonne(col) + " » est trop long (" + menu
+                    + "). Raccourcissez-le.";
         }
         return "Saisie invalide (" + menu + "). Vérifiez les champs renseignés.";
     }
@@ -174,8 +237,36 @@ public class AppExceptionMapper implements ExceptionMapper<Throwable> {
             case "titre": return "Titre";
             case "code": return "Code";
             case "type": return "Type";
-            default: return col == null ? "?" : col.replace('_', ' ');
+            case "description": return "Description";
+            case "nom": return "Nom";
+            case "objectif": return "Objectif";
+            case "message": return "Message";
+            case "dateLivraison": return "Date de livraison";
+            case "dateResolution": return "Date estimée de résolution";
+            case "dateGarde": return "Date de la garde";
+            case "dateEnvoi": return "Date d'envoi";
+            case "dateFinValidite": return "Fin de validité";
+            case "dateDebut": return "Date de début";
+            case "dateFin": return "Date de fin";
+            default: return col == null ? "?" : humaniser(col);
         }
+    }
+
+    /**
+     * Rend lisible un identifiant technique : {@code date_livraison} et
+     * {@code dateLivraison} donnent tous deux « date livraison ». Les noms de
+     * colonnes SQL sont en minuscules avec underscores, les propriétés JSON en
+     * camelCase : les deux formes arrivent ici selon l'origine de l'erreur.
+     */
+    private String humaniser(String nom) {
+        if (nom.indexOf('_') >= 0) { return nom.replace('_', ' '); }
+        StringBuilder sb = new StringBuilder(nom.length() + 4);
+        for (int i = 0; i < nom.length(); i++) {
+            char c = nom.charAt(i);
+            if (i > 0 && Character.isUpperCase(c)) { sb.append(' ').append(Character.toLowerCase(c)); }
+            else { sb.append(c); }
+        }
+        return sb.toString();
     }
 
     /** Libellé du menu déduit du chemin REST (pour un message adapté). */

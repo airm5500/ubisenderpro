@@ -38,7 +38,10 @@ function bruit(args) {
   return false;
 }
 
-const origErr = console.error.bind(console);
-const origLog = console.log.bind(console);
-console.error = function () { if (!bruit(arguments)) { origErr.apply(null, arguments); } };
-console.log = function () { if (!bruit(arguments)) { origLog.apply(null, arguments); } };
+// Tous les canaux de la console sont couverts : libsignal n'utilise pas
+// seulement console.log/error (les dumps SessionEntry passaient par info/warn).
+for (const canal of ['log', 'error', 'info', 'warn', 'debug', 'trace']) {
+  const origine = console[canal] && console[canal].bind(console);
+  if (!origine) { continue; }
+  console[canal] = function () { if (!bruit(arguments)) { origine.apply(null, arguments); } };
+}

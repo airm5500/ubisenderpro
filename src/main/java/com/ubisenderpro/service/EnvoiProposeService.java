@@ -83,6 +83,8 @@ public class EnvoiProposeService {
     public static final String CLE_ANNIV_SANS_AVIS = "anniversaire.envoi_sans_avis";
     /** URL publique de base (pour joindre les pièces jointes en mode auto, hors contexte HTTP). */
     public static final String CLE_URL_BASE = "app.url_base";
+    /** Seuil au-delà duquel les produits d'une promotion ne sont plus listés dans le message. */
+    public static final String CLE_SEUIL_PRODUITS = "promo.max_produits_message";
     /** Audience virtuelle : contacts dont c'est l'anniversaire aujourd'hui. */
     public static final String AUDIENCE_ANNIVERSAIRE = "ANNIVERSAIRE_JOUR";
 
@@ -573,11 +575,18 @@ public class EnvoiProposeService {
             corps = construireMessage(e, p);
             verifierResidu(corps);
             contexte = variablesContextePromo(e, p);
-            // Pièce jointe .xlsx (produits de la promo) hébergée puis attachée en en-tête document.
-            byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
-            String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
-                    xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
-            modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
+            if (produitsDansMessage(p.getId())) {
+                // Les produits sont annoncés dans le texte : pas de pièce jointe,
+                // qui ferait doublon (règle : la liste OU le fichier).
+                modele = creerModele(e.getTitre(), corps, null, null, "PROMOTION", contexte);
+            } else {
+                // Trop de produits pour le message : ils partent en .xlsx héberge,
+                // attaché au modèle en en-tête document.
+                byte[] xlsx = xlsxService.genererClasseurProduits(p.getId());
+                String url = urlMedia(baseUrl, mediaFichierService.enregistrer(
+                        xlsx, PromotionXlsxService.MIME, "Promotion-" + slug(p.getNom()) + ".xlsx").getId());
+                modele = creerModele(e.getTitre(), corps, "document", url, "PROMOTION", contexte);
+            }
         } else if ("ANNONCE_MENSUELLE".equals(e.getType())) {
             LocalDate premier = premierDuMois(e);
             List<Promotion> promos = promosDuMois(premier);
@@ -606,13 +615,24 @@ public class EnvoiProposeService {
 
         Campagne c = new Campagne();
         c.setNom(e.getTitre());
-        c.setDescription(corps);
+        // Résumé court : recopier tout le message ici rendait le champ
+        // « Description » illisible dans le formulaire. Le texte réellement
+        // envoyé vit dans le modèle (et lui seul est utilisé à l'envoi).
+        c.setDescription(resumeCampagne(objectif, e.getTitre()));
         c.setObjectif(objectif);
         c.setCategorie(categorie);
         c.setStatut("BROUILLON");
         // Messages riches (texte libre + emojis + pièce jointe) : canal WhatsApp Web
         // par défaut ; l'opérateur peut basculer sur Cloud API avant l'envoi.
         c.setCanal("WEB");
+        // Sécurité : une campagne sans modèle est inutilisable (elle ne peut ni
+        // s'afficher ni se lancer). Mieux vaut refuser la validation avec un
+        // message clair que de laisser un brouillon impossible à envoyer.
+        if (modele == null || modele.getId() == null) {
+            throw new ValidationException("modele",
+                    "Le modèle de message n'a pas pu être créé. Réessayez ; "
+                    + "si le problème persiste, contactez l'administrateur.");
+        }
         c.setModeleId(modele.getId());
         // Audience (§16) : mémorise le ciblage et les segmentations résolues.
         if (audienceCampagne != null && !audienceCampagne.isEmpty()) {
@@ -823,7 +843,58 @@ public class EnvoiProposeService {
         BigDecimal taux = maxTauxUg(p.getId());
         v.put("taux_ug_max", taux == null ? "" : taux.stripTrailingZeros().toPlainString());
         v.put("avantage_ug", avantageUg(taux));
+        // Soit la liste dans le message, soit le fichier joint — jamais les deux.
+        boolean listable = produitsDansMessage(p.getId());
+        v.put("liste_produits", listable ? listeProduitsPromo(p.getId()) + "\n\n" : "");
+        v.put("mention_fichier", listable ? ""
+                : "📎 Consultez le fichier Excel joint pour découvrir les produits "
+                  + "et leurs conditions promotionnelles.\n\n");
         return v;
+    }
+
+    /**
+     * Vrai si les produits de la promotion sont annoncés DANS le message ; faux
+     * s'ils partent dans le fichier Excel joint. Règle métier : l'un ou l'autre,
+     * jamais les deux — un message qui liste les produits n'a pas de pièce
+     * jointe, et inversement.
+     */
+    private boolean produitsDansMessage(Long promotionId) {
+        int nb = nbProduitsActifs(promotionId);
+        return nb > 0 && nb <= seuilProduitsMessage();
+    }
+
+    /** Au-delà de ce nombre de produits, le message renvoie vers le fichier Excel. */
+    private int seuilProduitsMessage() {
+        try {
+            return Integer.parseInt(parametreService.valeur(CLE_SEUIL_PRODUITS, "10").trim());
+        } catch (RuntimeException e) {
+            return 10;
+        }
+    }
+
+    /**
+     * Liste lisible des produits d'une promotion, telle qu'elle apparaît dans le
+     * message : nom (ou CIP7 à défaut), quantité minimale et unités gratuites.
+     */
+    String listeProduitsPromo(Long promotionId) {
+        StringBuilder sb = new StringBuilder();
+        for (com.ubisenderpro.entity.PromotionProduit pp : promotionProduitService.lister(promotionId)) {
+            if (!pp.isActif()) { continue; }
+            if (sb.length() > 0) { sb.append('\n'); }
+            String nom = nz(pp.getNomProduit()).isEmpty() ? nz(pp.getCip7()) : nz(pp.getNomProduit());
+            sb.append("✅ ").append(nom);
+            List<String> details = new ArrayList<>();
+            if (pp.getQuantiteMinimale() != null && pp.getQuantiteMinimale() > 0) {
+                details.add("dès " + pp.getQuantiteMinimale() + " u.");
+            }
+            if (pp.getQuantiteUg() != null && pp.getQuantiteUg() > 0) {
+                details.add("+" + pp.getQuantiteUg() + " u. offerte(s)");
+            } else if (pp.getTauxUg() != null && pp.getTauxUg().signum() > 0) {
+                details.add("+" + pp.getTauxUg().stripTrailingZeros().toPlainString() + " %");
+            }
+            if (!details.isEmpty()) { sb.append("\n   ").append(String.join(" · ", details)); }
+        }
+        return sb.toString();
     }
 
     /** Formule d'avantage UG, jamais vide : « jusqu'à X % d'unités gratuites » ou « des unités gratuites ». */
@@ -948,6 +1019,20 @@ public class EnvoiProposeService {
 
     private String fdate(LocalDateTime d) { return d == null ? "" : d.toLocalDate().format(DF); }
     private String nz(String s) { return s == null ? "" : s.trim(); }
+
+    /**
+     * Résumé court porté par la campagne générée : rappelle l'origine et la date
+     * de génération. Le message complet reste dans le modèle associé — le
+     * recopier ici rendait le champ « Description » du formulaire illisible.
+     */
+    static String resumeCampagne(String objectif, String titre) {
+        String o = (objectif == null || objectif.trim().isEmpty()) ? "Envoi" : objectif.trim();
+        String t = (titre == null || titre.trim().isEmpty()) ? "" : " « " + titre.trim() + " »";
+        String resume = o + t + " — générée automatiquement le "
+                + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " depuis une proposition d'envoi. Le message se trouve dans le modèle associé.";
+        return resume.length() <= 500 ? resume : resume.substring(0, 500);
+    }
 
     private String tronquer(String s, int max) {
         if (s == null) { return null; }

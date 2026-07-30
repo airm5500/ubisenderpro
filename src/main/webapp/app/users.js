@@ -184,7 +184,7 @@ Usp.users.gridPanel = function () {
     });
 
     return {
-        xtype: 'grid', title: '👤 Utilisateurs', store: store,
+        xtype: 'grid', title: '👤 Utilisateurs', store: store, rapportNom: 'utilisateurs',
         columns: [
             { text: '', dataIndex: 'avatar', width: 44, align: 'center', sortable: false, menuDisabled: true,
               renderer: function (v) { return '<span style="font-size:16px">' + (v || '👤') + '</span>'; } },
@@ -469,7 +469,7 @@ Usp.users.connexionsPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: '🔑 Historique des connexions', store: store,
+        xtype: 'grid', title: '🔑 Historique des connexions', store: store, rapportNom: 'connexions',
         columns: [
             { text: 'Utilisateur', dataIndex: 'login', width: 140 },
             { text: 'Connexion', dataIndex: 'connexionAt', width: 140, renderer: Usp.users.fmtDate },
@@ -543,7 +543,7 @@ Usp.users.journalPanel = function () {
         autoLoad: true
     });
     return {
-        xtype: 'grid', title: '📜 Journal d\'actions', store: store,
+        xtype: 'grid', title: '📜 Journal d\'actions', store: store, rapportNom: 'journal_actions',
         columns: [
             { text: 'Date', dataIndex: 'createdAt', width: 140, renderer: Usp.users.fmtDate },
             { text: 'Utilisateur', dataIndex: 'login', width: 130 },
