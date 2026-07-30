@@ -1167,11 +1167,15 @@ Usp.majSelectivePanel = function () {
             Ext.Msg.alert('Info', 'Cochez au moins un champ à modifier (segmentation, agence, région ou tournée).');
             return;
         }
-        Ext.Msg.confirm('Mise à jour sélective',
-            'Appliquer à <b>' + recs.length + '</b> compte(s) :<br>• '
-            + libelles.map(Ext.String.htmlEncode).join('<br>• ')
-            + '<br><br>Les autres champs des fiches ne sont pas modifiés.',
-            function (btn) {
+        // Ext.Msg.confirm a une largeur par défaut trop étroite : le message
+        // était tronqué. Largeur explicite + hauteur libre.
+        Ext.Msg.show({
+            title: 'Mise à jour sélective', icon: Ext.Msg.QUESTION, buttons: Ext.Msg.YESNO,
+            width: 460, minHeight: 160,
+            msg: 'Appliquer à <b>' + recs.length + '</b> compte(s) :<br>• '
+                + libelles.map(Ext.String.htmlEncode).join('<br>• ')
+                + '<br><br>Les autres champs des fiches ne sont pas modifiés.',
+            fn: function (btn) {
                 if (btn !== 'yes') { return; }
                 Usp.ajax({ url: '/clients/maj-selective', method: 'POST',
                     jsonData: { ids: recs.map(function (r) { return r.get('id'); }), champs: champs },
@@ -1181,9 +1185,25 @@ Usp.majSelectivePanel = function () {
                         charger(); chargerTournees();
                         if (Usp._clientStores) { Usp.reloadClients(); }
                         Usp.toast((r.modifies || 0) + ' compte(s) mis à jour.');
+                        // Enchaîner sur un autre lot avec les mêmes valeurs est
+                        // fréquent : on demande avant de vider les champs.
+                        Ext.Msg.confirm('Champs de mise à jour',
+                            'Réinitialiser les champs « Nouvelles valeurs » ?',
+                            function (b2) {
+                                if (b2 !== 'yes') { return; }
+                                ['msCaseSeg', 'msCaseAgence', 'msCaseRegion', 'msCaseTournee'].forEach(function (id) {
+                                    var c = panel.down('#' + id);
+                                    if (c) { c.setValue(false); }
+                                });
+                                ['msSeg', 'msAgence', 'msRegion', 'msTournee'].forEach(function (id) {
+                                    var c = panel.down('#' + id);
+                                    if (c) { c.setValue(null); }
+                                });
+                            });
                     },
                     failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
-            });
+            }
+        });
     };
 
     // Une case à cocher par champ : elle seule décide si le champ est appliqué.
@@ -1224,7 +1244,7 @@ Usp.majSelectivePanel = function () {
                 { xtype: 'combobox', emptyText: 'Tournée', width: 120, store: tourneeStore, valueField: 'v',
                   displayField: 'v', queryMode: 'local', editable: false, itemId: 'msFTournee',
                   listeners: { change: function (f, v) { etat.tournee = v || ''; charger(); } } },
-                { text: '♻️', tooltip: 'Effacer tous les filtres', handler: function (b) {
+                { text: '♻️ Réinitialiser', tooltip: 'Effacer toutes les zones de filtre', handler: function (b) {
                     var tb = b.up('toolbar');
                     tb.down('#msQ').setValue(''); tb.down('#msFSeg').setValue(null);
                     tb.down('#msFAgence').setValue(null); tb.down('#msFRegion').setValue(null);
@@ -1274,11 +1294,14 @@ Usp.majSelectivePanel = function () {
                     store: tourneeStore, valueField: 'v', displayField: 'v',
                     queryMode: 'local', forceSelection: false,
                     emptyText: 'Choisir ou saisir…' }),
-                { xtype: 'displayfield', itemId: 'msCompteur', hideLabel: true, margin: '6 0 0 0',
-                  value: '<span style="color:#888">Aucun compte coché.</span>' }
-              ],
-              bbar: ['->', { text: '✅ Appliquer', tooltip: 'Appliquer aux comptes cochés',
-                  handler: function (b) { appliquer(b.up('panel').up('panel')); } }]
+                { xtype: 'displayfield', itemId: 'msCompteur', hideLabel: true, margin: '4 0 0 0',
+                  value: '<span style="color:#888">Aucun compte coché.</span>' },
+                // Bouton DANS le formulaire, sous le compteur : en barre du bas
+                // il chevauchait les info-bulles et pouvait sortir de l'écran.
+                { xtype: 'button', text: '✅ Appliquer aux comptes cochés', scale: 'medium',
+                  margin: '12 0 0 0', anchor: '100%',
+                  handler: function (b) { appliquer(b.up('panel').up('panel')); } }
+              ]
             }
         ]
     };
