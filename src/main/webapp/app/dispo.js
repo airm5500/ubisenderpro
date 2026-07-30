@@ -326,8 +326,28 @@ Usp.dispo.produitsGrid = function (evenementId) {
         ],
         tbar: [
             Usp.permBtn('dispo', 'CREER', { text: '➕ Ajouter un produit', handler: function () { Usp.dispo.produitForm(store, evenementId, null); } }),
-            { xtype: 'filefield', buttonOnly: true, hideLabel: true, buttonText: '📥 Importer Excel',
-              listeners: { change: function (f) { Usp.dispo.importProduits(f, evenementId, store); } } }
+            { text: '📥 Importer Excel', tooltip: 'Assistant : choix des colonnes du fichier',
+              handler: function () {
+                  Usp.importer.mini({
+                      titre: 'Importer les produits de l\u2019\u00e9v\u00e9nement',
+                      url: '/dispo-evenements/' + evenementId + '/produits/import',
+                      accept: /\.xlsx?$/i,
+                      champs: [
+                    ['cip7', 'CIP7', false], ['cip13', 'CIP13', false],
+                    ['nom', 'Nom du produit', false],
+                    ['quantite', 'Quantit\u00e9 disponible', false], ['seuil', 'Seuil d\u2019alerte', false],
+                    ['couverture', 'Couverture (jours)', false],
+                    ['peremption', 'P\u00e9remption', false], ['lot', 'Lot', false],
+                    ['agence', 'Agence', false], ['lien', 'Lien de r\u00e9servation', false]
+                ],
+                      validation: function (m) {
+                          return (m.cip7 || m.cip13) ? null
+                              : 'Choisissez la colonne du CIP7 ou celle du CIP13.';
+                      },
+                      onDone: function () { store.load(); },
+                      onSuccess: Usp.dispo.rapportImport
+                  });
+              } }
         ],
         listeners: {
             itemdblclick: function (g, rec) { Usp.dispo.produitForm(store, evenementId, rec); },
@@ -422,29 +442,6 @@ Usp.dispo.produitForm = function (store, evenementId, rec) {
     win.show();
 };
 
-/* Import Excel des produits + rapport. */
-Usp.dispo.importProduits = function (f, evenementId, store) {
-    var file = f.fileInputEl.dom.files[0];
-    if (!file) { return; }
-    if (!/\.xlsx?$/i.test(file.name)) { Ext.Msg.alert('Import', 'Choisissez un fichier Excel (.xlsx).'); f.reset(); return; }
-    var reader = new FileReader();
-    reader.onload = function (e) {
-        var b64 = (e.target.result || '').split(',')[1];
-        Usp.ajax({ url: '/dispo-evenements/' + evenementId + '/produits/import', method: 'POST',
-            jsonData: { fichierBase64: b64, nomFichier: file.name },
-            success: function (resp) {
-                var r = Ext.decode(resp.responseText) || {};
-                store.load(); f.reset();
-                Usp.dispo.rapportImport(r);
-            },
-            failure: function (resp) {
-                var m = 'Import impossible.';
-                try { m = Ext.decode(resp.responseText).erreur || m; } catch (ex) {}
-                Ext.Msg.alert('Erreur', m); f.reset();
-            } });
-    };
-    reader.readAsDataURL(file);
-};
 
 Usp.dispo.rapportImport = function (r) {
     var err = (r.erreurs || []);

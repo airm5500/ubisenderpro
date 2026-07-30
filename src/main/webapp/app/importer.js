@@ -440,3 +440,133 @@ Usp.importer.downloadRejets = function (importId) {
     };
     xhr.send();
 };
+
+/* =====================================================================
+ * Mini-assistant d'import : même expérience que l'assistant CLIENTS
+ * (détection des colonnes du fichier, cases « je récupère ce champ »,
+ * listes de correspondance) pour les imports ciblés — produits d'une
+ * promotion, produits d'un événement de disponibilité…
+ *
+ * cfg = {
+ *   titre      : intitulé de la fenêtre,
+ *   url        : endpoint POST { fichierBase64, nomFichier, mapping },
+ *   champs     : [[cle, libellé, obligatoire(bool)]] — clés côté serveur,
+ *   validation : function (mapping) -> message d'erreur ou null,
+ *   accept     : extension imposée (ex. /\.xlsx?$/i), facultatif,
+ *   onSuccess  : function (reponseDecodee) — affiche le rapport,
+ *   onDone     : rechargement de la grille appelante
+ * }
+ * ===================================================================== */
+Usp.importer.mini = function (cfg) {
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col'] });
+    var fileData = { base64: null, nom: null };
+
+    var lignes = (cfg.champs || []).map(function (c) {
+        var obligatoire = !!c[2];
+        return { xtype: 'fieldcontainer', fieldLabel: c[1] + (obligatoire ? ' *' : ''), layout: 'hbox',
+            items: [
+                { xtype: 'checkbox', name: 'imp_' + c[0], checked: obligatoire, disabled: obligatoire,
+                  margin: '0 6 0 0',
+                  listeners: { change: function (cb, coche) {
+                      var combo = cb.up('fieldcontainer').down('combobox');
+                      combo.setDisabled(!coche);
+                      if (!coche) { combo.setValue(null); }
+                  } } },
+                { xtype: 'combobox', name: 'map_' + c[0], flex: 1,
+                  store: colStore, valueField: 'col', displayField: 'col',
+                  queryMode: 'local', editable: false, forceSelection: true,
+                  disabled: !obligatoire, emptyText: 'Choisir la colonne du fichier…' }
+            ] };
+    });
+
+    var detecter = function (win) {
+        if (!fileData.base64) { return; }
+        var etat = win.down('#miniEtat');
+        etat.setValue('<span style="color:#888">Analyse du fichier…</span>');
+        Usp.ajax({ url: '/imports/colonnes', method: 'POST',
+            jsonData: { fichierBase64: fileData.base64, nomFichier: fileData.nom, separateur: ';' },
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                var cols = r.colonnes || [];
+                colStore.loadData(cols.map(function (c) { return { col: c }; }));
+                var index = {};
+                cols.forEach(function (col) {
+                    var k = Usp.importer.normaliser(col);
+                    if (k && !index.hasOwnProperty(k)) { index[k] = col; }
+                });
+                var trouves = 0;
+                (cfg.champs || []).forEach(function (c) {
+                    var col = index[Usp.importer.normaliser(c[0])] || index[Usp.importer.normaliser(c[1])];
+                    if (!col) { return; }
+                    var caseImp = win.down('[name=imp_' + c[0] + ']');
+                    var combo = win.down('[name=map_' + c[0] + ']');
+                    if (caseImp && !caseImp.getValue()) { caseImp.setValue(true); }
+                    combo.setDisabled(false); combo.setValue(col); trouves++;
+                });
+                etat.setValue(cols.length
+                    ? '<span style="color:#2e7d32">' + cols.length + ' colonne(s) lue(s)'
+                        + (trouves ? ', ' + trouves + ' reconnue(s) automatiquement' : '') + '.</span>'
+                    : '<span style="color:#c62828">Aucune colonne détectée : la 1re ligne doit porter les intitulés.</span>');
+            },
+            failure: function (resp) {
+                win.down('#miniEtat').setValue('<span style="color:#c62828">'
+                    + Ext.String.htmlEncode(Usp.erreurServeur(resp)) + '</span>');
+            } });
+    };
+
+    var importer = function (win) {
+        if (!fileData.base64) { Ext.Msg.alert('Info', 'Choisissez un fichier.'); return; }
+        var mapping = {}, manquants = [];
+        (cfg.champs || []).forEach(function (c) {
+            var caseImp = win.down('[name=imp_' + c[0] + ']');
+            var v = caseImp && !caseImp.getValue() ? null : win.down('[name=map_' + c[0] + ']').getValue();
+            if (v) { mapping[c[0]] = v; }
+            else if (c[2]) { manquants.push(c[1]); }
+        });
+        if (manquants.length) {
+            Ext.Msg.alert('Champs obligatoires', 'Choisissez la colonne pour : <b>'
+                + manquants.map(Ext.String.htmlEncode).join('</b>, <b>') + '</b>.');
+            return;
+        }
+        var refus = cfg.validation ? cfg.validation(mapping) : null;
+        if (refus) { Ext.Msg.alert('Correspondance incomplète', refus); return; }
+        Usp.ajax({ url: cfg.url, method: 'POST',
+            jsonData: { fichierBase64: fileData.base64, nomFichier: fileData.nom, mapping: mapping },
+            success: function (resp) {
+                var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
+                win.close();
+                if (cfg.onDone) { cfg.onDone(); }
+                if (cfg.onSuccess) { cfg.onSuccess(r); }
+            },
+            failure: function (resp) { Ext.Msg.alert('Erreur', Usp.erreurServeur(resp)); } });
+    };
+
+    var win = Ext.create('Ext.window.Window', {
+        title: cfg.titre || 'Assistant d\'import', width: 560, modal: true,
+        maxHeight: Ext.getBody().getViewSize().height - 40, bodyPadding: 12, autoScroll: true,
+        items: [{ xtype: 'form', border: false, defaults: { anchor: '100%', labelWidth: 170 }, items: [
+            { xtype: 'filefield', name: 'fichier', fieldLabel: 'Fichier', buttonText: 'Parcourir...',
+              listeners: { change: function (f) {
+                  var file = f.fileInputEl.dom.files[0]; if (!file) { return; }
+                  if (cfg.accept && !cfg.accept.test(file.name)) {
+                      Ext.Msg.alert('Import', 'Choisissez un fichier Excel (.xlsx).'); f.reset(); return;
+                  }
+                  fileData.nom = file.name;
+                  var reader = new FileReader();
+                  reader.onload = function (e) {
+                      fileData.base64 = e.target.result.split(',')[1];
+                      detecter(f.up('window'));
+                  };
+                  reader.readAsDataURL(file);
+              } } },
+            { xtype: 'displayfield', itemId: 'miniEtat', hideLabel: true,
+              value: '<span style="color:#888">Choisissez un fichier : ses colonnes sont détectées '
+                  + 'automatiquement. Cochez les champs à récupérer.</span>' }
+        ].concat(lignes) }],
+        buttons: [
+            { text: 'Importer', handler: function (b) { importer(b.up('window')); } },
+            { text: 'Annuler', handler: function (b) { b.up('window').close(); } }
+        ]
+    });
+    win.show();
+};

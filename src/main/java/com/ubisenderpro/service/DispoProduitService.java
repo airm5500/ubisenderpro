@@ -138,6 +138,15 @@ public class DispoProduitService {
      * @return rapport { total, crees, majs, erreurs:[{ligne,raison}] }.
      */
     public Map<String, Object> importer(Long evenementId, byte[] contenu) throws Exception {
+        return importer(evenementId, contenu, null);
+    }
+
+    /** Clés de correspondance acceptées par l'assistant d'import. */
+    public static final String[] CLES_IMPORT = { "cip7", "cip13", "nom", "quantite", "seuil",
+            "couverture", "peremption", "lot", "agence", "lien" };
+
+    public Map<String, Object> importer(Long evenementId, byte[] contenu,
+                                        java.util.Map<String, String> mapping) throws Exception {
         DispoEvenement evt = em.find(DispoEvenement.class, evenementId);
         if (evt == null) { throw new ValidationException("evenement", "Événement introuvable."); }
         int crees = 0, majs = 0;
@@ -146,7 +155,10 @@ public class DispoProduitService {
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(contenu))) {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter fmt = new DataFormatter();
-            int[] col = entetes(sheet.getRow(sheet.getFirstRowNum()), fmt);
+            Row enTete = sheet.getRow(sheet.getFirstRowNum());
+            int[] col = (mapping == null || mapping.isEmpty())
+                    ? entetes(enTete, fmt)
+                    : entetesMappees(enTete, fmt, CLES_IMPORT, mapping);
             int total = 0;
             for (int r = sheet.getFirstRowNum() + 1; r <= sheet.getLastRowNum(); r++) {
                 Row row = sheet.getRow(r);
@@ -206,6 +218,38 @@ public class DispoProduitService {
     }
 
     /** Repère les colonnes par en-tête (ordre par défaut si en-têtes absents). */
+
+    /** Normalisation d'intitulé : minuscules, sans accents (comparaisons). */
+    private static String norm(String s) {
+        return java.text.Normalizer.normalize(s == null ? "" : s.trim().toLowerCase(),
+                java.text.Normalizer.Form.NFD).replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+    }
+
+    /**
+     * Résolution des colonnes quand l'assistant a fourni une correspondance
+     * explicite champ -> intitulé de colonne : chaque champ est cherché par
+     * ÉGALITÉ d'intitulé (accents/casse ignorés) ; un champ non fourni vaut -1
+     * (ignoré), sans repli heuristique — l'utilisateur a choisi.
+     */
+    private int[] entetesMappees(Row header, DataFormatter fmt, String[] cles,
+                                 java.util.Map<String, String> mapping) {
+        int[] c = new int[cles.length];
+        java.util.Arrays.fill(c, -1);
+        if (header == null) { return c; }
+        java.util.Map<String, Integer> parIntitule = new java.util.HashMap<>();
+        for (int i = 0; i < header.getLastCellNum(); i++) {
+            String h = norm(txt(header, i, fmt));
+            if (!h.isEmpty() && !parIntitule.containsKey(h)) { parIntitule.put(h, i); }
+        }
+        for (int k = 0; k < cles.length; k++) {
+            String voulu = mapping.get(cles[k]);
+            if (voulu == null || voulu.trim().isEmpty()) { continue; }
+            Integer idx = parIntitule.get(norm(voulu));
+            if (idx != null) { c[k] = idx; }
+        }
+        return c;
+    }
+
     private int[] entetes(Row header, DataFormatter fmt) {
         int[] c = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
         if (header == null) { return c; }

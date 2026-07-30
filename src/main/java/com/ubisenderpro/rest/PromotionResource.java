@@ -148,6 +148,9 @@ public class PromotionResource {
         if (b64 == null || b64.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("erreur", "Fichier Excel manquant.")).build();
         }
-        return Response.ok(produitService.importer(id, Base64.getDecoder().decode(b64))).build();
+        @SuppressWarnings("unchecked")
+        Map<String, String> mapping = body.get("mapping") instanceof Map
+                ? (Map<String, String>) body.get("mapping") : null;
+        return Response.ok(produitService.importer(id, Base64.getDecoder().decode(b64), mapping)).build();
     }
 }

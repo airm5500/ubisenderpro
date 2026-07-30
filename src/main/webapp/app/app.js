@@ -1590,7 +1590,7 @@ Usp.listeMembresWindow = function (rec) {
  * reste possible pour les cas simples. */
 Usp.listeImportAssistant = function (listeId, nomListe, onDone) {
     var fileData = { base64: null, nom: null };
-    var colStore = Ext.create('Ext.data.Store', { fields: ['col', 'exemples'] });
+    var colStore = Ext.create('Ext.data.Store', { fields: ['col'] });
 
     var detecter = function (win) {
         if (!fileData.base64) { return; }
@@ -1602,11 +1602,7 @@ Usp.listeImportAssistant = function (listeId, nomListe, onDone) {
             success: function (resp) {
                 var r = {}; try { r = Ext.decode(resp.responseText) || {}; } catch (e) {}
                 var cols = r.colonnes || [];
-                colStore.loadData(cols.map(function (c) {
-                    var vals = (r.exemples || []).map(function (l) { return l[c]; })
-                        .filter(function (v) { return v !== null && v !== undefined && v !== ''; });
-                    return { col: c, exemples: vals.slice(0, 3).join(' · ') };
-                }));
+                colStore.loadData(cols.map(function (c) { return { col: c }; }));
                 var combo = win.down('[name=colonne]');
                 combo.setValue(null);
                 // Pré-sélection : colonne dont l'intitulé évoque un code client.
@@ -1691,11 +1687,7 @@ Usp.listeImportAssistant = function (listeId, nomListe, onDone) {
                   + 'puis désignez celle des codes clients.</span>' },
             { xtype: 'combobox', name: 'colonne', fieldLabel: 'Colonne des codes clients',
               store: colStore, valueField: 'col', displayField: 'col', queryMode: 'local',
-              editable: false, forceSelection: true, emptyText: 'Détectée depuis le fichier…',
-              listConfig: { getInnerTpl: function () {
-                  return '<div><b>{col}</b><tpl if="exemples">'
-                      + '<div style="color:#888;font-size:11px">{exemples}</div></tpl></div>';
-              } } },
+              editable: false, forceSelection: true, emptyText: 'Détectée depuis le fichier…' },
             { xtype: 'textareafield', name: 'codes', height: 90,
               fieldLabel: 'ou collez des codes', emptyText: 'C001\nC002\nC003 (un par ligne — ignoré si un fichier est choisi)' }
         ] }],
