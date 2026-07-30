@@ -180,6 +180,56 @@ RAPPORTS = {
             ('adresseIp', 'Adresse IP', 80, 'Left'),
             ('poste', 'Poste', 80, 'Left'),
         ]},
+    'performance': {
+        'titre': 'Performance des campagnes', 'paysage': True,
+        'colonnes': [
+            ('nom', 'Campagne', 172, 'Left'),
+            ('categorie', 'Source', 72, 'Left'),
+            ('canal', 'Canal', 48, 'Left'),
+            ('nbDestinataires', 'Ciblés', 55, 'Right'),
+            ('nbEnvoyes', 'Envoyés', 55, 'Right'),
+            ('nbDistribues', 'Distribués', 60, 'Right'),
+            ('nbLus', 'Lus', 45, 'Right'),
+            ('nbRepondus', 'Réponses', 55, 'Right'),
+            ('nbEchoues', 'Échoués', 55, 'Right'),
+            ('tauxDistribution', '% Distrib.', 62, 'Right'),
+            ('tauxLecture', '% Lecture', 62, 'Right'),
+            ('tauxReponse', '% Réponse', 61, 'Right'),
+        ]},
+    'support_tickets': {
+        'titre': 'Tickets de support', 'paysage': False,
+        'colonnes': [
+            ('numero', 'N°', 75, 'Left'),
+            ('sujet', 'Sujet', 130, 'Left'),
+            ('type', 'Type', 55, 'Left'),
+            ('priorite', 'Priorité', 55, 'Left'),
+            ('statut', 'Statut', 80, 'Left'),
+            ('utilisateur', 'Par', 55, 'Left'),
+            ('affecteA', 'Affecté à', 50, 'Left'),
+            ('createdAt', 'Ouvert le', 55, 'Left'),
+        ]},
+    'support_demandes': {
+        'titre': 'Demandes reçues', 'paysage': False,
+        'colonnes': [
+            ('createdAt', 'Date', 70, 'Left'),
+            ('objet', 'Objet', 165, 'Left'),
+            ('nom', 'De', 90, 'Left'),
+            ('email', 'E-mail', 120, 'Left'),
+            ('creePar', 'Utilisateur', 55, 'Left'),
+            ('statut', 'Statut', 55, 'Left'),
+        ]},
+    'support_evenements': {
+        'titre': 'Diagnostic & bugs', 'paysage': True,
+        'colonnes': [
+            ('lastSeenAt', 'Dernière vue', 80, 'Left'),
+            ('niveau', 'Niveau', 50, 'Left'),
+            ('type', 'Type', 90, 'Left'),
+            ('module', 'Module', 90, 'Left'),
+            ('messageCourt', 'Message', 332, 'Left'),
+            ('occurrences', 'Occ.', 40, 'Right'),
+            ('utilisateur', 'Utilisateur', 60, 'Left'),
+            ('ticketId', 'Ticket', 60, 'Right'),
+        ]},
     'evolution': {
         'titre': 'Évolution des envois (30 jours)', 'paysage': False,
         'colonnes': [

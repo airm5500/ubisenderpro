@@ -63,6 +63,7 @@ public class RapportService {
             "disponibilites", "historique_envois", "informations",
             "rec_agences", "rec_encours", "rec_historique",
             "utilisateurs", "connexions", "journal_actions", "evolution",
+            "performance", "support_tickets", "support_demandes", "support_evenements",
             "releve", "releve_creances", "releve_paiements"
     };
 

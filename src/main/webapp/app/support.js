@@ -134,6 +134,7 @@ Usp.support.ticketsPanel = function (mine) {
     }
     return {
         xtype: 'grid', title: mine ? '🎫 Mes tickets' : '🎟️ Tous les tickets', store: store, columns: cols,
+        rapportNom: 'support_tickets',
         tbar: [
             { text: '➕ Nouveau ticket', cls: 'usp-btn-pri', handler: function () { Usp.support.ticketForm(store); } },
             { text: '🔄 Rafraîchir', handler: function () { store.load(); } }, '-',
@@ -143,8 +144,9 @@ Usp.support.ticketsPanel = function (mine) {
                   store.getProxy().extraParams.statut = v || ''; store.load(); } } },
             { xtype: 'textfield', emptyText: 'Rechercher (n°, sujet)…', width: 200,
               listeners: { change: { buffer: 350, fn: function (f, v) {
-                  store.getProxy().extraParams.q = v || ''; store.load(); } } } }
-        ],
+                  store.getProxy().extraParams.q = v || ''; store.load(); } } } },
+            '->'
+        ].concat(Usp.export.boutons(mine ? 'Mes tickets' : 'Tous les tickets')),
         listeners: { itemdblclick: function (g, rec) { Usp.support.ticketDetail(rec.get('id'), store); } }
     };
 };
@@ -286,6 +288,7 @@ Usp.support.demandesPanel = function () {
     });
     return {
         xtype: 'grid', title: '📥 Demandes reçues', store: store,
+        rapportNom: 'support_demandes',
         columns: [
             { text: 'Date', dataIndex: 'createdAt', width: 130, renderer: Usp.support.fdate },
             { text: 'Objet', dataIndex: 'objet', flex: 1 },
@@ -296,7 +299,8 @@ Usp.support.demandesPanel = function () {
                 var c = v === 'ENVOYEE' ? '#2e7d32' : (v === 'ECHOUEE' ? '#c62828' : '#777');
                 return '<span style="color:' + c + ';font-weight:bold">' + (v || '') + '</span>'; } }
         ],
-        tbar: [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }],
+        tbar: [{ text: '🔄 Rafraîchir', handler: function () { store.load(); } }, '->']
+            .concat(Usp.export.boutons('Demandes reçues')),
         listeners: { itemdblclick: function (g, rec) {
             Ext.Msg.show({ title: Ext.String.htmlEncode(rec.get('objet')), width: 560, buttons: Ext.Msg.OK,
                 msg: '<div style="max-height:340px;overflow:auto;white-space:pre-wrap">' +
@@ -320,6 +324,7 @@ Usp.support.diagnosticPanel = function () {
     var nivCouleur = { FATAL: '#8e0000', ERROR: '#c62828', WARN: '#ef6c00', INFO: '#1976d2' };
     return {
         xtype: 'grid', title: '🐞 Diagnostic & bugs', store: store,
+        rapportNom: 'support_evenements',
         columns: [
             { text: 'Dernière vue', dataIndex: 'lastSeenAt', width: 130, renderer: Usp.support.fdate },
             { text: 'Niveau', dataIndex: 'niveau', width: 70, renderer: function (v) {
@@ -358,7 +363,7 @@ Usp.support.diagnosticPanel = function () {
                       success: function (resp) { store.load();
                           Usp.toast(((Ext.decode(resp.responseText) || {}).purges || 0) + ' événement(s) purgé(s).'); } });
               } }
-        ],
+        ].concat(Usp.export.boutons('Diagnostic & bugs')),
         listeners: {
             cellclick: function (g, td, ci, rec, tr, ri, e) {
                 if (e.getTarget('.ev-voir')) {

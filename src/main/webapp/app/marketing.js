@@ -743,7 +743,26 @@ Usp.marketing.performance = function () {
               store: [['', 'Toutes sources'], ['PROMOTION', 'Promotions'], ['DISPONIBILITE', 'Dispo / Ruptures'], ['INFORMATION', 'Informations']] },
             { text: '🔎 Appliquer', handler: function (b) { charger(b.up('panel')); } },
             '->',
-            { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } }
+            { text: '🔄 Rafraîchir', handler: function (b) { charger(b.up('panel')); } },
+            // Éditions de l'onglet : PDF JasperReports (performance.jrxml) et
+            // classeur Excel — tous deux archivés côté serveur. Un élément de
+            // menu flotte hors de l'arbre des composants : le bouton mémorise
+            // sa grille au rendu (même approche que Usp.export.boutons).
+            (function () {
+                var grille = null;
+                return { text: '⬇️ Exporter',
+                    listeners: { afterrender: function (b) { grille = b.up('panel').down('grid'); } },
+                    menu: [
+                        { text: '📊 Excel (.xlsx)', handler: function () {
+                            if (!grille) { return; }
+                            Usp.rapportExcel('Performance des campagnes',
+                                Usp.export.colonnes(grille), Usp.marketing._perfLignes(grille)); } },
+                        { text: '🖨️ PDF', handler: function () {
+                            if (!grille) { return; }
+                            Usp.rapportPdfPost('performance', 'Performance des campagnes',
+                                Usp.marketing._perfLignes(grille)); } }
+                    ] };
+            })()
         ],
         items: [
             { xtype: 'component', itemId: 'perfSummary', style: 'padding:10px;background:#fafafa;border-bottom:1px solid #eee', html: '' },
@@ -765,6 +784,16 @@ Usp.marketing.performance = function () {
         ],
         listeners: { afterrender: function (p) { charger(p); } }
     };
+};
+
+/* Lignes de la grille Performance, prêtes pour une édition (Excel / PDF). */
+Usp.marketing._perfLignes = function (grid) {
+    var cols = Usp.export.colonnes(grid);
+    return grid.getStore().getRange().map(function (r) {
+        var l = {};
+        cols.forEach(function (c) { l[c.d] = Usp.export.valeur(r, c.d); });
+        return l;
+    });
 };
 
 Usp.marketing._perfHtml = function (t) {
