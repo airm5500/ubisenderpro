@@ -677,6 +677,10 @@ Usp.rapportExcel = function (titre, cols, lignes) {
     }));
 };
 
+/* Génère le document sous authentification (XHR) puis dirige l'onglet — ouvert
+ * PENDANT le clic, sinon bloqué comme pop-up — vers le lien de consultation
+ * éphémère renvoyé par le serveur : la barre d'adresse affiche le NOM du
+ * fichier (identique à la copie archivée), et non plus « blob:http://…uuid ». */
 Usp._rapportRequete = function (methode, chemin, corps) {
     var w = window.open('', '_blank');
     if (!w) { Ext.Msg.alert('Export', 'Autorisez les fenêtres pop-up pour afficher le PDF.'); return; }
@@ -685,19 +689,14 @@ Usp._rapportRequete = function (methode, chemin, corps) {
     xhr.open(methode, Usp.apiBase + chemin, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
     if (corps) { xhr.setRequestHeader('Content-Type', 'application/json'); }
-    xhr.responseType = 'blob';
     xhr.onload = function () {
-        if (xhr.status === 200) {
-            w.location = window.URL.createObjectURL(xhr.response);
+        var r = {};
+        try { r = JSON.parse(xhr.responseText) || {}; } catch (e) {}
+        if (xhr.status === 200 && r.vue) {
+            w.location = Usp.apiBase + '/' + r.vue;
         } else {
             w.close();
-            var lire = new FileReader();
-            lire.onload = function () {
-                var msg = 'Génération du PDF impossible.';
-                try { msg = (JSON.parse(lire.result) || {}).erreur || msg; } catch (e) {}
-                Ext.Msg.alert('Erreur', msg);
-            };
-            try { lire.readAsText(xhr.response); } catch (e) { Ext.Msg.alert('Erreur', 'Génération du PDF impossible.'); }
+            Ext.Msg.alert('Erreur', r.erreur || 'Génération du PDF impossible.');
         }
     };
     xhr.onerror = function () { w.close(); Ext.Msg.alert('Erreur', 'Serveur injoignable.'); };

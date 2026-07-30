@@ -447,18 +447,24 @@ Usp.marketing._verrouCatalogue = function (win, verrou) {
 
 Usp.marketing.rapportImport = function (r) {
     var err = (r.erreurs || []);
-    var html = '<div style="font-family:sans-serif">' +
-        '<b>' + (r.total || 0) + '</b> ligne(s) traitée(s)<br/>' +
-        '✅ Créés : <b>' + (r.crees || 0) + '</b><br/>' +
-        '♻️ Mis à jour : <b>' + (r.majs || 0) + '</b><br/>' +
-        '⚠️ Erreurs : <b>' + err.length + '</b>';
+    var html = '<div style="font-family:sans-serif;line-height:1.7">' +
+        '<b>' + (r.total || 0) + '</b> ligne(s) lue(s) dans le fichier<br/>' +
+        '✅ Produits ajoutés : <b>' + (r.crees || 0) + '</b><br/>' +
+        '♻️ Produits mis à jour (déjà présents) : <b>' + (r.majs || 0) + '</b>' +
+        ((r.ignores || 0) ? '<br/>⏭️ Lignes ignorées : <b>' + r.ignores + '</b>' : '') +
+        '<br/>⚠️ Lignes en erreur : <b>' + err.length + '</b>';
     if (err.length) {
         html += '<hr/><div style="max-height:200px;overflow:auto"><ul style="margin:0;padding-left:18px">';
         err.forEach(function (e) { html += '<li>Ligne ' + e.ligne + ' : ' + Ext.String.htmlEncode(e.raison) + '</li>'; });
         html += '</ul></div>';
     }
+    if (!(r.total || 0)) {
+        html += '<hr/><span style="color:#c62828">Aucune ligne exploitable : vérifiez que la 1re ligne du ' +
+            'fichier porte les intitulés de colonnes et que la colonne CIP choisie est la bonne.</span>';
+    }
     html += '</div>';
-    Ext.Msg.show({ title: 'Rapport d\'import', message: html, buttons: Ext.Msg.OK, width: 460 });
+    // ExtJS 4.2 : la clé est « msg » — avec « message », la fenêtre s'affichait VIDE.
+    Ext.Msg.show({ title: 'Rapport d\'import', msg: html, buttons: Ext.Msg.OK, width: 460 });
 };
 
 /* =====================================================================

@@ -24,21 +24,10 @@ Usp.recouvrement.refCombo = function (type, cfg) {
         queryMode: 'local', forceSelection: false, anchor: '100%' }, cfg || {});
 };
 
-/* Télécharge/ouvre le relevé de compte PDF d'un client (avec jeton d'authentification). */
+/* Ouvre le relevé de compte PDF d'un client. Le mode « vue » renvoie un lien
+ * de consultation éphémère : l'onglet affiche le nom du fichier, pas un blob. */
 Usp.recouvrement.ouvrirReleve = function (clientId) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', Usp.apiBase + '/recouvrement/clients/' + clientId + '/releve', true);
-    xhr.responseType = 'blob';
-    xhr.setRequestHeader('Authorization', 'Bearer ' + (Usp.token || ''));
-    xhr.onload = function () {
-        if (xhr.status >= 200 && xhr.status < 300) {
-            var url = window.URL.createObjectURL(xhr.response);
-            window.open(url, '_blank');
-            setTimeout(function () { window.URL.revokeObjectURL(url); }, 60000);
-        } else { Ext.Msg.alert('Erreur', 'Impossible de générer le relevé de compte.'); }
-    };
-    xhr.onerror = function () { Ext.Msg.alert('Erreur', 'Impossible de générer le relevé de compte.'); };
-    xhr.send();
+    Usp._rapportRequete('GET', '/recouvrement/clients/' + clientId + '/releve?vue=1', null);
 };
 
 /* Combo des segmentations clients existantes (réutilise la même liste que Comptes clients).

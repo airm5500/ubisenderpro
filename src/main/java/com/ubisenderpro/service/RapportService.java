@@ -96,6 +96,17 @@ public class RapportService {
      * @param lignes données du bandeau détail (une Map par ligne)
      */
     public byte[] pdf(String nom, Map<String, Object> params, List<Map<String, ?>> lignes) {
+        return generer(nom, params, lignes).contenu;
+    }
+
+    /** Document généré : contenu + nom de fichier (identique à la copie archivée). */
+    public static final class Genere {
+        public final byte[] contenu;
+        public final String nomFichier;
+        Genere(byte[] contenu, String nomFichier) { this.contenu = contenu; this.nomFichier = nomFichier; }
+    }
+
+    public Genere generer(String nom, Map<String, Object> params, List<Map<String, ?>> lignes) {
         if (nom == null || !NOM_VALIDE.matcher(nom).matches()) {
             throw new ValidationException("rapport", "Nom de rapport invalide.");
         }
@@ -111,9 +122,10 @@ public class RapportService {
             JasperPrint print = JasperFillManager.fillReport(rapport, p,
                     new JRMapCollectionDataSource(donnees));
             byte[] pdf = JasperExportManager.exportReportToPdf(print);
-            // Copie d'archive : le document reste consultable sans réimpression.
-            archiver("pdf", String.valueOf(p.getOrDefault("TITRE", nom)), "pdf", pdf);
-            return pdf;
+            // Un seul nom pour la copie d'archive ET la consultation à l'écran.
+            String nomFichier = nomArchive(String.valueOf(p.getOrDefault("TITRE", nom)), "pdf");
+            archiverSous("pdf", nomFichier, pdf);
+            return new Genere(pdf, nomFichier);
         } catch (ValidationException ve) {
             throw ve;
         } catch (Exception e) {
@@ -259,6 +271,11 @@ public class RapportService {
      * @return le nom du fichier archivé, ou null si l'archivage a échoué
      */
     public String archiver(String sousDossier, String nomMenu, String extension, byte[] contenu) {
+        return archiverSous(sousDossier, nomArchive(nomMenu, extension), contenu);
+    }
+
+    /** Variante avec nom de fichier déjà arrêté (partagé avec la consultation). */
+    public String archiverSous(String sousDossier, String nomFichier, byte[] contenu) {
         if (contenu == null || contenu.length == 0) { return null; }
         try {
             String base = parametreService.valeur("archivage.repertoire", ARCHIVAGE_DEFAUT);
@@ -268,13 +285,44 @@ public class RapportService {
                 LOG.info("Archivage : répertoire " + dir.getPath() + " inaccessible — document non archivé.");
                 return null;
             }
-            String nomFichier = nomArchive(nomMenu, extension);
             java.nio.file.Files.write(new File(dir, nomFichier).toPath(), contenu);
             return nomFichier;
         } catch (Exception e) {
-            LOG.warning("Archivage impossible (" + nomMenu + ") : " + e.getMessage());
+            LOG.warning("Archivage impossible (" + nomFichier + ") : " + e.getMessage());
             return null;
         }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Tickets de consultation                                              */
+    /*                                                                      */
+    /* Le PDF est généré sous authentification (XHR + jeton), mais l'onglet */
+    /* qui l'affiche doit montrer LE NOM DU FICHIER dans la barre d'adresse */
+    /* — impossible avec un blob mémoire (blob:http://...uuid). On remet    */
+    /* donc à l'écran un lien éphémère …/rapports-vue/{jeton}/{nom}.pdf :   */
+    /* jeton à usage unique, deux minutes de validité, jamais listable.     */
+    /* ------------------------------------------------------------------ */
+
+    private static final long TICKET_TTL_MS = 2 * 60 * 1000L;
+    private static final int TICKETS_MAX = 100;
+    private static final ConcurrentHashMap<String, Object[]> TICKETS = new ConcurrentHashMap<>();
+
+    /** Dépose un document à consulter ; renvoie le jeton à usage unique. */
+    public static String creerTicket(String nomFichier, byte[] contenu) {
+        long maintenant = System.currentTimeMillis();
+        TICKETS.entrySet().removeIf(e -> ((Long) e.getValue()[2]) < maintenant);
+        if (TICKETS.size() >= TICKETS_MAX) { return null; }
+        String jeton = java.util.UUID.randomUUID().toString();
+        TICKETS.put(jeton, new Object[]{contenu, nomFichier, maintenant + TICKET_TTL_MS});
+        return jeton;
+    }
+
+    /** Consomme le jeton : {contenu, nomFichier} ou null (inconnu, expiré, déjà lu). */
+    public static Object[] consommerTicket(String jeton) {
+        if (jeton == null) { return null; }
+        Object[] t = TICKETS.remove(jeton);
+        if (t == null || ((Long) t[2]) < System.currentTimeMillis()) { return null; }
+        return t;
     }
 
     /** {@code comptes_clients_29072026_23180023.pdf} : menu + date + heure au centième. */

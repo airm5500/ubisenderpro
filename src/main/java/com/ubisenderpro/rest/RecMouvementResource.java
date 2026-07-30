@@ -32,11 +32,22 @@ public class RecMouvementResource {
     @GET
     @Path("/releve")
     @Produces("application/pdf")
-    public Response releve(@PathParam("clientId") Long clientId) {
+    public Response releve(@PathParam("clientId") Long clientId,
+                           @javax.ws.rs.QueryParam("vue") String vue) {
         byte[] pdf = relevePdfService.genererReleve(clientId);
+        String nom = relevePdfService.nomFichier(clientId);
+        // Mode « vue » : lien de consultation éphémère — l'onglet du navigateur
+        // affiche le nom du fichier au lieu d'un blob mémoire.
+        if (vue != null && !vue.isEmpty()) {
+            String jeton = com.ubisenderpro.service.RapportService.creerTicket(nom, pdf);
+            java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("nom", nom);
+            r.put("vue", jeton == null ? null : "rapports-vue/" + jeton + "/" + nom);
+            return Response.ok(r).type(javax.ws.rs.core.MediaType.APPLICATION_JSON).build();
+        }
         return Response.ok(pdf)
                 .type("application/pdf")
-                .header("Content-Disposition", "inline; filename=\"" + relevePdfService.nomFichier(clientId) + "\"")
+                .header("Content-Disposition", "inline; filename=\"" + nom + "\"")
                 .build();
     }
 

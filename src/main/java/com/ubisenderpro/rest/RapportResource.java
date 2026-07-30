@@ -79,10 +79,20 @@ public class RapportResource {
         params.put("SOUS_TITRE", sousTitre(q, agence, region, tournee,
                 segmentationId == null ? null : segs.get(segmentationId)));
 
-        byte[] pdf = rapportService.pdf("clients", params, lignes);
-        return Response.ok(pdf)
-                .header("Content-Disposition", "inline; filename=\"comptes_clients.pdf\"")
-                .build();
+        return reponseVue(rapportService.generer("clients", params, lignes));
+    }
+
+    /**
+     * Réponse commune des éditions PDF : un lien de consultation éphémère
+     * plutôt que le binaire — l'onglet du navigateur montre ainsi le NOM du
+     * fichier (identique à la copie archivée) au lieu d'un blob mémoire.
+     */
+    private Response reponseVue(RapportService.Genere g) {
+        String jeton = RapportService.creerTicket(g.nomFichier, g.contenu);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("nom", g.nomFichier);
+        r.put("vue", jeton == null ? null : "rapports-vue/" + jeton + "/" + g.nomFichier);
+        return Response.ok(r).type(javax.ws.rs.core.MediaType.APPLICATION_JSON).build();
     }
 
     /**
@@ -114,10 +124,7 @@ public class RapportResource {
                 lignes.add(l);
             }
         }
-        byte[] pdf = rapportService.pdf(nom, params, lignes);
-        return Response.ok(pdf)
-                .header("Content-Disposition", "inline; filename=\"" + nom + ".pdf\"")
-                .build();
+        return reponseVue(rapportService.generer(nom, params, lignes));
     }
 
     /**
