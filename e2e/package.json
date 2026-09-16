@@ -1,0 +1,13 @@
+{
+  "name": "ubisenderpro-e2e",
+  "private": true,
+  "description": "Tests de bout en bout (API + interface) d'UbiSmartCRM Pro - Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

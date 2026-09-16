@@ -18,3 +18,9 @@ wa-web/.env
 # Verrou de dependances : non suivi (il depend de la plateforme d'installation).
 # La reproductibilite est assuree par la version EPINGLEE dans package.json.
 wa-web/package-lock.json
+
+# Tests de bout en bout (Playwright) : dépendances et sorties de campagne.
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/package-lock.json

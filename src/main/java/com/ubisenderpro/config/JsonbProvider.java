@@ -81,8 +81,12 @@ public class JsonbProvider implements ContextResolver<Jsonb> {
     static LocalDate versDate(String brut) {
         String s = texte(brut);
         if (s == null) { return null; }
-        int t = s.indexOf('T');
-        return LocalDate.parse(t > 0 ? s.substring(0, t) : s);
+        try {
+            int t = s.indexOf('T');
+            return LocalDate.parse(t > 0 ? s.substring(0, t) : s);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw formatInvalide(s);
+        }
     }
 
     /**
@@ -92,14 +96,36 @@ public class JsonbProvider implements ContextResolver<Jsonb> {
     static LocalDateTime versDateHeure(String brut) {
         String s = texte(brut);
         if (s == null) { return null; }
-        if (s.indexOf('T') < 0) { return LocalDate.parse(s).atStartOfDay(); }
-        return LocalDateTime.parse(s);
+        try {
+            if (s.indexOf('T') < 0) { return LocalDate.parse(s).atStartOfDay(); }
+            return LocalDateTime.parse(s);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw formatInvalide(s);
+        }
     }
 
     /** {@code ""} → {@code null}. Accepte « 08:30 » comme « 08:30:00 ». */
     static LocalTime versHeure(String brut) {
         String s = texte(brut);
-        return s == null ? null : LocalTime.parse(s);
+        try {
+            return s == null ? null : LocalTime.parse(s);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw formatInvalide(s);
+        }
+    }
+
+    /**
+     * Une valeur de date réellement invalide doit produire un message MÉTIER.
+     * Yasson enveloppe l'échec d'un désérialiseur personnalisé dans
+     * {@code JsonbException("Internal error: …")}, sans le nom de la propriété :
+     * on lève donc une ValidationException — le mapper d'exceptions la retrouve
+     * dans la chaîne des causes et répond 400 avec ce message, au lieu d'un
+     * « échec technique » opaque (constaté par le test e2e sur POST /infos).
+     */
+    private static com.ubisenderpro.service.ValidationException formatInvalide(String valeur) {
+        return new com.ubisenderpro.service.ValidationException(null,
+                "La date « " + valeur + " » n'est pas au bon format : utilisez le "
+                + "sélecteur de date de l'écran (format attendu AAAA-MM-JJ, ex. 2026-07-29).");
     }
 
     /* ------------------------------------------------------------------ */

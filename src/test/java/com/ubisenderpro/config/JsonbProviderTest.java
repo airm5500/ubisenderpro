@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -65,9 +64,20 @@ class JsonbProviderTest {
         assertEquals(LocalTime.of(8, 30, 15), JsonbProvider.versHeure("08:30:15"));
     }
 
-    /** Une vraie erreur de saisie reste une erreur : elle ne doit pas etre avalee. */
+    /** Une vraie erreur de saisie reste une erreur - METIER, pas technique :
+     * Yasson enveloppe l'echec d'un deserialiseur personnalise dans un
+     * JsonbException opaque ; la ValidationException traverse la chaine des
+     * causes et le mapper repond 400 avec ce message. */
     @Test
-    void dateInvalideRejetee() {
-        assertThrows(DateTimeParseException.class, () -> JsonbProvider.versDate("29/07/2026"));
+    void dateInvalideRejeteeAvecMessageMetier() {
+        com.ubisenderpro.service.ValidationException ex = assertThrows(
+                com.ubisenderpro.service.ValidationException.class,
+                () -> JsonbProvider.versDate("29/07/2026"));
+        assertEquals(true, ex.getMessage().contains("29/07/2026"));
+        assertEquals(true, ex.getMessage().contains("AAAA-MM-JJ"));
+        assertThrows(com.ubisenderpro.service.ValidationException.class,
+                () -> JsonbProvider.versDateHeure("hier"));
+        assertThrows(com.ubisenderpro.service.ValidationException.class,
+                () -> JsonbProvider.versHeure("8h30"));
     }
 }
