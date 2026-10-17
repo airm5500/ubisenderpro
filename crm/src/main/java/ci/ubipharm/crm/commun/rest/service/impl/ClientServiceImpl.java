@@ -26,11 +26,14 @@ public class ClientServiceImpl implements ClientService {
     private static final String SELECT = """
             select c.id as id, c.code as code, c.raison_sociale as raisonSociale,
                    c.segmentation as segmentation, c.ville as ville, c.statut as statut,
-                   a.id as agenceId, a.libelle as agenceLibelle,
+                   a.id as agenceId, a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.adresse as adresse,
+                   c.email as email, c.commentaire as commentaire,
                    (select ct.numero_whatsapp from crm_contact ct
-                     where ct.client_id = c.id and ct.rang = 1 and ct.statut = 'ACTIF' limit 1) as numeroPrincipal,
+                     where ct.client_id = c.id and ct.rang = 1 and ct.statut = 'ACTIF' order by ct.id desc limit 1) as numeroPrincipal,
                    (select ct.numero_whatsapp from crm_contact ct
-                     where ct.client_id = c.id and ct.rang = 2 and ct.statut = 'ACTIF' limit 1) as numeroSecondaire
+                     where ct.client_id = c.id and ct.rang = 2 and ct.statut = 'ACTIF'
+                     order by field(ct.fonction, 'TITULAIRE', 'SECONDAIRE', 'ASSISTANT', 'CHARGE_COMMANDE', 'COMPTABLE'), ct.id
+                     limit 1) as numeroSecondaire
             from crm_client c
             join crm_agence a on a.id = c.agence_id
             """;
@@ -118,6 +121,10 @@ public class ClientServiceImpl implements ClientService {
                 .statut(tuple.get("statut", String.class))
                 .agenceId(tuple.get("agenceId", Long.class))
                 .agenceLibelle(tuple.get("agenceLibelle", String.class))
+                .sousAgence(tuple.get("sousAgence", String.class))
+                .adresse(tuple.get("adresse", String.class))
+                .email(tuple.get("email", String.class))
+                .commentaire(tuple.get("commentaire", String.class))
                 .numeroPrincipal(tuple.get("numeroPrincipal", String.class))
                 .numeroSecondaire(tuple.get("numeroSecondaire", String.class))
                 .build();

@@ -7,6 +7,7 @@ import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.valeur;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,16 +47,35 @@ public class ImportClientServiceImpl implements ImportClientService {
 
     static final String TYPE = "CLIENTS";
 
-    static final List<String> CODE = List.of("code_client", "code", "client_code", "numero_client", "n_client");
+    static final List<String> CODE = List.of("code_client", "code", "client_code", "numero_client", "n_client",
+            "numero_de_compte", "numerodecompte", "numerodeompte", "compte", "n_compte");
     static final List<String> RAISON_SOCIALE = List.of("raison_sociale", "nom_client", "nom", "pharmacie", "libelle");
-    static final List<String> AGENCE = List.of("agence", "code_agence", "agence_code", "libelle_agence");
-    static final List<String> SEGMENTATION = List.of("segmentation", "segment", "categorie");
+    static final List<String> AGENCE = List.of("agence", "agce", "code_agence", "agence_code", "libelle_agence");
+    static final List<String> SOUS_AGENCE = List.of("sous_agence", "sgce", "secteur");
+    static final List<String> SEGMENTATION = List.of("segmentation", "seg", "segment", "categorie");
     static final List<String> VILLE = List.of("ville", "localite", "commune");
-    static final List<String> NUMERO_1 = List.of("numero_1", "numero_whatsapp", "numero_principal", "whatsapp", "contact_1",
-            "telephone", "telephone_1", "tel", "tel_1");
-    static final List<String> NOM_1 = List.of("nom_contact_1", "nom_contact", "titulaire");
-    static final List<String> NUMERO_2 = List.of("numero_2", "numero_secondaire", "contact_2", "telephone_2", "tel_2");
-    static final List<String> NOM_2 = List.of("nom_contact_2", "employe");
+    static final List<String> ADRESSE = List.of("adresse", "adresse1", "adresse_1");
+    static final List<String> EMAIL = List.of("email", "e_mail", "e_mailmaj", "emailmaj", "mail", "courriel");
+    static final List<String> COMMENTAIRE = List.of("commentaire", "commentair", "commentaires", "observation");
+
+    /** Numeros par role : le numero PRINCIPAL est celui des relances WhatsApp. */
+    static final Map<String, List<String>> NUMEROS = numeros();
+
+    private static Map<String, List<String>> numeros() {
+        Map<String, List<String>> numeros = new LinkedHashMap<>();
+        numeros.put("PRINCIPAL", List.of("whatsappmaj", "whatsapp", "numero_whatsapp", "numero_principal", "numero_1", "contact_1",
+                "telephone", "telephone_1", "tel", "tel_1"));
+        numeros.put("TITULAIRE", List.of("pharmacientitulaire", "pharmacien_titulaire", "titulaire"));
+        numeros.put("ASSISTANT", List.of("pharmacienass", "pharmacien_ass", "pharmacien_assistant", "assistant"));
+        numeros.put("CHARGE_COMMANDE", List.of("chargedecde", "charge_de_cde", "charge_de_commande", "charge_commande"));
+        numeros.put("COMPTABLE", List.of("comptable"));
+        numeros.put("SECONDAIRE", List.of("numero_2", "numero_secondaire", "contact_2", "telephone_2", "tel_2"));
+        return numeros;
+    }
+
+    private static final Map<String, String> LIBELLES_NUMEROS = Map.of(
+            "PRINCIPAL", "Numero WhatsApp", "TITULAIRE", "Numero du titulaire", "ASSISTANT", "Numero du pharmacien assistant",
+            "CHARGE_COMMANDE", "Numero du charge de commande", "COMPTABLE", "Numero du comptable", "SECONDAIRE", "Numero secondaire");
 
     private static final int TAILLE_LOT = 1000;
 
@@ -133,7 +153,8 @@ public class ImportClientServiceImpl implements ImportClientService {
         }
         if (!manquantes.isEmpty()) {
             throw new ErreurMetierException("Colonnes obligatoires absentes : " + String.join(", ", manquantes)
-                    + ". Colonnes attendues : code client, raison sociale, agence, et en option segmentation, ville, numero 1, numero 2.");
+                    + ". Colonnes attendues : numero de compte (code client), nom (raison sociale), agence ; en option sous-agence,"
+                    + " segmentation, ville, adresse, e-mail, commentaire et numeros (WhatsApp, titulaire, assistant, charge de commande, comptable).");
         }
     }
 
@@ -162,8 +183,17 @@ public class ImportClientServiceImpl implements ImportClientService {
         } else if (!contexte.dansPerimetre(agence.id())) {
             motifs.add("L'agence " + agence.libelle() + " est hors de votre perimetre.");
         }
-        String numero1 = numero(valeurs, NUMERO_1, "principal", contexte, motifs);
-        String numero2 = numero(valeurs, NUMERO_2, "secondaire", contexte, motifs);
+        Map<String, String> numeros = new LinkedHashMap<>();
+        NUMEROS.forEach((fonction, alias) -> {
+            String numero = numero(valeurs, alias, LIBELLES_NUMEROS.get(fonction), contexte, motifs);
+            if (numero != null) {
+                numeros.put(fonction, numero);
+            }
+        });
+        String email = renseigne(valeur(valeurs, EMAIL));
+        if (email != null && !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+            motifs.add("Adresse e-mail invalide : " + email + ".");
+        }
 
         ClientExistant existant = contexte.existants().get(cle);
         if (existant != null && !contexte.dansPerimetre(existant.agenceId())) {
@@ -175,8 +205,8 @@ public class ImportClientServiceImpl implements ImportClientService {
             return rejet(code, String.join(" ", motifs));
         }
 
-        ClientLu lu = new ClientLu(code, raisonSociale, agence, valeur(valeurs, SEGMENTATION), valeur(valeurs, VILLE),
-                numero1, valeur(valeurs, NOM_1), numero2, valeur(valeurs, NOM_2));
+        ClientLu lu = new ClientLu(code, raisonSociale, agence, valeur(valeurs, SOUS_AGENCE), valeur(valeurs, SEGMENTATION),
+                valeur(valeurs, VILLE), valeur(valeurs, ADRESSE), email, renseigne(valeur(valeurs, COMMENTAIRE)), numeros);
         if (existant == null) {
             return new Evaluation(verdict("CREATION", code, null), lu, null);
         }
@@ -187,14 +217,19 @@ public class ImportClientServiceImpl implements ImportClientService {
     }
 
     private String numero(Map<String, String> valeurs, List<String> alias, String libelle, Contexte contexte, List<String> motifs) {
-        String saisi = valeur(valeurs, alias);
+        String saisi = renseigne(valeur(valeurs, alias));
         if (saisi == null) {
             return null;
         }
         return ValeursImport.numeroWhatsapp(saisi, contexte.prefixePays()).orElseGet(() -> {
-            motifs.add("Numero " + libelle + " invalide : " + saisi + " (10 chiffres attendus, par exemple 07 00 00 00 01).");
+            motifs.add(libelle + " invalide : " + saisi + " (10 chiffres attendus, par exemple 07 00 00 00 01).");
             return null;
         });
+    }
+
+    /** Dans les fichiers UBIPHARM, une cellule a 0 signifie « non renseigne ». */
+    private String renseigne(String valeur) {
+        return valeur == null || valeur.equals("0") ? null : valeur;
     }
 
     /** Une cellule vide n'efface jamais une valeur existante. */
@@ -202,10 +237,13 @@ public class ImportClientServiceImpl implements ImportClientService {
         List<String> ecarts = new ArrayList<>();
         ecart(ecarts, "Raison sociale", existant.raisonSociale(), lu.raisonSociale());
         ecart(ecarts, "Agence", existant.agenceLibelle(), lu.agence().libelle());
+        ecart(ecarts, "Sous-agence", existant.sousAgence(), lu.sousAgence());
         ecart(ecarts, "Segmentation", existant.segmentation(), lu.segmentation());
         ecart(ecarts, "Ville", existant.ville(), lu.ville());
-        ecart(ecarts, "Numero principal", existant.numero1(), lu.numero1());
-        ecart(ecarts, "Numero secondaire", existant.numero2(), lu.numero2());
+        ecart(ecarts, "Adresse", existant.adresse(), lu.adresse());
+        ecart(ecarts, "E-mail", existant.email(), lu.email());
+        ecart(ecarts, "Commentaire", existant.commentaire(), lu.commentaire());
+        NUMEROS.keySet().forEach(f -> ecart(ecarts, LIBELLES_NUMEROS.get(f), existant.numeros().get(f), lu.numeros().get(f)));
         return ecarts;
     }
 
@@ -217,79 +255,90 @@ public class ImportClientServiceImpl implements ImportClientService {
 
     private void creer(ClientLu lu) {
         em.createNativeQuery("""
-                insert into crm_client (code, raison_sociale, segmentation, agence_id, ville, statut, created_at)
-                values (:code, :raisonSociale, :segmentation, :agenceId, :ville, 'ACTIF', utc_timestamp())
+                insert into crm_client (code, raison_sociale, segmentation, agence_id, sous_agence, ville, adresse, email,
+                                        commentaire, statut, created_at)
+                values (:code, :raisonSociale, :segmentation, :agenceId, :sousAgence, :ville, :adresse, :email,
+                        :commentaire, 'ACTIF', utc_timestamp())
                 """)
                 .setParameter("code", lu.code())
                 .setParameter("raisonSociale", lu.raisonSociale())
                 .setParameter("segmentation", lu.segmentation())
                 .setParameter("agenceId", lu.agence().id())
+                .setParameter("sousAgence", lu.sousAgence())
                 .setParameter("ville", lu.ville())
+                .setParameter("adresse", lu.adresse())
+                .setParameter("email", lu.email())
+                .setParameter("commentaire", lu.commentaire())
                 .executeUpdate();
         Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
-        ajouterContact(id, 1, lu.numero1(), lu.nom1());
-        ajouterContact(id, 2, lu.numero2(), lu.nom2());
+        lu.numeros().forEach((fonction, numero) -> ajouterContact(id, fonction, numero));
     }
 
     private void mettreAJour(ClientExistant existant, ClientLu lu) {
         em.createNativeQuery("""
                 update crm_client set raison_sociale = :raisonSociale, agence_id = :agenceId,
-                       segmentation = coalesce(:segmentation, segmentation), ville = coalesce(:ville, ville),
-                       updated_at = utc_timestamp()
+                       sous_agence = coalesce(:sousAgence, sous_agence), segmentation = coalesce(:segmentation, segmentation),
+                       ville = coalesce(:ville, ville), adresse = coalesce(:adresse, adresse), email = coalesce(:email, email),
+                       commentaire = coalesce(:commentaire, commentaire), updated_at = utc_timestamp()
                 where id = :id
                 """)
                 .setParameter("raisonSociale", lu.raisonSociale())
                 .setParameter("agenceId", lu.agence().id())
+                .setParameter("sousAgence", lu.sousAgence())
                 .setParameter("segmentation", lu.segmentation())
                 .setParameter("ville", lu.ville())
+                .setParameter("adresse", lu.adresse())
+                .setParameter("email", lu.email())
+                .setParameter("commentaire", lu.commentaire())
                 .setParameter("id", existant.id())
                 .executeUpdate();
-        remplacerContact(existant.id(), 1, existant.numero1(), lu.numero1(), lu.nom1());
-        remplacerContact(existant.id(), 2, existant.numero2(), lu.numero2(), lu.nom2());
+        lu.numeros().forEach((fonction, numero) -> remplacerContact(existant.id(), fonction, existant.numeros().get(fonction), numero));
     }
 
     /** L'ancien numero est archive, pas supprime : l'historique des envois y reste rattache. */
-    private void remplacerContact(Long clientId, int rang, String actuel, String nouveau, String nom) {
+    private void remplacerContact(Long clientId, String fonction, String actuel, String nouveau) {
         if (nouveau == null || nouveau.equals(actuel)) {
             return;
         }
         em.createNativeQuery("""
                 update crm_contact set statut = 'ARCHIVE', updated_at = utc_timestamp()
-                where client_id = :clientId and rang = :rang and statut = 'ACTIF'
+                where client_id = :clientId and fonction = :fonction and statut = 'ACTIF'
                 """)
                 .setParameter("clientId", clientId)
-                .setParameter("rang", rang)
+                .setParameter("fonction", fonction)
                 .executeUpdate();
-        ajouterContact(clientId, rang, nouveau, nom);
+        ajouterContact(clientId, fonction, nouveau);
     }
 
-    private void ajouterContact(Long clientId, int rang, String numero, String nom) {
-        if (numero == null) {
-            return;
-        }
+    /** Rang 1 : numero de relance ; rang 2 : autres interlocuteurs de la pharmacie. */
+    private void ajouterContact(Long clientId, String fonction, String numero) {
         em.createNativeQuery("""
-                insert into crm_contact (client_id, nom, numero_whatsapp, rang, statut, created_at)
-                values (:clientId, :nom, :numero, :rang, 'ACTIF', utc_timestamp())
+                insert into crm_contact (client_id, fonction, numero_whatsapp, rang, statut, created_at)
+                values (:clientId, :fonction, :numero, :rang, 'ACTIF', utc_timestamp())
                 """)
                 .setParameter("clientId", clientId)
-                .setParameter("nom", nom)
+                .setParameter("fonction", fonction)
                 .setParameter("numero", numero)
-                .setParameter("rang", rang)
+                .setParameter("rang", "PRINCIPAL".equals(fonction) ? 1 : 2)
                 .executeUpdate();
     }
 
     private Contexte contexte(List<Map<String, String>> lignes) {
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         @SuppressWarnings("unchecked")
-        List<Tuple> agences = em.createNativeQuery("select id as id, code as code, libelle as libelle from crm_agence where statut = 'ACTIF' order by libelle", Tuple.class)
+        List<Tuple> agences = em.createNativeQuery("select id as id, code as code, code_import as codeImport, libelle as libelle from crm_agence where statut = 'ACTIF' order by libelle", Tuple.class)
                 .getResultList();
         Map<String, Agence> agencesParCle = new HashMap<>();
         for (Tuple t : agences) {
             Agence agence = new Agence(t.get("id", Long.class), t.get("libelle", String.class));
             agencesParCle.put(normaliserLibelle(t.get("code", String.class)), agence);
             agencesParCle.putIfAbsent(normaliserLibelle(agence.libelle()), agence);
+            if (t.get("codeImport", String.class) != null) {
+                agencesParCle.putIfAbsent(normaliserLibelle(t.get("codeImport", String.class)), agence);
+            }
         }
-        String listeAgences = agences.stream().map(t -> t.get("code", String.class) + " " + t.get("libelle", String.class))
+        String listeAgences = agences.stream().map(t -> (t.get("codeImport", String.class) == null ? t.get("code", String.class) : t.get("codeImport", String.class))
+                + " " + t.get("libelle", String.class))
                 .collect(Collectors.joining(", "));
 
         Set<String> codes = new HashSet<>();
@@ -307,39 +356,51 @@ public class ImportClientServiceImpl implements ImportClientService {
         Map<String, ClientExistant> existants = new HashMap<>();
         List<String> liste = new ArrayList<>(codes);
         for (int debut = 0; debut < liste.size(); debut += TAILLE_LOT) {
+            List<String> lot = liste.subList(debut, Math.min(debut + TAILLE_LOT, liste.size()));
             @SuppressWarnings("unchecked")
-            List<Tuple> lignes = em.createNativeQuery("""
+            List<Tuple> clients = em.createNativeQuery("""
                     select c.id as id, c.code as code, c.raison_sociale as raisonSociale, c.agence_id as agenceId,
-                           a.libelle as agenceLibelle, c.segmentation as segmentation, c.ville as ville, c.statut as statut,
-                           (select ct.numero_whatsapp from crm_contact ct
-                             where ct.client_id = c.id and ct.rang = 1 and ct.statut = 'ACTIF' limit 1) as numero1,
-                           (select ct.numero_whatsapp from crm_contact ct
-                             where ct.client_id = c.id and ct.rang = 2 and ct.statut = 'ACTIF' limit 1) as numero2
+                           a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.segmentation as segmentation,
+                           c.ville as ville, c.adresse as adresse, c.email as email, c.commentaire as commentaire,
+                           c.statut as statut
                     from crm_client c join crm_agence a on a.id = c.agence_id
                     where c.code in (:codes)
-                    """, Tuple.class)
-                    .setParameter("codes", liste.subList(debut, Math.min(debut + TAILLE_LOT, liste.size())))
-                    .getResultList();
-            for (Tuple t : lignes) {
-                ClientExistant client = mapTupleToExistant(t);
+                    """, Tuple.class).setParameter("codes", lot).getResultList();
+            @SuppressWarnings("unchecked")
+            List<Tuple> contacts = em.createNativeQuery("""
+                    select ct.client_id as clientId, ct.fonction as fonction, ct.numero_whatsapp as numero
+                    from crm_contact ct join crm_client c on c.id = ct.client_id
+                    where c.code in (:codes) and ct.statut = 'ACTIF'
+                    order by ct.id
+                    """, Tuple.class).setParameter("codes", lot).getResultList();
+            Map<Long, Map<String, String>> numerosParClient = new HashMap<>();
+            for (Tuple t : contacts) {
+                numerosParClient.computeIfAbsent(t.get("clientId", Long.class), k -> new HashMap<>())
+                        .put(t.get("fonction", String.class), t.get("numero", String.class));
+            }
+            for (Tuple t : clients) {
+                ClientExistant client = mapTupleToExistant(t, numerosParClient.getOrDefault(t.get("id", Long.class), Map.of()));
                 existants.put(client.code().toUpperCase(Locale.ROOT), client);
             }
         }
         return existants;
     }
 
-    ClientExistant mapTupleToExistant(Tuple tuple) {
+    ClientExistant mapTupleToExistant(Tuple tuple, Map<String, String> numeros) {
         return new ClientExistant(
                 tuple.get("id", Long.class),
                 tuple.get("code", String.class),
                 tuple.get("raisonSociale", String.class),
                 tuple.get("agenceId", Long.class),
                 tuple.get("agenceLibelle", String.class),
+                tuple.get("sousAgence", String.class),
                 tuple.get("segmentation", String.class),
                 tuple.get("ville", String.class),
+                tuple.get("adresse", String.class),
+                tuple.get("email", String.class),
+                tuple.get("commentaire", String.class),
                 tuple.get("statut", String.class),
-                tuple.get("numero1", String.class),
-                tuple.get("numero2", String.class));
+                numeros);
     }
 
     private Evaluation rejet(String cle, String message) {
@@ -353,12 +414,13 @@ public class ImportClientServiceImpl implements ImportClientService {
     record Agence(Long id, String libelle) {
     }
 
-    record ClientLu(String code, String raisonSociale, Agence agence, String segmentation, String ville,
-            String numero1, String nom1, String numero2, String nom2) {
+    record ClientLu(String code, String raisonSociale, Agence agence, String sousAgence, String segmentation, String ville,
+            String adresse, String email, String commentaire, Map<String, String> numeros) {
     }
 
-    record ClientExistant(Long id, String code, String raisonSociale, Long agenceId, String agenceLibelle,
-            String segmentation, String ville, String statut, String numero1, String numero2) {
+    record ClientExistant(Long id, String code, String raisonSociale, Long agenceId, String agenceLibelle, String sousAgence,
+            String segmentation, String ville, String adresse, String email, String commentaire, String statut,
+            Map<String, String> numeros) {
     }
 
     record Evaluation(ResultatLigneDTO verdict, ClientLu lu, ClientExistant existant) {

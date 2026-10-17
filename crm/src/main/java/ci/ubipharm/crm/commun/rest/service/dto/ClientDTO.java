@@ -20,6 +20,10 @@ public class ClientDTO {
     private String ville;
     private Long agenceId;
     private String agenceLibelle;
+    private String sousAgence;
+    private String adresse;
+    private String email;
+    private String commentaire;
     private String numeroPrincipal;
     private String numeroSecondaire;
     private String statut;

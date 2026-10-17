@@ -64,7 +64,7 @@ class ImportsIT extends IntegrationBase {
                 .andExpect(jsonPath("$.elements[0].message").value("Raison sociale manquante."))
                 .andExpect(jsonPath("$.elements[1].message", containsString("Agence inconnue")))
                 .andExpect(jsonPath("$.elements[2].message", containsString("deja present ligne 2")))
-                .andExpect(jsonPath("$.elements[3].message", containsString("Numero principal invalide")));
+                .andExpect(jsonPath("$.elements[3].message", containsString("Numero WhatsApp invalide")));
 
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -83,6 +83,40 @@ class ImportsIT extends IntegrationBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Cet import est deja valide."));
         assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where action = 'IMPORT_VALIDATION'", Long.class)).isEqualTo(1);
+    }
+
+    @Test
+    void laBaseClientsUbipharmEstImporteeAvecSesColonnesDOrigine() throws Exception {
+        MockHttpSession session = connecter("admin", MOT_DE_PASSE_ADMIN);
+        // Memes en-tetes que l'extraction UBIPHARM du 17/09/2026, donnees fictives
+        byte[] fichier = classeur(
+                new String[] {"Numérodeompte", "Agce", "Sgce", "Seg", "Nom", "Adresse1", "WhatsappMAJ", "PharmacienTitulaire",
+                        "PharmacienAss.", "Chargédecde", "Comptable", "E-MailMAJ", "Commentair"},
+                new String[] {"9001", "B", "B2", "P", "DU PLATEAU", "RUE 12", "2250700000001", "2250700000002", "0",
+                        "2250700000003", "0", "contact@exemple.ci", "0"},
+                new String[] {"9002", "B", "B2", "S", "DES ROSES", "CARREFOUR", "2250700000004", "0", "0", "0", "0", "pas-un-mail", "0"},
+                new String[] {"9003", "Z", "Z1", "B", "INCONNUE", "", "2250700000005", "0", "0", "0", "0", "0", "0"});
+
+        String simulation = mvc.perform(multipart("/api/imports/clients").file(fichier("base.xlsx", fichier)).session(session).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nbCreations").value(1))
+                .andExpect(jsonPath("$.nbRejets").value(2))
+                .andReturn().getResponse().getContentAsString();
+        Long id = idDe(simulation);
+        mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "REJET").session(session))
+                .andExpect(jsonPath("$.elements[0].message").value("Adresse e-mail invalide : pas-un-mail."))
+                .andExpect(jsonPath("$.elements[1].message", containsString("Agence inconnue : Z")));
+
+        mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(jsonPath("$.nbCrees").value(1));
+        assertThat(jdbc.queryForObject("select concat(a.code, ':', c.sous_agence, ':', c.segmentation, ':', c.raison_sociale, ':', c.email, ':', "
+                + "coalesce(c.commentaire, '-')) from crm_client c join crm_agence a on a.id = c.agence_id where c.code = '9001'", String.class))
+                .isEqualTo("BKE:B2:P:DU PLATEAU:contact@exemple.ci:-");
+        // Les cellules a 0 ne creent pas de numero
+        assertThat(jdbc.queryForList("select concat(ct.rang, ':', ct.fonction, ':', ct.numero_whatsapp) from crm_contact ct "
+                + "join crm_client c on c.id = ct.client_id where c.code = '9001' order by ct.id", String.class))
+                .containsExactly("1:PRINCIPAL:2250700000001", "2:TITULAIRE:2250700000002", "2:CHARGE_COMMANDE:2250700000003");
     }
 
     @Test
@@ -105,7 +139,7 @@ class ImportsIT extends IntegrationBase {
         Long id = idDe(simulation);
         mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "MISE_A_JOUR").session(session))
                 .andExpect(jsonPath("$.elements[0].message",
-                        containsString("Raison sociale : Pharmacie Alpha -> Pharmacie Alpha Plus ; Numero principal : 2250700000001 -> 2250700000099")));
+                        containsString("Raison sociale : Pharmacie Alpha -> Pharmacie Alpha Plus ; Numero WhatsApp : 2250700000001 -> 2250700000099")));
 
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"clesAMettreAJour\":[\"it-c1\"]}"))
@@ -230,7 +264,7 @@ class ImportsIT extends IntegrationBase {
         jdbc.update("insert into crm_client (code, raison_sociale, agence_id, created_at) values (?, ?, ?, utc_timestamp())", code, raisonSociale, agenceId);
         Long id = jdbc.queryForObject("select id from crm_client where code = ?", Long.class, code);
         if (numero != null) {
-            jdbc.update("insert into crm_contact (client_id, numero_whatsapp, rang, created_at) values (?, ?, 1, utc_timestamp())", id, numero);
+            jdbc.update("insert into crm_contact (client_id, fonction, numero_whatsapp, rang, created_at) values (?, 'PRINCIPAL', ?, 1, utc_timestamp())", id, numero);
         }
         return id;
     }
