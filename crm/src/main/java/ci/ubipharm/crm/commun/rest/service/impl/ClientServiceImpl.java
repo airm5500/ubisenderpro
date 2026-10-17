@@ -25,7 +25,8 @@ public class ClientServiceImpl implements ClientService {
 
     private static final String SELECT = """
             select c.id as id, c.code as code, c.raison_sociale as raisonSociale,
-                   c.segmentation as segmentation, c.ville as ville, c.statut as statut,
+                   c.segmentation as segmentation, sg.libelle as segmentationLibelle,
+                   c.nom_pharmacien as nomPharmacien, c.ville as ville, c.statut as statut,
                    a.id as agenceId, a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.adresse as adresse,
                    c.email as email, c.commentaire as commentaire,
                    (select ct.numero_whatsapp from crm_contact ct
@@ -36,6 +37,7 @@ public class ClientServiceImpl implements ClientService {
                      limit 1) as numeroSecondaire
             from crm_client c
             join crm_agence a on a.id = c.agence_id
+            left join crm_segment sg on sg.code = c.segmentation
             """;
 
     private final EntityManager em;
@@ -66,7 +68,7 @@ public class ClientServiceImpl implements ClientService {
             parametres.put("segmentation", criteres.getSegmentation().trim());
         }
         if (criteres.getQ() != null && !criteres.getQ().isBlank()) {
-            where.append(" and (c.raison_sociale like :q or c.code like :q or exists (select 1 from crm_contact ct"
+            where.append(" and (c.raison_sociale like :q or c.nom_pharmacien like :q or c.code like :q or exists (select 1 from crm_contact ct"
                     + " where ct.client_id = c.id and ct.numero_whatsapp like :q))");
             parametres.put("q", "%" + echapperLike(criteres.getQ().trim()) + "%");
         }
@@ -117,6 +119,8 @@ public class ClientServiceImpl implements ClientService {
                 .code(tuple.get("code", String.class))
                 .raisonSociale(tuple.get("raisonSociale", String.class))
                 .segmentation(tuple.get("segmentation", String.class))
+                .segmentationLibelle(tuple.get("segmentationLibelle", String.class))
+                .nomPharmacien(tuple.get("nomPharmacien", String.class))
                 .ville(tuple.get("ville", String.class))
                 .statut(tuple.get("statut", String.class))
                 .agenceId(tuple.get("agenceId", Long.class))

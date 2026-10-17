@@ -92,20 +92,22 @@ class ImportsIT extends IntegrationBase {
         byte[] fichier = classeur(
                 new String[] {"Numérodeompte", "Agce", "Sgce", "Seg", "Nom", "Adresse1", "WhatsappMAJ", "PharmacienTitulaire",
                         "PharmacienAss.", "Chargédecde", "Comptable", "E-MailMAJ", "Commentair"},
-                new String[] {"9001", "B", "B2", "P", "DU PLATEAU", "RUE 12", "2250700000001", "2250700000002", "0",
+                new String[] {"9001", "B", "B2", "P", "DU PLATEAU", "KOFFI AYA", "2250700000001", "2250700000002", "0",
                         "2250700000003", "0", "contact@exemple.ci", "0"},
                 new String[] {"9002", "B", "B2", "S", "DES ROSES", "CARREFOUR", "2250700000004", "0", "0", "0", "0", "pas-un-mail", "0"},
-                new String[] {"9003", "Z", "Z1", "B", "INCONNUE", "", "2250700000005", "0", "0", "0", "0", "0", "0"});
+                new String[] {"9003", "Z", "Z1", "B", "INCONNUE", "", "2250700000005", "0", "0", "0", "0", "0", "0"},
+                new String[] {"9004", "B", "B2", "X", "DU LAC", "", "2250700000006", "0", "0", "0", "0", "0", "0"});
 
         String simulation = mvc.perform(multipart("/api/imports/clients").file(fichier("base.xlsx", fichier)).session(session).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nbCreations").value(1))
-                .andExpect(jsonPath("$.nbRejets").value(2))
+                .andExpect(jsonPath("$.nbRejets").value(3))
                 .andReturn().getResponse().getContentAsString();
         Long id = idDe(simulation);
         mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "REJET").session(session))
                 .andExpect(jsonPath("$.elements[0].message").value("Adresse e-mail invalide : pas-un-mail."))
-                .andExpect(jsonPath("$.elements[1].message", containsString("Agence inconnue : Z")));
+                .andExpect(jsonPath("$.elements[1].message", containsString("Agence inconnue : Z")))
+                .andExpect(jsonPath("$.elements[2].message", containsString("Segment inconnu : X (segments connus : P Platinum, S Silver, B Bronze)")));
 
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -113,6 +115,13 @@ class ImportsIT extends IntegrationBase {
         assertThat(jdbc.queryForObject("select concat(a.code, ':', c.sous_agence, ':', c.segmentation, ':', c.raison_sociale, ':', c.email, ':', "
                 + "coalesce(c.commentaire, '-')) from crm_client c join crm_agence a on a.id = c.agence_id where c.code = '9001'", String.class))
                 .isEqualTo("BKE:B2:P:DU PLATEAU:contact@exemple.ci:-");
+        // Adresse1 est le nom du pharmacien titulaire
+        mvc.perform(get("/api/clients").param("q", "KOFFI").session(session))
+                .andExpect(jsonPath("$.elements[0].code").value("9001"))
+                .andExpect(jsonPath("$.elements[0].nomPharmacien").value("KOFFI AYA"))
+                .andExpect(jsonPath("$.elements[0].segmentationLibelle").value("Platinum"));
+        assertThat(jdbc.queryForObject("select ct.nom from crm_contact ct join crm_client c on c.id = ct.client_id "
+                + "where c.code = '9001' and ct.fonction = 'TITULAIRE'", String.class)).isEqualTo("KOFFI AYA");
         // Les cellules a 0 ne creent pas de numero
         assertThat(jdbc.queryForList("select concat(ct.rang, ':', ct.fonction, ':', ct.numero_whatsapp) from crm_contact ct "
                 + "join crm_client c on c.id = ct.client_id where c.code = '9001' order by ct.id", String.class))

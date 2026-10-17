@@ -17,6 +17,8 @@ public class ClientDTO {
     private String code;
     private String raisonSociale;
     private String segmentation;
+    private String segmentationLibelle;
+    private String nomPharmacien;
     private String ville;
     private Long agenceId;
     private String agenceLibelle;
