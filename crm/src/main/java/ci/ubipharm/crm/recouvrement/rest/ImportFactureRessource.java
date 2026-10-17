@@ -1,0 +1,36 @@
+package ci.ubipharm.crm.recouvrement.rest;
+
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import ci.ubipharm.crm.commun.rest.service.dto.ImportDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.ValidationImportDTO;
+import ci.ubipharm.crm.recouvrement.rest.service.ImportFactureService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/api/recouvrement/imports/factures")
+@PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE')")
+@RequiredArgsConstructor
+public class ImportFactureRessource {
+
+    private final ImportFactureService importFactureService;
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ImportDTO simuler(@RequestParam("fichier") MultipartFile fichier) {
+        return importFactureService.simuler(fichier);
+    }
+
+    @PostMapping("/{id}/validation")
+    public ImportDTO valider(@PathVariable Long id, @Valid @RequestBody ValidationImportDTO choix) {
+        return importFactureService.valider(id, choix);
+    }
+}

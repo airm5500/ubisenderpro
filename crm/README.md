@@ -64,3 +64,31 @@ Les lectures passent en GET avec des query params, les ecritures en POST/PUT
 | GET | `/api/agences` | Agences visibles |
 | GET | `/api/clients?q=&agenceId=&segmentation=&statut=&page=&taille=` | Recherche paginee |
 | GET | `/api/clients/{id}` | Fiche client |
+
+## Imports (lot 2)
+
+Chaque import se fait en deux temps : une **simulation** qui evalue chaque ligne sans rien modifier
+(creation, mise a jour avec ses ecarts, identique, ou rejet avec son motif), puis une **validation**
+qui re-evalue les lignes contre la base et applique les creations et les mises a jour choisies.
+Formats acceptes : `.xlsx`, `.xls`, `.csv` (separateur `;`, `,` ou tabulation, UTF-8 ou Windows-1252),
+10 Mo et 20 000 lignes au plus (parametre `import.lignes_max`). Les en-tetes sont reconnus sans tenir
+compte des accents ni de la casse (`Date d'échéance`, `date_echeance`, `Echeance`...).
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| POST | `/api/imports/clients` (multipart `fichier`) | Simulation d'un import clients |
+| POST | `/api/imports/clients/{id}/validation` | Validation `{toutesLesMisesAJour, clesAMettreAJour[]}` |
+| POST | `/api/recouvrement/imports/factures` (multipart `fichier`) | Simulation d'un import factures |
+| POST | `/api/recouvrement/imports/factures/{id}/validation` | Validation, meme corps |
+| GET | `/api/imports?type=&page=&taille=` | Historique des imports |
+| GET | `/api/imports/{id}` | Bilan d'un import |
+| GET | `/api/imports/{id}/lignes?action=&page=&taille=` | Detail ligne par ligne |
+| POST | `/api/imports/{id}/annulation` | Abandon d'une simulation |
+| GET | `/api/recouvrement/factures?q=&clientId=&agenceId=&sousTypeId=&statut=&nature=&echeanceDu=&echeanceAu=&enRetard=&page=&taille=` | Recherche paginee |
+| GET | `/api/recouvrement/sous-types` | Sous-types de compte |
+
+Colonnes clients : code client, raison sociale, agence (code ou libelle) ; en option segmentation, ville,
+numero 1, numero 2. Colonnes factures : reference, code client, date facture, date d'echeance, montant,
+solde ; en option sous-type (Normal par defaut) et nature (facture ou avoir ; un montant negatif est un avoir).
+Une cellule vide n'efface jamais une valeur existante, un ancien numero WhatsApp est archive et non supprime.
+Imports reserves aux profils ADMIN, DIR_RECOUVREMENT et DIR_AGENCE (limite a ses agences).

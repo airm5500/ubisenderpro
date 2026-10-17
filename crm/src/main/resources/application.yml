@@ -17,8 +17,15 @@ spring:
           time_zone: UTC
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   jackson:
     time-zone: UTC
+    deserialization:
+      # Un booleen absent du JSON vaut false au lieu de faire echouer la lecture
+      fail-on-null-for-primitives: false
 
 server:
   port: 8080

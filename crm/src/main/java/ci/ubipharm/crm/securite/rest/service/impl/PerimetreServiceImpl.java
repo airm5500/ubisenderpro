@@ -2,15 +2,12 @@ package ci.ubipharm.crm.securite.rest.service.impl;
 
 import java.util.List;
 
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.securite.rest.service.PerimetreService;
+import ci.ubipharm.crm.securite.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.securite.rest.service.dto.PerimetreDTO;
-import ci.ubipharm.crm.securite.rest.service.dto.UtilisateurPrincipal;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 
@@ -19,14 +16,11 @@ import lombok.RequiredArgsConstructor;
 public class PerimetreServiceImpl implements PerimetreService {
 
     private final EntityManager em;
+    private final UtilisateurCourantService utilisateurCourantService;
 
     @Override
     public PerimetreDTO perimetreCourant() {
-        Authentication authentification = SecurityContextHolder.getContext().getAuthentication();
-        if (authentification == null || !(authentification.getPrincipal() instanceof UtilisateurPrincipal principal)) {
-            throw new AccessDeniedException("Aucun utilisateur connecte");
-        }
-        return perimetre(principal.getId());
+        return perimetre(utilisateurCourantService.utilisateur().getId());
     }
 
     @Override

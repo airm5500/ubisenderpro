@@ -10,7 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -49,6 +53,21 @@ public class GestionnaireErreurs {
     public ResponseEntity<ErreurDTO> parametreInvalide(MethodArgumentTypeMismatchException e) {
         ChampEnErreurDTO champ = ChampEnErreurDTO.builder().champ(e.getName()).message("Valeur invalide.").build();
         return reponse(HttpStatus.BAD_REQUEST, "Certaines saisies sont invalides.", List.of(champ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErreurDTO> requeteIllisible(HttpMessageNotReadableException e) {
+        return reponse(HttpStatus.BAD_REQUEST, "La requete est illisible.", null);
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+    public ResponseEntity<ErreurDTO> fichierAbsent(Exception e) {
+        return reponse(HttpStatus.BAD_REQUEST, "Joignez un fichier Excel ou CSV.", null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErreurDTO> fichierTropGros(MaxUploadSizeExceededException e) {
+        return reponse(HttpStatus.BAD_REQUEST, "Le fichier depasse 10 Mo : decoupez-le en plusieurs imports.", null);
     }
 
     @ExceptionHandler(AuthenticationException.class)
