@@ -36,6 +36,20 @@ public class JournalActionServiceImpl implements JournalActionService {
                 .executeUpdate();
     }
 
+    @Override
+    @Transactional
+    public void enregistrerSysteme(String action, String entite, Long entiteId, String details) {
+        em.createNativeQuery("""
+                insert into crm_journal_action (login, action, entite, entite_id, details, created_at)
+                values ('systeme', :action, :entite, :entiteId, :details, utc_timestamp())
+                """)
+                .setParameter("action", action)
+                .setParameter("entite", entite)
+                .setParameter("entiteId", entiteId)
+                .setParameter("details", details)
+                .executeUpdate();
+    }
+
     private String adresseIp() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributs) {
             return attributs.getRequest().getRemoteAddr();

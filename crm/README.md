@@ -128,3 +128,44 @@ numeros WhatsApp des agents reserves a ADMIN et DIR_RECOUVREMENT.
 | GET | `/api/recouvrement/delegations?agentId=&enCours=` | Interims |
 | POST | `/api/recouvrement/delegations` | Interim `{titulaireId, remplacantId, dateDebut, dateFin, motif}`, sans chevauchement |
 | POST | `/api/recouvrement/delegations/{id}/annulation` | Annule un interim |
+
+## Campagnes de relance (lot 4)
+
+Une facture = un message, envoye au numero WhatsApp principal du client depuis le numero de son agent.
+Cycle : **brouillon** -> **a valider** (soumission) -> **validee** (la Direction du Recouvrement valide, les
+messages sont figes) -> **en cours** a la date d'execution (vide = des la validation) -> terminee. Une campagne
+peut etre rejetee avec un motif (elle redevient brouillon) ou annulee (messages non envoyes annules, factures
+remises a relancer). Avant validation, le recapitulatif et les messages sont recalcules en direct.
+
+Une facture est exclue, avec son motif, si le client n'a pas d'agent, si l'agent est desactive ou n'a pas de
+numero, si le client n'a pas de numero WhatsApp, ou si la facture attend deja l'envoi d'une autre campagne.
+Au demarrage, une facture soldee depuis la validation n'est plus relancee. Fenetres par type : avant echeance
+J-5 a J-1 (parametres `campagne.avant_echeance_jours_*`), jour de l'echeance, apres echeance (des J+1),
+personnalisee (criteres libres). Criteres combinables : agences, agents, clients, sous-types, segments, solde
+min/max, periode d'echeance, jours avant echeance, jours de retard. La selection reste dans le perimetre du
+createur (un agent : son portefeuille). Le planificateur (`crm.campagnes.planificateur`, chaque minute) demarre
+les campagnes programmees ; l'envoi WhatsApp des messages `A_ENVOYER` arrive au lot 5.
+
+Modeles : crees et modifies par ADMIN et DIR_RECOUVREMENT, variables ecrites `{code}` comme dans UbiSenderPro.
+Une variable inconnue est refusee. Les variables (`crm_variable_message`) pointent vers une colonne de
+`crm_client` ou `crm_facture`, ou une valeur calculee (agence, segment, sous-type, jours de retard, jours avant
+echeance, nom et numero de l'agent) : une colonne ajoutee a la base devient une variable sans developpement.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/recouvrement/variables` | Variables actives |
+| GET | `/api/recouvrement/variables/sources` | Champs utilisables par une variable |
+| POST / PUT | `/api/recouvrement/variables[/{id}]` | `{code, libelle, source, exemple}` |
+| POST | `/api/recouvrement/variables/{id}/archivage` | Refuse si un modele actif l'utilise |
+| GET | `/api/recouvrement/modeles-messages?typeCampagne=&statut=` | Modeles et variables qu'ils citent |
+| POST / PUT | `/api/recouvrement/modeles-messages[/{id}]` | `{nom, typeCampagne, contenu}` |
+| POST | `/api/recouvrement/modeles-messages/{id}/archivage` | Archive un modele |
+| GET | `/api/recouvrement/campagnes?q=&statut=&typeCampagne=&page=&taille=` | Journal des campagnes |
+| POST / PUT | `/api/recouvrement/campagnes[/{id}]` | `{nom, typeCampagne, modeleId, criteres, dateExecution}` |
+| GET | `/api/recouvrement/campagnes/{id}/recapitulatif` | Clients, factures, messages, solde, agents, exclusions par motif, 3 exemples |
+| GET | `/api/recouvrement/campagnes/{id}/messages?statut=&agentId=&q=&page=&taille=` | Messages generes |
+| POST | `/api/recouvrement/campagnes/{id}/soumission` | Auteur ou direction |
+| POST | `/api/recouvrement/campagnes/{id}/validation` | ADMIN, DIR_RECOUVREMENT |
+| POST | `/api/recouvrement/campagnes/{id}/rejet` | `{motif}`, ADMIN, DIR_RECOUVREMENT |
+| POST | `/api/recouvrement/campagnes/{id}/lancement` | Demarre maintenant une campagne programmee |
+| POST | `/api/recouvrement/campagnes/{id}/annulation` | `{motif}` ; une fois validee, direction seulement |

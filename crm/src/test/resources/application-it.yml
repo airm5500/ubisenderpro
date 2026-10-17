@@ -5,3 +5,8 @@ spring:
     password: ${CRM_DB_PASSWORD:ubicrm}
   flyway:
     clean-disabled: false
+
+# Les tests demarrent les campagnes eux-memes
+crm:
+  campagnes:
+    planificateur: false
