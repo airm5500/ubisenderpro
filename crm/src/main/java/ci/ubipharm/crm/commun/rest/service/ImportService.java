@@ -24,6 +24,15 @@ public interface ImportService {
 
     ImportDTO annuler(Long id);
 
+    /** Type de l'import (CLIENTS, FACTURES...), s'il est visible par l'utilisateur. */
+    String type(Long id);
+
+    /** Toutes les lignes d'une action donnee (REJET...), dans l'ordre du fichier. */
+    List<ImportLigneDTO> lignesParAction(Long id, String action);
+
+    /** Remplace le verdict et les donnees des lignes d'une simulation, puis recalcule son bilan. */
+    ImportDTO majSimulation(Long id, List<ImportLigneDTO> lignes);
+
     /** Verrouille un import simule du type attendu et rend ses lignes avec leurs donnees d'origine. */
     List<ImportLigneDTO> lignesAValider(Long id, String type);
 

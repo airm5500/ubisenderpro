@@ -15,6 +15,9 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TableurDTO {
 
+    /** En-tetes normalises (cles des valeurs de chaque ligne). */
     private List<String> entetes;
+    /** En-tetes tels qu'ils figurent dans le fichier, dans le meme ordre. */
+    private List<String> entetesOrigine;
     private List<LigneTableurDTO> lignes;
 }

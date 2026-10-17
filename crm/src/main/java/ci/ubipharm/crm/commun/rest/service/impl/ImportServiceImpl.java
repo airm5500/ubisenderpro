@@ -172,6 +172,53 @@ public class ImportServiceImpl implements ImportService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public String type(Long id) {
+        verifierAcces(id);
+        return (String) em.createNativeQuery("select type from crm_import where id = :id").setParameter("id", id).getSingleResult();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImportLigneDTO> lignesParAction(Long id, String action) {
+        verifierAcces(id);
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery("""
+                select l.id as id, l.numero_ligne as numeroLigne, l.cle as cle, l.action as action,
+                       l.message as message, l.resultat as resultat, l.donnees as donnees
+                from crm_import_ligne l where l.import_id = :id and l.action = :action order by l.numero_ligne
+                """, Tuple.class).setParameter("id", id).setParameter("action", action).getResultList();
+        return lignes.stream().map(this::mapTupleToLigneDto).toList();
+    }
+
+    @Override
+    @Transactional
+    public ImportDTO majSimulation(Long id, List<ImportLigneDTO> lignes) {
+        SqlParameterSource[] parametres = lignes.stream()
+                .map(l -> new MapSqlParameterSource()
+                        .addValue("id", l.getId())
+                        .addValue("cle", tronquer(l.getCle(), 100))
+                        .addValue("action", l.getAction())
+                        .addValue("message", tronquer(l.getMessage(), 2000))
+                        .addValue("donnees", jsonMapper.writeValueAsString(l.getDonnees())))
+                .toArray(SqlParameterSource[]::new);
+        jdbc.batchUpdate("update crm_import_ligne set cle = :cle, action = :action, message = :message, donnees = :donnees where id = :id",
+                parametres);
+        em.createNativeQuery("""
+                update crm_import set nb_creations = :nbCreations, nb_mises_a_jour = :nbMisesAJour,
+                       nb_identiques = :nbIdentiques, nb_rejets = :nbRejets
+                where id = :id
+                """)
+                .setParameter("nbCreations", compter(lignes, "CREATION"))
+                .setParameter("nbMisesAJour", compter(lignes, "MISE_A_JOUR"))
+                .setParameter("nbIdentiques", compter(lignes, "IDENTIQUE"))
+                .setParameter("nbRejets", compter(lignes, "REJET"))
+                .setParameter("id", id)
+                .executeUpdate();
+        return consulter(id);
+    }
+
+    @Override
     @Transactional
     public List<ImportLigneDTO> lignesAValider(Long id, String type) {
         String typeImport = verrouillerSimulation(id);

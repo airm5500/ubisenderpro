@@ -1,6 +1,6 @@
 package ci.ubipharm.crm.commun.rest.service.impl;
 
-import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.colonnePresente;
+import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.champ;
 import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.normaliserLibelle;
 import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.valeur;
 
@@ -19,19 +19,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import ci.ubipharm.crm.commun.rest.service.CorrespondanceImportService;
 import ci.ubipharm.crm.commun.rest.service.ImportClientService;
 import ci.ubipharm.crm.commun.rest.service.ImportService;
 import ci.ubipharm.crm.commun.rest.service.LecteurTableurService;
 import ci.ubipharm.crm.commun.rest.service.ParametreService;
+import ci.ubipharm.crm.commun.rest.service.dto.ChampImportDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.CorrectionLigneDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ImportDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ImportLigneDTO;
-import ci.ubipharm.crm.commun.rest.service.dto.LigneTableurDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.ParametresImportDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ResultatLigneDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.TableurDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ValidationImportDTO;
 import ci.ubipharm.crm.securite.rest.service.PerimetreService;
 import ci.ubipharm.crm.securite.rest.service.dto.PerimetreDTO;
-import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
+import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +59,7 @@ public class ImportClientServiceImpl implements ImportClientService {
     static final List<String> VILLE = List.of("ville", "localite", "commune");
     static final List<String> ADRESSE = List.of("adresse", "adresse_postale", "localisation");
     /** Dans le fichier UBIPHARM, la colonne Adresse1 contient le nom du pharmacien. */
-    static final List<String> NOM_PHARMACIEN = List.of("adresse1", "adresse_1", "nom_pharmacien", "pharmacien", "nom_du_pharmacien");
+    static final List<String> NOM_PHARMACIEN = List.of("nom_pharmacien", "adresse1", "adresse_1", "pharmacien", "nom_du_pharmacien");
     static final List<String> EMAIL = List.of("email", "e_mail", "e_mailmaj", "emailmaj", "mail", "courriel");
     static final List<String> COMMENTAIRE = List.of("commentaire", "commentair", "commentaires", "observation");
 
@@ -65,13 +68,13 @@ public class ImportClientServiceImpl implements ImportClientService {
 
     private static Map<String, List<String>> numeros() {
         Map<String, List<String>> numeros = new LinkedHashMap<>();
-        numeros.put("PRINCIPAL", List.of("whatsappmaj", "whatsapp", "numero_whatsapp", "numero_principal", "numero_1", "contact_1",
+        numeros.put("PRINCIPAL", List.of("numero_whatsapp", "whatsappmaj", "whatsapp", "numero_principal", "numero_1", "contact_1",
                 "telephone", "telephone_1", "tel", "tel_1"));
-        numeros.put("TITULAIRE", List.of("pharmacientitulaire", "pharmacien_titulaire", "titulaire"));
-        numeros.put("ASSISTANT", List.of("pharmacienass", "pharmacien_ass", "pharmacien_assistant", "assistant"));
-        numeros.put("CHARGE_COMMANDE", List.of("chargedecde", "charge_de_cde", "charge_de_commande", "charge_commande"));
-        numeros.put("COMPTABLE", List.of("comptable"));
-        numeros.put("SECONDAIRE", List.of("numero_2", "numero_secondaire", "contact_2", "telephone_2", "tel_2"));
+        numeros.put("TITULAIRE", List.of("numero_titulaire", "pharmacientitulaire", "pharmacien_titulaire", "titulaire"));
+        numeros.put("ASSISTANT", List.of("numero_assistant", "pharmacienass", "pharmacien_ass", "pharmacien_assistant", "assistant"));
+        numeros.put("CHARGE_COMMANDE", List.of("numero_charge_commande", "chargedecde", "charge_de_cde", "charge_de_commande", "charge_commande"));
+        numeros.put("COMPTABLE", List.of("numero_comptable", "comptable"));
+        numeros.put("SECONDAIRE", List.of("numero_secondaire", "numero_2", "contact_2", "telephone_2", "tel_2"));
         return numeros;
     }
 
@@ -79,33 +82,82 @@ public class ImportClientServiceImpl implements ImportClientService {
             "PRINCIPAL", "Numero WhatsApp", "TITULAIRE", "Numero du titulaire", "ASSISTANT", "Numero du pharmacien assistant",
             "CHARGE_COMMANDE", "Numero du charge de commande", "COMPTABLE", "Numero du comptable", "SECONDAIRE", "Numero secondaire");
 
+    /** Champs proposes par l'assistant, dans l'ordre de l'exemplaire. */
+    static final List<ChampImportDTO> CHAMPS = champsImport();
+
+    private static List<ChampImportDTO> champsImport() {
+        List<ChampImportDTO> champs = new ArrayList<>(List.of(
+                champ("Numero de compte", true, "5125", CODE),
+                champ("Nom de la pharmacie", true, "PHARMACIE DU PLATEAU", RAISON_SOCIALE),
+                champ("Agence", true, "Y", AGENCE),
+                champ("Sous-agence", false, "Y2", SOUS_AGENCE),
+                champ("Segment", false, "P", SEGMENTATION),
+                champ("Nom du pharmacien", false, "KOFFI AYA", NOM_PHARMACIEN),
+                champ("Ville", false, "Abidjan", VILLE),
+                champ("Adresse", false, "Boulevard Latrille", ADRESSE),
+                champ("E-mail", false, "contact@pharmacie.ci", EMAIL),
+                champ("Commentaire", false, "", COMMENTAIRE)));
+        NUMEROS.forEach((fonction, alias) -> champs.add(champ(LIBELLES_NUMEROS.get(fonction), false,
+                "PRINCIPAL".equals(fonction) ? "2250700000001" : "", alias)));
+        return List.copyOf(champs);
+    }
+
     private static final int TAILLE_LOT = 1000;
 
     private final EntityManager em;
     private final LecteurTableurService lecteurTableurService;
     private final ImportService importService;
+    private final CorrespondanceImportService correspondanceImportService;
     private final PerimetreService perimetreService;
     private final ParametreService parametreService;
 
     @Override
-    @Transactional
-    public ImportDTO simuler(MultipartFile fichier) {
-        TableurDTO tableur = lecteurTableurService.lire(fichier);
-        verifierColonnes(tableur.getEntetes());
-        Contexte contexte = contexte(tableur.getLignes().stream().map(LigneTableurDTO::getValeurs).toList());
+    public String type() {
+        return TYPE;
+    }
 
-        List<ImportLigneDTO> lignes = new ArrayList<>();
-        for (LigneTableurDTO ligne : tableur.getLignes()) {
-            ResultatLigneDTO verdict = evaluer(ligne.getNumero(), ligne.getValeurs(), contexte).verdict();
-            lignes.add(ImportLigneDTO.builder()
-                    .numeroLigne(ligne.getNumero())
-                    .cle(verdict.getCle())
-                    .action(verdict.getAction())
-                    .message(verdict.getMessage())
-                    .donnees(ligne.getValeurs())
-                    .build());
-        }
+    @Override
+    public String moduleRequis() {
+        return null;
+    }
+
+    @Override
+    public List<ChampImportDTO> champs() {
+        return CHAMPS;
+    }
+
+    @Override
+    @Transactional
+    public ImportDTO simuler(MultipartFile fichier, ParametresImportDTO parametres) {
+        TableurDTO tableur = lecteurTableurService.lire(fichier);
+        Map<String, String> correspondance = correspondanceImportService.resoudre(TYPE, CHAMPS, tableur.getEntetes(), parametres);
+        List<ImportLigneDTO> lignes = correspondanceImportService.appliquer(CHAMPS, tableur, correspondance).stream()
+                .map(l -> ImportLigneDTO.builder().numeroLigne(l.getNumero()).donnees(l.getValeurs()).build())
+                .toList();
+        evaluerLignes(lignes);
         return importService.simulation(TYPE, fichier.getOriginalFilename(), lignes);
+    }
+
+    @Override
+    @Transactional
+    public ImportDTO corriger(Long id, Long ligneId, CorrectionLigneDTO correction) {
+        List<ImportLigneDTO> lignes = importService.lignesAValider(id, TYPE);
+        ImportLigneDTO ligne = lignes.stream().filter(l -> l.getId().equals(ligneId)).findFirst()
+                .orElseThrow(() -> new RessourceIntrouvableException("Ligne introuvable"));
+        ligne.setDonnees(ValeursImport.corriger(CHAMPS, ligne.getDonnees(), correction.getValeurs()));
+        // Une correction peut lever un doublon sur une autre ligne : tout le fichier est re-evalue
+        evaluerLignes(lignes);
+        return importService.majSimulation(id, lignes);
+    }
+
+    private void evaluerLignes(List<ImportLigneDTO> lignes) {
+        Contexte contexte = contexte(lignes.stream().map(ImportLigneDTO::getDonnees).toList());
+        for (ImportLigneDTO ligne : lignes) {
+            ResultatLigneDTO verdict = evaluer(ligne.getNumeroLigne(), ligne.getDonnees(), contexte).verdict();
+            ligne.setCle(verdict.getCle());
+            ligne.setAction(verdict.getAction());
+            ligne.setMessage(verdict.getMessage());
+        }
     }
 
     @Override
@@ -140,24 +192,6 @@ public class ImportClientServiceImpl implements ImportClientService {
             }
         }
         return importService.terminerValidation(id, lignes);
-    }
-
-    private void verifierColonnes(List<String> entetes) {
-        List<String> manquantes = new ArrayList<>();
-        if (!colonnePresente(entetes, CODE)) {
-            manquantes.add("code client");
-        }
-        if (!colonnePresente(entetes, RAISON_SOCIALE)) {
-            manquantes.add("raison sociale");
-        }
-        if (!colonnePresente(entetes, AGENCE)) {
-            manquantes.add("agence");
-        }
-        if (!manquantes.isEmpty()) {
-            throw new ErreurMetierException("Colonnes obligatoires absentes : " + String.join(", ", manquantes)
-                    + ". Colonnes attendues : numero de compte (code client), nom (raison sociale), agence ; en option sous-agence,"
-                    + " segment, nom du pharmacien (Adresse1), ville, adresse, e-mail, commentaire et numeros (WhatsApp, titulaire, assistant, charge de commande, comptable).");
-        }
     }
 
     Evaluation evaluer(int numeroLigne, Map<String, String> valeurs, Contexte contexte) {

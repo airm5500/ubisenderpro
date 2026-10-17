@@ -67,6 +67,11 @@ Les lectures passent en GET avec des query params, les ecritures en POST/PUT
 
 ## Imports (lot 2)
 
+Chaque import passe par l'**assistant d'import**, comme dans UbiSenderPro : choix du fichier, apercu des
+colonnes avec correspondance proposee (modifiable, enregistrable en modele), simulation, correction des
+lignes rejetees, puis validation. La simulation accepte une partie multipart `parametres`
+`{correspondance:{champ:colonne}}` ou `{modeleId}` ; sans elle, la correspondance est devinee.
+
 Chaque import se fait en deux temps : une **simulation** qui evalue chaque ligne sans rien modifier
 (creation, mise a jour avec ses ecarts, identique, ou rejet avec son motif), puis une **validation**
 qui re-evalue les lignes contre la base et applique les creations et les mises a jour choisies.
@@ -84,6 +89,13 @@ compte des accents ni de la casse (`Date d'échéance`, `date_echeance`, `Echean
 | GET | `/api/imports/{id}` | Bilan d'un import |
 | GET | `/api/imports/{id}/lignes?action=&page=&taille=` | Detail ligne par ligne |
 | POST | `/api/imports/{id}/annulation` | Abandon d'une simulation |
+| GET | `/api/imports/{type}/champs` | Assistant : champs attendus (`type` = `clients`, `factures`) |
+| GET | `/api/imports/{type}/exemplaire` | Assistant : exemplaire CSV a remplir, reimportable tel quel |
+| POST | `/api/imports/{type}/apercu?modeleId=` (multipart `fichier`) | Assistant : colonnes lues, 3 exemples par colonne, correspondance proposee, champs obligatoires manquants |
+| GET / POST | `/api/imports/{type}/modeles` | Assistant : modeles de correspondance enregistres |
+| POST | `/api/imports/modeles/{id}/archivage` | Archive un modele |
+| PUT | `/api/imports/{id}/lignes/{ligneId}` | Corrige une ligne de la simulation `{valeurs:{champ:valeur}}`, tout le fichier est re-evalue |
+| GET | `/api/imports/{id}/rejets` | Lignes rejetees et leur motif en CSV, a corriger puis reimporter |
 | GET | `/api/recouvrement/factures?q=&clientId=&agenceId=&sousTypeId=&statut=&nature=&echeanceDu=&echeanceAu=&enRetard=&page=&taille=` | Recherche paginee |
 | GET | `/api/recouvrement/sous-types` | Sous-types de compte |
 

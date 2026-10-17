@@ -51,6 +51,7 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_facture");
         jdbc.update("delete from crm_import_ligne");
         jdbc.update("delete from crm_import");
+        jdbc.update("delete from crm_import_modele");
         jdbc.update("delete from crm_journal_action");
         jdbc.update("delete from crm_contact");
         jdbc.update("delete from crm_client");

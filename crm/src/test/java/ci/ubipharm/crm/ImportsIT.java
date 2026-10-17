@@ -190,7 +190,7 @@ class ImportsIT extends IntegrationBase {
         mvc.perform(multipart("/api/recouvrement/imports/factures").file(fichier("factures.csv", csv.getBytes(StandardCharsets.UTF_8)))
                 .session(connecter("admin", MOT_DE_PASSE_ADMIN)).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("Colonnes obligatoires absentes : date facture, date d'echeance, montant, solde")));
+                .andExpect(jsonPath("$.message", containsString("Champs obligatoires sans colonne : Date facture, Date d'echeance, Montant, Solde")));
         assertThat(jdbc.queryForObject("select count(*) from crm_import", Long.class)).isZero();
     }
 

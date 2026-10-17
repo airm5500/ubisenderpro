@@ -11,6 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import ci.ubipharm.crm.commun.rest.service.dto.ChampImportDTO;
+
 /**
  * Conversion des valeurs texte lues dans les fichiers d'import :
  * en-tetes, dates, montants et numeros WhatsApp, avec les formats courants en Cote d'Ivoire.
@@ -121,6 +123,42 @@ public final class ValeursImport {
             chiffres = prefixePays + chiffres;
         }
         return chiffres.matches(prefixePays + "\\d{10}") ? Optional.of(chiffres) : Optional.empty();
+    }
+
+    /**
+     * Definition d'un champ importable : son code est le premier alias, et son libelle normalise
+     * est aussi reconnu, pour qu'un exemplaire ou un fichier de rejets se reimporte tel quel.
+     */
+    public static ChampImportDTO champ(String libelle, boolean obligatoire, String exemple, List<String> alias) {
+        List<String> tous = new java.util.ArrayList<>(alias);
+        String libelleNormalise = normaliserEntete(libelle);
+        if (!tous.contains(libelleNormalise)) {
+            tous.add(libelleNormalise);
+        }
+        return ChampImportDTO.builder()
+                .code(alias.getFirst())
+                .libelle(libelle)
+                .obligatoire(obligatoire)
+                .exemple(exemple)
+                .alias(List.copyOf(tous))
+                .build();
+    }
+
+    /** Donnees d'une ligne apres correction : seuls les champs connus sont pris, une valeur vide efface le champ. */
+    public static Map<String, String> corriger(List<ChampImportDTO> champs, Map<String, String> donnees, Map<String, String> corrections) {
+        Map<String, String> resultat = new java.util.LinkedHashMap<>(donnees);
+        java.util.Set<String> codes = champs.stream().map(ChampImportDTO::getCode).collect(java.util.stream.Collectors.toSet());
+        corrections.forEach((champ, valeur) -> {
+            if (!codes.contains(champ)) {
+                return;
+            }
+            if (valeur == null || valeur.isBlank()) {
+                resultat.remove(champ);
+            } else {
+                resultat.put(champ, valeur.strip());
+            }
+        });
+        return resultat;
     }
 
     public static String montantLisible(BigDecimal montant) {

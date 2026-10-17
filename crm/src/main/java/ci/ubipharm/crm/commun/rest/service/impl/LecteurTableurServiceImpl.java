@@ -93,7 +93,8 @@ public class LecteurTableurServiceImpl implements LecteurTableurService {
             // Numero de ligne tel que l'utilisateur le voit dans son tableur (en-tete = ligne 1)
             lignes.add(LigneTableurDTO.builder().numero(i + 1).valeurs(valeurs).build());
         }
-        return TableurDTO.builder().entetes(entetes).lignes(lignes).build();
+        List<String> entetesOrigine = brut.getFirst().stream().map(e -> e == null ? "" : e.strip()).toList();
+        return TableurDTO.builder().entetes(entetes).entetesOrigine(entetesOrigine).lignes(lignes).build();
     }
 
     private List<List<String>> lireClasseur(InputStream flux) throws IOException {

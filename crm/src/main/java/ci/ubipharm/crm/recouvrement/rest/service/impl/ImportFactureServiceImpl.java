@@ -1,6 +1,6 @@
 package ci.ubipharm.crm.recouvrement.rest.service.impl;
 
-import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.colonnePresente;
+import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.champ;
 import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.montantLisible;
 import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.normaliserLibelle;
 import static ci.ubipharm.crm.commun.rest.service.impl.ValeursImport.valeur;
@@ -12,7 +12,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,11 +24,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import ci.ubipharm.crm.commun.rest.service.CorrespondanceImportService;
 import ci.ubipharm.crm.commun.rest.service.ImportService;
 import ci.ubipharm.crm.commun.rest.service.LecteurTableurService;
+import ci.ubipharm.crm.commun.rest.service.dto.ChampImportDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.CorrectionLigneDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ImportDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ImportLigneDTO;
-import ci.ubipharm.crm.commun.rest.service.dto.LigneTableurDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.ParametresImportDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ResultatLigneDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.TableurDTO;
 import ci.ubipharm.crm.commun.rest.service.dto.ValidationImportDTO;
@@ -37,7 +39,7 @@ import ci.ubipharm.crm.commun.rest.service.impl.ValeursImport;
 import ci.ubipharm.crm.recouvrement.rest.service.ImportFactureService;
 import ci.ubipharm.crm.securite.rest.service.PerimetreService;
 import ci.ubipharm.crm.securite.rest.service.dto.PerimetreDTO;
-import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
+import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +64,17 @@ public class ImportFactureServiceImpl implements ImportFactureService {
     static final List<String> SOUS_TYPE = List.of("sous_type", "sous_type_compte", "type_compte", "type_de_compte");
     static final List<String> NATURE = List.of("nature", "type_piece", "type");
 
+    /** Champs proposes par l'assistant, dans l'ordre de l'exemplaire. */
+    static final List<ChampImportDTO> CHAMPS = List.of(
+            champ("Reference facture", true, "FA-2026-000123", REFERENCE),
+            champ("Numero de compte client", true, "5125", CODE_CLIENT),
+            champ("Date facture", true, "01/09/2026", DATE_FACTURE),
+            champ("Date d'echeance", true, "30/09/2026", DATE_ECHEANCE),
+            champ("Montant", true, "150000", MONTANT),
+            champ("Solde", true, "100000", SOLDE),
+            champ("Sous-type", false, "Normal", SOUS_TYPE),
+            champ("Nature", false, "Facture", NATURE));
+
     private static final String SOUS_TYPE_PAR_DEFAUT = "NORMAL";
     private static final DateTimeFormatter DATE_LISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final int TAILLE_LOT = 1000;
@@ -69,27 +82,56 @@ public class ImportFactureServiceImpl implements ImportFactureService {
     private final EntityManager em;
     private final LecteurTableurService lecteurTableurService;
     private final ImportService importService;
+    private final CorrespondanceImportService correspondanceImportService;
     private final PerimetreService perimetreService;
 
     @Override
-    @Transactional
-    public ImportDTO simuler(MultipartFile fichier) {
-        TableurDTO tableur = lecteurTableurService.lire(fichier);
-        verifierColonnes(tableur.getEntetes());
-        Contexte contexte = contexte(tableur.getLignes().stream().map(LigneTableurDTO::getValeurs).toList());
+    public String type() {
+        return TYPE;
+    }
 
-        List<ImportLigneDTO> lignes = new ArrayList<>();
-        for (LigneTableurDTO ligne : tableur.getLignes()) {
-            ResultatLigneDTO verdict = evaluer(ligne.getNumero(), ligne.getValeurs(), contexte).verdict();
-            lignes.add(ImportLigneDTO.builder()
-                    .numeroLigne(ligne.getNumero())
-                    .cle(verdict.getCle())
-                    .action(verdict.getAction())
-                    .message(verdict.getMessage())
-                    .donnees(ligne.getValeurs())
-                    .build());
-        }
+    @Override
+    public String moduleRequis() {
+        return "RECOUVREMENT";
+    }
+
+    @Override
+    public List<ChampImportDTO> champs() {
+        return CHAMPS;
+    }
+
+    @Override
+    @Transactional
+    public ImportDTO simuler(MultipartFile fichier, ParametresImportDTO parametres) {
+        TableurDTO tableur = lecteurTableurService.lire(fichier);
+        Map<String, String> correspondance = correspondanceImportService.resoudre(TYPE, CHAMPS, tableur.getEntetes(), parametres);
+        List<ImportLigneDTO> lignes = correspondanceImportService.appliquer(CHAMPS, tableur, correspondance).stream()
+                .map(l -> ImportLigneDTO.builder().numeroLigne(l.getNumero()).donnees(l.getValeurs()).build())
+                .toList();
+        evaluerLignes(lignes);
         return importService.simulation(TYPE, fichier.getOriginalFilename(), lignes);
+    }
+
+    @Override
+    @Transactional
+    public ImportDTO corriger(Long id, Long ligneId, CorrectionLigneDTO correction) {
+        List<ImportLigneDTO> lignes = importService.lignesAValider(id, TYPE);
+        ImportLigneDTO ligne = lignes.stream().filter(l -> l.getId().equals(ligneId)).findFirst()
+                .orElseThrow(() -> new RessourceIntrouvableException("Ligne introuvable"));
+        ligne.setDonnees(ValeursImport.corriger(CHAMPS, ligne.getDonnees(), correction.getValeurs()));
+        // Une correction peut lever un doublon sur une autre ligne : tout le fichier est re-evalue
+        evaluerLignes(lignes);
+        return importService.majSimulation(id, lignes);
+    }
+
+    private void evaluerLignes(List<ImportLigneDTO> lignes) {
+        Contexte contexte = contexte(lignes.stream().map(ImportLigneDTO::getDonnees).toList());
+        for (ImportLigneDTO ligne : lignes) {
+            ResultatLigneDTO verdict = evaluer(ligne.getNumeroLigne(), ligne.getDonnees(), contexte).verdict();
+            ligne.setCle(verdict.getCle());
+            ligne.setAction(verdict.getAction());
+            ligne.setMessage(verdict.getMessage());
+        }
     }
 
     @Override
@@ -124,25 +166,6 @@ public class ImportFactureServiceImpl implements ImportFactureService {
             }
         }
         return importService.terminerValidation(id, lignes);
-    }
-
-    private void verifierColonnes(List<String> entetes) {
-        Map<String, List<String>> obligatoires = new LinkedHashMap<>();
-        obligatoires.put("reference", REFERENCE);
-        obligatoires.put("code client", CODE_CLIENT);
-        obligatoires.put("date facture", DATE_FACTURE);
-        obligatoires.put("date d'echeance", DATE_ECHEANCE);
-        obligatoires.put("montant", MONTANT);
-        obligatoires.put("solde", SOLDE);
-        List<String> manquantes = obligatoires.entrySet().stream()
-                .filter(e -> !colonnePresente(entetes, e.getValue()))
-                .map(Map.Entry::getKey)
-                .toList();
-        if (!manquantes.isEmpty()) {
-            throw new ErreurMetierException("Colonnes obligatoires absentes : " + String.join(", ", manquantes)
-                    + ". Colonnes attendues : reference, code client, date facture, date d'echeance, montant, solde,"
-                    + " et en option sous-type et nature (facture ou avoir).");
-        }
     }
 
     Evaluation evaluer(int numeroLigne, Map<String, String> valeurs, Contexte contexte) {
