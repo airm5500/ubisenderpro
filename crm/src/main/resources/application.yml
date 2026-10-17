@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: ubipharm-crm
+  profiles:
+    default: dev
+  datasource:
+    url: ${CRM_DB_URL:jdbc:mariadb://localhost:3306/ubicrm}
+    username: ${CRM_DB_USER:ubicrm}
+    password: ${CRM_DB_PASSWORD:ubicrm}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+  jackson:
+    time-zone: UTC
+
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+  servlet:
+    session:
+      timeout: 60m
+      cookie:
+        http-only: true
+        same-site: strict
+        name: CRMSESSION
+
+logging:
+  level:
+    root: INFO

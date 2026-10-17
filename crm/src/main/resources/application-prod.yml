@@ -1,0 +1,11 @@
+# Les valeurs reelles (base, jeton Meta, SMTP) sont fournies par un fichier
+# application-prod.yml place hors du dossier d'installation
+# (spring.config.additional-location), pour qu'une mise a jour ne l'ecrase pas.
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+logging:
+  file:
+    name: ${CRM_LOG_DIR:logs}/crm.log
