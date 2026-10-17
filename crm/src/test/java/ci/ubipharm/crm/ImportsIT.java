@@ -253,6 +253,9 @@ class ImportsIT extends IntegrationBase {
         facture("FAC-3", c2, "2026-01-31", "50000.00");
         creerUtilisateur("it-agent", "AGENT", "RECOUVREMENT", YOPOUGON);
         creerUtilisateur("it-marketing", "AGENT", "MARKETING", YOPOUGON);
+        // Un agent ne voit que les factures des clients de son portefeuille
+        jdbc.update("insert into crm_affectation (client_id, agent_id, date_debut, affecte_par) select ?, id, utc_timestamp(), id "
+                + "from crm_utilisateur where login = 'it-agent'", c1);
 
         MockHttpSession agent = connecter("it-agent", MOT_DE_PASSE_ADMIN);
         mvc.perform(get("/api/recouvrement/factures").session(agent))

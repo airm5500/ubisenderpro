@@ -39,7 +39,6 @@ class AssistantImportIT extends IntegrationBase {
     @BeforeEach
     void donnees() throws Exception {
         reinitialiser();
-        jdbc.update("delete from crm_import_modele");
         session = connecter("admin", MOT_DE_PASSE_ADMIN);
     }
 

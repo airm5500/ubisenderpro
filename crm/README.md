@@ -107,3 +107,24 @@ L'agence est reconnue par son code, son libelle ou sa lettre UBIPHARM (`crm_agen
 solde ; en option sous-type (Normal par defaut) et nature (facture ou avoir ; un montant negatif est un avoir).
 Une cellule vide n'efface jamais une valeur existante, un ancien numero WhatsApp est archive et non supprime.
 Imports reserves aux profils ADMIN, DIR_RECOUVREMENT et DIR_AGENCE (limite a ses agences).
+
+## Portefeuilles agents (lot 3)
+
+Chaque client a au plus un agent en cours (contrainte en base). Une reaffectation clot l'affectation
+precedente avec son motif et garde l'historique ; rien n'est supprime. Un agent ne voit que les clients et
+factures de son portefeuille, plus ceux des agents qu'il remplace pendant un interim en cours. La direction
+voit ses agences. Affectations reservees a ADMIN, DIR_RECOUVREMENT et DIR_AGENCE (ses agences) ; interims et
+numeros WhatsApp des agents reserves a ADMIN et DIR_RECOUVREMENT.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/recouvrement/portefeuille?agentId=&agenceId=&q=&sansAgent=&avecSolde=&page=&taille=` | Clients du portefeuille avec factures ouvertes, solde et retard max |
+| POST | `/api/recouvrement/affectations` | Affecte `{agentId, clientIds[], motif}` ; renvoie traites, inchanges et refus motives |
+| POST | `/api/recouvrement/affectations/retrait` | Retire `{clientIds[], motif}` de leur agent |
+| POST | `/api/recouvrement/agents/{id}/transfert` | Transfere tout le portefeuille `{versAgentId, motif}` |
+| GET | `/api/recouvrement/clients/{id}/affectations` | Historique des agents d'un client |
+| GET | `/api/recouvrement/agents?agenceId=` | Agents de recouvrement, taille du portefeuille, remplacant en cours |
+| PUT | `/api/recouvrement/agents/{id}/numero` | Numero WhatsApp de l'agent `{numeroWhatsapp}`, normalise et unique |
+| GET | `/api/recouvrement/delegations?agentId=&enCours=` | Interims |
+| POST | `/api/recouvrement/delegations` | Interim `{titulaireId, remplacantId, dateDebut, dateFin, motif}`, sans chevauchement |
+| POST | `/api/recouvrement/delegations/{id}/annulation` | Annule un interim |

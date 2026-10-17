@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.recouvrement.rest.service.FactureService;
+import ci.ubipharm.crm.recouvrement.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.recouvrement.rest.service.dto.FactureCriteresDTO;
 import ci.ubipharm.crm.recouvrement.rest.service.dto.FactureDTO;
 import ci.ubipharm.crm.recouvrement.rest.service.dto.SousTypeDTO;
@@ -44,6 +45,7 @@ public class FactureServiceImpl implements FactureService {
 
     private final EntityManager em;
     private final PerimetreService perimetreService;
+    private final PortefeuilleService portefeuilleService;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,6 +61,13 @@ public class FactureServiceImpl implements FactureService {
         if (!perimetre.isVisionGlobale()) {
             where.append(" and c.agence_id in (:agencesVisibles)");
             parametres.put("agencesVisibles", perimetre.getAgenceIds());
+        }
+        List<Long> agentsGeres = portefeuilleService.agentsGeres();
+        if (agentsGeres != null) {
+            // Un agent ne voit que les factures de son portefeuille et de ceux qu'il remplace
+            where.append(" and exists (select 1 from crm_affectation af where af.client_id = c.id and af.date_fin is null"
+                    + " and af.agent_id in (:agentsGeres))");
+            parametres.put("agentsGeres", agentsGeres);
         }
         if (criteres.getClientId() != null) {
             where.append(" and f.client_id = :clientId");
