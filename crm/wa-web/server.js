@@ -65,9 +65,11 @@ const __dirname = path.dirname(__filename);
  * fenêtre courante — rouvrir une invite fait perdre la configuration et les
  * messages entrants ne sont alors plus transmis à l'application.
  * Une vraie variable d'environnement reste prioritaire sur le fichier.
+ * WA_WEB_ENV désigne un autre fichier : le service Windows lit le sien dans le
+ * dossier des données, qu'une mise à jour de l'application ne remplace pas.
  */
 function chargerEnvFichier() {
-  const f = path.join(__dirname, '.env');
+  const f = process.env.WA_WEB_ENV || path.join(__dirname, '.env');
   if (!fs.existsSync(f)) { return false; }
   for (const ligne of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
     const t = ligne.trim();
@@ -711,7 +713,7 @@ function versionBaileys() {
 
 function verifierConfiguration() {
   logger.info('Baileys version ' + versionBaileys() + ' — Node ' + process.version);
-  logger.info('Configuration : ' + (ENV_FICHIER ? 'fichier .env chargé' : 'aucun fichier .env (variables d\'environnement seules)'));
+  logger.info('Configuration : ' + (ENV_FICHIER ? 'fichier ' + (process.env.WA_WEB_ENV || '.env') + ' chargé' : 'aucun fichier .env (variables d\'environnement seules)'));
   if (!CALLBACK) {
     console.error('\n' + '='.repeat(72));
     console.error('  ERREUR DE CONFIGURATION : CRM_CALLBACK n\'est pas defini.');

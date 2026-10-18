@@ -331,3 +331,20 @@ Le serveur SMTP reste dans `application-prod.yml`.
 | --- | --- | --- |
 | GET | `/api/parametres` | Parametres modifiables, par categorie et ordre d'affichage |
 | PUT | `/api/parametres` | `[{cle, valeur}]` : enregistre tout ou rien ; renvoie la liste a jour |
+
+## Installation Windows (lot 11)
+
+Le dossier `distribution/` produit le paquet d'installation du poste d'UBIPHARM : un zip qui embarque un Java 25
+reduit par jlink (73 Mo), Node.js portable pour le compagnon WhatsApp et WinSW, qui fait du CRM et du compagnon
+deux services Windows a demarrage automatique. Seule MariaDB s'installe a part.
+
+- `construire-paquet-windows.ps1` : a lancer sur un poste Windows relie a Internet (avec Git) ; telecharge le JDK
+  Temurin 25, Node.js et WinSW, construit l'interface et le jar, assemble et zippe le paquet (environ 160 Mo).
+- `modele/` : definitions des deux services (`crm-service.xml`, `wa-web-service.xml`), `installer.bat`,
+  `desinstaller.bat` et les modeles de configuration `application-prod.yml` et `wa-web.env`.
+- `INSTALLATION.md` : guide d'installation, d'exploitation, de sauvegarde et de mise a jour, joint au paquet.
+
+Sur le poste, `C:\UBIPHARM-CRM\application` est remplace a chaque mise a jour ; `C:\UBIPHARM-CRM\donnees` garde
+la configuration, les journaux et la session WhatsApp. `installer.bat` y cree les deux fichiers de configuration a
+la premiere execution, avec un jeton commun au CRM et au compagnon, puis installe et demarre les services.
+Le compagnon lit son fichier par la variable `WA_WEB_ENV`.
