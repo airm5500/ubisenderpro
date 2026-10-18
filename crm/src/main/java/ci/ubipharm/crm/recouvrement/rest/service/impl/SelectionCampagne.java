@@ -30,8 +30,8 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Selection des factures d'une campagne et generation de leurs messages : une facture = un message (4.7),
- * envoye au numero WhatsApp principal du client depuis le numero de son agent, ou a l'adresse e-mail du client
- * avec l'adresse de l'agent en reponse.
+ * envoye au numero WhatsApp principal du client depuis le numero de son agent, a l'adresse e-mail du client
+ * avec l'adresse de l'agent en reponse, ou par SMS au meme numero principal sous le nom d'expediteur du fournisseur.
  */
 @Component
 @RequiredArgsConstructor
@@ -189,8 +189,9 @@ class SelectionCampagne {
 
     private Ligne ligne(Tuple t, Modele modele, Map<String, String> sourcesParCode, Map<String, String> aliasParSource) {
         boolean email = "EMAIL".equals(modele.canal());
+        boolean sms = "SMS".equals(modele.canal());
         String adresse = email ? premiereAdresse(t.get("clientEmail", String.class)) : null;
-        String motif = email ? motifExclusionEmail(t, adresse) : motifExclusion(t);
+        String motif = email ? motifExclusionEmail(t, adresse) : sms ? motifExclusionSms(t) : motifExclusion(t);
         String texte = null;
         String objet = null;
         if (motif == null) {
@@ -213,7 +214,7 @@ class SelectionCampagne {
                 .emailDestinataire(adresse)
                 .agentId(t.get("agentId", Long.class))
                 .agentNom(t.get("agentNom", String.class))
-                .numeroExpediteur(email ? null : t.get("agentNumero", String.class))
+                .numeroExpediteur(email || sms ? null : t.get("agentNumero", String.class))
                 .emailReponse(email ? t.get("agentEmail", String.class) : null)
                 .objet(objet)
                 .contenu(texte)
@@ -235,6 +236,23 @@ class SelectionCampagne {
         }
         if (t.get("contactId") == null) {
             return "Client sans numéro WhatsApp";
+        }
+        if (t.get("campagneEnAttente") != null) {
+            return enAttente(t);
+        }
+        return null;
+    }
+
+    /** SMS : il part sous le nom du fournisseur, l'agent n'a pas besoin de numero WhatsApp. */
+    private String motifExclusionSms(Tuple t) {
+        if (t.get("agentId") == null) {
+            return "Client sans agent de recouvrement";
+        }
+        if (!"ACTIF".equals(t.get("agentStatut", String.class))) {
+            return "Agent " + t.get("agentNom", String.class) + " désactivé";
+        }
+        if (t.get("contactId") == null) {
+            return "Client sans numéro de téléphone";
         }
         if (t.get("campagneEnAttente") != null) {
             return enAttente(t);
@@ -277,6 +295,18 @@ class SelectionCampagne {
         return null;
     }
 
+    /** 2250708123456 devient 07 08 12 34 56 : le client le lit ou l'appelle tel quel. */
+    static String numeroLisible(String numero) {
+        if (numero == null) {
+            return "";
+        }
+        String chiffres = numero.replaceAll("\\D", "");
+        if (chiffres.length() == 13 && chiffres.startsWith("225")) {
+            chiffres = chiffres.substring(3);
+        }
+        return chiffres.length() == 10 ? chiffres.replaceAll("(\\d{2})(?!$)", "$1 ") : numero;
+    }
+
     private String valeur(Tuple t, String source, Map<String, String> aliasParSource) {
         int ecart = ((Number) t.get("ecart")).intValue();
         return switch (source) {
@@ -286,7 +316,7 @@ class SelectionCampagne {
             case "calcul.jours_retard" -> String.valueOf(Math.max(ecart, 0));
             case "calcul.jours_avant_echeance" -> String.valueOf(Math.max(-ecart, 0));
             case "calcul.agent_nom" -> t.get("agentNom", String.class);
-            case "calcul.agent_numero" -> t.get("agentNumero", String.class);
+            case "calcul.agent_numero" -> numeroLisible(t.get("agentNumero", String.class));
             default -> {
                 String alias = aliasParSource.get(source);
                 yield alias == null ? "" : formater(t.get(alias));

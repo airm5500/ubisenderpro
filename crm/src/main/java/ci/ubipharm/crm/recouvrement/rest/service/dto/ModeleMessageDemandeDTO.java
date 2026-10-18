@@ -24,8 +24,8 @@ public class ModeleMessageDemandeDTO {
     @NotBlank(message = "Choisissez le type de relance.")
     private String typeCampagne;
 
-    /** WHATSAPP ou EMAIL ; vide = WHATSAPP. */
-    @Pattern(regexp = "WHATSAPP|EMAIL", message = "Canal inconnu.")
+    /** WHATSAPP, EMAIL ou SMS ; vide = WHATSAPP. */
+    @Pattern(regexp = "WHATSAPP|EMAIL|SMS", message = "Canal inconnu.")
     private String canal;
 
     /** Objet de l'e-mail, obligatoire pour le canal EMAIL ; peut contenir des variables. */

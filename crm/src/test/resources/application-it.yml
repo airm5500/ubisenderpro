@@ -21,3 +21,5 @@ crm:
     jeton: jeton-de-test
   email:
     envoi: false
+  sms:
+    envoi: false

@@ -6,8 +6,8 @@ import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
-import { Agence, Agent, Campagne, CampagneDemande, CriteresCampagne, EtatEmail, ModeleMessage, Recapitulatif, SousType } from '../../core/modeles';
-import { LIBELLES, MontantPipe, aujourdhui, resumeCriteres, TelephonePipe } from '../../core/format';
+import { Agence, Agent, Campagne, CampagneDemande, CriteresCampagne, EtatEmail, EtatSms, ModeleMessage, Recapitulatif, SousType } from '../../core/modeles';
+import { LIBELLES, MontantPipe, aujourdhui, compterSms, resumeCriteres, TelephonePipe } from '../../core/format';
 
 const SEGMENTS = [{ code: 'P', libelle: 'Platinum' }, { code: 'S', libelle: 'Silver' }, { code: 'B', libelle: 'Bronze' }];
 
@@ -50,9 +50,11 @@ export class CampagneEdition implements OnInit {
   /** Le recapitulatif ne correspond plus au formulaire. */
   protected readonly perime = signal(true);
 
-  /** Le canal (WhatsApp ou e-mail) est celui du modele choisi ; on choisit d'abord le canal, puis un modele de ce canal. */
+  /** Le canal (WhatsApp, e-mail ou SMS) est celui du modele choisi ; on choisit d'abord le canal, puis un modele de ce canal. */
   protected readonly canal = signal('WHATSAPP');
   protected readonly etatEmail = signal<EtatEmail | null>(null);
+  protected readonly etatSms = signal<EtatSms | null>(null);
+  protected readonly compter = (texte: string | null) => compterSms(texte ?? '');
   protected readonly modelesDuType = computed(() => this.modeles()
     .filter(m => m.typeCampagne === this.typeSignal() && m.canal === this.canal()));
   private readonly typeSignal = signal('APRES_ECHEANCE');
@@ -78,6 +80,7 @@ export class CampagneEdition implements OnInit {
       this.nom = `Relance de ${this.criteres.clientIds.length} client${this.criteres.clientIds.length > 1 ? 's' : ''} · ${aujourdhui().split('-').reverse().join('/')}`;
     }
     this.api.getSilencieux<EtatEmail>('/api/email/etat').subscribe({ next: e => this.etatEmail.set(e), error: () => undefined });
+    this.api.getSilencieux<EtatSms>('/api/sms/etat').subscribe({ next: e => this.etatSms.set(e), error: () => undefined });
     this.modifie();
   }
 

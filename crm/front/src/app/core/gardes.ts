@@ -30,7 +30,7 @@ export const moduleRecouvrement: CanActivateFn = async (_route, etat) => {
   const auth = inject(Auth);
   const router = inject(Router);
   await auth.verifier();
-  const libre = ['/marketing', '/mot-de-passe', '/utilisateurs'].some(u => etat.url.startsWith(u));
+  const libre = ['/marketing', '/mot-de-passe', '/utilisateurs', '/fournisseurs-sms'].some(u => etat.url.startsWith(u));
   return auth.recouvrement() || libre ? true : router.createUrlTree(['/marketing']);
 };
 

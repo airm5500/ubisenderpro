@@ -284,3 +284,35 @@ Essai en local : une boite GreenMail (`greenmail-standalone`, SMTP 3025, IMAP 31
 | --- | --- | --- |
 | GET | `/api/email/etat` | Canal configure ou non, expediteur, plage horaire, e-mails en attente et envoyes du jour |
 | GET | `/api/recouvrement/modeles-messages?canal=EMAIL` | Modeles filtres par canal |
+
+## Canal SMS (lot 9)
+
+Troisieme canal, apres WhatsApp et l'e-mail : un modele SMS (612 caracteres au plus) part au numero principal du client,
+sous le nom d'expediteur du fournisseur (11 caracteres). Le client ne peut pas repondre : le modele donne le numero de
+son agent par `{agent_numero}` (affiche 07 08 12 34 56). Client sans numero : facture exclue, avec le motif.
+
+- **Fournisseurs** (`crm_fournisseur_sms`, ecran Administration > Fournisseurs SMS, ADMIN) : chaque fournisseur est decrit
+  par son API HTTP, sans code propre. Adresse, methode, type de contenu (JSON ou formulaire), en-tetes et corps sont des
+  gabarits avec `{cle}` `{expediteur}` `{numero}` `{message}` `{reference}` `{url_accuse}` `{identifiant}`, echappes selon
+  l'endroit ; un champ JSON reste vide est retire. Les reponses se lisent par chemins JSON (`data.id`, plusieurs separes par
+  des virgules). Format des numeros : 225..., +225... ou 10 chiffres. Un seul fournisseur par defaut, celui des relances ;
+  il reste actif. La cle API n'est jamais renvoyee par l'API. LeTexto est fourni parametre (cle a saisir).
+- **Envoi** : un SMS a la fois, `sms.envoi.delai_secondes` (1), `sms.envoi.plafond_jour` (2000), entre `sms.envoi.heure_debut`
+  et `sms.envoi.heure_fin`. Numero refuse (HTTP 4xx) : echec immediat avec le message du fournisseur. Fournisseur injoignable,
+  HTTP 429 ou 5xx : nouvel essai. Cle refusee (401/403) : le SMS reprend sa place sans essai compte, les envois s'arretent
+  `sms.envoi.pause_cle_refusee_minutes` (10) et l'ecran de campagne affiche l'alerte.
+- **Accuses** : avec `application.url_publique` renseigne, le CRM donne au fournisseur l'adresse
+  `/api/passerelle/sms/{code}/accuse?jeton=...` (POST JSON ou GET avec parametres). Sinon, ou si l'accuse n'arrive pas, le
+  statut des SMS envoyes depuis plus de 5 minutes est demande au fournisseur (`crm.sms.verification`, 2 min). La
+  correspondance `SENT=ENVOYE; DELIVERED=DISTRIBUE; FAILED=ECHEC` traduit ses statuts ; un SMS non remis rend la facture
+  a relancer.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/sms/etat` | Canal pret ou non, fournisseur, expediteur, plage horaire, en attente, envoyes du jour, alerte |
+| GET, POST | `/api/sms/fournisseurs` | Liste, creation (ADMIN) |
+| GET, PUT | `/api/sms/fournisseurs/{id}` | Consultation, modification (cle vide = cle gardee) |
+| POST | `/api/sms/fournisseurs/{id}/defaut` | Devient le fournisseur des relances |
+| POST | `/api/sms/fournisseurs/{id}/essai` | `{numero, message}` : vrai SMS d'essai, renvoie la reponse lue et brute |
+| GET | `/api/sms/fournisseurs/{id}/solde` | Solde du compte chez le fournisseur |
+| POST, GET | `/api/passerelle/sms/{code}/accuse?jeton=` | Accuses du fournisseur |

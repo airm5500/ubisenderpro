@@ -31,7 +31,7 @@ export const LIBELLES = {
     A_RELANCER: '#9DB0BF', RELANCE_PROGRAMMEE: '#F4B740', RELANCE_ENVOYEE: '#7FA8C9', MESSAGE_DISTRIBUE: '#0B5C8E',
     MESSAGE_LU: '#05253D', REPONSE_RECUE: '#51D78E', SOLDEE: '#157A47'
   } as Partial<Record<string, string>>,
-  canal: { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail' } as Partial<Record<string, string>>,
+  canal: { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail', SMS: 'SMS' } as Partial<Record<string, string>>,
   typeCampagne: {
     AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée'
   } as Partial<Record<string, string>>,
@@ -100,4 +100,16 @@ export class TelephonePipe implements PipeTransform {
     }
     return chiffres.length > 8 ? '+' + chiffres : valeur;
   }
+}
+
+/** Alphabet GSM 7 bits d'un SMS ; les caracteres de GSM_DOUBLE comptent pour deux, tout autre caractere passe le SMS en Unicode. */
+const GSM = '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
+const GSM_DOUBLE = '^{}\\[~]|€';
+
+/** Longueur d'un SMS et nombre de SMS factures (160 / 153 caracteres, 70 / 67 en Unicode). */
+export function compterSms(texte: string): { caracteres: number; sms: number; unicode: boolean } {
+  const unicode = [...texte].some(c => !GSM.includes(c) && !GSM_DOUBLE.includes(c));
+  const caracteres = unicode ? [...texte].length : [...texte].reduce((n, c) => n + (GSM_DOUBLE.includes(c) ? 2 : 1), 0);
+  const [seul, partie] = unicode ? [70, 67] : [160, 153];
+  return { caracteres, sms: caracteres === 0 ? 0 : caracteres <= seul ? 1 : Math.ceil(caracteres / partie), unicode };
 }

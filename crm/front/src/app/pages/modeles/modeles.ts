@@ -4,8 +4,8 @@ import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
-import { ModeleMessage, SourceVariable, Variable } from '../../core/modeles';
-import { JourPipe, LIBELLES } from '../../core/format';
+import { EtatSms, ModeleMessage, SourceVariable, Variable } from '../../core/modeles';
+import { JourPipe, LIBELLES, compterSms } from '../../core/format';
 
 interface Morceau { texte: string; variable: boolean; inconnue: boolean; }
 
@@ -48,6 +48,11 @@ export class Modeles implements OnInit {
   protected readonly apercu = computed<Morceau[]>(() => this.morceaux(this.enEdition() ? this.contenu() : this.choisi()?.contenu ?? ''));
   protected readonly apercuObjet = computed<Morceau[]>(() => this.morceaux(this.enEdition() ? this.objet() : this.choisi()?.objet ?? ''));
 
+  /** Longueur estimee avec les valeurs d'exemple : les vraies valeurs peuvent l'allonger. */
+  protected readonly comptageSms = computed(() => compterSms(this.apercu().map(p => p.texte).join('')));
+  protected readonly etatSms = signal<EtatSms | null>(null);
+  protected readonly expediteurSms = computed(() => this.etatSms()?.expediteur || 'UBIPHARM');
+
   protected readonly apercuInconnues = computed(() => [...this.apercu(), ...this.apercuObjet()].some(m => m.inconnue));
 
   private morceaux(texte: string): Morceau[] {
@@ -67,6 +72,7 @@ export class Modeles implements OnInit {
   ngOnInit(): void {
     this.chargerModeles();
     this.chargerVariables();
+    this.api.get<EtatSms>('/api/sms/etat').subscribe(e => this.etatSms.set(e));
     if (this.auth.gestionnaire()) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
   }
 

@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'campagnes/:id', loadComponent: () => import('./pages/campagne-suivi/campagne-suivi').then(m => m.CampagneSuivi), title: 'Campagne' },
       { path: 'modeles', loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles de messages' },
       { path: 'numeros', loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Numéros WhatsApp' },
+      { path: 'fournisseurs-sms', canActivate: [roles('ADMIN')], loadComponent: () => import('./pages/fournisseurs-sms/fournisseurs-sms').then(m => m.FournisseursSms), title: 'Fournisseurs SMS' },
       { path: 'utilisateurs', canActivate: [roles('ADMIN')], loadComponent: () => import('./pages/utilisateurs/utilisateurs').then(m => m.Utilisateurs), title: 'Utilisateurs et habilitations' },
       { path: 'mot-de-passe', loadComponent: () => import('./pages/mot-de-passe/mot-de-passe').then(m => m.MotDePasse), title: 'Mon mot de passe' },
       { path: 'reponses', loadComponent: () => import('./pages/reponses/reponses').then(m => m.Reponses), title: 'Réponses des clients' }

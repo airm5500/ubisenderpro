@@ -65,6 +65,8 @@
           @if (r.nbExclus) { <div class="ligne"><span>Exclues</span><strong>{{ r.nbExclus }}</strong></div> }
           @if (c.canal === 'EMAIL') {
             <div class="ligne"><span>Envoi</span><strong style="text-align: right">par e-mail, réponses aux agents</strong></div>
+          } @else if (c.canal === 'SMS') {
+            <div class="ligne"><span>Envoi</span><strong style="text-align: right">par SMS, au nom d'UBIPHARM</strong></div>
           } @else {
           <div class="ligne"><span>Envoi depuis</span><strong style="text-align: right">{{ r.agents.length === 1 ? r.agents[0].agentNom + ' · ' + ((r.agents[0].numeroExpediteur | telephone) || 'sans numéro') : r.agents.length + ' numéros d\'agents' }}</strong></div>
           }

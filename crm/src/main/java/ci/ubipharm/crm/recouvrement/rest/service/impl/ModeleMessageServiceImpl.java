@@ -39,6 +39,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             left join crm_utilisateur u on u.id = m.modifie_par
             """;
 
+    /** 4 SMS de 153 caracteres. */
+    private static final int SMS_LONGUEUR_MAX = 612;
+
     private final EntityManager em;
     private final VariableMessageService variableMessageService;
     private final UtilisateurCourantService utilisateurCourantService;
@@ -153,6 +156,10 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         }
         if ("EMAIL".equals(canal(demande)) && objet(demande) == null) {
             throw new ErreurMetierException("Saisissez l'objet de l'e-mail.");
+        }
+        // Au-dela, le message serait decoupe en trop de SMS factures (153 caracteres par SMS, 67 avec des caracteres speciaux)
+        if ("SMS".equals(canal(demande)) && demande.getContenu() != null && demande.getContenu().length() > SMS_LONGUEUR_MAX) {
+            throw new ErreurMetierException("Un modèle SMS tient en " + SMS_LONGUEUR_MAX + " caractères, variables comprises.");
         }
         Set<String> connues = variableMessageService.sourcesParCode().keySet();
         List<String> inconnues = new ArrayList<>();

@@ -49,9 +49,9 @@
         </section>
         @if (r.agents.length) {
           <section class="bloc">
-            <div class="titre"><h2 class="h2">{{ c.canal === 'EMAIL' ? 'Agents en adresse de réponse' : "Numéros d'envoi" }}</h2></div>
+            <div class="titre"><h2 class="h2">{{ c.canal === 'EMAIL' ? 'Agents en adresse de réponse' : c.canal === 'SMS' ? 'Agents des clients' : "Numéros d'envoi" }}</h2></div>
             @for (a of r.agents; track a.agentId) {
-              <div class="li"><span>{{ a.agentNom }}{{ c.canal === 'EMAIL' ? '' : ' · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</span><strong>{{ a.nbMessages }} messages, {{ a.nbClients }} clients</strong></div>
+              <div class="li"><span>{{ a.agentNom }}{{ c.canal !== 'WHATSAPP' ? '' : ' · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</span><strong>{{ a.nbMessages }} messages, {{ a.nbClients }} clients</strong></div>
             }
           </section>
         }
@@ -66,6 +66,7 @@
       @if (c.statut === 'EN_COURS') {
         <div class="info"><i class="pi pi-clock"></i><span>{{ c.canal === 'EMAIL'
           ? "Envoi en cours, les e-mails partent l'un après l'autre entre 8 h et 18 h."
+          : c.canal === 'SMS' ? "Envoi en cours, les SMS partent l'un après l'autre entre 8 h et 18 h ; le statut distribué arrive de l'opérateur."
           : "Envoi en cours, un message toutes les 20 à 45 secondes par numéro d'agent, entre 8 h et 18 h." }} Cette page se met à jour toute seule.</span></div>
       }
     }
@@ -80,7 +81,7 @@
       </div>
       <div class="defile">
         <table class="t">
-          <thead><tr><th>Client</th><th>Facture</th><th class="n">Solde</th><th>{{ c.canal === 'EMAIL' ? 'Agent' : "Agent · numéro d'envoi" }}</th><th>{{ c.canal === 'EMAIL' ? 'E-mail du client' : 'Numéro du client' }}</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Client</th><th>Facture</th><th class="n">Solde</th><th>{{ c.canal === 'WHATSAPP' ? "Agent · numéro d'envoi" : 'Agent' }}</th><th>{{ c.canal === 'EMAIL' ? 'E-mail du client' : 'Numéro du client' }}</th><th>Statut</th><th></th></tr></thead>
           <tbody>
             @for (m of page()?.elements; track m.factureId) {
               <tr>
@@ -125,6 +126,8 @@
         </div>
         <div class="corps">{{ m.contenu }}</div>
       </div>
+    } @else if (m.canal === 'SMS') {
+      <div class="fil-sms"><div class="exp">{{ m.factureReference }} · vers {{ m.numeroDestinataire | telephone }}</div><div class="bulle">{{ m.contenu }}</div></div>
     } @else {
       <div class="fil-wa"><div class="out">{{ m.contenu }}<span class="meta">{{ m.factureReference }} · de {{ m.numeroExpediteur | telephone }} vers {{ m.numeroDestinataire | telephone }}</span></div></div>
     }

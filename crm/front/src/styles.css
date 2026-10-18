@@ -214,3 +214,14 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .courriel .corps { padding: 16px; font-size: 14px; line-height: 1.6; color: #1F2D38; white-space: pre-wrap; }
 .courriel .v { background: #E5F8EE; color: #157A47; border-radius: 4px; padding: 0 3px; font-weight: 600; }
 .canal { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--texte-2); }
+
+/* Apercu d'un SMS : fil de messagerie du telephone */
+.fil-sms { background: #F2F4F6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.fil-sms .exp { font-size: 12px; font-weight: 700; color: var(--texte-2); text-align: center; letter-spacing: .02em; }
+.fil-sms .bulle { align-self: flex-start; max-width: 85%; background: #E3E7EB; color: #1F2D38; border-radius: 16px 16px 16px 4px; padding: 9px 13px;
+  font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.fil-sms .v { background: #D4F1E2; color: #157A47; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.fil-sms .compte { font-size: 12px; color: var(--texte-2); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.brut { margin: 0; padding: 10px 12px; background: #F2F4F6; border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; white-space: pre-wrap; word-break: break-all; color: #33434F; }

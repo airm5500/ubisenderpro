@@ -39,6 +39,7 @@
     <div class="gl">{{ auth.gestionnaire() ? 'Administration' : 'WhatsApp' }}</div>
     <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
     @if (auth.admin()) {
+      <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a>
       <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
     }
     } @else {
@@ -46,6 +47,7 @@
       <a class="nv" routerLink="/marketing" routerLinkActive="on">Accueil</a>
       @if (auth.admin()) {
         <div class="gl">Administration</div>
+        <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a>
         <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
       }
     }

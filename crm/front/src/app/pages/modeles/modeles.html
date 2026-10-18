@@ -48,6 +48,7 @@
             <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
               <label class="opt" [class.optn]="edition.canal === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">WhatsApp, depuis le numéro de l'agent</label>
               <label class="opt" [class.optn]="edition.canal === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">E-mail, l'agent en adresse de réponse</label>
+              <label class="opt" [class.optn]="edition.canal === 'SMS'"><input type="radio" name="canal" value="SMS" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">SMS, au nom d'UBIPHARM, sans réponse</label>
             </div>
           </div>
           @if (edition.canal === 'EMAIL') {
@@ -56,7 +57,10 @@
           <div class="f">Variables disponibles <span class="discret">(cliquez pour insérer)</span>
             <div class="chips">@for (v of variables(); track v.id) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
           </div>
-          <label class="f">Message<textarea #zone class="sel" style="min-height: 200px" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)"></textarea></label>
+          <label class="f">Message<textarea #zone class="sel" [style.min-height]="edition.canal === 'SMS' ? '110px' : '200px'" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)" [attr.maxlength]="edition.canal === 'SMS' ? 612 : null"></textarea></label>
+          @if (edition.canal === 'SMS') {
+            <p class="discret" style="margin: -6px 0 0">Le client ne peut pas répondre à un SMS : indiquez plutôt le numéro de son agent avec la variable {{ '{agent_numero}' }}.</p>
+          }
           <div class="actions">
             <button class="bs" (click)="enEdition.set(false)">Annuler</button>
             <button class="bp" (click)="enregistrer()" [disabled]="!edition.nom.trim() || !edition.contenu.trim() || (edition.canal === 'EMAIL' && !edition.objet.trim())">Enregistrer</button>
@@ -82,6 +86,14 @@
                 <span class="objet">@for (p of apercuObjet(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</span>
               </div>
               <div class="corps">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>
+            </div>
+          } @else if (canalApercu() === 'SMS') {
+            <div class="fil-sms">
+              <div class="exp">{{ expediteurSms() }}</div>
+              <div class="bulle">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>
+              @if (comptageSms(); as n) {
+                <div class="compte" [class.retard]="n.sms > 2">{{ n.caracteres }} caractères · {{ n.sms }} SMS{{ n.unicode ? ' (caractères spéciaux : 70 par SMS)' : '' }}</div>
+              }
             </div>
           } @else {
             <div class="fil-wa">

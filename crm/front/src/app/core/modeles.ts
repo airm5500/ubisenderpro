@@ -95,6 +95,24 @@ export interface MessageCampagne {
   emailReponse: string | null; objet: string | null; contenu: string | null; statut: string; motif: string | null;
   envoyeLe: string | null; distribueLe: string | null; luLe: string | null;
 }
+export interface EtatSms {
+  configure: boolean; fournisseur: string | null; expediteur: string | null; enAttente: number; envoyesAujourdhui: number;
+  heureDebut: number; heureFin: number; alerte: string | null;
+}
+
+export interface FournisseurSms {
+  id: number; code: string; libelle: string; actif: boolean; parDefaut: boolean; expediteur: string | null; cleRenseignee: boolean;
+  formatNumero: string; urlEnvoi: string; methodeEnvoi: string; typeContenu: string; entetes: string | null; corps: string | null;
+  cheminIdentifiant: string | null; cheminNbSms: string | null; cheminErreur: string | null; urlStatut: string | null; cheminStatut: string | null;
+  champIdentifiantAccuse: string | null; champStatutAccuse: string | null; correspondanceStatuts: string | null;
+  urlSolde: string | null; cheminSolde: string | null; urlAccuse: string | null; modifiePar: string | null; modifieLe: string | null;
+}
+
+export interface ResultatAppelSms {
+  reussi: boolean; statutHttp: number | null; identifiant: string | null; nbSms: number | null; solde: string | null;
+  erreur: string | null; reponse: string | null;
+}
+
 export interface EtatEmail { configure: boolean; expediteur: string; enAttente: number; envoyesAujourdhui: number; heureDebut: number; heureFin: number; }
 
 export interface Recapitulatif {

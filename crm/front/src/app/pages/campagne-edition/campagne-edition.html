@@ -77,9 +77,13 @@
           <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
             <label class="opt" [class.optn]="canal() === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [checked]="canal() === 'WHATSAPP'" (change)="changerCanal('WHATSAPP')"><span>WhatsApp<br><span class="discret">depuis le numéro de l'agent du client</span></span></label>
             <label class="opt" [class.optn]="canal() === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [checked]="canal() === 'EMAIL'" (change)="changerCanal('EMAIL')"><span>E-mail<br><span class="discret">à l'adresse du client, réponses à l'agent</span></span></label>
+            <label class="opt" [class.optn]="canal() === 'SMS'"><input type="radio" name="canal" value="SMS" [checked]="canal() === 'SMS'" (change)="changerCanal('SMS')"><span>SMS<br><span class="discret">au numéro du client, sans réponse possible</span></span></label>
           </div>
           @if (canal() === 'EMAIL' && etatEmail() && !etatEmail()!.configure) {
             <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Le serveur d'envoi des e-mails n'est pas encore configuré : la campagne peut être préparée et validée, les e-mails partiront une fois le serveur renseigné.</span></div>
+          }
+          @if (canal() === 'SMS' && etatSms() && !etatSms()!.configure) {
+            <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Aucun fournisseur SMS n'est prêt (clé API à saisir dans Fournisseurs SMS) : la campagne peut être préparée et validée, les SMS partiront une fois le fournisseur configuré.</span></div>
           }
           <label class="f">Modèle
             <select class="sel" name="modele" [(ngModel)]="modeleId" (ngModelChange)="modifie()">
@@ -109,6 +113,8 @@
           }
           @if (canal() === 'EMAIL') {
             <p class="discret">Les e-mails partent entre {{ etatEmail()?.heureDebut ?? 8 }} h et {{ etatEmail()?.heureFin ?? 18 }} h, heure d'Abidjan, depuis {{ etatEmail()?.expediteur || "l'adresse d'envoi d'UBIPHARM" }}, l'un après l'autre.</p>
+          } @else if (canal() === 'SMS') {
+            <p class="discret">Les SMS partent entre {{ etatSms()?.heureDebut ?? 8 }} h et {{ etatSms()?.heureFin ?? 18 }} h, heure d'Abidjan, par {{ etatSms()?.fournisseur || 'le fournisseur SMS' }}, sous le nom {{ etatSms()?.expediteur || 'UBIPHARM' }}, l'un après l'autre.</p>
           } @else {
             <p class="discret">Les messages partent entre 8 h et 18 h, heure d'Abidjan, au rythme lent imposé par WhatsApp Web : 20 à 45 secondes entre deux messages d'un même numéro, 200 par jour au plus.</p>
           }
@@ -125,7 +131,7 @@
           <div class="sum"><span>Messages à envoyer</span><strong>{{ r.nbMessages }}, un par facture</strong></div>
           <div class="sum"><span>Montant visé</span><strong>{{ r.totalSolde | montant }} FCFA</strong></div>
           @for (a of r.agents; track a.agentId) {
-            <div class="sum"><span>{{ a.agentNom }}</span><strong>{{ a.nbMessages }} {{ canal() === 'EMAIL' ? 'e-mail' + (a.nbMessages > 1 ? 's' : '') : 'msg · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</strong></div>
+            <div class="sum"><span>{{ a.agentNom }}</span><strong>{{ a.nbMessages }} {{ canal() === 'EMAIL' ? 'e-mail' + (a.nbMessages > 1 ? 's' : '') : canal() === 'SMS' ? 'SMS' : 'msg · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</strong></div>
           }
           @for (e of r.exclusions; track e.motif) {
             <div class="sum"><span>Exclues : {{ e.motif }}</span><strong>{{ e.nb }}</strong></div>
@@ -156,6 +162,12 @@
                   <span class="objet">{{ m.objet }}</span>
                 </div>
                 <div class="corps">{{ m.contenu }}</div>
+              </div>
+            } @else if (m.canal === 'SMS') {
+              <div class="fil-sms">
+                <div class="exp">{{ etatSms()?.expediteur || 'UBIPHARM' }} · vers {{ m.numeroDestinataire | telephone }}</div>
+                <div class="bulle">{{ m.contenu }}</div>
+                @if (compter(m.contenu); as n) { <div class="compte" [class.retard]="n.sms > 2">{{ n.caracteres }} caractères · {{ n.sms }} SMS</div> }
               </div>
             } @else {
               <div class="fil-wa">
