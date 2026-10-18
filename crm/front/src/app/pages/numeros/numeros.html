@@ -30,7 +30,14 @@
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="7" class="vide">{{ sessions() ? 'Aucun agent de recouvrement.' : 'Chargement…' }}</td></tr>
+          <tr><td colspan="7" class="vide">
+            @if (!sessions()) { Chargement… }
+            @else {
+              Aucun agent n'a encore de numéro WhatsApp. Créez le compte de l'agent avec le rôle Agent du Recouvrement et son numéro professionnel
+              @if (auth.admin()) { dans <a routerLink="/utilisateurs">Utilisateurs et habilitations</a> } @else { (administrateur) },
+              puis revenez ici pour scanner le QR.
+            }
+          </td></tr>
         }
       </tbody>
     </table>
