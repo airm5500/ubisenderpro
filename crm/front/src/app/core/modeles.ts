@@ -95,6 +95,11 @@ export interface MessageCampagne {
   emailReponse: string | null; objet: string | null; contenu: string | null; statut: string; motif: string | null;
   envoyeLe: string | null; distribueLe: string | null; luLe: string | null;
 }
+export interface Parametre {
+  cle: string; valeur: string | null; typeValeur: string; minimum: number | null; maximum: number | null; obligatoire: boolean;
+  description: string; categorie: string; modifiePar: string | null; modifieLe: string | null;
+}
+
 export interface EtatSms {
   configure: boolean; fournisseur: string | null; expediteur: string | null; enAttente: number; envoyesAujourdhui: number;
   heureDebut: number; heureFin: number; alerte: string | null;

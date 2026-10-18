@@ -316,3 +316,18 @@ son agent par `{agent_numero}` (affiche 07 08 12 34 56). Client sans numero : fa
 | POST | `/api/sms/fournisseurs/{id}/essai` | `{numero, message}` : vrai SMS d'essai, renvoie la reponse lue et brute |
 | GET | `/api/sms/fournisseurs/{id}/solde` | Solde du compte chez le fournisseur |
 | POST, GET | `/api/passerelle/sms/{code}/accuse?jeton=` | Accuses du fournisseur |
+
+## Parametres (lot 10)
+
+Ecran Administration > Parametres (ADMIN) : les parametres de `crm_parametre` par categorie (general, campagnes,
+WhatsApp, e-mail, SMS, securite, imports). Chaque parametre porte son type (`TEXTE`, `ENTIER`, `HEURE`, `EMAIL`, `URL`,
+`COULEUR`), ses bornes et s'il est obligatoire ; le serveur controle chaque valeur et la coherence des couples (heure de fin
+apres l'heure de debut, attente minimale sous l'attente maximale, fenetre avant echeance). Un enregistrement passe en entier
+ou pas du tout, chaque changement est journalise (`PARAMETRE_MODIFICATION`, ancienne et nouvelle valeur). Les parametres
+internes (`modifiable = false` : mot de passe initial, nom et couleurs pas encore appliques a l'interface) n'apparaissent pas.
+Le serveur SMTP reste dans `application-prod.yml`.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/parametres` | Parametres modifiables, par categorie et ordre d'affichage |
+| PUT | `/api/parametres` | `[{cle, valeur}]` : enregistre tout ou rien ; renvoie la liste a jour |
