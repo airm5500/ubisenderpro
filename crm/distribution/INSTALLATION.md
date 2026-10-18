@@ -7,7 +7,7 @@ redemarrent seuls avec le poste :
 
 | Service | Role | Port |
 | --- | --- | --- |
-| UBIPHARM CRM | Application web (interface et envois e-mail, SMS) | 8080 |
+| UBIPHARM CRM | Application web (interface et envois e-mail, SMS) | 8080 (choisi a l'installation) |
 | UBIPHARM CRM - WhatsApp | Compagnon WhatsApp Web, utilise par le CRM pour les relances WhatsApp | 3000 (interne) |
 
 Poste conseille : Windows 10/11 64 bits ou Windows Server 2019 et plus, 8 Go de
@@ -57,7 +57,9 @@ Si Windows a bloque le fichier telecharge (clic droit > Proprietes >
 
 1. Dans `C:\UBIPHARM-CRM\application`, clic droit sur `installer.bat` >
    **Executer en tant qu'administrateur**.
-2. Premiere execution : le script cree `C:\UBIPHARM-CRM\donnees` et ouvre
+2. Premiere execution : le script demande le port de l'interface web
+   (Entree = 8080 ; s'il est deja pris sur le poste, saisir par exemple 8090),
+   cree `C:\UBIPHARM-CRM\donnees` et ouvre
    `application-prod.yml` dans le Bloc-notes. Remplacer `A_RENSEIGNER` par le
    mot de passe `MotDePasseBase` de l'etape 1, enregistrer, fermer.
    Le jeton qui relie le CRM au compagnon WhatsApp est deja genere dans les deux
@@ -68,7 +70,7 @@ Si Windows a bloque le fichier telecharge (clic droit > Proprietes >
 
 ## 4. Premiere connexion et reglages
 
-Ouvrir http://localhost:8080 sur le poste, se connecter avec le compte `admin`
+Ouvrir http://localhost:8080 sur le poste (ou le port choisi a l'installation), se connecter avec le compte `admin`
 et le mot de passe `Admin@2026` : le CRM demande aussitot d'en choisir un autre.
 Ensuite, depuis l'interface :
 

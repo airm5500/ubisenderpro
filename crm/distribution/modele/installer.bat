@@ -37,11 +37,25 @@ if not exist "%DONNEES%\wa-web-sessions" mkdir "%DONNEES%\wa-web-sessions"
 
 REM --- 1. Fichiers de configuration (crees une seule fois, jamais ecrases) ---
 if exist "%DONNEES%\application-prod.yml" goto CONFIG_PRESENTE
+REM Port de l'interface web : 8080 par defaut, a changer s'il est deja pris sur ce poste
+:DEMANDER_PORT
+set "PORT_CRM=8080"
+set /p "PORT_CRM= Port de l'interface web du CRM [Entree = 8080] : "
+powershell -NoProfile -Command "if ($env:PORT_CRM -notmatch '^[0-9]{2,5}$') { exit 2 }; if (Get-NetTCPConnection -State Listen -LocalPort ([int]$env:PORT_CRM) -ErrorAction SilentlyContinue) { exit 1 }; exit 0"
+if errorlevel 2 (
+  echo  Saisissez un numero de port, par exemple 8090.
+  goto DEMANDER_PORT
+)
+if errorlevel 1 (
+  echo  Le port %PORT_CRM% est deja utilise sur ce poste : choisissez-en un autre, par exemple 8090.
+  goto DEMANDER_PORT
+)
 echo  Creation des fichiers de configuration...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$j = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N');" ^
   "foreach ($f in 'application-prod.yml','wa-web.env') {" ^
   "  $t = [IO.File]::ReadAllText((Join-Path $env:APP ('modeles\' + $f))).Replace('__JETON_WA_WEB__', $j);" ^
+  "  $t = $t.Replace('port: 8080', 'port: ' + $env:PORT_CRM).Replace('localhost:8080', 'localhost:' + $env:PORT_CRM);" ^
   "  [IO.File]::WriteAllText((Join-Path $env:DONNEES $f), $t) }"
 if errorlevel 1 goto ECHEC
 echo.
@@ -67,14 +81,16 @@ call :INSTALLER_SERVICE crm-service ubipharm-crm
 if errorlevel 1 goto ECHEC
 
 REM --- 3. Demarrage : WhatsApp d'abord, le CRM ensuite ---
+set "PORT=8080"
+for /f "tokens=1,* delims=:" %%a in ('findstr /r /c:"^  port: *[0-9]" "%DONNEES%\application-prod.yml"') do set "PORT=%%b"
+set "PORT=%PORT: =%"
+powershell -NoProfile -Command "if (Get-NetTCPConnection -State Listen -LocalPort ([int]$env:PORT) -ErrorAction SilentlyContinue) { exit 1 }; exit 0"
+if errorlevel 1 goto PORT_PRIS
 echo.
 echo  Demarrage des services...
 "%APP%\wa-web-service.exe" start
 "%APP%\crm-service.exe" start
 
-set "PORT=8080"
-for /f "tokens=1,* delims=:" %%a in ('findstr /r /c:"^  port: *[0-9]" "%DONNEES%\application-prod.yml"') do set "PORT=%%b"
-set "PORT=%PORT: =%"
 echo  Attente du CRM sur le port %PORT% (premier demarrage : creation de la base, jusqu'a 2 minutes)...
 powershell -NoProfile -Command ^
   "for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 ('http://localhost:' + $env:PORT + '/api/auth/csrf') | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"
@@ -110,6 +126,15 @@ echo  Installation du service %~2...
 "%APP%\%~1.exe" install
 if errorlevel 1 exit /b 1
 exit /b 0
+
+:PORT_PRIS
+echo.
+echo  Le port %PORT% est deja utilise par un autre programme de ce poste.
+echo  Changez "port:" sous "server:" dans %DONNEES%\application-prod.yml
+echo  (par exemple 8090) et reportez-le dans CRM_CALLBACK de wa-web.env,
+echo  puis relancez installer.bat.
+start "" notepad "%DONNEES%\application-prod.yml"
+goto FIN
 
 :PAS_ADMIN
 echo.
