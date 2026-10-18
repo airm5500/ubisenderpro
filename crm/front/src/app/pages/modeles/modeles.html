@@ -1,0 +1,108 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Modèles de messages</h1>
+      <p class="sous-titre">Les variables s'écrivent entre accolades, par exemple {{ '{' }}nom_pharmacie{{ '}' }}, et sont remplacées pour chaque facture à l'envoi.</p>
+    </div>
+    @if (auth.gestionnaire()) {
+      <div class="actions">
+        @if (vue() === 'modeles') { <button class="ba" (click)="nouveau()">Nouveau modèle</button> }
+        @else { <button class="ba" (click)="ouvrirVariable('nouvelle')">Nouvelle variable</button> }
+      </div>
+    }
+  </div>
+
+  @if (auth.gestionnaire()) {
+    <div role="tablist" class="onglets">
+      <button class="tab" [class.tabon]="vue() === 'modeles'" role="tab" (click)="vue.set('modeles')">Modèles</button>
+      <button class="tab" [class.tabon]="vue() === 'variables'" role="tab" (click)="vue.set('variables')">Variables<span class="cnt">{{ variables().length }}</span></button>
+    </div>
+  }
+
+  @if (vue() === 'modeles') {
+    <div class="cote">
+      <div class="liste-g">
+        @for (g of parType(); track g.code) {
+          <div class="grp">{{ g.libelle }}</div>
+          @for (m of g.modeles; track m.id) {
+            <button class="it" [class.iton]="choisi()?.id === m.id && !enEdition()" (click)="choisir(m)">
+              <strong>{{ m.nom }}</strong><span class="second">modifié le {{ (m.updatedAt || m.createdAt) | jour }}{{ m.modifiePar || m.creePar ? ' par ' + (m.modifiePar || m.creePar) : '' }}</span>
+            </button>
+          }
+        } @empty {
+          <p class="discret" style="padding: 14px">{{ archives() ? 'Aucun modèle archivé.' : 'Aucun modèle actif pour l\'instant.' }}</p>
+        }
+        <a style="padding: 14px; font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux modèles actifs' : 'Voir les modèles archivés' }}</a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
+        @if (enEdition()) {
+          <h2 class="h2">{{ choisi() ? 'Modifier « ' + choisi()!.nom + ' »' : 'Nouveau modèle' }}</h2>
+          <div class="grille">
+            <label class="f large">Nom<input class="sel" [(ngModel)]="edition.nom" placeholder="Ex. Après échéance · Normal"></label>
+            <label class="f">Type de relance
+              <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
+            </label>
+          </div>
+          <div class="f">Variables disponibles <span class="discret">(cliquez pour insérer)</span>
+            <div class="chips">@for (v of variables(); track v.id) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
+          </div>
+          <label class="f">Message<textarea #zone class="sel" style="min-height: 200px" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)"></textarea></label>
+          <div class="actions">
+            <button class="bs" (click)="enEdition.set(false)">Annuler</button>
+            <button class="bp" (click)="enregistrer()" [disabled]="!edition.nom.trim() || !edition.contenu.trim()">Enregistrer</button>
+          </div>
+        } @else if (choisi(); as m) {
+          <div class="entete">
+            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
+            @if (auth.gestionnaire() && m.statut === 'ACTIF') {
+              <div class="actions"><button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button></div>
+            }
+          </div>
+          @if (m.variables.length) {
+            <div class="chips">@for (v of m.variables; track v) { <span class="tag">{{ '{' + v + '}' }}</span> }</div>
+          }
+        }
+
+        @if (enEdition() || choisi()) {
+          <div class="lbl">Aperçu avec les valeurs d'exemple</div>
+          <div class="fil-wa">
+            <div class="out">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}<span class="meta">09:30</span></div>
+          </div>
+          @if (apercuInconnues()) { <p class="avert" style="margin: 0">Une variable surlignée en rouge n'existe pas : le modèle sera refusé à l'enregistrement.</p> }
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Variable</th><th>Libellé</th><th>Source</th><th>Exemple</th><th></th></tr></thead>
+        <tbody>
+          @for (v of variables(); track v.id) {
+            <tr><td><span class="tag">{{ '{' + v.code + '}' }}</span></td><td>{{ v.libelle }}</td><td>{{ libelleSource(v.source) }}</td><td>{{ v.exemple }}</td>
+              <td class="nw actions"><a (click)="ouvrirVariable(v)">Modifier</a><a (click)="archiverVariable(v)">Archiver</a></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="discret">Une colonne ajoutée aux clients ou aux factures devient une variable sans développement : choisissez-la comme source.</p>
+  }
+</div>
+
+<p-dialog [header]="fenetreVariable() === 'nouvelle' ? 'Nouvelle variable' : 'Modifier la variable'" [visible]="fenetreVariable() !== null" (visibleChange)="!$event && fenetreVariable.set(null)" [modal]="true" [style]="{ width: '520px' }">
+  <form class="formulaire" (ngSubmit)="enregistrerVariable()">
+    <label class="f">Code, en minuscules sans accent<input class="sel" name="code" [(ngModel)]="variable.code" placeholder="Ex. ville"></label>
+    <label class="f">Libellé<input class="sel" name="libelle" [(ngModel)]="variable.libelle"></label>
+    <label class="f">Source
+      <select class="sel" name="source" [(ngModel)]="variable.source">
+        <option value="" disabled>Choisir un champ</option>
+        @for (s of sources(); track s.source) { <option [value]="s.source">{{ s.libelle }}</option> }
+      </select>
+    </label>
+    <label class="f">Exemple affiché dans les aperçus<input class="sel" name="exemple" [(ngModel)]="variable.exemple"></label>
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetreVariable.set(null)">Annuler</button>
+      <button class="bp" type="submit">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

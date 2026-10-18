@@ -1,0 +1,42 @@
+<div class="cadre">
+  <nav aria-label="Navigation principale">
+    <div class="marque">
+      <img src="logo.svg" alt="" width="44" height="44">
+      <div><div class="nom">UBIPHARM CI</div><div class="sous">Relation client</div></div>
+    </div>
+    <div role="group" aria-label="Module" class="modules">
+      <span class="md mdon">Recouvrement</span>
+      <span class="md" title="Disponible dans une prochaine version">Marketing</span>
+    </div>
+
+    @if (auth.agent() && !auth.direction()) {
+      <div class="gl">Mon activité</div>
+      <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a>
+    }
+    <div class="gl">Créances</div>
+    <a class="nv" routerLink="/factures" routerLinkActive="on">Factures</a>
+    <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a>
+    @if (auth.direction()) {
+      <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a>
+    }
+    @if (auth.pilotage()) {
+      <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a>
+    }
+    <div class="gl">Relances</div>
+    <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a>
+    <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a>
+    <div class="gl">Échanges</div>
+    <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a>
+    <div class="gl">{{ auth.gestionnaire() ? 'Administration' : 'WhatsApp' }}</div>
+    <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+
+    <div class="profil">
+      <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>
+      <div class="sous">{{ auth.libelleProfil() }}</div>
+      <button type="button" class="sortie" (click)="auth.deconnecter()"><i class="pi pi-sign-out"></i> Se déconnecter</button>
+    </div>
+  </nav>
+  <main>
+    <router-outlet />
+  </main>
+</div>

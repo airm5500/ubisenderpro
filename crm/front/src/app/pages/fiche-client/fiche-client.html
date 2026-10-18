@@ -1,0 +1,92 @@
+<div class="page">
+  <a class="retour" routerLink="/clients">← Retour aux clients</a>
+  @if (client(); as c) {
+    <div class="entete">
+      <div>
+        <h1>{{ c.raisonSociale }}</h1>
+        <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.segmentationLibelle ? ' · segment ' + c.segmentationLibelle : '' }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
+      </div>
+      @if (auth.auteurCampagnes() && ouvertes().length) {
+        <div class="actions"><a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a></div>
+      }
+    </div>
+
+    <div class="kvs bandeau">
+      <div class="kv"><span>Agence</span><strong>{{ c.agenceLibelle }}{{ c.sousAgence ? ' · ' + c.sousAgence : '' }}</strong></div>
+      @if (auth.direction()) {
+        <div class="kv"><span>Agent responsable</span><strong>{{ agentEnCours()?.agentNom ?? 'Sans agent' }}</strong>
+          @if (auth.direction()) { <a routerLink="/portefeuilles" [queryParams]="{ q: c.code }">Réaffecter</a> }</div>
+      }
+      <div class="kv"><span>WhatsApp principal</span><strong>{{ (c.numeroPrincipal | telephone) || 'Non renseigné' }}</strong></div>
+      <div class="kv"><span>Second numéro</span><strong>{{ (c.numeroSecondaire | telephone) || '—' }}</strong></div>
+      <div class="kv"><span>E-mail</span><strong>{{ c.email || '—' }}</strong></div>
+    </div>
+    @if (!c.numeroPrincipal) {
+      <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ce client n'a pas de numéro WhatsApp : il sera exclu des campagnes tant qu'un import ne l'aura pas complété.</span></div>
+    }
+    @if (c.commentaire) { <div class="info"><span>{{ c.commentaire }}</span></div> }
+
+    <div class="deux-colonnes">
+      <div class="colonne">
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Factures ouvertes</h2><span class="discret">{{ ouvertes().length }} facture{{ ouvertes().length > 1 ? 's' : '' }}</span></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Référence</th><th>Sous-type</th><th>Échéance</th><th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th></tr></thead>
+              <tbody>
+                @for (f of (voirSoldees() ? factures() : ouvertes()); track f.id) {
+                  <tr>
+                    <td class="nw"><strong>{{ f.reference }}</strong>@if (f.nature === 'AVOIR') {<div class="second">Avoir</div>}</td>
+                    <td>{{ f.sousTypeLibelle }}</td>
+                    <td class="nw">{{ f.dateEcheance | jour }}
+                      @if (f.statut !== 'SOLDEE' && f.joursRetard > 0) {<span class="retard"> J+{{ f.joursRetard }}</span>}</td>
+                    <td class="n">{{ f.montant | montant }}</td>
+                    <td class="n" style="font-weight: 700">{{ f.solde | montant }}</td>
+                    <td class="nw"><span class="dot" [style.background]="L.couleurFacture[f.statut]"></span>{{ L.statutFacture[f.statut] ?? f.statut }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="6" class="vide">Aucune facture ouverte.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (soldees().length) {
+            <a (click)="voirSoldees.set(!voirSoldees())">{{ voirSoldees() ? 'Masquer les factures soldées' : 'Afficher les ' + soldees().length + ' factures soldées' }}</a>
+          }
+        </section>
+
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Historique du client</h2>
+            <a routerLink="/reponses" [queryParams]="{ clientId: c.id }">Toutes ses réponses</a></div>
+          @for (e of historique(); track $index) {
+            <div class="ev">
+              <span class="evd" [style.background]="e.couleur"></span>
+              <div>
+                <div class="discret">{{ e.quand | jour: true }} · {{ e.qui }}</div>
+                <div class="ev-titre">{{ e.titre }}</div>
+                <div class="ev-detail">{{ e.detail }}</div>
+              </div>
+            </div>
+          } @empty {
+            <p class="discret">Aucune réponse ni changement d'agent enregistré pour l'instant.</p>
+          }
+        </section>
+      </div>
+
+      <section class="restant">
+        <h2 class="lbl">Restant dû</h2>
+        <div class="total">{{ totalDu() | montant }} <span>FCFA</span></div>
+        @if (parSousType().length) {
+          <div class="repartition" role="img" aria-label="Répartition par sous-type de compte">
+            @for (s of parSousType(); track s.libelle) { <div [style.width.%]="s.part" [style.background]="s.couleur"></div> }
+          </div>
+          @for (s of parSousType(); track s.libelle) {
+            <div class="sum"><span><span class="dot" [style.background]="s.couleur"></span>{{ s.libelle }}</span><strong>{{ s.montant | montant }}</strong></div>
+          }
+        }
+      </section>
+    </div>
+  } @else {
+    <p class="discret">Chargement…</p>
+  }
+</div>

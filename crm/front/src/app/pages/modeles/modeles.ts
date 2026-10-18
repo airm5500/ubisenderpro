@@ -1,0 +1,156 @@
+import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { MessageService } from 'primeng/api';
+import { DialogModule } from 'primeng/dialog';
+import { Api } from '../../core/api';
+import { Auth } from '../../core/auth';
+import { ModeleMessage, SourceVariable, Variable } from '../../core/modeles';
+import { JourPipe, LIBELLES } from '../../core/format';
+
+interface Morceau { texte: string; variable: boolean; inconnue: boolean; }
+
+const VARIABLE = /\{([a-z][a-z0-9_]*)\}/g;
+
+@Component({
+  selector: 'app-modeles',
+  imports: [FormsModule, DialogModule, JourPipe],
+  templateUrl: './modeles.html'
+})
+export class Modeles implements OnInit {
+  private readonly api = inject(Api);
+  private readonly messages = inject(MessageService);
+  protected readonly auth = inject(Auth);
+  protected readonly L = LIBELLES;
+  protected readonly types = Object.entries(LIBELLES.typeCampagne);
+  private readonly zone = viewChild<ElementRef<HTMLTextAreaElement>>('zone');
+
+  protected readonly vue = signal<'modeles' | 'variables'>('modeles');
+  protected readonly archives = signal(false);
+  protected readonly modeles = signal<ModeleMessage[]>([]);
+  protected readonly variables = signal<Variable[]>([]);
+  protected readonly sources = signal<SourceVariable[]>([]);
+  protected readonly choisi = signal<ModeleMessage | null>(null);
+  protected readonly enEdition = signal(false);
+  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', contenu: '' };
+  protected readonly contenu = signal('');
+
+  protected readonly fenetreVariable = signal<Variable | 'nouvelle' | null>(null);
+  variable = { code: '', libelle: '', source: '', exemple: '' };
+
+  protected readonly parType = computed(() => this.types
+    .map(([code, libelle]) => ({ code, libelle, modeles: this.modeles().filter(m => m.typeCampagne === code) }))
+    .filter(g => g.modeles.length));
+
+  /** Apercu : variables remplacees par leur exemple, surlignees ; une variable inconnue est signalee. */
+  protected readonly apercu = computed<Morceau[]>(() => {
+    const texte = this.enEdition() ? this.contenu() : this.choisi()?.contenu ?? '';
+    const exemples = new Map(this.variables().map(v => [v.code, v.exemple || v.libelle]));
+    const morceaux: Morceau[] = [];
+    let dernier = 0;
+    for (const m of texte.matchAll(VARIABLE)) {
+      morceaux.push({ texte: texte.substring(dernier, m.index), variable: false, inconnue: false });
+      const connu = exemples.has(m[1]);
+      morceaux.push({ texte: connu ? exemples.get(m[1])! : m[0], variable: true, inconnue: !connu });
+      dernier = m.index! + m[0].length;
+    }
+    morceaux.push({ texte: texte.substring(dernier), variable: false, inconnue: false });
+    return morceaux;
+  });
+
+  protected readonly apercuInconnues = computed(() => this.apercu().some(m => m.inconnue));
+
+  ngOnInit(): void {
+    this.chargerModeles();
+    this.chargerVariables();
+    if (this.auth.gestionnaire()) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
+  }
+
+  basculerArchives(): void {
+    this.archives.set(!this.archives());
+    this.choisi.set(null);
+    this.enEdition.set(false);
+    this.chargerModeles();
+  }
+
+  choisir(m: ModeleMessage): void {
+    this.choisi.set(m);
+    this.enEdition.set(false);
+  }
+
+  nouveau(): void {
+    this.choisi.set(null);
+    this.edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', contenu: '' };
+    this.contenu.set('');
+    this.enEdition.set(true);
+  }
+
+  modifier(m: ModeleMessage): void {
+    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, contenu: m.contenu };
+    this.contenu.set(m.contenu);
+    this.enEdition.set(true);
+  }
+
+  /** Insere {code} a la position du curseur. */
+  inserer(code: string): void {
+    const zone = this.zone()?.nativeElement;
+    const texte = this.edition.contenu;
+    const debut = zone?.selectionStart ?? texte.length;
+    const fin = zone?.selectionEnd ?? texte.length;
+    this.edition.contenu = texte.substring(0, debut) + `{${code}}` + texte.substring(fin);
+    this.contenu.set(this.edition.contenu);
+    setTimeout(() => { zone?.focus(); zone?.setSelectionRange(debut + code.length + 2, debut + code.length + 2); });
+  }
+
+  enregistrer(): void {
+    const m = this.choisi();
+    const requete = m
+      ? this.api.put<ModeleMessage>(`/api/recouvrement/modeles-messages/${m.id}`, this.edition)
+      : this.api.post<ModeleMessage>('/api/recouvrement/modeles-messages', this.edition);
+    requete.subscribe(enregistre => {
+      this.messages.add({ severity: 'success', summary: 'Modèle enregistré', detail: enregistre.nom });
+      this.enEdition.set(false);
+      this.chargerModeles(enregistre.id);
+    });
+  }
+
+  archiver(m: ModeleMessage): void {
+    this.api.post(`/api/recouvrement/modeles-messages/${m.id}/archivage`).subscribe(() => {
+      this.messages.add({ severity: 'info', summary: 'Modèle archivé', detail: `${m.nom} n'est plus proposé dans les nouvelles campagnes.` });
+      this.choisi.set(null);
+      this.chargerModeles();
+    });
+  }
+
+  ouvrirVariable(v: Variable | 'nouvelle'): void {
+    this.variable = v === 'nouvelle' ? { code: '', libelle: '', source: '', exemple: '' } : { code: v.code, libelle: v.libelle, source: v.source, exemple: v.exemple };
+    this.fenetreVariable.set(v);
+  }
+
+  enregistrerVariable(): void {
+    const v = this.fenetreVariable();
+    const requete = v && v !== 'nouvelle'
+      ? this.api.put<Variable>(`/api/recouvrement/variables/${v.id}`, this.variable)
+      : this.api.post<Variable>('/api/recouvrement/variables', this.variable);
+    requete.subscribe(() => { this.fenetreVariable.set(null); this.chargerVariables(); });
+  }
+
+  archiverVariable(v: Variable): void {
+    this.api.post(`/api/recouvrement/variables/${v.id}/archivage`).subscribe(() => this.chargerVariables());
+  }
+
+  libelleSource(source: string): string {
+    return this.sources().find(s => s.source === source)?.libelle ?? source;
+  }
+
+  private chargerModeles(choisirId?: number): void {
+    this.api.get<ModeleMessage[]>('/api/recouvrement/modeles-messages', { statut: this.archives() ? 'ARCHIVE' : 'ACTIF' }).subscribe(m => {
+      this.modeles.set(m);
+      const cible = m.find(x => x.id === (choisirId ?? this.choisi()?.id)) ?? (this.enEdition() ? null : m[0] ?? null);
+      this.choisi.set(cible);
+    });
+  }
+
+  private chargerVariables(): void {
+    this.api.get<Variable[]>('/api/recouvrement/variables').subscribe(v => this.variables.set(v));
+  }
+}

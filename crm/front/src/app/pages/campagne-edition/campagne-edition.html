@@ -1,0 +1,147 @@
+<div class="page">
+  <div class="deux-colonnes">
+    <form (ngSubmit)="soumettre()" style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px">
+        <a class="retour" routerLink="/campagnes">← Campagnes</a>
+        <h1>{{ id() ? 'Modifier la campagne' : 'Nouvelle campagne' }}</h1>
+      </div>
+      @if (motifRejet()) {
+        <div class="avert"><i class="pi pi-replay"></i><span>Renvoyée pour modification : {{ motifRejet() }}</span></div>
+      }
+      <label class="f">Nom de la campagne<input class="sel" name="nom" [(ngModel)]="nom" placeholder="Ex. Relance ponctuelle Yopougon Nord" maxlength="150"></label>
+
+      <section class="sec" aria-labelledby="s1">
+        <span class="num">1</span>
+        <div>
+          <div><h2 id="s1" class="h">Factures ciblées</h2>
+            <p class="sous-titre">Les critères se combinent. {{ auth.agent() && !auth.direction() ? 'Limité à votre portefeuille.' : 'Limité à votre périmètre.' }}</p></div>
+          <div class="grille">
+            <label class="f">Type de relance
+              <select class="sel" name="type" [(ngModel)]="typeCampagne" (ngModelChange)="changerType()">
+                @for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
+              </select>
+            </label>
+            @if (typeCampagne === 'AVANT_ECHEANCE') {
+              <label class="f">Échéance dans (jours, de)<input class="sel" type="number" min="1" name="avMin" [(ngModel)]="criteres.joursAvantMin" (ngModelChange)="modifie()" placeholder="1"></label>
+              <label class="f">à<input class="sel" type="number" min="1" name="avMax" [(ngModel)]="criteres.joursAvantMax" (ngModelChange)="modifie()" placeholder="5"></label>
+            }
+            @if (typeCampagne === 'APRES_ECHEANCE' || typeCampagne === 'PERSONNALISEE') {
+              <label class="f">Échue depuis (jours, de)<input class="sel" type="number" min="0" name="rtMin" [(ngModel)]="criteres.joursRetardMin" (ngModelChange)="modifie()" placeholder="1"></label>
+              <label class="f">à<input class="sel" type="number" min="0" name="rtMax" [(ngModel)]="criteres.joursRetardMax" (ngModelChange)="modifie()" placeholder="60"></label>
+            }
+            @if (typeCampagne === 'PERSONNALISEE') {
+              <label class="f">Échéance du<input class="sel" type="date" name="du" [(ngModel)]="criteres.echeanceDu" (ngModelChange)="modifie()"></label>
+              <label class="f">au<input class="sel" type="date" name="au" [(ngModel)]="criteres.echeanceAu" (ngModelChange)="modifie()"></label>
+            }
+            <label class="f">Solde dû minimum<input class="sel" type="number" min="0" name="soldeMin" [(ngModel)]="criteres.soldeMin" (ngModelChange)="modifie()" placeholder="Ex. 100000"></label>
+            <label class="f">Solde dû maximum<input class="sel" type="number" min="0" name="soldeMax" [(ngModel)]="criteres.soldeMax" (ngModelChange)="modifie()"></label>
+          </div>
+
+          @if (agences().length > 1) {
+            <div class="f">Agences <span class="discret">(aucune cochée = toutes)</span>
+              <div class="chips">@for (a of agences(); track a.id) {
+                <label class="opt" [class.optn]="criteres.agenceIds?.includes(a.id)" style="padding: 8px 12px"><input type="checkbox" [checked]="criteres.agenceIds?.includes(a.id)" (change)="basculer('agenceIds', a.id)">{{ a.libelle }}</label>
+              }</div>
+            </div>
+          }
+          @if (agents().length) {
+            <div class="f">Agents <span class="discret">(aucun coché = tous)</span>
+              <div class="chips">@for (a of agents(); track a.id) {
+                <label class="opt" [class.optn]="criteres.agentIds?.includes(a.id)" style="padding: 8px 12px"><input type="checkbox" [checked]="criteres.agentIds?.includes(a.id)" (change)="basculer('agentIds', a.id)">{{ a.nomComplet }}</label>
+              }</div>
+            </div>
+          }
+          <div class="f">Sous-types de compte
+            <div class="chips">@for (s of sousTypes(); track s.id) {
+              <label class="opt" [class.optn]="criteres.sousTypeIds?.includes(s.id)" style="padding: 8px 12px"><input type="checkbox" [checked]="criteres.sousTypeIds?.includes(s.id)" (change)="basculer('sousTypeIds', s.id)">{{ s.libelle }}</label>
+            }</div>
+          </div>
+          <div class="f">Segments
+            <div class="chips">@for (s of segments; track s.code) {
+              <label class="opt" [class.optn]="criteres.segments?.includes(s.code)" style="padding: 8px 12px"><input type="checkbox" [checked]="criteres.segments?.includes(s.code)" (change)="basculerSegment(s.code)">{{ s.libelle }}</label>
+            }</div>
+          </div>
+          @if (puces().length || criteres.clientIds?.length) {
+            <div class="chips">
+              @for (p of puces(); track p) { <span class="chip">{{ p }}</span> }
+              @if (criteres.clientIds?.length) { <span class="chip">{{ criteres.clientIds!.length }} client{{ criteres.clientIds!.length > 1 ? 's' : '' }} choisi{{ criteres.clientIds!.length > 1 ? 's' : '' }} <button type="button" aria-label="Retirer les clients choisis" (click)="retirerClients()">×</button></span> }
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="s2">
+        <span class="num">2</span>
+        <div>
+          <div><h2 id="s2" class="h">Message</h2><p class="sous-titre">Seuls les modèles actifs prévus pour ce type de relance sont proposés.</p></div>
+          <label class="f">Modèle
+            <select class="sel" name="modele" [(ngModel)]="modeleId" (ngModelChange)="modifie()">
+              @for (m of modelesDuType(); track m.id) { <option [ngValue]="m.id">{{ m.nom }}</option> }
+              @empty { <option [ngValue]="null">Aucun modèle actif pour ce type</option> }
+            </select>
+          </label>
+          @if (!modelesDuType().length) {
+            <p class="discret">La Direction du Recouvrement crée les modèles dans <a routerLink="/modeles">Modèles de messages</a>.</p>
+          }
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="s3">
+        <span class="num">3</span>
+        <div>
+          <h2 id="s3" class="h">Programmation</h2>
+          <div class="opts" role="radiogroup" aria-label="Quand">
+            <label class="opt" [class.optn]="quand === 'validation'"><input type="radio" name="quand" value="validation" [(ngModel)]="quand">Dès la validation</label>
+            <label class="opt" [class.optn]="quand === 'date'"><input type="radio" name="quand" value="date" [(ngModel)]="quand">À une date</label>
+          </div>
+          @if (quand === 'date') {
+            <div class="grille">
+              <label class="f">Date<input class="sel" type="date" name="date" [(ngModel)]="dateEnvoi" [min]="aujourdhui"></label>
+              <label class="f">Heure<input class="sel" type="time" name="heure" [(ngModel)]="heureEnvoi"></label>
+            </div>
+          }
+          <p class="discret">Les messages partent entre 8 h et 18 h, heure d'Abidjan, au rythme lent imposé par WhatsApp Web : 20 à 45 secondes entre deux messages d'un même numéro, 200 par jour au plus.</p>
+        </div>
+      </section>
+    </form>
+
+    <aside style="display: flex; flex-direction: column; gap: 24px; position: sticky; top: 24px">
+      <section style="display: flex; flex-direction: column; gap: 4px">
+        <h2 class="h2" style="padding-bottom: 8px">Récapitulatif avant validation</h2>
+        @if (recap(); as r) {
+          <div class="sum"><span>Clients concernés</span><strong>{{ r.nbClients }}</strong></div>
+          <div class="sum"><span>Factures concernées</span><strong>{{ r.nbFactures }}</strong></div>
+          <div class="sum"><span>Messages à envoyer</span><strong>{{ r.nbMessages }}, un par facture</strong></div>
+          <div class="sum"><span>Montant visé</span><strong>{{ r.totalSolde | montant }} FCFA</strong></div>
+          @for (a of r.agents; track a.agentId) {
+            <div class="sum"><span>{{ a.agentNom }}</span><strong>{{ a.nbMessages }} msg · {{ (a.numeroExpediteur | telephone) || 'sans numéro' }}</strong></div>
+          }
+          @for (e of r.exclusions; track e.motif) {
+            <div class="sum"><span>Exclues : {{ e.motif }}</span><strong>{{ e.nb }}</strong></div>
+          }
+          @if (perime()) { <p class="avert" style="margin: 8px 0 0">Le formulaire a changé : recalculez le récapitulatif.</p> }
+        } @else {
+          <p class="discret">Calculez le récapitulatif pour voir les clients, les factures et les messages concernés. Le brouillon est enregistré au passage.</p>
+        }
+        <div class="actions" style="padding-top: 14px">
+          <button class="bs" type="button" (click)="calculer()" [disabled]="occupe()">{{ recap() ? 'Recalculer' : 'Calculer le récapitulatif' }}</button>
+          <button class="bs" type="button" (click)="brouillon()" [disabled]="occupe()">Enregistrer le brouillon</button>
+        </div>
+        <button class="bp" type="button" style="margin-top: 10px" (click)="soumettre()" [disabled]="occupe() || !nom.trim() || !modeleId">Soumettre à validation</button>
+        <p class="discret">Validée par la Direction du Recouvrement. Rien ne part avant sa validation.</p>
+      </section>
+
+      @if (recap()?.exemples?.length) {
+        <section style="display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline">
+            <h2 class="h" style="margin: 0">Aperçu pour {{ recap()!.exemples[exemple()].clientRaisonSociale }}</h2>
+            @if (recap()!.exemples.length > 1) { <a (click)="exempleSuivant()">Suivant</a> }
+          </div>
+          <div class="fil-wa">
+            <div class="out">{{ recap()!.exemples[exemple()].contenu }}<span class="meta">{{ recap()!.exemples[exemple()].factureReference }} · vers {{ recap()!.exemples[exemple()].numeroDestinataire | telephone }}</span></div>
+          </div>
+        </section>
+      }
+    </aside>
+  </div>
+</div>

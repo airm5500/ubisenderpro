@@ -197,3 +197,26 @@ Voir `wa-web/README.md` pour le lancer ; le CRM le joint par `CRM_WHATSAPP_URL` 
 | POST | `/api/whatsapp/sessions/{agentId}/deconnexion` | Delie le telephone |
 | GET | `/api/recouvrement/reponses?clientId=&agentId=&page=&taille=` | Reponses des clients |
 | POST | `/api/passerelle/wa-web/status`, `/ack`, `/message` | Callbacks du service, en-tete `X-Api-Token` |
+
+## Interface Angular (lot 6)
+
+L'interface est dans `front/` (Angular 21, PrimeNG 21), d'apres la maquette validee. Construire le front puis
+le jar : `cd front && npm install && npm run build`, puis `./mvnw package` copie `front/dist/front/browser` dans
+le jar (`/static`) : un seul service sert l'API et l'interface sur le meme port. Une route de l'interface
+(`/factures`, `/campagnes/12`...) renvoie `index.html` ; les routes `/api` ne sont jamais concernees. En
+developpement, `npm start` sert l'interface sur le port 4200 et relaie `/api` vers le port 8080.
+
+Ecrans du pilote, avec le menu adapte au profil :
+
+| Ecran | Profils | Contenu |
+| --- | --- | --- |
+| Connexion | tous | Session serveur, jeton CSRF, identifiant memorise au choix |
+| Ma journee | agent | A faire (numero deconnecte, campagne renvoyee, factures echues sans relance, reponses), echeances sur 14 jours, ses campagnes |
+| Factures | tous | Recherche multicritere, onglets par statut avec compteurs, selection puis « Relancer ces clients » |
+| Clients et fiche client | tous | Portefeuille, solde et retard ; fiche avec factures, restant du par sous-type, historique (reponses, agents) |
+| Imports | direction | Historique, assistant en 4 etapes (fichier, colonnes et modeles, simulation avec ecarts et corrections, rapport) |
+| Portefeuilles agents | pilotage | Agents, numero WhatsApp, affectation et retrait en lot, transfert, interims |
+| Campagnes | tous | Onglets par statut, panneau de validation (valider, renvoyer avec motif), creation avec recapitulatif et apercu du message, suivi des envois |
+| Modeles de messages | tous (edition : ADMIN, DIR_RECOUVREMENT) | Modeles par type, insertion des variables, apercu avec exemples ; gestion des variables |
+| Numeros WhatsApp | agent (le sien), ADMIN et DIR_RECOUVREMENT | Etat des sessions, QR a scanner, envoyes du jour, messages en attente |
+| Reponses des clients | tous | Copie des messages recus, rattaches au client et a la campagne |

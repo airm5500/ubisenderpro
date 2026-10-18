@@ -1,0 +1,101 @@
+/** Contrats de l'API Spring Boot (DTO de rest.service.dto). */
+
+export interface Page<T> { elements: T[]; total: number; page: number; taille: number; }
+export interface Erreur { statut: number; message: string; reference?: string; champs?: { champ: string; message: string }[]; }
+
+export interface Utilisateur {
+  id: number; login: string; nomComplet: string; roles: string[]; modules: string[];
+  visionGlobale: boolean; agenceIds: number[];
+}
+
+export interface Agence { id: number; code: string; libelle: string; }
+export interface SousType { id: number; code: string; libelle: string; }
+
+export interface Client {
+  id: number; code: string; raisonSociale: string; segmentation: string; segmentationLibelle: string;
+  nomPharmacien: string; ville: string; agenceId: number; agenceLibelle: string; sousAgence: string;
+  adresse: string; email: string; commentaire: string; numeroPrincipal: string; numeroSecondaire: string; statut: string;
+}
+
+export interface Facture {
+  id: number; reference: string; clientId: number; clientCode: string; clientRaisonSociale: string;
+  agenceId: number; agenceLibelle: string; sousTypeId: number; sousTypeLibelle: string; nature: string;
+  dateFacture: string; dateEcheance: string; montant: number; solde: number; statut: string; joursRetard: number;
+}
+
+export interface Import {
+  id: number; type: string; nomFichier: string; statut: string; nbLignes: number; nbCreations: number;
+  nbMisesAJour: number; nbIdentiques: number; nbRejets: number; nbCrees: number | null; nbMisAJour: number | null;
+  nbIgnores: number | null; auteur: string; creeLe: string; validePar: string | null; valideLe: string | null;
+}
+export interface ImportLigne { id: number; numeroLigne: number; cle: string; action: string; message: string; resultat: string; donnees: Record<string, string>; }
+export interface ChampImport { code: string; libelle: string; obligatoire: boolean; exemple: string; alias: string[]; }
+export interface ColonneApercu { cle: string; libelle: string; exemples: string[]; }
+export interface ApercuImport {
+  nomFichier: string; nbLignes: number; colonnes: ColonneApercu[]; champs: ChampImport[];
+  correspondance: Record<string, string>; champsManquants: string[];
+}
+export interface ModeleImport { id: number; type: string; nom: string; correspondance: Record<string, string>; auteur: string; modifieLe: string; }
+
+export interface Agent {
+  id: number; login: string; nomComplet: string; numeroWhatsapp: string | null; agences: string;
+  nbClients: number; totalSolde: number; remplacant: string | null;
+}
+export interface PortefeuilleClient {
+  clientId: number; code: string; raisonSociale: string; nomPharmacien: string; agenceId: number; agenceLibelle: string;
+  segmentation: string; numeroPrincipal: string; agentId: number | null; agentNom: string | null; affecteLe: string | null;
+  nbFacturesOuvertes: number; totalSolde: number; retardMax: number;
+}
+export interface ResultatAffectation { nbTraites: number; nbInchanges: number; refus: string[]; }
+export interface Affectation {
+  id: number; clientId: number; agentId: number; agentNom: string; dateDebut: string; dateFin: string | null;
+  motifDebut: string; motifFin: string | null; affectePar: string; retirePar: string | null;
+}
+export interface Delegation {
+  id: number; titulaireId: number; titulaireNom: string; titulaireNumero: string; remplacantId: number; remplacantNom: string;
+  dateDebut: string; dateFin: string; motif: string; statut: string; enCours: boolean; autorisePar: string;
+}
+
+export interface Variable { id: number; code: string; libelle: string; source: string; exemple: string; statut: string; }
+export interface SourceVariable { source: string; libelle: string; }
+export interface ModeleMessage {
+  id: number; nom: string; typeCampagne: string; contenu: string; statut: string; variables: string[];
+  creePar: string; modifiePar: string; createdAt: string; updatedAt: string;
+}
+
+export interface CriteresCampagne {
+  agenceIds?: number[]; agentIds?: number[]; clientIds?: number[]; sousTypeIds?: number[]; segments?: string[];
+  soldeMin?: number | null; soldeMax?: number | null; echeanceDu?: string | null; echeanceAu?: string | null;
+  joursAvantMin?: number | null; joursAvantMax?: number | null; joursRetardMin?: number | null; joursRetardMax?: number | null;
+}
+export interface CampagneDemande { nom: string; typeCampagne: string; modeleId: number | null; criteres: CriteresCampagne; dateExecution: string | null; }
+export interface Campagne {
+  id: number; nom: string; typeCampagne: string; modeleId: number; modeleNom: string; criteres: CriteresCampagne;
+  dateExecution: string | null; statut: string; nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number;
+  nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string; createdAt: string; soumiseLe: string | null;
+  validePar: string | null; valideLe: string | null; motifRejet: string | null; rejetePar: string | null;
+  lanceLe: string | null; termineLe: string | null; annulePar: string | null; annuleLe: string | null; motifAnnulation: string | null;
+}
+export interface MessageCampagne {
+  id: number | null; factureId: number; factureReference: string; dateEcheance: string; solde: number; clientId: number;
+  clientCode: string; clientRaisonSociale: string; agenceId: number; numeroDestinataire: string | null; agentId: number | null;
+  agentNom: string | null; numeroExpediteur: string | null; contenu: string | null; statut: string; motif: string | null;
+  envoyeLe: string | null; distribueLe: string | null; luLe: string | null;
+}
+export interface Recapitulatif {
+  nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number; totalSolde: number;
+  agents: { agentId: number; agentNom: string; numeroExpediteur: string; nbClients: number; nbMessages: number }[];
+  exclusions: { motif: string; nb: number }[];
+  exemples: MessageCampagne[];
+}
+
+export interface SessionAgent {
+  agentId: number; agentNom: string; numero: string | null; statut: string; sante: string | null; raison: string | null;
+  connecteLe: string | null; envoyesAujourdhui: number; enAttente: number;
+}
+export interface EtatSession { statut: string; sante: string | null; raison: string | null; qr: string | null; }
+export interface MessageRecu {
+  id: number; numeroAgent: string; agentNom: string; numeroClient: string; nomAffiche: string | null; clientId: number | null;
+  clientCode: string | null; clientRaisonSociale: string | null; factureReference: string | null; campagneNom: string | null;
+  type: string; contenu: string; recuLe: string;
+}

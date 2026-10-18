@@ -1,0 +1,176 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Portefeuilles agents</h1>
+      <p class="sous-titre">Chaque client a un seul agent à la fois. Une réaffectation garde l'historique, rien n'est supprimé.</p>
+    </div>
+  </div>
+
+  <section class="bloc">
+    <div class="titre"><h2 class="h2">Agents de recouvrement</h2><span class="discret">{{ agents().length }} agent{{ agents().length > 1 ? 's' : '' }}</span></div>
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Agent</th><th>Agences</th><th>Numéro WhatsApp</th><th class="n">Clients</th><th class="n">Solde dû</th><th>Intérim</th><th></th></tr></thead>
+        <tbody>
+          @for (a of agents(); track a.id) {
+            <tr [class.choisi]="criteres.agentId === a.id">
+              <td><a class="ref" (click)="voirAgent(a)">{{ a.nomComplet }}</a><div class="second">{{ a.login }}</div></td>
+              <td>{{ a.agences || '—' }}</td>
+              <td class="nw">@if (a.numeroWhatsapp) { {{ a.numeroWhatsapp | telephone }} } @else { <span class="retard">À renseigner</span> }</td>
+              <td class="n">{{ a.nbClients }}</td>
+              <td class="n">{{ a.totalSolde | montant }}</td>
+              <td>{{ a.remplacant ? 'Remplacé par ' + a.remplacant : '—' }}</td>
+              <td class="nw actions">
+                @if (auth.gestionnaire()) {
+                  <a (click)="ouvrir('numero', a)">Numéro</a>
+                  <a (click)="ouvrir('interim', a)">Intérim</a>
+                }
+                @if (auth.direction() && a.nbClients > 0) { <a (click)="ouvrir('transfert', a)">Transférer</a> }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="vide">Aucun agent de recouvrement dans votre périmètre.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  @if (delegations().length) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Intérims en cours</h2></div>
+      @for (d of delegations(); track d.id) {
+        <div class="li">
+          <span><strong>{{ d.remplacantNom }}</strong> remplace <strong>{{ d.titulaireNom }}</strong> du {{ d.dateDebut | jour }} au {{ d.dateFin | jour }}{{ d.motif ? ' · ' + d.motif : '' }}</span>
+          @if (auth.gestionnaire()) { <a (click)="annulerInterim(d)">Annuler</a> }
+        </div>
+      }
+      <p class="discret">Pendant un intérim, le remplaçant voit et relance les clients du titulaire ; les messages partent du numéro du titulaire.</p>
+    </section>
+  }
+
+  <section class="bloc">
+    <div class="titre"><h2 class="h2">Clients</h2></div>
+    <form class="filtres" (ngSubmit)="rechercher()">
+      <div class="grille">
+        <label class="f large">Pharmacie, pharmacien, code ou n° WhatsApp<input class="sel" name="q" [(ngModel)]="criteres.q"></label>
+        <label class="f">Agence
+          <select class="sel" name="agenceId" [(ngModel)]="criteres.agenceId">
+            <option [ngValue]="null">Toutes</option>
+            @for (a of ref.agences | async; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+          </select>
+        </label>
+        <label class="f">Agent
+          <select class="sel" name="agentId" [(ngModel)]="criteres.agentId">
+            <option [ngValue]="null">Tous</option>
+            @for (a of agents(); track a.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> }
+          </select>
+        </label>
+      </div>
+      <div class="pied-filtres" style="justify-content: space-between">
+        <div class="actions">
+          <label class="case"><input type="checkbox" name="sansAgent" [(ngModel)]="criteres.sansAgent">Sans agent</label>
+          <label class="case"><input type="checkbox" name="avecSolde" [(ngModel)]="criteres.avecSolde">Avec un solde dû</label>
+        </div>
+        <button class="bp" type="submit">Rechercher</button>
+      </div>
+    </form>
+
+    @if (selection().size > 0 && auth.direction()) {
+      <div class="barre-selection">
+        <span><strong>{{ selection().size }} client{{ selection().size > 1 ? 's' : '' }} sélectionné{{ selection().size > 1 ? 's' : '' }}</strong></span>
+        <div class="actions">
+          <button class="ba" type="button" (click)="ouvrir('affecter')">Affecter à un agent</button>
+          <button class="bs" type="button" (click)="ouvrir('retirer')">Retirer de leur agent</button>
+        </div>
+      </div>
+    }
+
+    <div class="defile">
+      <table class="t">
+        <thead><tr>
+          @if (auth.direction()) {
+            <th><input type="checkbox" aria-label="Tout sélectionner" (change)="toutBasculer($any($event.target).checked)"></th>
+          }
+          <th>Pharmacie</th><th>Agence</th><th>Agent</th><th>Depuis</th><th class="n">Factures ouvertes</th><th class="n">Solde dû</th><th class="n">Retard max</th></tr></thead>
+        <tbody>
+          @for (c of page()?.elements; track c.clientId) {
+            <tr [class.choisi]="selection().has(c.clientId)">
+              @if (auth.direction()) {
+                <td><input type="checkbox" [attr.aria-label]="'Sélectionner ' + c.raisonSociale" [checked]="selection().has(c.clientId)" (change)="basculer(c.clientId)"></td>
+              }
+              <td><a class="ref" [routerLink]="['/clients', c.clientId]">{{ c.raisonSociale }}</a><div class="second">{{ c.code }}</div></td>
+              <td>{{ c.agenceLibelle }}</td>
+              <td>{{ c.agentNom || 'Sans agent' }}</td>
+              <td class="nw">{{ c.affecteLe | jour }}</td>
+              <td class="n">{{ c.nbFacturesOuvertes }}</td>
+              <td class="n" style="font-weight: 700">{{ c.totalSolde | montant }}</td>
+              <td class="n">@if (c.retardMax > 0) {<span class="retard">{{ c.retardMax }} j</span>} @else {—}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="8" class="vide">{{ page() ? 'Aucun client ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (page(); as p) {
+      <div class="pagination">
+        <span>{{ p.total }} client{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+        <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+          <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+      </div>
+    }
+  </section>
+</div>
+
+<p-dialog [header]="titres[fenetre() ?? ''] ?? ''" [visible]="fenetre() !== null" (visibleChange)="!$event && fenetre.set(null)" [modal]="true" [style]="{ width: '520px' }">
+  <form class="formulaire" (ngSubmit)="confirmer()">
+    @switch (fenetre()) {
+      @case ('affecter') {
+        <p class="sous-titre">{{ selection().size }} client(s) choisi(s). Leur agent actuel, s'il existe, est remplacé et l'historique conservé.</p>
+        <label class="f">Nouvel agent
+          <select class="sel" name="agentId" [(ngModel)]="formulaire.agentId" required>
+            <option [ngValue]="null" disabled>Choisir un agent</option>
+            @for (a of agents(); track a.id) { <option [ngValue]="a.id">{{ a.nomComplet }} · {{ a.nbClients }} clients</option> }
+          </select>
+        </label>
+      }
+      @case ('retirer') {
+        <p class="sous-titre">{{ selection().size }} client(s) n'auront plus d'agent : ils seront exclus des campagnes jusqu'à leur réaffectation.</p>
+      }
+      @case ('transfert') {
+        <p class="sous-titre">Les {{ agentCible?.nbClients }} clients de {{ agentCible?.nomComplet }} passent à un autre agent, avec leur historique.</p>
+        <label class="f">Vers l'agent
+          <select class="sel" name="agentId" [(ngModel)]="formulaire.agentId" required>
+            <option [ngValue]="null" disabled>Choisir un agent</option>
+            @for (a of agents(); track a.id) { @if (a.id !== agentCible?.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> } }
+          </select>
+        </label>
+      }
+      @case ('numero') {
+        <p class="sous-titre">Les relances de {{ agentCible?.nomComplet }} partent de ce numéro, une fois sa session WhatsApp connectée. L'ancien numéro reste lié aux messages déjà envoyés.</p>
+        <label class="f">Numéro WhatsApp<input class="sel" name="numero" [(ngModel)]="formulaire.numero" placeholder="Ex. 07 08 12 34 56" required></label>
+      }
+      @case ('interim') {
+        <p class="sous-titre">Le remplaçant suit les clients de {{ agentCible?.nomComplet }} pendant la période choisie.</p>
+        <label class="f">Remplaçant
+          <select class="sel" name="remplacantId" [(ngModel)]="formulaire.remplacantId" required>
+            <option [ngValue]="null" disabled>Choisir un agent</option>
+            @for (a of agents(); track a.id) { @if (a.id !== agentCible?.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> } }
+          </select>
+        </label>
+        <div class="grille">
+          <label class="f">Du<input class="sel" type="date" name="dateDebut" [(ngModel)]="formulaire.dateDebut"></label>
+          <label class="f">Au<input class="sel" type="date" name="dateFin" [(ngModel)]="formulaire.dateFin"></label>
+        </div>
+      }
+    }
+    @if (fenetre() !== 'numero') {
+      <label class="f">Motif<input class="sel" name="motif" [(ngModel)]="formulaire.motif" placeholder="Ex. congés, réorganisation de l'agence"></label>
+    }
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetre.set(null)">Annuler</button>
+      <button class="bp" type="submit">Confirmer</button>
+    </div>
+  </form>
+</p-dialog>

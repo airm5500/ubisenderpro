@@ -1,0 +1,63 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</h1>
+      <p class="sous-titre">Chaque agent relance depuis son numéro professionnel, relié par WhatsApp Web. Le téléphone doit rester allumé et connecté à internet.</p>
+    </div>
+    @if (auth.gestionnaire()) { <a class="bs" routerLink="/portefeuilles">Changer le numéro d'un agent</a> }
+  </div>
+
+  <div class="avert"><i class="pi pi-info-circle"></i>
+    <span>Canal non officiel pour le pilote : les messages partent lentement (20 à 45 secondes d'écart, 200 par jour et par numéro, de 8 h à 18 h) pour limiter le risque de blocage du numéro par WhatsApp.</span></div>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Agent</th><th>Numéro</th><th>Session WhatsApp Web</th><th>Connecté depuis</th><th class="n">Envoyés aujourd'hui</th><th class="n">En attente</th><th></th></tr></thead>
+      <tbody>
+        @for (s of sessions(); track s.agentId) {
+          <tr>
+            <td><strong>{{ s.agentNom }}</strong></td>
+            <td class="nw">{{ (s.numero | telephone) || 'Non renseigné' }}</td>
+            <td><span class="dot" [style.background]="L.couleurSession[s.statut]"></span>{{ L.statutSession[s.statut] ?? s.statut }}
+              @if (s.raison && s.statut !== 'CONNECTE') {<div class="second">{{ s.raison }}</div>}</td>
+            <td class="nw">{{ s.statut === 'CONNECTE' ? (s.connecteLe | jour: true) : '—' }}</td>
+            <td class="n">{{ s.envoyesAujourdhui }}</td>
+            <td class="n">{{ s.enAttente }}</td>
+            <td class="nw">
+              @if (!s.numero) { <span class="discret">Numéro à renseigner</span> }
+              @else if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Délier le téléphone</a> }
+              @else { <button class="ba petit" (click)="connecter(s)">Scanner le QR</button> }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="vide">{{ sessions() ? 'Aucun agent de recouvrement.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <section class="bloc">
+    <div class="titre"><h2 class="h2">Relier un téléphone</h2></div>
+    <div class="li"><span>1. Sur le téléphone professionnel, ouvrez WhatsApp (ou WhatsApp Business).</span></div>
+    <div class="li"><span>2. Menu ⋮ ou Réglages, puis Appareils connectés, puis Connecter un appareil.</span></div>
+    <div class="li"><span>3. Cliquez sur « Scanner le QR » ci-dessus et visez le code avec le téléphone.</span></div>
+    <p class="discret">Les clients continuent de répondre sur ce WhatsApp ; une copie de leurs réponses arrive dans la fiche client.</p>
+  </section>
+</div>
+
+<p-dialog [header]="'Relier ' + (liaison()?.numero | telephone)" [visible]="liaison() !== null" (visibleChange)="!$event && fermer()" [modal]="true" [style]="{ width: '420px' }">
+  <div class="qr">
+    @switch (etat()?.statut) {
+      @case ('CONNECTE') { <i class="pi pi-check-circle" style="font-size: 48px; color: var(--vert-texte)"></i><strong>Téléphone relié.</strong> }
+      @case ('QR') {
+        @if (etat()?.qr) { <img [src]="etat()!.qr" alt="QR code à scanner avec WhatsApp"> }
+        <span class="sous-titre">Scannez ce code depuis Appareils connectés. Il se renouvelle tout seul.</span>
+      }
+      @default {
+        @if (etat()?.qr) { <img [src]="etat()!.qr" alt="QR code à scanner avec WhatsApp"> }
+        @else { <i class="pi pi-spin pi-spinner" style="font-size: 32px; color: var(--bleu)"></i> }
+        <span class="sous-titre">{{ etat()?.raison || 'Démarrage de la session WhatsApp Web…' }}</span>
+      }
+    }
+  </div>
+</p-dialog>
