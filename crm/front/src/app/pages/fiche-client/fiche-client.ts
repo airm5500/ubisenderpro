@@ -64,7 +64,7 @@ export class FicheClient implements OnInit {
     this.api.get<Client>(`/api/clients/${id}`).subscribe(c => this.client.set(c));
     this.api.toutes<Facture>('/api/recouvrement/factures', { clientId: id }, 100).subscribe(f => this.factures.set(f));
     this.api.get<Page<MessageRecu>>('/api/recouvrement/reponses', { clientId: id, page: 0, taille: 50 }).subscribe(p => this.reponses.set(p.elements));
-    if (this.auth.direction()) {
+    if (this.auth.peut('PORTEFEUILLES_AFFECTER')) {
       this.api.get<Affectation[]>(`/api/recouvrement/clients/${id}/affectations`).subscribe(a => this.affectations.set(a));
     }
   }

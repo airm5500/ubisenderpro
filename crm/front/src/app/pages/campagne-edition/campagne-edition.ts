@@ -64,7 +64,7 @@ export class CampagneEdition implements OnInit {
   ngOnInit(): void {
     this.ref.agences.subscribe(a => this.agences.set(a.filter(x => this.auth.utilisateur()?.visionGlobale || this.auth.utilisateur()?.agenceIds.includes(x.id))));
     this.ref.sousTypes.subscribe(s => this.sousTypes.set(s));
-    if (this.auth.pilotage()) this.ref.agents().subscribe(a => this.agents.set(a));
+    if (this.auth.voitAgents()) this.ref.agents().subscribe(a => this.agents.set(a));
     this.api.get<ModeleMessage[]>('/api/recouvrement/modeles-messages', { statut: 'ACTIF' }).subscribe(m => {
       this.modeles.set(m);
       if (!this.modeleId) this.choisirModeleParDefaut();

@@ -21,11 +21,9 @@
               <td class="n">{{ a.totalSolde | montant }}</td>
               <td>{{ a.remplacant ? 'Remplacé par ' + a.remplacant : '—' }}</td>
               <td class="nw actions">
-                @if (auth.gestionnaire()) {
-                  <a (click)="ouvrir('numero', a)">Numéro</a>
-                  <a (click)="ouvrir('interim', a)">Intérim</a>
-                }
-                @if (auth.direction() && a.nbClients > 0) { <a (click)="ouvrir('transfert', a)">Transférer</a> }
+                @if (auth.peut('NUMEROS_TOUS')) { <a (click)="ouvrir('numero', a)">Numéro</a> }
+                @if (auth.peut('INTERIMS')) { <a (click)="ouvrir('interim', a)">Intérim</a> }
+                @if (auth.peut('PORTEFEUILLES_AFFECTER') && a.nbClients > 0) { <a (click)="ouvrir('transfert', a)">Transférer</a> }
               </td>
             </tr>
           } @empty {
@@ -42,7 +40,7 @@
       @for (d of delegations(); track d.id) {
         <div class="li">
           <span><strong>{{ d.remplacantNom }}</strong> remplace <strong>{{ d.titulaireNom }}</strong> du {{ d.dateDebut | jour }} au {{ d.dateFin | jour }}{{ d.motif ? ' · ' + d.motif : '' }}</span>
-          @if (auth.gestionnaire()) { <a (click)="annulerInterim(d)">Annuler</a> }
+          @if (auth.peut('INTERIMS')) { <a (click)="annulerInterim(d)">Annuler</a> }
         </div>
       }
       <p class="discret">Pendant un intérim, le remplaçant voit et relance les clients du titulaire ; les messages partent du numéro du titulaire.</p>
@@ -76,7 +74,7 @@
       </div>
     </form>
 
-    @if (selection().size > 0 && auth.direction()) {
+    @if (selection().size > 0 && auth.peut('PORTEFEUILLES_AFFECTER')) {
       <div class="barre-selection">
         <span><strong>{{ selection().size }} client{{ selection().size > 1 ? 's' : '' }} sélectionné{{ selection().size > 1 ? 's' : '' }}</strong></span>
         <div class="actions">
@@ -89,14 +87,14 @@
     <div class="defile">
       <table class="t">
         <thead><tr>
-          @if (auth.direction()) {
+          @if (auth.peut('PORTEFEUILLES_AFFECTER')) {
             <th><input type="checkbox" aria-label="Tout sélectionner" (change)="toutBasculer($any($event.target).checked)"></th>
           }
           <th>Pharmacie</th><th>Agence</th><th>Agent</th><th>Depuis</th><th class="n">Factures ouvertes</th><th class="n">Solde dû</th><th class="n">Retard max</th></tr></thead>
         <tbody>
           @for (c of page()?.elements; track c.clientId) {
             <tr [class.choisi]="selection().has(c.clientId)">
-              @if (auth.direction()) {
+              @if (auth.peut('PORTEFEUILLES_AFFECTER')) {
                 <td><input type="checkbox" [attr.aria-label]="'Sélectionner ' + c.raisonSociale" [checked]="selection().has(c.clientId)" (change)="basculer(c.clientId)"></td>
               }
               <td><a class="ref" [routerLink]="['/clients', c.clientId]">{{ c.raisonSociale }}</a><div class="second">{{ c.code }}</div></td>

@@ -348,3 +348,21 @@ Sur le poste, `C:\UBIPHARM-CRM\application` est remplace a chaque mise a jour ; 
 la configuration, les journaux et la session WhatsApp. `installer.bat` y cree les deux fichiers de configuration a
 la premiere execution, avec un jeton commun au CRM et au compagnon, puis installe et demarre les services.
 Le compagnon lit son fichier par la variable `WA_WEB_ENV`.
+
+## Roles et droits (lot 12)
+
+Chaque role porte la liste des ecrans et actions qu'il ouvre (`crm_droit`, `crm_role_droit`), cochee par
+l'administrateur dans l'ecran **Roles et droits** (`/api/roles`, droit `ROLES`). On y cree aussi ses propres roles,
+en partant au besoin d'un role existant ; un role n'est jamais supprime, il se desactive quand plus aucun compte
+actif ne l'a. Une case decochee reste en base (`actif = false`) et chaque changement est journalise.
+
+- **Au serveur** : la connexion donne une autorite `DROIT_<code>` par droit coche ; les routes sont protegees par
+  `hasAuthority('DROIT_...')` (imports, affectations, interims, validation des campagnes, ecriture des modeles,
+  numeros des agents, administration). Les consultations restent limitees au perimetre du compte (ses agences,
+  ou son seul portefeuille sans `PERIMETRE_AGENCES`).
+- **Par module** : un droit du Recouvrement ne vient que d'un role attribue sur ce module (ou sur tous les modules) ;
+  les droits d'administration et `IMPORTS` (clients) valent quel que soit le module.
+- **Interface** : menus, boutons et gardes de route suivent les memes droits (`auth.peut(...)`).
+- **Garde-fous** : le role Administrateur garde toujours `UTILISATEURS` et `ROLES` et ne se desactive pas. Quand les
+  droits d'un role changent, les comptes qui l'ont se reconnectent (`droits_revises_le`).
+- Les roles livres gardent les droits qu'ils avaient avant ce lot (migration `V1.0.17`).

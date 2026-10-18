@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/recouvrement/imports/factures")
-@PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE')")
+@PreAuthorize("hasAuthority('DROIT_IMPORTS') and hasAuthority('MODULE_RECOUVREMENT')")
 @RequiredArgsConstructor
 public class ImportFactureRessource {
 

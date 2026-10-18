@@ -28,8 +28,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CampagneRessource {
 
-    private static final String AUTEURS = "hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'AGENT')";
-    private static final String VALIDEURS = "hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT')";
+    private static final String AUTEURS = "hasAnyAuthority('DROIT_CAMPAGNES_PREPARER', 'DROIT_CAMPAGNES_VALIDER')";
+    private static final String VALIDEURS = "hasAuthority('DROIT_CAMPAGNES_VALIDER')";
 
     private final CampagneService campagneService;
 

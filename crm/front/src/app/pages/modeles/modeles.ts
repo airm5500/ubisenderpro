@@ -73,7 +73,7 @@ export class Modeles implements OnInit {
     this.chargerModeles();
     this.chargerVariables();
     this.api.get<EtatSms>('/api/sms/etat').subscribe(e => this.etatSms.set(e));
-    if (this.auth.gestionnaire()) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
+    if (this.auth.peut('MODELES_GERER')) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
   }
 
   basculerArchives(): void {

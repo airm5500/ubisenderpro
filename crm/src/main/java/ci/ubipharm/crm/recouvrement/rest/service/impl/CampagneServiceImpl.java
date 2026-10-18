@@ -52,7 +52,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class CampagneServiceImpl implements CampagneService {
 
     /** Profils qui valident les campagnes et peuvent intervenir sur celles des autres. */
-    private static final Set<String> GESTIONNAIRES = Set.of("ROLE_ADMIN", "ROLE_DIR_RECOUVREMENT");
+    private static final Set<String> GESTIONNAIRES = Set.of("DROIT_CAMPAGNES_VALIDER");
     private static final Set<String> NON_VALIDEES = Set.of("BROUILLON", "A_VALIDER");
     private static final int EXEMPLES = 3;
 

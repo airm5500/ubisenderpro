@@ -40,8 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class PortefeuilleServiceImpl implements PortefeuilleService {
 
     /** Profils qui voient toutes les relances de leur perimetre, et pas seulement un portefeuille. */
-    private static final Set<String> ROLES_DIRECTION = Set.of("ROLE_ADMIN", "ROLE_DIR_RECOUVREMENT", "ROLE_DIR_AGENCE", "ROLE_DG",
-            "ROLE_DIR_COMMERCIAL");
+    private static final Set<String> ROLES_DIRECTION = Set.of("DROIT_PERIMETRE_AGENCES");
 
     /** Factures ouvertes : les avoirs ne sont pas relances. */
     private static final String FACTURES_OUVERTES = "f.client_id = c.id and f.nature = 'FACTURE' and f.solde <> 0";

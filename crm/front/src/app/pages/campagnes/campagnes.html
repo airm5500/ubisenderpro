@@ -4,7 +4,7 @@
       <h1>Campagnes de relance</h1>
       <p class="sous-titre">Créer, programmer, valider, puis exécuter. Valider n'envoie rien avant la date prévue.</p>
     </div>
-    @if (auth.auteurCampagnes()) { <a class="ba" routerLink="/campagnes/nouvelle">Nouvelle campagne</a> }
+    @if (auth.peut('CAMPAGNES_PREPARER')) { <a class="ba" routerLink="/campagnes/nouvelle">Nouvelle campagne</a> }
   </div>
 
   <div role="tablist" aria-label="Statut" class="onglets">
@@ -54,7 +54,7 @@
 
     @if (choisie(); as c) {
       <aside class="panneau" aria-labelledby="detail-campagne">
-        <div class="surtitre">{{ c.statut === 'A_VALIDER' && auth.gestionnaire() ? 'En attente de votre validation' : L.statutCampagne[c.statut] }}</div>
+        <div class="surtitre">{{ c.statut === 'A_VALIDER' && auth.peut('CAMPAGNES_VALIDER') ? 'En attente de votre validation' : L.statutCampagne[c.statut] }}</div>
         <h2 id="detail-campagne">{{ c.nom }}</h2>
         <div class="ligne"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }} · {{ L.canal[c.canal] }}</strong></div>
         <div class="ligne"><span>Critères</span><strong style="text-align: right">{{ resume(c.criteres).join(' · ') || 'Toutes les factures du type' }}</strong></div>
@@ -80,7 +80,7 @@
         @if (c.motifRejet && c.statut === 'BROUILLON') { <div class="ligne"><span>Renvoyée</span><strong>{{ c.motifRejet }}</strong></div> }
         <a [routerLink]="['/campagnes', c.id]">{{ c.statut === 'A_VALIDER' || c.statut === 'BROUILLON' ? 'Contrôler les messages générés' : 'Ouvrir le suivi' }}</a>
 
-        @if (c.statut === 'A_VALIDER' && auth.gestionnaire()) {
+        @if (c.statut === 'A_VALIDER' && auth.peut('CAMPAGNES_VALIDER')) {
           @if (!rejetOuvert()) {
             <div class="actions">
               <button class="ba" type="button" (click)="valider(c)">Valider</button>

@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ModeleMessageRessource {
 
-    private static final String DIRECTION = "hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT')";
+    private static final String DIRECTION = "hasAuthority('DROIT_MODELES_GERER')";
 
     private final ModeleMessageService modeleMessageService;
 

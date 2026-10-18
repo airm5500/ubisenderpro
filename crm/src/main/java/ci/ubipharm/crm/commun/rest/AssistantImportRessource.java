@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 /** Etapes de l'assistant d'import, communes a tous les types (clients, factures...). */
 @RestController
 @RequestMapping("/api/imports")
-@PreAuthorize("hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE')")
+@PreAuthorize("hasAuthority('DROIT_IMPORTS')")
 @RequiredArgsConstructor
 public class AssistantImportRessource {
 

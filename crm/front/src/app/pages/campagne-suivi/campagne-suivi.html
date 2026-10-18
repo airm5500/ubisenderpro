@@ -12,16 +12,16 @@
         </p>
       </div>
       <div class="actions">
-        @if (c.statut === 'BROUILLON' && (estAuteur() || auth.gestionnaire())) {
+        @if (c.statut === 'BROUILLON' && (estAuteur() || auth.peut('CAMPAGNES_VALIDER'))) {
           <a class="bs" [routerLink]="['/campagnes', c.id, 'modifier']">Modifier</a>
           <button class="bp" (click)="soumettre()">Soumettre à validation</button>
         }
-        @if (c.statut === 'A_VALIDER' && auth.gestionnaire()) {
+        @if (c.statut === 'A_VALIDER' && auth.peut('CAMPAGNES_VALIDER')) {
           <button class="bs" (click)="action.set('rejet')">Renvoyer pour modification</button>
           <button class="ba" (click)="valider()">Valider</button>
         }
-        @if (c.statut === 'VALIDEE' && auth.gestionnaire()) { <button class="bp" (click)="lancer()">Lancer maintenant</button> }
-        @if ((['BROUILLON', 'A_VALIDER'].includes(c.statut) && (estAuteur() || auth.gestionnaire())) || (['VALIDEE', 'EN_COURS'].includes(c.statut) && auth.gestionnaire())) {
+        @if (c.statut === 'VALIDEE' && auth.peut('CAMPAGNES_VALIDER')) { <button class="bp" (click)="lancer()">Lancer maintenant</button> }
+        @if ((['BROUILLON', 'A_VALIDER'].includes(c.statut) && (estAuteur() || auth.peut('CAMPAGNES_VALIDER'))) || (['VALIDEE', 'EN_COURS'].includes(c.statut) && auth.peut('CAMPAGNES_VALIDER'))) {
           <button class="bd" (click)="action.set('annulation')">Annuler la campagne</button>
         }
       </div>

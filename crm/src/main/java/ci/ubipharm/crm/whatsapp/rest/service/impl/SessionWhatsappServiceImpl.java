@@ -33,7 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class SessionWhatsappServiceImpl implements SessionWhatsappService {
 
     /** Profils qui lient ou delient le telephone de n'importe quel agent. */
-    private static final Set<String> GESTIONNAIRES = Set.of("ROLE_ADMIN", "ROLE_DIR_RECOUVREMENT");
+    private static final Set<String> GESTIONNAIRES = Set.of("DROIT_NUMEROS_TOUS");
 
     private static final String SELECT = """
             select u.id as agentId, u.nom_complet as agentNom, u.numero_whatsapp as numero, coalesce(s.statut, 'DECONNECTE') as statut,
@@ -68,7 +68,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
                     + " and :direction = true))");
             parametres.put("moi", utilisateur.getId());
             parametres.put("agences", perimetre.getAgenceIds().isEmpty() ? List.of(0L) : perimetre.getAgenceIds());
-            parametres.put("direction", utilisateur.getAuthorities().stream().anyMatch(a -> "ROLE_DIR_AGENCE".equals(a.getAuthority())));
+            parametres.put("direction", utilisateur.getAuthorities().stream().anyMatch(a -> "DROIT_PERIMETRE_AGENCES".equals(a.getAuthority())));
         }
         Query requete = em.createNativeQuery(SELECT + where + " order by u.nom_complet", Tuple.class);
         parametres.forEach(requete::setParameter);

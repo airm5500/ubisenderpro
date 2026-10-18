@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AsyncPipe } from '@angular/common';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -18,7 +19,7 @@ type Fenetre = 'compte' | 'mot-de-passe' | 'desactivation' | null;
 
 @Component({
   selector: 'app-utilisateurs',
-  imports: [FormsModule, AsyncPipe, DialogModule, JourPipe, TelephonePipe],
+  imports: [FormsModule, RouterLink, AsyncPipe, DialogModule, JourPipe, TelephonePipe],
   templateUrl: './utilisateurs.html'
 })
 export class Utilisateurs implements OnInit {

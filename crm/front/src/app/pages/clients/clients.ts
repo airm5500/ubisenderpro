@@ -28,7 +28,7 @@ export class Clients implements OnInit {
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));
 
   ngOnInit(): void {
-    if (this.auth.pilotage()) this.agents = this.ref.agents();
+    if (this.auth.voitAgents()) this.agents = this.ref.agents();
     this.rechercher();
   }
 

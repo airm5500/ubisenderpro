@@ -6,6 +6,14 @@ export interface Erreur { statut: number; message: string; reference?: string; c
 export interface Utilisateur {
   id: number; login: string; nomComplet: string; roles: string[]; modules: string[];
   visionGlobale: boolean; agenceIds: number[]; motDePasseProvisoire: boolean;
+  /** Ecrans et actions permis par ses roles. */
+  droits: string[]; profil: string;
+}
+
+export interface Droit { code: string; libelle: string; description: string; groupe: string; module: string | null; moduleLibelle: string | null; }
+export interface RoleGestion {
+  id: number; code: string; libelle: string; description: string | null; visionGlobale: boolean; actif: boolean; systeme: boolean;
+  nbUtilisateurs: number; droits: string[]; modifiePar: string | null; modifieLe: string | null;
 }
 
 export interface Habilitation { roleCode: string; roleLibelle?: string; moduleCode: string | null; moduleLibelle?: string; }

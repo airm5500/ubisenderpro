@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/sms/fournisseurs")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('DROIT_FOURNISSEURS_SMS')")
 @RequiredArgsConstructor
 public class FournisseurSmsRessource {
 

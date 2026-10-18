@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/parametres")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('DROIT_PARAMETRES')")
 @RequiredArgsConstructor
 public class ParametreRessource {
 

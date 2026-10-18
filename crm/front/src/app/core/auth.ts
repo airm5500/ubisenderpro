@@ -14,34 +14,28 @@ export class Auth {
   private verifie = false;
 
   readonly roles = computed(() => this.utilisateur()?.roles ?? []);
-  /** ADMIN et Direction du Recouvrement : validation des campagnes, modeles, interims, numeros. */
-  readonly gestionnaire = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT'));
-  /** Profils de direction (imports, affectations) ; une Direction d'agence est limitee a ses agences. */
-  readonly direction = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE'));
-  /** Consultation des agents et portefeuilles. */
-  readonly pilotage = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'DG', 'DIR_COMMERCIAL'));
-  readonly admin = computed(() => this.aUnRole('ADMIN'));
-  readonly agent = computed(() => this.aUnRole('AGENT'));
-  readonly auteurCampagnes = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'AGENT'));
+  /** Ecrans et actions coches sur ses roles (ecran Roles et droits) ; le serveur applique les memes. */
+  readonly droits = computed(() => new Set(this.utilisateur()?.droits ?? []));
+  /** Liste des agents (filtres, portefeuilles) : directions et consultation. */
+  readonly voitAgents = computed(() => this.peut('PORTEFEUILLES', 'PERIMETRE_AGENCES'));
+  /** Sans droit sur son agence, l'utilisateur ne voit que son portefeuille (agent). */
+  readonly portefeuillePersonnel = computed(() => !this.peut('PERIMETRE_AGENCES'));
 
   readonly modules = computed(() => this.utilisateur()?.modules ?? []);
   readonly recouvrement = computed(() => this.modules().includes('RECOUVREMENT'));
   readonly marketing = computed(() => this.modules().includes('MARKETING'));
 
-  aUnRole(...roles: string[]): boolean {
-    return this.roles().some(r => roles.includes(r));
+  /** Vrai si l'un des droits est coche sur ses roles. */
+  peut(...codes: string[]): boolean {
+    const droits = this.droits();
+    return codes.some(c => droits.has(c));
   }
 
   /** Libelle du profil affiche en bas du menu. */
   readonly libelleProfil = computed(() => {
     const u = this.utilisateur();
     if (!u) return '';
-    const libelles: Record<string, string> = {
-      ADMIN: 'Administrateur', DIR_RECOUVREMENT: 'Direction du Recouvrement', DIR_AGENCE: "Direction d'agence",
-      AGENT: 'Agent de recouvrement', DG: 'Directeur Général', DIR_COMMERCIAL: 'Directeur Commercial'
-    };
-    const profil = u.roles.map(r => libelles[r] ?? r).join(', ');
-    return u.visionGlobale ? `${profil} · toutes agences` : profil;
+    return u.visionGlobale ? `${u.profil} · toutes agences` : u.profil;
   });
 
   /** Au demarrage : recupere le jeton CSRF puis la session en cours, si elle existe. */
@@ -84,7 +78,12 @@ export class Auth {
   accueil(): string {
     if (this.utilisateur()?.motDePasseProvisoire) return '/mot-de-passe';
     if (!this.recouvrement()) return '/marketing';
-    return this.agent() && !this.direction() ? '/ma-journee' : '/factures';
+    // Premier ecran permis, dans l'ordre du menu
+    const ecrans: [string, string][] = [['MA_JOURNEE', '/ma-journee'], ['FACTURES', '/factures'], ['CLIENTS', '/clients'],
+      ['PORTEFEUILLES', '/portefeuilles'], ['CAMPAGNES', '/campagnes'], ['MODELES', '/modeles'], ['REPONSES', '/reponses'],
+      ['NUMEROS', '/numeros'], ['NUMEROS_TOUS', '/numeros'], ['UTILISATEURS', '/utilisateurs'], ['ROLES', '/roles'],
+      ['PARAMETRES', '/parametres'], ['FOURNISSEURS_SMS', '/fournisseurs-sms']];
+    return ecrans.find(([droit]) => this.peut(droit))?.[1] ?? '/mot-de-passe';
   }
 
   private jetonCsrf(): Observable<unknown> {

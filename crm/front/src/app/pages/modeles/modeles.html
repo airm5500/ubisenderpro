@@ -4,7 +4,7 @@
       <h1>Modèles de messages</h1>
       <p class="sous-titre">Les variables s'écrivent entre accolades, par exemple {{ '{' }}nom_pharmacie{{ '}' }}, et sont remplacées pour chaque facture à l'envoi.</p>
     </div>
-    @if (auth.gestionnaire()) {
+    @if (auth.peut('MODELES_GERER')) {
       <div class="actions">
         @if (vue() === 'modeles') { <button class="ba" (click)="nouveau()">Nouveau modèle</button> }
         @else { <button class="ba" (click)="ouvrirVariable('nouvelle')">Nouvelle variable</button> }
@@ -12,7 +12,7 @@
     }
   </div>
 
-  @if (auth.gestionnaire()) {
+  @if (auth.peut('MODELES_GERER')) {
     <div role="tablist" class="onglets">
       <button class="tab" [class.tabon]="vue() === 'modeles'" role="tab" (click)="vue.set('modeles')">Modèles</button>
       <button class="tab" [class.tabon]="vue() === 'variables'" role="tab" (click)="vue.set('variables')">Variables<span class="cnt">{{ variables().length }}</span></button>
@@ -68,7 +68,7 @@
         } @else if (choisi(); as m) {
           <div class="entete">
             <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
-            @if (auth.gestionnaire() && m.statut === 'ACTIF') {
+            @if (auth.peut('MODELES_GERER') && m.statut === 'ACTIF') {
               <div class="actions"><button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button></div>
             }
           </div>

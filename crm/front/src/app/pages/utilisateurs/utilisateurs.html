@@ -107,7 +107,8 @@
       </div>
     }
     <div><button class="bs petit" type="button" (click)="ajouterRole()"><i class="pi pi-plus"></i> Ajouter un rôle sur un autre module</button></div>
-    <p class="discret">Un agent du Recouvrement peut avoir un rôle différent en Marketing. « Tous les modules » est réservé à la direction générale et à l'administrateur.</p>
+    <p class="discret">Un agent du Recouvrement peut avoir un rôle différent en Marketing. « Tous les modules » est réservé à la direction générale et à l'administrateur.
+      Les écrans ouverts par chaque rôle se cochent dans @if (auth.peut('ROLES')) { <a routerLink="/roles" (click)="fenetre.set(null)">Rôles et droits</a> } @else { Rôles et droits }.</p>
 
     <div class="sous-sec">Agences</div>
     @if (visionGlobale()) {

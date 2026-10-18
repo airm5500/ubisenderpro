@@ -86,6 +86,8 @@ public class AuthServiceImpl implements AuthService {
                 .nomComplet(principal.getNomComplet())
                 .roles(sansPrefixe(droits, UtilisateurDetailsServiceImpl.PREFIXE_ROLE))
                 .modules(sansPrefixe(droits, UtilisateurDetailsServiceImpl.PREFIXE_MODULE))
+                .droits(sansPrefixe(droits, UtilisateurDetailsServiceImpl.PREFIXE_DROIT))
+                .profil(profil(principal.getId()))
                 .visionGlobale(perimetre.isVisionGlobale())
                 .agenceIds(perimetre.getAgenceIds())
                 .motDePasseProvisoire(motDePasseProvisoire(principal.getId()))
@@ -101,6 +103,15 @@ public class AuthServiceImpl implements AuthService {
         Object valeur = em.createNativeQuery("select mot_de_passe_provisoire from crm_utilisateur where id = :id")
                 .setParameter("id", utilisateurId).getSingleResult();
         return valeur instanceof Boolean b ? b : valeur instanceof Number n && n.intValue() != 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String profil(Long utilisateurId) {
+        List<String> libelles = em.createNativeQuery("""
+                select distinct r.libelle from crm_habilitation h join crm_role r on r.id = h.role_id and r.actif = true
+                where h.utilisateur_id = :id and h.actif = true order by r.libelle
+                """).setParameter("id", utilisateurId).getResultList();
+        return String.join(", ", libelles);
     }
 
     private List<String> sansPrefixe(List<String> droits, String prefixe) {

@@ -32,13 +32,13 @@ public class DelegationRessource {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT')")
+    @PreAuthorize("hasAuthority('DROIT_INTERIMS')")
     public DelegationDTO creer(@Valid @RequestBody DelegationDemandeDTO demande) {
         return delegationService.creer(demande);
     }
 
     @PostMapping("/{id}/annulation")
-    @PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT')")
+    @PreAuthorize("hasAuthority('DROIT_INTERIMS')")
     public DelegationDTO annuler(@PathVariable Long id) {
         return delegationService.annuler(id);
     }

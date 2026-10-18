@@ -22,6 +22,7 @@ public class UtilisateurDetailsServiceImpl implements UserDetailsService {
 
     static final String PREFIXE_ROLE = "ROLE_";
     static final String PREFIXE_MODULE = "MODULE_";
+    static final String PREFIXE_DROIT = "DROIT_";
 
     private final EntityManager em;
 
@@ -63,6 +64,19 @@ public class UtilisateurDetailsServiceImpl implements UserDetailsService {
                 tousLesModules().forEach(m -> droits.add(PREFIXE_MODULE + m));
             }
         }
+        // Un droit d'un module ne vient que d'une habilitation sur ce module (ou sur tous les modules)
+        @SuppressWarnings("unchecked")
+        List<String> codesDroits = em.createNativeQuery("""
+                select distinct d.code
+                from crm_habilitation h
+                join crm_role r on r.id = h.role_id and r.actif = true
+                join crm_role_droit rd on rd.role_id = r.id and rd.actif = true
+                join crm_droit d on d.id = rd.droit_id
+                where h.utilisateur_id = :id and h.actif = true
+                  and (d.module_id is null or h.module_id is null or d.module_id = h.module_id)
+                order by d.code
+                """).setParameter("id", utilisateurId).getResultList();
+        codesDroits.forEach(d -> droits.add(PREFIXE_DROIT + d));
         List<SimpleGrantedAuthority> autorites = new ArrayList<>();
         droits.forEach(d -> autorites.add(new SimpleGrantedAuthority(d)));
         return autorites;

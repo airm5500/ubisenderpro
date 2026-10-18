@@ -4,7 +4,7 @@
       <h1>Réponses des clients</h1>
       <p class="sous-titre">Copie des messages reçus sur les WhatsApp professionnels des agents. On répond depuis son téléphone, comme d'habitude.</p>
     </div>
-    @if (auth.pilotage()) {
+    @if (auth.voitAgents()) {
       <label class="f" style="min-width: 240px">Agent
         <select class="sel" [(ngModel)]="agentId" (ngModelChange)="filtrer()">
           <option [ngValue]="null">Tous</option>

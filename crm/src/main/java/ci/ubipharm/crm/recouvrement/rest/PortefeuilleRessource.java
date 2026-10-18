@@ -34,13 +34,13 @@ public class PortefeuilleRessource {
     }
 
     @GetMapping("/agents")
-    @PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'DG', 'DIR_COMMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('DROIT_PORTEFEUILLES', 'DROIT_PERIMETRE_AGENCES')")
     public List<AgentDTO> agents(@RequestParam(required = false) Long agenceId) {
         return portefeuilleService.agents(agenceId);
     }
 
     @PutMapping("/agents/{agentId}/numero")
-    @PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT')")
+    @PreAuthorize("hasAuthority('DROIT_NUMEROS_TOUS')")
     public AgentDTO enregistrerNumero(@PathVariable Long agentId, @Valid @RequestBody NumeroAgentDTO numero) {
         return portefeuilleService.enregistrerNumero(agentId, numero);
     }

@@ -234,3 +234,14 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .param .unite { font-size: 13px; color: var(--texte-2); }
 .param input[type=color] { width: 44px; height: 40px; padding: 2px; border: 1px solid var(--filet); border-radius: 8px; background: #fff; }
 @media (max-width: 800px) { .param { grid-template-columns: 1fr; } }
+
+/* Roles et droits */
+.droits-groupe { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--filet); }
+.droits-groupe:last-child { border-bottom: 0; }
+.droits-groupe > .case { font-weight: 700; color: var(--bleu); }
+.droits-liste { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; padding-left: 26px; }
+.droit { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: #1F2D38; cursor: pointer; }
+.droit input { flex: none; width: 16px; height: 16px; margin: 2px 0 0; }
+.droit .discret { display: block; margin-top: 1px; }
+.droit.verrou { cursor: default; opacity: .75; }
+@media (max-width: 800px) { .droits-liste { grid-template-columns: 1fr; } }

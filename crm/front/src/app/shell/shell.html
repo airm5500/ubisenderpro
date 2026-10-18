@@ -18,40 +18,40 @@
 
     @if (auth.recouvrement() && !surMarketing()) {
 
-    @if (auth.agent() && !auth.direction()) {
+    @if (auth.peut('MA_JOURNEE')) {
       <div class="gl">Mon activité</div>
       <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a>
     }
-    <div class="gl">Créances</div>
-    <a class="nv" routerLink="/factures" routerLinkActive="on">Factures</a>
-    <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a>
-    @if (auth.direction()) {
-      <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a>
+    @if (auth.peut('FACTURES', 'CLIENTS', 'IMPORTS', 'PORTEFEUILLES')) {
+      <div class="gl">Créances</div>
+      @if (auth.peut('FACTURES')) { <a class="nv" routerLink="/factures" routerLinkActive="on">Factures</a> }
+      @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">{{ auth.portefeuillePersonnel() ? 'Mes clients' : 'Clients' }}</a> }
+      @if (auth.peut('IMPORTS')) { <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a> }
+      @if (auth.peut('PORTEFEUILLES')) { <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a> }
     }
-    @if (auth.pilotage()) {
-      <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a>
+    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER')) {
+      <div class="gl">Relances</div>
+      @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a> }
+      @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a> }
     }
-    <div class="gl">Relances</div>
-    <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a>
-    <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a>
-    <div class="gl">Échanges</div>
-    <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a>
-    <div class="gl">{{ auth.gestionnaire() ? 'Administration' : 'WhatsApp' }}</div>
-    <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
-    @if (auth.admin()) {
-      <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a>
-      <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a>
-      <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
+    @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS')) {
+      <div class="gl">Échanges</div>
+      @if (auth.peut('REPONSES')) { <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a> }
+      @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
+        <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+      }
     }
     } @else {
       <div class="gl">Marketing</div>
       <a class="nv" routerLink="/marketing" routerLinkActive="on">Accueil</a>
-      @if (auth.admin()) {
-        <div class="gl">Administration</div>
-        <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a>
-      <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a>
-        <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
-      }
+    }
+    <!-- Administration : la meme dans les deux modules -->
+    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'FOURNISSEURS_SMS')) {
+      <div class="gl">Administration</div>
+      @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a> }
+      @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on">Rôles et droits</a> }
+      @if (auth.peut('PARAMETRES')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
+      @if (auth.peut('FOURNISSEURS_SMS')) { <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a> }
     }
     }
 

@@ -10,12 +10,12 @@ export const connecte: CanActivateFn = async () => {
   return (await auth.verifier()) ? true : router.createUrlTree(['/connexion']);
 };
 
-/** Ecran reserve a certains roles ; les autres sont renvoyes vers leur accueil. */
-export const roles = (...autorises: string[]): CanActivateFn => async () => {
+/** Ecran ouvert a qui a l'un de ces droits ; les autres sont renvoyes vers leur accueil. */
+export const droit = (...codes: string[]): CanActivateFn => async () => {
   const auth = inject(Auth);
   const router = inject(Router);
   await auth.verifier();
-  return auth.aUnRole(...autorises) ? true : router.createUrlTree([auth.accueil()]);
+  return auth.peut(...codes) ? true : router.createUrlTree([auth.accueil()]);
 };
 
 export const accueil: CanActivateFn = async () => {
@@ -30,7 +30,7 @@ export const moduleRecouvrement: CanActivateFn = async (_route, etat) => {
   const auth = inject(Auth);
   const router = inject(Router);
   await auth.verifier();
-  const libre = ['/marketing', '/mot-de-passe', '/utilisateurs', '/fournisseurs-sms', '/parametres'].some(u => etat.url.startsWith(u));
+  const libre = ['/marketing', '/mot-de-passe', '/utilisateurs', '/roles', '/fournisseurs-sms', '/parametres'].some(u => etat.url.startsWith(u));
   return auth.recouvrement() || libre ? true : router.createUrlTree(['/marketing']);
 };
 

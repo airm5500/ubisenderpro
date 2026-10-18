@@ -91,7 +91,7 @@ export class Campagnes implements OnInit {
     forkJoin(requetes).subscribe(r => {
       const c = Object.fromEntries(Object.entries(r).map(([k, p]) => [k, p.total]));
       this.compteurs.set(c);
-      if (choisirOnglet) this.onglet.set(this.auth.gestionnaire() && c['A_VALIDER'] > 0 ? 'A_VALIDER' : '');
+      if (choisirOnglet) this.onglet.set(this.auth.peut('CAMPAGNES_VALIDER') && c['A_VALIDER'] > 0 ? 'A_VALIDER' : '');
       this.charger();
     });
   }

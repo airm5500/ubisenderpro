@@ -20,6 +20,10 @@ public class UtilisateurConnecteDTO {
     private String nomComplet;
     private List<String> roles;
     private List<String> modules;
+    /** Ecrans et actions permis, coches sur ses roles dans l'ecran Roles et droits. */
+    private List<String> droits;
+    /** Libelles de ses roles, pour le bas du menu. */
+    private String profil;
     private boolean visionGlobale;
     private List<Long> agenceIds;
     /** Vrai tant que l'utilisateur n'a pas remplace le mot de passe donne par l'administrateur. */

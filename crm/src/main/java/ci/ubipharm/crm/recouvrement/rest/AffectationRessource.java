@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/recouvrement")
-@PreAuthorize("hasAuthority('MODULE_RECOUVREMENT') and hasAnyRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE')")
+@PreAuthorize("hasAuthority('DROIT_PORTEFEUILLES_AFFECTER')")
 @RequiredArgsConstructor
 public class AffectationRessource {
 

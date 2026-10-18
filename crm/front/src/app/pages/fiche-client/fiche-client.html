@@ -6,16 +6,16 @@
         <h1>{{ c.raisonSociale }}</h1>
         <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.segmentationLibelle ? ' · segment ' + c.segmentationLibelle : '' }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
       </div>
-      @if (auth.auteurCampagnes() && ouvertes().length) {
+      @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length) {
         <div class="actions"><a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a></div>
       }
     </div>
 
     <div class="kvs bandeau">
       <div class="kv"><span>Agence</span><strong>{{ c.agenceLibelle }}{{ c.sousAgence ? ' · ' + c.sousAgence : '' }}</strong></div>
-      @if (auth.direction()) {
+      @if (auth.peut('PORTEFEUILLES_AFFECTER')) {
         <div class="kv"><span>Agent responsable</span><strong>{{ agentEnCours()?.agentNom ?? 'Sans agent' }}</strong>
-          @if (auth.direction()) { <a routerLink="/portefeuilles" [queryParams]="{ q: c.code }">Réaffecter</a> }</div>
+          @if (auth.peut('PORTEFEUILLES_AFFECTER')) { <a routerLink="/portefeuilles" [queryParams]="{ q: c.code }">Réaffecter</a> }</div>
       }
       <div class="kv"><span>WhatsApp principal</span><strong>{{ (c.numeroPrincipal | telephone) || 'Non renseigné' }}</strong></div>
       <div class="kv"><span>Second numéro</span><strong>{{ (c.numeroSecondaire | telephone) || '—' }}</strong></div>

@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 /** Comptes et habilitations : reserves a l'administrateur. */
 @RestController
 @RequestMapping("/api/utilisateurs")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('DROIT_UTILISATEURS')")
 @RequiredArgsConstructor
 public class UtilisateurRessource {
 

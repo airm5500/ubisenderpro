@@ -1,10 +1,10 @@
 <div class="page">
   <div class="entete">
     <div>
-      <h1>{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</h1>
+      <h1>{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</h1>
       <p class="sous-titre">Chaque agent relance depuis son numéro professionnel, relié par WhatsApp Web. Le téléphone doit rester allumé et connecté à internet.</p>
     </div>
-    @if (auth.gestionnaire()) { <a class="bs" routerLink="/portefeuilles">Changer le numéro d'un agent</a> }
+    @if (auth.peut('NUMEROS_TOUS')) { <a class="bs" routerLink="/portefeuilles">Changer le numéro d'un agent</a> }
   </div>
 
   <div class="avert"><i class="pi pi-info-circle"></i>
@@ -34,7 +34,7 @@
             @if (!sessions()) { Chargement… }
             @else {
               Aucun agent n'a encore de numéro WhatsApp. Créez le compte de l'agent avec le rôle Agent du Recouvrement et son numéro professionnel
-              @if (auth.admin()) { dans <a routerLink="/utilisateurs">Utilisateurs et habilitations</a> } @else { (administrateur) },
+              @if (auth.peut('UTILISATEURS')) { dans <a routerLink="/utilisateurs">Utilisateurs et habilitations</a> } @else { (administrateur) },
               puis revenez ici pour scanner le QR.
             }
           </td></tr>
