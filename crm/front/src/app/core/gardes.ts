@@ -30,5 +30,14 @@ export const moduleRecouvrement: CanActivateFn = async (_route, etat) => {
   const auth = inject(Auth);
   const router = inject(Router);
   await auth.verifier();
-  return auth.recouvrement() || etat.url.startsWith('/marketing') ? true : router.createUrlTree(['/marketing']);
+  const libre = ['/marketing', '/mot-de-passe', '/utilisateurs'].some(u => etat.url.startsWith(u));
+  return auth.recouvrement() || libre ? true : router.createUrlTree(['/marketing']);
+};
+
+/** Mot de passe provisoire (compte cree ou reinitialise par l'administrateur) : a remplacer avant tout autre ecran. */
+export const motDePasseAJour: CanActivateFn = async (_route, etat) => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  await auth.verifier();
+  return !auth.utilisateur()?.motDePasseProvisoire || etat.url.startsWith('/mot-de-passe') ? true : router.createUrlTree(['/mot-de-passe']);
 };

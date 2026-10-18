@@ -113,7 +113,7 @@ class WhatsappIT extends IntegrationBase {
         mvc.perform(post("/api/whatsapp/sessions/" + agent2 + "/connexion").session(agent).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(post("/api/whatsapp/sessions/" + agent2 + "/connexion").session(admin).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Enregistrez d'abord le numero WhatsApp professionnel de l'agent."));
+                .andExpect(jsonPath("$.message").value("Enregistrez d'abord le numéro WhatsApp professionnel de l'agent."));
         mvc.perform(get("/api/whatsapp/sessions").session(agent)).andExpect(jsonPath("$[0].statut").value("QR"));
     }
 

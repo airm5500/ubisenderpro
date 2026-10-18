@@ -17,6 +17,6 @@ import lombok.Setter;
 public class MotifDTO {
 
     @NotBlank(message = "Saisissez le motif.")
-    @Size(max = 500, message = "Le motif ne peut pas depasser 500 caracteres.")
+    @Size(max = 500, message = "Le motif ne peut pas dépasser 500 caractères.")
     private String motif;
 }

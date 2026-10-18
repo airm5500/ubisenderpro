@@ -21,13 +21,13 @@ import lombok.Setter;
 public class CampagneDemandeDTO {
 
     @NotBlank(message = "Saisissez le nom de la campagne.")
-    @Size(max = 150, message = "Le nom ne peut pas depasser 150 caracteres.")
+    @Size(max = 150, message = "Le nom ne peut pas dépasser 150 caractères.")
     private String nom;
 
     @NotBlank(message = "Choisissez le type de relance.")
     private String typeCampagne;
 
-    @NotNull(message = "Choisissez le modele de message.")
+    @NotNull(message = "Choisissez le modèle de message.")
     private Long modeleId;
 
     @Valid

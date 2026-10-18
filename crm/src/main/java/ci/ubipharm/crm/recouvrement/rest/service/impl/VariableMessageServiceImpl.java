@@ -35,10 +35,10 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.agence", "Agence du client");
         SOURCES_CALCULEES.put("calcul.segment", "Segment du client");
         SOURCES_CALCULEES.put("calcul.sous_type", "Sous-type de compte de la facture");
-        SOURCES_CALCULEES.put("calcul.jours_retard", "Jours de retard a la date d'execution");
-        SOURCES_CALCULEES.put("calcul.jours_avant_echeance", "Jours avant l'echeance a la date d'execution");
+        SOURCES_CALCULEES.put("calcul.jours_retard", "Jours de retard à la date d'exécution");
+        SOURCES_CALCULEES.put("calcul.jours_avant_echeance", "Jours avant l'échéance à la date d'exécution");
         SOURCES_CALCULEES.put("calcul.agent_nom", "Nom de l'agent du client");
-        SOURCES_CALCULEES.put("calcul.agent_numero", "Numero WhatsApp de l'agent du client");
+        SOURCES_CALCULEES.put("calcul.agent_numero", "Numéro WhatsApp de l'agent du client");
     }
 
     /** Colonnes techniques jamais proposees. */
@@ -77,7 +77,7 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         verifierSource(demande.getSource());
         if (((Number) em.createNativeQuery("select count(*) from crm_variable_message where code = :code")
                 .setParameter("code", demande.getCode()).getSingleResult()).longValue() > 0) {
-            throw new ErreurMetierException("La variable {" + demande.getCode() + "} existe deja.");
+            throw new ErreurMetierException("La variable {" + demande.getCode() + "} existe déjà.");
         }
         em.createNativeQuery("""
                 insert into crm_variable_message (code, libelle, source, exemple, created_at)
@@ -100,7 +100,7 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         verifierSource(demande.getSource());
         if (!existante.getCode().equals(demande.getCode())) {
             // Les modeles citent la variable par son code : le renommer casserait leur texte
-            throw new ErreurMetierException("Le code d'une variable ne change pas ; creez une nouvelle variable.");
+            throw new ErreurMetierException("Le code d'une variable ne change pas ; créez une nouvelle variable.");
         }
         em.createNativeQuery("""
                 update crm_variable_message set libelle = :libelle, source = :source, exemple = :exemple, updated_at = utc_timestamp()

@@ -17,7 +17,9 @@ import org.springframework.security.web.context.SecurityContextRepository;
 
 import ci.ubipharm.crm.securite.rest.service.JournalConnexionService;
 import ci.ubipharm.crm.securite.rest.service.PerimetreService;
+import ci.ubipharm.crm.securite.rest.service.UtilisateurService;
 import ci.ubipharm.crm.securite.rest.service.dto.ConnexionDTO;
+import jakarta.persistence.EntityManager;
 
 class AuthServiceImplTest {
 
@@ -25,7 +27,7 @@ class AuthServiceImplTest {
     private final SecurityContextRepository contextRepository = mock(SecurityContextRepository.class);
     private final JournalConnexionService journal = mock(JournalConnexionService.class);
     private final AuthServiceImpl service = new AuthServiceImpl(authenticationManager, contextRepository, journal,
-            mock(PerimetreService.class));
+            mock(PerimetreService.class), mock(UtilisateurService.class), mock(EntityManager.class));
 
     @Test
     void unCompteDesactiveRecoitLeMemeMessageQuUnMauvaisMotDePasse() {
@@ -35,7 +37,7 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service.connecter(new ConnexionDTO("agent1", "x"), requete, new MockHttpServletResponse()))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Echec de connexion");
+                .hasMessage("Échec de connexion");
         verify(journal).enregistrerEchec("agent1", "10.0.0.5", null);
         verify(contextRepository, never()).saveContext(any(), any(), any());
     }

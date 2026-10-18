@@ -66,10 +66,10 @@ public class ImportFactureServiceImpl implements ImportFactureService {
 
     /** Champs proposes par l'assistant, dans l'ordre de l'exemplaire. */
     static final List<ChampImportDTO> CHAMPS = List.of(
-            champ("Reference facture", true, "FA-2026-000123", REFERENCE),
-            champ("Numero de compte client", true, "5125", CODE_CLIENT),
+            champ("Référence facture", true, "FA-2026-000123", REFERENCE),
+            champ("Numéro de compte client", true, "5125", CODE_CLIENT),
             champ("Date facture", true, "01/09/2026", DATE_FACTURE),
-            champ("Date d'echeance", true, "30/09/2026", DATE_ECHEANCE),
+            champ("Date d'échéance", true, "30/09/2026", DATE_ECHEANCE),
             champ("Montant", true, "150000", MONTANT),
             champ("Solde", true, "100000", SOLDE),
             champ("Sous-type", false, "Normal", SOUS_TYPE),
@@ -171,12 +171,12 @@ public class ImportFactureServiceImpl implements ImportFactureService {
     Evaluation evaluer(int numeroLigne, Map<String, String> valeurs, Contexte contexte) {
         String reference = valeur(valeurs, REFERENCE);
         if (reference == null) {
-            return rejet(null, "Reference de facture manquante.");
+            return rejet(null, "Référence de facture manquante.");
         }
         String cle = reference.toUpperCase(Locale.ROOT);
         Integer premiereLigne = contexte.lignesVues().putIfAbsent(cle, numeroLigne);
         if (premiereLigne != null && premiereLigne != numeroLigne) {
-            return rejet(reference, "Reference deja presente ligne " + premiereLigne + " du fichier.");
+            return rejet(reference, "Référence déjà présente ligne " + premiereLigne + " du fichier.");
         }
 
         List<String> motifs = new ArrayList<>();
@@ -187,21 +187,21 @@ public class ImportFactureServiceImpl implements ImportFactureService {
         } else if (client == null) {
             motifs.add("Client inconnu : " + codeClient + ". Importez d'abord le client.");
         } else if (!contexte.dansPerimetre(client.agenceId())) {
-            motifs.add("Le client " + codeClient + " est hors de votre perimetre.");
+            motifs.add("Le client " + codeClient + " est hors de votre périmètre.");
         } else if ("ARCHIVE".equals(client.statut())) {
-            motifs.add("Le client " + codeClient + " est archive.");
+            motifs.add("Le client " + codeClient + " est archivé.");
         }
 
         LocalDate dateFacture = date(valeurs, DATE_FACTURE, "Date de facture", motifs);
-        LocalDate dateEcheance = date(valeurs, DATE_ECHEANCE, "Date d'echeance", motifs);
+        LocalDate dateEcheance = date(valeurs, DATE_ECHEANCE, "Date d'échéance", motifs);
         if (dateFacture != null && dateEcheance != null && dateEcheance.isBefore(dateFacture)) {
-            motifs.add("L'echeance (" + dateEcheance.format(DATE_LISIBLE) + ") precede la date de facture ("
+            motifs.add("L'échéance (" + dateEcheance.format(DATE_LISIBLE) + ") précède la date de facture ("
                     + dateFacture.format(DATE_LISIBLE) + ").");
         }
         BigDecimal montant = montant(valeurs, MONTANT, "Montant", motifs);
         BigDecimal solde = montant(valeurs, SOLDE, "Solde", motifs);
         if (montant != null && solde != null && solde.abs().compareTo(montant.abs()) > 0) {
-            motifs.add("Le solde (" + montantLisible(solde) + ") depasse le montant (" + montantLisible(montant) + ").");
+            motifs.add("Le solde (" + montantLisible(solde) + ") dépasse le montant (" + montantLisible(montant) + ").");
         }
 
         String sousTypeSaisi = valeur(valeurs, SOUS_TYPE);
@@ -212,7 +212,7 @@ public class ImportFactureServiceImpl implements ImportFactureService {
 
         FactureExistante existante = contexte.existantes().get(cle);
         if (existante != null && client != null && !existante.clientId().equals(client.id())) {
-            motifs.add("Cette reference appartient deja au client " + existante.clientCode() + ".");
+            motifs.add("Cette référence appartient déjà au client " + existante.clientCode() + ".");
         }
         if (!motifs.isEmpty()) {
             return rejet(reference, String.join(" ", motifs));

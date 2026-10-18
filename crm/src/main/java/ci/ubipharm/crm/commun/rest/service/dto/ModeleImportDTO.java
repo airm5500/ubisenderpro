@@ -23,8 +23,8 @@ public class ModeleImportDTO {
     private Long id;
     private String type;
 
-    @NotBlank(message = "Le nom du modele est obligatoire.")
-    @Size(max = 100, message = "Le nom ne peut pas depasser 100 caracteres.")
+    @NotBlank(message = "Le nom du modèle est obligatoire.")
+    @Size(max = 100, message = "Le nom ne peut pas dépasser 100 caractères.")
     private String nom;
 
     @NotEmpty(message = "La correspondance est vide.")

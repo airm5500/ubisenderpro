@@ -38,7 +38,7 @@ public class GestionnaireErreurs {
 
     @ExceptionHandler({RessourceIntrouvableException.class, NoResourceFoundException.class})
     public ResponseEntity<ErreurDTO> introuvable(Exception e) {
-        return reponse(HttpStatus.NOT_FOUND, "Element introuvable.", null);
+        return reponse(HttpStatus.NOT_FOUND, "Élément introuvable.", null);
     }
 
     @ExceptionHandler(BindException.class)
@@ -57,7 +57,7 @@ public class GestionnaireErreurs {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErreurDTO> requeteIllisible(HttpMessageNotReadableException e) {
-        return reponse(HttpStatus.BAD_REQUEST, "La requete est illisible.", null);
+        return reponse(HttpStatus.BAD_REQUEST, "La requête est illisible.", null);
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
@@ -67,7 +67,7 @@ public class GestionnaireErreurs {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErreurDTO> fichierTropGros(MaxUploadSizeExceededException e) {
-        return reponse(HttpStatus.BAD_REQUEST, "Le fichier depasse 10 Mo : decoupez-le en plusieurs imports.", null);
+        return reponse(HttpStatus.BAD_REQUEST, "Le fichier dépasse 10 Mo : découpez-le en plusieurs imports.", null);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -86,7 +86,7 @@ public class GestionnaireErreurs {
         LOG.error("Erreur inattendue, reference {}", reference, e);
         ErreurDTO corps = ErreurDTO.builder()
                 .statut(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .message("Une erreur est survenue. Communiquez la reference " + reference + " a l'administrateur.")
+                .message("Une erreur est survenue. Communiquez la référence " + reference + " à l'administrateur.")
                 .reference(reference)
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(corps);

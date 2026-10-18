@@ -14,6 +14,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class NumeroAgentDTO {
 
-    @NotBlank(message = "Saisissez le numero WhatsApp professionnel.")
+    @NotBlank(message = "Saisissez le numéro WhatsApp professionnel.")
     private String numeroWhatsapp;
 }

@@ -194,3 +194,14 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .liste-reponses { display: flex; flex-direction: column; }
 .reponse { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--filet-2); align-items: start; }
 @media (max-width: 900px) { .reponse { grid-template-columns: minmax(0, 1fr); } }
+
+/* Regles de mot de passe */
+.regles { list-style: none; margin: -4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--texte-2); }
+.regles li { display: flex; gap: 8px; align-items: center; }
+.regles li.ok { color: #157A47; }
+
+/* Habilitations */
+.hab { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; align-items: center; }
+.mdp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: var(--bleu); background: #EAF0F4; border-radius: 10px; padding: 14px 16px; text-align: center; user-select: all; }
+.etat-compte { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.sous-sec { margin-top: 6px; font-size: 13px; font-weight: 800; color: var(--bleu); text-transform: uppercase; letter-spacing: .4px; }

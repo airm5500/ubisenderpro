@@ -63,7 +63,7 @@ class AssistantImportIT extends IntegrationBase {
         String csv = "Col A;Col B;Col C;Col D\n9101;PHARMACIE A;Yopougon;0700000011\n";
         mvc.perform(multipart("/api/imports/clients").file(fichier("f.csv", csv)).session(session).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("Champs obligatoires sans colonne : Numero de compte, Nom de la pharmacie, Agence")));
+                .andExpect(jsonPath("$.message", containsString("Champs obligatoires sans colonne : Numéro de compte, Nom de la pharmacie, Agence")));
 
         String parametres = """
                 {"correspondance":{"code_client":"col_a","raison_sociale":"col_b","agence":"col_c","numero_whatsapp":"col_d"}}""";
@@ -111,9 +111,9 @@ class AssistantImportIT extends IntegrationBase {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", containsString("rejets_import_" + id + ".csv")))
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(rejets).startsWith("﻿Ligne;Numero de compte;Nom de la pharmacie;Agence;")
+        assertThat(rejets).startsWith("﻿Ligne;Numéro de compte;Nom de la pharmacie;Agence;")
                 .contains("3;9002;DES ROSES;V;V1;S;KONE ALI;")
-                .contains("Numero WhatsApp invalide : 07 00 00 1");
+                .contains("Numéro WhatsApp invalide : 07 00 00 1");
 
         String lignes = mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "REJET").session(session))
                 .andReturn().getResponse().getContentAsString();
@@ -143,7 +143,7 @@ class AssistantImportIT extends IntegrationBase {
         String exemplaire = mvc.perform(get("/api/imports/clients/exemplaire").session(session))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(exemplaire).startsWith("﻿Numero de compte *;Nom de la pharmacie *;Agence *;Sous-agence;Segment;Nom du pharmacien;");
+        assertThat(exemplaire).startsWith("﻿Numéro de compte *;Nom de la pharmacie *;Agence *;Sous-agence;Segment;Nom du pharmacien;");
 
         mvc.perform(multipart("/api/imports/clients").file(new MockMultipartFile("fichier", "exemplaire.csv", "text/csv",
                         exemplaire.getBytes(StandardCharsets.UTF_8))).session(session).with(csrf()))

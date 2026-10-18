@@ -79,15 +79,15 @@ public class ImportClientServiceImpl implements ImportClientService {
     }
 
     private static final Map<String, String> LIBELLES_NUMEROS = Map.of(
-            "PRINCIPAL", "Numero WhatsApp", "TITULAIRE", "Numero du titulaire", "ASSISTANT", "Numero du pharmacien assistant",
-            "CHARGE_COMMANDE", "Numero du charge de commande", "COMPTABLE", "Numero du comptable", "SECONDAIRE", "Numero secondaire");
+            "PRINCIPAL", "Numéro WhatsApp", "TITULAIRE", "Numéro du titulaire", "ASSISTANT", "Numéro du pharmacien assistant",
+            "CHARGE_COMMANDE", "Numéro du chargé de commande", "COMPTABLE", "Numéro du comptable", "SECONDAIRE", "Numéro secondaire");
 
     /** Champs proposes par l'assistant, dans l'ordre de l'exemplaire. */
     static final List<ChampImportDTO> CHAMPS = champsImport();
 
     private static List<ChampImportDTO> champsImport() {
         List<ChampImportDTO> champs = new ArrayList<>(List.of(
-                champ("Numero de compte", true, "5125", CODE),
+                champ("Numéro de compte", true, "5125", CODE),
                 champ("Nom de la pharmacie", true, "PHARMACIE DU PLATEAU", RAISON_SOCIALE),
                 champ("Agence", true, "Y", AGENCE),
                 champ("Sous-agence", false, "Y2", SOUS_AGENCE),
@@ -203,7 +203,7 @@ public class ImportClientServiceImpl implements ImportClientService {
         String cle = code.toUpperCase(Locale.ROOT);
         Integer premiereLigne = contexte.lignesVues().putIfAbsent(cle, numeroLigne);
         if (premiereLigne != null && premiereLigne != numeroLigne) {
-            return rejet(code, "Code client deja present ligne " + premiereLigne + " du fichier.");
+            return rejet(code, "Code client déjà présent ligne " + premiereLigne + " du fichier.");
         }
 
         String raisonSociale = valeur(valeurs, RAISON_SOCIALE);
@@ -217,7 +217,7 @@ public class ImportClientServiceImpl implements ImportClientService {
         } else if (agence == null) {
             motifs.add("Agence inconnue : " + agenceSaisie + " (agences connues : " + contexte.listeAgences() + ").");
         } else if (!contexte.dansPerimetre(agence.id())) {
-            motifs.add("L'agence " + agence.libelle() + " est hors de votre perimetre.");
+            motifs.add("L'agence " + agence.libelle() + " est hors de votre périmètre.");
         }
         String segmentSaisi = valeur(valeurs, SEGMENTATION);
         String segment = segmentSaisi == null ? null : contexte.segments().get(normaliserLibelle(segmentSaisi));
@@ -238,9 +238,9 @@ public class ImportClientServiceImpl implements ImportClientService {
 
         ClientExistant existant = contexte.existants().get(cle);
         if (existant != null && !contexte.dansPerimetre(existant.agenceId())) {
-            motifs.add("Ce client existe deja dans une agence hors de votre perimetre.");
+            motifs.add("Ce client existe déjà dans une agence hors de votre périmètre.");
         } else if (existant != null && "ARCHIVE".equals(existant.statut())) {
-            motifs.add("Ce client est archive : reactivez-le avant de le reimporter.");
+            motifs.add("Ce client est archivé : réactivez-le avant de le réimporter.");
         }
         if (!motifs.isEmpty()) {
             return rejet(code, String.join(" ", motifs));

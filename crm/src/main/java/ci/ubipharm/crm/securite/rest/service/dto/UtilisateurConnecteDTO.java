@@ -22,4 +22,6 @@ public class UtilisateurConnecteDTO {
     private List<String> modules;
     private boolean visionGlobale;
     private List<Long> agenceIds;
+    /** Vrai tant que l'utilisateur n'a pas remplace le mot de passe donne par l'administrateur. */
+    private boolean motDePasseProvisoire;
 }

@@ -220,3 +220,30 @@ Ecrans du pilote, avec le menu adapte au profil :
 | Modeles de messages | tous (edition : ADMIN, DIR_RECOUVREMENT) | Modeles par type, insertion des variables, apercu avec exemples ; gestion des variables |
 | Numeros WhatsApp | agent (le sien), ADMIN et DIR_RECOUVREMENT | Etat des sessions, QR a scanner, envoyes du jour, messages en attente |
 | Reponses des clients | tous | Copie des messages recus, rattaches au client et a la campagne |
+| Utilisateurs et habilitations | ADMIN | Comptes, un role par module (ou tous les modules), agences, mot de passe provisoire, desactivation |
+| Mon mot de passe | tous | Remplacement du mot de passe ; obligatoire a la premiere connexion |
+
+## Comptes et habilitations (lot 7)
+
+Reserve a l'administrateur. Un compte n'est jamais supprime : il est desactive, ses habilitations retirees passent
+a inactif et ses rattachements d'agence sont clotures a la veille, pour garder l'historique.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/utilisateurs?q=&statut=&roleCode=&agenceId=&page=&taille=` | Recherche paginee (taille 100 au plus), avec roles et agences en cours |
+| GET | `/api/utilisateurs/referentiel` | Roles et modules proposes |
+| GET | `/api/utilisateurs/{id}` | Un compte |
+| POST | `/api/utilisateurs` | Creation `{login, nomComplet, email, numeroWhatsapp, habilitations:[{roleCode, moduleCode}], agenceIds}` ; renvoie le mot de passe provisoire, une seule fois |
+| PUT | `/api/utilisateurs/{id}` | Modification (le login ne change pas) |
+| POST | `/api/utilisateurs/{id}/desactivation` et `/reactivation` | Desactiver, reactiver (remet les echecs a zero) |
+| POST | `/api/utilisateurs/{id}/reinitialisation-mot-de-passe` | Nouveau mot de passe provisoire ; debloque un compte verrouille |
+| POST | `/api/auth/mot-de-passe` | `{actuel, nouveau}` pour l'utilisateur connecte |
+
+Regles :
+- `moduleCode` vide = le role vaut pour tous les modules ; il couvre alors les lignes du meme role sur un module.
+- Il reste toujours un administrateur actif ; un administrateur ne peut ni se desactiver ni retirer son propre role.
+- Mot de passe : `securite.mot_de_passe_longueur_min` caracteres (10 par defaut), lettres et chiffres, sans l'identifiant.
+- Mot de passe provisoire (compte cree ou reinitialise, admin initial) : seules les routes `/api/auth` repondent
+  tant qu'il n'est pas remplace (403 sinon).
+- Desactivation, changement de roles ou d'agences, reinitialisation : la session ouverte de la personne est fermee
+  a son appel suivant (401), elle se reconnecte avec ses nouveaux droits (`ControleSessionFiltre`).

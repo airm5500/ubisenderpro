@@ -53,7 +53,7 @@ public class AffectationServiceImpl implements AffectationService {
             if (client == null || !dansPerimetre(perimetre, client.agenceId())) {
                 resultat.getRefus().add("Client n° " + clientId + " : introuvable.");
             } else if (!"ACTIF".equals(client.statut())) {
-                resultat.getRefus().add(client.code() + " : client archive.");
+                resultat.getRefus().add(client.code() + " : client archivé.");
             } else if (!agent.agenceIds().contains(client.agenceId())) {
                 resultat.getRefus().add(client.code() + " : client de l'agence " + client.agenceLibelle() + ", hors des agences de "
                         + agent.nom() + ".");

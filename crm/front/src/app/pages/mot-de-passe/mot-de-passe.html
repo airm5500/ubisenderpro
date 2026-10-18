@@ -1,0 +1,33 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Mon mot de passe</h1>
+      <p class="sous-titre">{{ provisoire()
+        ? "Votre compte a un mot de passe provisoire donné par l'administrateur. Choisissez le vôtre pour continuer."
+        : 'Choisissez un mot de passe que vous êtes seul à connaître.' }}</p>
+    </div>
+  </div>
+
+  <section class="bloc" style="max-width: 520px">
+    <form class="formulaire" (ngSubmit)="enregistrer()">
+      <label class="f">{{ provisoire() ? 'Mot de passe provisoire' : 'Mot de passe actuel' }}
+        <input class="sel" type="password" name="actuel" [(ngModel)]="actuel" autocomplete="current-password" required>
+      </label>
+      <label class="f">Nouveau mot de passe
+        <input class="sel" type="password" name="nouveau" [ngModel]="nouveau()" (ngModelChange)="nouveau.set($event)" autocomplete="new-password" required>
+      </label>
+      <ul class="regles">
+        @for (r of regles(); track r.libelle) {
+          <li [class.ok]="r.ok"><i class="pi" [class.pi-check-circle]="r.ok" [class.pi-circle]="!r.ok"></i> {{ r.libelle }}</li>
+        }
+      </ul>
+      <label class="f">Confirmer le nouveau mot de passe
+        <input class="sel" type="password" name="confirmation" [(ngModel)]="confirmation" autocomplete="new-password" required>
+      </label>
+      @if (erreur()) { <div class="erreur" role="alert">{{ erreur() }}</div> }
+      <div class="pied">
+        <button class="bp" type="submit" [disabled]="enCours()">Enregistrer le mot de passe</button>
+      </div>
+    </form>
+  </section>
+</div>

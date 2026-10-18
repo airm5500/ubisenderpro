@@ -1,14 +1,17 @@
 package ci.ubipharm.crm.securite.rest;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import ci.ubipharm.crm.securite.rest.service.AuthService;
+import ci.ubipharm.crm.securite.rest.service.dto.ChangementMotDePasseDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.ConnexionDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.JetonCsrfDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.UtilisateurConnecteDTO;
@@ -39,5 +42,11 @@ public class AuthRessource {
     @GetMapping("/moi")
     public UtilisateurConnecteDTO moi(@AuthenticationPrincipal UtilisateurPrincipal principal) {
         return authService.utilisateurConnecte(principal);
+    }
+
+    @PostMapping("/mot-de-passe")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changerMotDePasse(@Valid @RequestBody ChangementMotDePasseDTO changement) {
+        authService.changerMotDePasse(changement);
     }
 }

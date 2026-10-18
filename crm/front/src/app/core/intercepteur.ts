@@ -17,6 +17,10 @@ export const intercepteurErreurs: HttpInterceptorFn = (requete, suivant) => {
     catchError((erreur: HttpErrorResponse) => {
       const silencieux = requete.context.get(SILENCIEUX) || SANS_MESSAGE.some(u => requete.url.startsWith(u));
       if (erreur.status === 401 && !silencieux) {
+        // Compte desactive ou droits changes par l'administrateur : le serveur explique pourquoi
+        if (erreur.error?.message) {
+          messages.add({ severity: 'info', summary: 'Session fermée', detail: erreur.error.message, life: 7000 });
+        }
         auth.sessionTerminee();
       } else if (!silencieux) {
         messages.add({ severity: 'error', summary: 'Action impossible', detail: messageErreur(erreur), life: 7000 });

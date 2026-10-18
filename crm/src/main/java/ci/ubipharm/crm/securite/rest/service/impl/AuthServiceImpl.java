@@ -1,5 +1,7 @@
 package ci.ubipharm.crm.securite.rest.service.impl;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,11 +19,14 @@ import org.springframework.stereotype.Service;
 import ci.ubipharm.crm.securite.rest.service.AuthService;
 import ci.ubipharm.crm.securite.rest.service.JournalConnexionService;
 import ci.ubipharm.crm.securite.rest.service.PerimetreService;
+import ci.ubipharm.crm.securite.rest.service.UtilisateurService;
+import ci.ubipharm.crm.securite.rest.service.dto.ChangementMotDePasseDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.ConnexionDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.JetonCsrfDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.UtilisateurConnecteDTO;
 import ci.ubipharm.crm.securite.rest.service.dto.UtilisateurPrincipal;
+import jakarta.persistence.EntityManager;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +39,8 @@ public class AuthServiceImpl implements AuthService {
     private final SecurityContextRepository securityContextRepository;
     private final JournalConnexionService journalConnexionService;
     private final PerimetreService perimetreService;
+    private final UtilisateurService utilisateurService;
+    private final EntityManager em;
 
     @Override
     public JetonCsrfDTO jetonCsrf(CsrfToken jeton) {
@@ -51,7 +58,7 @@ public class AuthServiceImpl implements AuthService {
         } catch (AuthenticationException e) {
             journalConnexionService.enregistrerEchec(connexion.getLogin(), adresseIp, navigateur);
             // Meme message que le compte existe, soit desactive ou inconnu
-            throw new BadCredentialsException("Echec de connexion");
+            throw new BadCredentialsException("Échec de connexion");
         }
 
         // Nouvel identifiant de session apres connexion (fixation de session)
@@ -62,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
         contexte.setAuthentication(authentification);
         SecurityContextHolder.setContext(contexte);
         securityContextRepository.saveContext(contexte, requete, reponse);
+        requete.getSession().setAttribute(ControleSessionFiltre.CONNECTE_LE, LocalDateTime.now(ZoneOffset.UTC));
 
         UtilisateurPrincipal principal = (UtilisateurPrincipal) authentification.getPrincipal();
         journalConnexionService.enregistrerSucces(principal.getId(), principal.getLogin(), adresseIp, navigateur);
@@ -80,7 +88,19 @@ public class AuthServiceImpl implements AuthService {
                 .modules(sansPrefixe(droits, UtilisateurDetailsServiceImpl.PREFIXE_MODULE))
                 .visionGlobale(perimetre.isVisionGlobale())
                 .agenceIds(perimetre.getAgenceIds())
+                .motDePasseProvisoire(motDePasseProvisoire(principal.getId()))
                 .build();
+    }
+
+    @Override
+    public void changerMotDePasse(ChangementMotDePasseDTO changement) {
+        utilisateurService.changerMonMotDePasse(changement);
+    }
+
+    private boolean motDePasseProvisoire(Long utilisateurId) {
+        Object valeur = em.createNativeQuery("select mot_de_passe_provisoire from crm_utilisateur where id = :id")
+                .setParameter("id", utilisateurId).getSingleResult();
+        return valeur instanceof Boolean b ? b : valeur instanceof Number n && n.intValue() != 0;
     }
 
     private List<String> sansPrefixe(List<String> droits, String prefixe) {

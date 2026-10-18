@@ -108,7 +108,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     private String numeroAutorise(Long agentId) {
         UtilisateurPrincipal utilisateur = utilisateurCourantService.utilisateur();
         if (!agentId.equals(utilisateur.getId()) && utilisateur.getAuthorities().stream().noneMatch(a -> GESTIONNAIRES.contains(a.getAuthority()))) {
-            throw new AccessDeniedException("Seuls l'agent et la Direction du Recouvrement lient ce numero");
+            throw new AccessDeniedException("Seuls l'agent et la Direction du Recouvrement lient ce numéro");
         }
         @SuppressWarnings("unchecked")
         List<String> numeros = em.createNativeQuery("select numero_whatsapp from crm_utilisateur where id = :id and statut = 'ACTIF'")
@@ -117,7 +117,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
             throw new RessourceIntrouvableException("Agent introuvable");
         }
         if (numeros.getFirst() == null) {
-            throw new ErreurMetierException("Enregistrez d'abord le numero WhatsApp professionnel de l'agent.");
+            throw new ErreurMetierException("Enregistrez d'abord le numéro WhatsApp professionnel de l'agent.");
         }
         return numeros.getFirst();
     }

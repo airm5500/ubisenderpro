@@ -74,7 +74,7 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
             return appel.get();
         } catch (RestClientException e) {
             log.warn("Service WhatsApp : {}", e.getMessage());
-            throw new ErreurMetierException("Le service WhatsApp ne repond pas ; verifiez qu'il est demarre.");
+            throw new ErreurMetierException("Le service WhatsApp ne répond pas ; vérifiez qu'il est démarré.");
         }
     }
 

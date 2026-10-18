@@ -61,7 +61,7 @@ public class LecteurTableurServiceImpl implements LecteurTableurService {
             if (e instanceof ErreurMetierException metier) {
                 throw metier;
             }
-            throw new ErreurMetierException("Le fichier n'a pas pu etre lu. Verifiez qu'il n'est pas protege ou endommage.");
+            throw new ErreurMetierException("Le fichier n'a pas pu être lu. Vérifiez qu'il n'est pas protégé ou endommagé.");
         }
         return versTableur(brut);
     }
@@ -79,7 +79,7 @@ public class LecteurTableurServiceImpl implements LecteurTableurService {
                 continue;
             }
             if (lignes.size() >= lignesMax) {
-                throw new ErreurMetierException("Le fichier depasse " + lignesMax + " lignes : decoupez-le en plusieurs imports.");
+                throw new ErreurMetierException("Le fichier dépasse " + lignesMax + " lignes : découpez-le en plusieurs imports.");
             }
             Map<String, String> valeurs = new LinkedHashMap<>();
             for (int c = 0; c < entetes.size(); c++) {

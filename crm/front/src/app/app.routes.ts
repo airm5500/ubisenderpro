@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { accueil, connecte, moduleRecouvrement, roles } from './core/gardes';
+import { accueil, connecte, moduleRecouvrement, motDePasseAJour, roles } from './core/gardes';
 import { Shell } from './shell/shell';
 
 const DIRECTION = ['ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE'];
@@ -8,7 +8,7 @@ const PILOTAGE = [...DIRECTION, 'DG', 'DIR_COMMERCIAL'];
 export const routes: Routes = [
   { path: 'connexion', loadComponent: () => import('./pages/connexion/connexion').then(m => m.Connexion), title: 'Connexion' },
   {
-    path: '', component: Shell, canActivate: [connecte], canActivateChild: [moduleRecouvrement],
+    path: '', component: Shell, canActivate: [connecte], canActivateChild: [motDePasseAJour, moduleRecouvrement],
     children: [
       { path: '', pathMatch: 'full', canActivate: [accueil], children: [] },
       { path: 'marketing', loadComponent: () => import('./pages/marketing/marketing').then(m => m.Marketing), title: 'Marketing' },
@@ -25,6 +25,8 @@ export const routes: Routes = [
       { path: 'campagnes/:id', loadComponent: () => import('./pages/campagne-suivi/campagne-suivi').then(m => m.CampagneSuivi), title: 'Campagne' },
       { path: 'modeles', loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles de messages' },
       { path: 'numeros', loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Numéros WhatsApp' },
+      { path: 'utilisateurs', canActivate: [roles('ADMIN')], loadComponent: () => import('./pages/utilisateurs/utilisateurs').then(m => m.Utilisateurs), title: 'Utilisateurs et habilitations' },
+      { path: 'mot-de-passe', loadComponent: () => import('./pages/mot-de-passe/mot-de-passe').then(m => m.MotDePasse), title: 'Mon mot de passe' },
       { path: 'reponses', loadComponent: () => import('./pages/reponses/reponses').then(m => m.Reponses), title: 'Réponses des clients' }
     ]
   },

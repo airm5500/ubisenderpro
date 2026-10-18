@@ -86,12 +86,12 @@ class LecteurTableurServiceImplTest {
         String csv = "code\nA\nB\nC\nD\n";
         assertThatThrownBy(() -> lecteur.lire(new MockMultipartFile("fichier", "f.csv", null, csv.getBytes(StandardCharsets.UTF_8))))
                 .isInstanceOf(ErreurMetierException.class)
-                .hasMessageContaining("depasse 3 lignes");
+                .hasMessageContaining("dépasse 3 lignes");
         assertThatThrownBy(() -> lecteur.lire(new MockMultipartFile("fichier", "f.pdf", null, new byte[] {1})))
                 .isInstanceOf(ErreurMetierException.class)
                 .hasMessageContaining("Format non pris en charge");
         assertThatThrownBy(() -> lecteur.lire(new MockMultipartFile("fichier", "f.xlsx", null, new byte[] {1, 2, 3})))
                 .isInstanceOf(ErreurMetierException.class)
-                .hasMessageContaining("n'a pas pu etre lu");
+                .hasMessageContaining("n'a pas pu être lu");
     }
 }

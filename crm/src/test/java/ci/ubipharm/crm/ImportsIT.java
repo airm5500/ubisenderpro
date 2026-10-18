@@ -63,8 +63,8 @@ class ImportsIT extends IntegrationBase {
                 .andExpect(jsonPath("$.elements[0].numeroLigne").value(4))
                 .andExpect(jsonPath("$.elements[0].message").value("Raison sociale manquante."))
                 .andExpect(jsonPath("$.elements[1].message", containsString("Agence inconnue")))
-                .andExpect(jsonPath("$.elements[2].message", containsString("deja present ligne 2")))
-                .andExpect(jsonPath("$.elements[3].message", containsString("Numero WhatsApp invalide")));
+                .andExpect(jsonPath("$.elements[2].message", containsString("déjà présent ligne 2")))
+                .andExpect(jsonPath("$.elements[3].message", containsString("Numéro WhatsApp invalide")));
 
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -81,7 +81,7 @@ class ImportsIT extends IntegrationBase {
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Cet import est deja valide."));
+                .andExpect(jsonPath("$.message").value("Cet import est déjà validé."));
         assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where action = 'IMPORT_VALIDATION'", Long.class)).isEqualTo(1);
     }
 
@@ -148,7 +148,7 @@ class ImportsIT extends IntegrationBase {
         Long id = idDe(simulation);
         mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "MISE_A_JOUR").session(session))
                 .andExpect(jsonPath("$.elements[0].message",
-                        containsString("Raison sociale : Pharmacie Alpha -> Pharmacie Alpha Plus ; Numero WhatsApp : 2250700000001 -> 2250700000099")));
+                        containsString("Raison sociale : Pharmacie Alpha -> Pharmacie Alpha Plus ; Numéro WhatsApp : 2250700000001 -> 2250700000099")));
 
         mvc.perform(post("/api/imports/clients/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"clesAMettreAJour\":[\"it-c1\"]}"))
@@ -190,7 +190,7 @@ class ImportsIT extends IntegrationBase {
         mvc.perform(multipart("/api/recouvrement/imports/factures").file(fichier("factures.csv", csv.getBytes(StandardCharsets.UTF_8)))
                 .session(connecter("admin", MOT_DE_PASSE_ADMIN)).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("Champs obligatoires sans colonne : Date facture, Date d'echeance, Montant, Solde")));
+                .andExpect(jsonPath("$.message", containsString("Champs obligatoires sans colonne : Date facture, Date d'échéance, Montant, Solde")));
         assertThat(jdbc.queryForObject("select count(*) from crm_import", Long.class)).isZero();
     }
 
@@ -218,10 +218,10 @@ class ImportsIT extends IntegrationBase {
                 .andReturn().getResponse().getContentAsString();
         Long id = idDe(simulation);
         mvc.perform(get("/api/imports/" + id + "/lignes").param("action", "REJET").session(session))
-                .andExpect(jsonPath("$.elements[0].message", containsString("precede la date de facture")))
+                .andExpect(jsonPath("$.elements[0].message", containsString("précède la date de facture")))
                 .andExpect(jsonPath("$.elements[1].message", containsString("Client inconnu : INCONNU")))
                 .andExpect(jsonPath("$.elements[2].message", containsString("Sous-type inconnu : Bizarre")))
-                .andExpect(jsonPath("$.elements[3].message", containsString("depasse le montant")));
+                .andExpect(jsonPath("$.elements[3].message", containsString("dépasse le montant")));
 
         mvc.perform(post("/api/recouvrement/imports/factures/" + id + "/validation").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))

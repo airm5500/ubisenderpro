@@ -103,7 +103,7 @@ class CampagneIT extends IntegrationBase {
                 .andExpect(jsonPath("$.nbMessages").value(2))
                 .andExpect(jsonPath("$.nbExclus").value(1))
                 .andExpect(jsonPath("$.totalSolde").value(170000.50))
-                .andExpect(jsonPath("$.exclusions[0].motif").value("Client sans numero WhatsApp"))
+                .andExpect(jsonPath("$.exclusions[0].motif").value("Client sans numéro WhatsApp"))
                 .andExpect(jsonPath("$.agents[0].numeroExpediteur").value("2250711111111"))
                 .andExpect(jsonPath("$.exemples[0].contenu").value(
                         "Bonjour Dr KOUASSI Aya, la facture K-F1 de 150 000 FCFA est echue depuis 10 jours. Test it-agent1"))
@@ -113,8 +113,8 @@ class CampagneIT extends IntegrationBase {
         Long campagneAdmin = idDe(creerCampagne(admin, "Retards", "APRES_ECHEANCE", modeleRetard, "{}", null));
         mvc.perform(get("/api/recouvrement/campagnes/" + campagneAdmin + "/recapitulatif").session(admin))
                 .andExpect(jsonPath("$.nbMessages").value(2))
-                .andExpect(jsonPath("$.exclusions[*].motif", containsInAnyOrder("Client sans numero WhatsApp",
-                        "Agent Test it-agent2 sans numero WhatsApp", "Client sans agent de recouvrement")));
+                .andExpect(jsonPath("$.exclusions[*].motif", containsInAnyOrder("Client sans numéro WhatsApp",
+                        "Agent Test it-agent2 sans numéro WhatsApp", "Client sans agent de recouvrement")));
         mvc.perform(get("/api/recouvrement/campagnes/" + campagneAdmin + "/messages").param("statut", "EXCLU").session(admin))
                 .andExpect(jsonPath("$.total").value(3));
 
@@ -134,7 +134,7 @@ class CampagneIT extends IntegrationBase {
                 .andExpect(status().isBadRequest());
         creerCampagne(admin, "Mauvais modele", "JOUR_ECHEANCE", modeleAvant, "{}", null)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Le modele « Rappel » est prevu pour un autre type de relance."));
+                .andExpect(jsonPath("$.message").value("Le modèle « Rappel » est prévu pour un autre type de relance."));
         Long cible = idDe(creerCampagne(admin, "Ciblee", "PERSONNALISEE", modeleAvant,
                 "{\"clientIds\":[" + c1 + "],\"soldeMin\":25000}", null));
         mvc.perform(get("/api/recouvrement/campagnes/" + cible + "/messages").session(admin))
@@ -174,7 +174,7 @@ class CampagneIT extends IntegrationBase {
                 .andExpect(jsonPath("$.exclusions[0].motif").value("Deja dans la campagne « Retards agent » en attente d'envoi"))
                 .andExpect(jsonPath("$.exclusions[0].nb").value(2));
         action(admin, doublon, "soumission", null).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("La campagne ne contient aucun message a envoyer."));
+                .andExpect(jsonPath("$.message").value("La campagne ne contient aucun message à envoyer."));
 
         action(agent, id, "annulation", "Erreur").andExpect(status().isBadRequest());
         action(admin, id, "annulation", "Client injoignable").andExpect(jsonPath("$.statut").value("ANNULEE"))
@@ -210,7 +210,7 @@ class CampagneIT extends IntegrationBase {
                 .andExpect(status().isNotFound());
         creerCampagne(admin, "Passee", "PERSONNALISEE", modeleRetard, "{}", "2020-01-01T08:00:00")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("La date d'execution est deja passee."));
+                .andExpect(jsonPath("$.message").value("La date d'exécution est déjà passée."));
     }
 
     private ResultActions creerModele(MockHttpSession session, String nom, String type, String contenu) throws Exception {

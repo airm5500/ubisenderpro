@@ -70,7 +70,7 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_habilitation where utilisateur_id <> (select id from crm_utilisateur where login = 'admin')");
         jdbc.update("delete from crm_journal_connexion");
         jdbc.update("delete from crm_utilisateur where login <> 'admin'");
-        jdbc.update("update crm_utilisateur set statut = 'ACTIF', echecs_connexion = 0, numero_whatsapp = null where login = 'admin'");
+        jdbc.update("update crm_utilisateur set statut = 'ACTIF', echecs_connexion = 0, numero_whatsapp = null, mot_de_passe_provisoire = false, droits_revises_le = null where login = 'admin'");
     }
 
     /** Cree un utilisateur (mot de passe identique a l'admin) avec un role, un module et une agence. */

@@ -4,6 +4,8 @@
       <img src="logo.svg" alt="" width="44" height="44">
       <div><div class="nom">UBIPHARM CI</div><div class="sous">Relation client</div></div>
     </div>
+    <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
+    @if (!auth.utilisateur()?.motDePasseProvisoire) {
     <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
     @if (auth.recouvrement() && auth.marketing()) {
       <div role="group" aria-label="Module" class="modules">
@@ -36,14 +38,23 @@
     <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a>
     <div class="gl">{{ auth.gestionnaire() ? 'Administration' : 'WhatsApp' }}</div>
     <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+    @if (auth.admin()) {
+      <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
+    }
     } @else {
       <div class="gl">Marketing</div>
       <a class="nv" routerLink="/marketing" routerLinkActive="on">Accueil</a>
+      @if (auth.admin()) {
+        <div class="gl">Administration</div>
+        <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a>
+      }
+    }
     }
 
     <div class="profil">
       <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>
       <div class="sous">{{ auth.libelleProfil() }}</div>
+      <a class="sortie" routerLink="/mot-de-passe"><i class="pi pi-key"></i> Mon mot de passe</a>
       <button type="button" class="sortie" (click)="auth.deconnecter()"><i class="pi pi-sign-out"></i> Se déconnecter</button>
     </div>
   </nav>

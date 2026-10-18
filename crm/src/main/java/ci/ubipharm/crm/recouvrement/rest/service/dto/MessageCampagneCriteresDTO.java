@@ -20,12 +20,12 @@ public class MessageCampagneCriteresDTO {
     private Long agentId;
     private String q;
 
-    @Min(value = 0, message = "La page doit etre positive.")
+    @Min(value = 0, message = "La page doit être positive.")
     @Builder.Default
     private int page = 0;
 
-    @Min(value = 1, message = "La taille doit etre au moins 1.")
-    @Max(value = 200, message = "La taille ne peut pas depasser 200.")
+    @Min(value = 1, message = "La taille doit être au moins 1.")
+    @Max(value = 200, message = "La taille ne peut pas dépasser 200.")
     @Builder.Default
     private int taille = 25;
 }

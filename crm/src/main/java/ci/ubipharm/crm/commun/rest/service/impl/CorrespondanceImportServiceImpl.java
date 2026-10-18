@@ -67,7 +67,7 @@ public class CorrespondanceImportServiceImpl implements CorrespondanceImportServ
         if (parametres != null && parametres.getModeleId() != null) {
             ModeleImportDTO modele = modele(parametres.getModeleId());
             if (!modele.getType().equals(type)) {
-                throw new RessourceIntrouvableException("Modele introuvable");
+                throw new RessourceIntrouvableException("Modèle introuvable");
             }
             return modele.getCorrespondance();
         }
@@ -93,12 +93,12 @@ public class CorrespondanceImportServiceImpl implements CorrespondanceImportServ
         List<String> colonnesAbsentes = correspondance.values().stream().filter(c -> !tableur.getEntetes().contains(c)).distinct().toList();
         if (!colonnesAbsentes.isEmpty()) {
             throw new ErreurMetierException("Colonnes absentes du fichier : " + String.join(", ", colonnesAbsentes)
-                    + ". Rechargez l'apercu du fichier ou choisissez un autre modele.");
+                    + ". Rechargez l'aperçu du fichier ou choisissez un autre modèle.");
         }
         List<String> manquants = champsManquants(champs, correspondance, tableur.getEntetes());
         if (!manquants.isEmpty()) {
             throw new ErreurMetierException("Champs obligatoires sans colonne : " + String.join(", ", manquants)
-                    + ". Associez-les a une colonne du fichier, ou partez de l'exemplaire a telecharger.");
+                    + ". Associez-les à une colonne du fichier, ou partez de l'exemplaire à télécharger.");
         }
 
         List<LigneTableurDTO> lignes = new ArrayList<>();
@@ -177,7 +177,7 @@ public class CorrespondanceImportServiceImpl implements CorrespondanceImportServ
                 .setParameter("id", id)
                 .executeUpdate();
         if (archives == 0) {
-            throw new RessourceIntrouvableException("Modele introuvable");
+            throw new RessourceIntrouvableException("Modèle introuvable");
         }
         journalActionService.enregistrer("IMPORT_MODELE_ARCHIVAGE", "crm_import_modele", id, null);
     }
@@ -191,7 +191,7 @@ public class CorrespondanceImportServiceImpl implements CorrespondanceImportServ
                 where m.id = :id and m.statut = 'ACTIF'
                 """, Tuple.class).setParameter("id", id).getResultList();
         if (lignes.isEmpty()) {
-            throw new RessourceIntrouvableException("Modele introuvable");
+            throw new RessourceIntrouvableException("Modèle introuvable");
         }
         return mapTupleToDto(lignes.getFirst());
     }

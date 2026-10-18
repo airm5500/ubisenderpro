@@ -259,7 +259,7 @@ public class ImportServiceImpl implements ImportService {
                 .setParameter("id", id)
                 .executeUpdate();
         journalActionService.enregistrer("IMPORT_VALIDATION", "crm_import", id,
-                crees + " creations, " + misAJour + " mises a jour, " + (lignes.size() - crees - misAJour) + " ignorees");
+                crees + " créations, " + misAJour + " mises à jour, " + (lignes.size() - crees - misAJour) + " ignorées");
         return consulter(id);
     }
 
@@ -283,7 +283,7 @@ public class ImportServiceImpl implements ImportService {
                 .getSingleResult();
         String statut = importCourant.get("statut", String.class);
         if (!"SIMULE".equals(statut)) {
-            throw new ErreurMetierException("Cet import est deja " + ("VALIDE".equals(statut) ? "valide." : "annule."));
+            throw new ErreurMetierException("Cet import est déjà " + ("VALIDE".equals(statut) ? "validé." : "annulé."));
         }
         return importCourant.get("type", String.class);
     }

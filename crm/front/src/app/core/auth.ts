@@ -20,6 +20,7 @@ export class Auth {
   readonly direction = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE'));
   /** Consultation des agents et portefeuilles. */
   readonly pilotage = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'DG', 'DIR_COMMERCIAL'));
+  readonly admin = computed(() => this.aUnRole('ADMIN'));
   readonly agent = computed(() => this.aUnRole('AGENT'));
   readonly auteurCampagnes = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'AGENT'));
 
@@ -68,6 +69,12 @@ export class Auth {
     this.http.post('/api/auth/deconnexion', {}).pipe(catchError(() => of(null))).subscribe(() => this.sessionTerminee());
   }
 
+  /** Apres le remplacement du mot de passe provisoire, les autres ecrans s'ouvrent. */
+  motDePasseRemplace(): void {
+    const u = this.utilisateur();
+    if (u) this.utilisateur.set({ ...u, motDePasseProvisoire: false });
+  }
+
   sessionTerminee(): void {
     this.utilisateur.set(null);
     this.router.navigate(['/connexion']);
@@ -75,6 +82,7 @@ export class Auth {
 
   /** Page d'accueil selon le profil. */
   accueil(): string {
+    if (this.utilisateur()?.motDePasseProvisoire) return '/mot-de-passe';
     if (!this.recouvrement()) return '/marketing';
     return this.agent() && !this.direction() ? '/ma-journee' : '/factures';
   }

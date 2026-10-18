@@ -15,7 +15,7 @@ public class UtilisateurCourantServiceImpl implements UtilisateurCourantService 
     public UtilisateurPrincipal utilisateur() {
         Authentication authentification = SecurityContextHolder.getContext().getAuthentication();
         if (authentification == null || !(authentification.getPrincipal() instanceof UtilisateurPrincipal principal)) {
-            throw new AccessDeniedException("Aucun utilisateur connecte");
+            throw new AccessDeniedException("Aucun utilisateur connecté");
         }
         return principal;
     }

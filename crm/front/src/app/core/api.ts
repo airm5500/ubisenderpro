@@ -34,6 +34,11 @@ export class Api {
     return this.http.post<T>(url, corps, { params: parametres(criteres) });
   }
 
+  /** Ecriture dont l'appelant affiche lui-meme l'erreur (formulaire). */
+  postSilencieux<T>(url: string, corps: unknown = {}): Observable<T> {
+    return this.http.post<T>(url, corps, { context: new HttpContext().set(SILENCIEUX, true) });
+  }
+
   put<T>(url: string, corps: unknown): Observable<T> {
     return this.http.put<T>(url, corps);
   }

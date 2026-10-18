@@ -19,12 +19,12 @@ public class ImportLigneCriteresDTO {
     @Pattern(regexp = "CREATION|MISE_A_JOUR|IDENTIQUE|REJET", message = "Action inconnue.")
     private String action;
 
-    @Min(value = 0, message = "La page doit etre positive.")
+    @Min(value = 0, message = "La page doit être positive.")
     @Builder.Default
     private int page = 0;
 
-    @Min(value = 1, message = "La taille doit etre au moins 1.")
-    @Max(value = 500, message = "La taille ne peut pas depasser 500.")
+    @Min(value = 1, message = "La taille doit être au moins 1.")
+    @Max(value = 500, message = "La taille ne peut pas dépasser 500.")
     @Builder.Default
     private int taille = 100;
 }

@@ -173,7 +173,7 @@ public class CampagneServiceImpl implements CampagneService {
         CampagneDTO campagne = lire(id, true).dto();
         verifierAuteurOuGestionnaire(campagne);
         if (!NON_VALIDEES.contains(campagne.getStatut())) {
-            throw new ErreurMetierException("Une campagne validee ne se modifie plus ; annulez-la et creez-en une autre.");
+            throw new ErreurMetierException("Une campagne validée ne se modifie plus ; annulez-la et créez-en une autre.");
         }
         verifierDemande(demande);
         em.createNativeQuery("""
@@ -258,12 +258,12 @@ public class CampagneServiceImpl implements CampagneService {
         Campagne campagne = lire(id, true);
         verifierAuteurOuGestionnaire(campagne.dto());
         if (!"BROUILLON".equals(campagne.dto().getStatut())) {
-            throw new ErreurMetierException("Seul un brouillon peut etre soumis a validation.");
+            throw new ErreurMetierException("Seul un brouillon peut être soumis à validation.");
         }
         List<Ligne> lignes = generer(campagne);
         long envoyables = lignes.stream().filter(l -> l.contactId() != null).count();
         if (envoyables == 0) {
-            throw new ErreurMetierException("La campagne ne contient aucun message a envoyer.");
+            throw new ErreurMetierException("La campagne ne contient aucun message à envoyer.");
         }
         em.createNativeQuery("update crm_campagne set statut = 'A_VALIDER', soumise_le = utc_timestamp(), motif_rejet = null, rejete_par = null, "
                 + "updated_at = utc_timestamp() where id = :id").setParameter("id", id).executeUpdate();
@@ -277,14 +277,14 @@ public class CampagneServiceImpl implements CampagneService {
     public CampagneDTO valider(Long id) {
         Campagne campagne = lire(id, true);
         if (!"A_VALIDER".equals(campagne.dto().getStatut())) {
-            throw new ErreurMetierException("Seule une campagne soumise peut etre validee.");
+            throw new ErreurMetierException("Seule une campagne soumise peut être validée.");
         }
         if (!"ACTIF".equals(campagne.modeleStatut())) {
-            throw new ErreurMetierException("Le modele « " + campagne.dto().getModeleNom() + " » a ete archive ; choisissez-en un autre.");
+            throw new ErreurMetierException("Le modèle « " + campagne.dto().getModeleNom() + " » a été archivé ; choisissez-en un autre.");
         }
         List<Ligne> lignes = generer(campagne);
         if (lignes.stream().noneMatch(l -> l.contactId() != null)) {
-            throw new ErreurMetierException("La campagne ne contient plus aucun message a envoyer.");
+            throw new ErreurMetierException("La campagne ne contient plus aucun message à envoyer.");
         }
         SqlParameterSource[] lots = lignes.stream().map(l -> new MapSqlParameterSource()
                 .addValue("campagneId", id)
@@ -328,7 +328,7 @@ public class CampagneServiceImpl implements CampagneService {
     @Transactional
     public CampagneDTO rejeter(Long id, MotifDTO motif) {
         if (!"A_VALIDER".equals(lire(id, true).dto().getStatut())) {
-            throw new ErreurMetierException("Seule une campagne soumise peut etre rejetee.");
+            throw new ErreurMetierException("Seule une campagne soumise peut être rejetée.");
         }
         em.createNativeQuery("""
                 update crm_campagne set statut = 'BROUILLON', motif_rejet = :motif, rejete_par = :rejetePar, soumise_le = null,
@@ -347,7 +347,7 @@ public class CampagneServiceImpl implements CampagneService {
     @Transactional
     public CampagneDTO lancer(Long id) {
         if (!"VALIDEE".equals(lire(id, true).dto().getStatut())) {
-            throw new ErreurMetierException("Seule une campagne validee et pas encore demarree peut etre lancee.");
+            throw new ErreurMetierException("Seule une campagne validée et pas encore démarrée peut être lancée.");
         }
         em.createNativeQuery("update crm_campagne set date_execution = utc_timestamp() where id = :id").setParameter("id", id).executeUpdate();
         demarrer(id, false);
@@ -360,10 +360,10 @@ public class CampagneServiceImpl implements CampagneService {
         CampagneDTO campagne = lire(id, true).dto();
         verifierAuteurOuGestionnaire(campagne);
         if ("TERMINEE".equals(campagne.getStatut()) || "ANNULEE".equals(campagne.getStatut())) {
-            throw new ErreurMetierException("La campagne est deja " + ("TERMINEE".equals(campagne.getStatut()) ? "terminee." : "annulee."));
+            throw new ErreurMetierException("La campagne est déjà " + ("TERMINEE".equals(campagne.getStatut()) ? "terminée." : "annulée."));
         }
         if (!NON_VALIDEES.contains(campagne.getStatut()) && !estGestionnaire()) {
-            throw new ErreurMetierException("Une campagne validee ne peut etre annulee que par la Direction du Recouvrement.");
+            throw new ErreurMetierException("Une campagne validée ne peut être annulée que par la Direction du Recouvrement.");
         }
         @SuppressWarnings("unchecked")
         List<Long> factures = em.createNativeQuery("select facture_id from crm_campagne_message where campagne_id = :id and statut = 'A_ENVOYER'")
@@ -518,14 +518,14 @@ public class CampagneServiceImpl implements CampagneService {
         List<Tuple> modeles = em.createNativeQuery("select nom as nom, type_campagne as typeCampagne, statut as statut from crm_modele_message where id = :id",
                 Tuple.class).setParameter("id", demande.getModeleId()).getResultList();
         if (modeles.isEmpty() || !"ACTIF".equals(modeles.getFirst().get("statut", String.class))) {
-            throw new ErreurMetierException("Choisissez un modele de message actif.");
+            throw new ErreurMetierException("Choisissez un modèle de message actif.");
         }
         String typeModele = modeles.getFirst().get("typeCampagne", String.class);
         if (!"PERSONNALISEE".equals(demande.getTypeCampagne()) && !demande.getTypeCampagne().equals(typeModele)) {
-            throw new ErreurMetierException("Le modele « " + modeles.getFirst().get("nom", String.class) + " » est prevu pour un autre type de relance.");
+            throw new ErreurMetierException("Le modèle « " + modeles.getFirst().get("nom", String.class) + " » est prévu pour un autre type de relance.");
         }
         if (demande.getDateExecution() != null && demande.getDateExecution().isBefore(maintenant().minusMinutes(1))) {
-            throw new ErreurMetierException("La date d'execution est deja passee.");
+            throw new ErreurMetierException("La date d'exécution est déjà passée.");
         }
         selectionCampagne.verifier(demande.getTypeCampagne(), demande.getCriteres());
     }

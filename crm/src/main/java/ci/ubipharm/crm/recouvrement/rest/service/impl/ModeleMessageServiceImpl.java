@@ -65,7 +65,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = em.createNativeQuery(SELECT + " where m.id = :id", Tuple.class).setParameter("id", id).getResultList();
         if (lignes.isEmpty()) {
-            throw new RessourceIntrouvableException("Modele introuvable");
+            throw new RessourceIntrouvableException("Modèle introuvable");
         }
         return mapTupleToDto(lignes.getFirst());
     }
@@ -93,7 +93,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     public ModeleMessageDTO modifier(Long id, ModeleMessageDemandeDTO demande) {
         ModeleMessageDTO existant = consulter(id);
         if ("ARCHIVE".equals(existant.getStatut())) {
-            throw new ErreurMetierException("Le modele « " + existant.getNom() + " » est archive.");
+            throw new ErreurMetierException("Le modèle « " + existant.getNom() + " » est archivé.");
         }
         verifier(demande, id);
         em.createNativeQuery("""
@@ -120,7 +120,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 select nom from crm_campagne where modele_id = :id and statut in ('BROUILLON', 'A_VALIDER') order by nom
                 """).setParameter("id", id).getResultList();
         if (!campagnes.isEmpty()) {
-            throw new ErreurMetierException("Le modele est utilise par des campagnes non validees : " + String.join(", ", campagnes) + ".");
+            throw new ErreurMetierException("Le modèle est utilisé par des campagnes non validées : " + String.join(", ", campagnes) + ".");
         }
         em.createNativeQuery("update crm_modele_message set statut = 'ARCHIVE', modifie_par = :modifiePar, updated_at = utc_timestamp() where id = :id")
                 .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
@@ -145,7 +145,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("id", id == null ? 0L : id)
                 .getSingleResult()).longValue();
         if (homonymes > 0) {
-            throw new ErreurMetierException("Un modele s'appelle deja « " + demande.getNom().trim() + " ».");
+            throw new ErreurMetierException("Un modèle s'appelle déjà « " + demande.getNom().trim() + " ».");
         }
     }
 

@@ -13,10 +13,14 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+
+import ci.ubipharm.crm.securite.rest.service.impl.ControleSessionFiltre;
+import jakarta.persistence.EntityManager;
 
 /**
  * Session serveur (cookie HttpOnly) + protection CSRF adaptee a une application Angular :
@@ -27,8 +31,9 @@ import org.springframework.security.web.context.SecurityContextRepository;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filtres(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filtres(HttpSecurity http, EntityManager em) throws Exception {
         http
+            .addFilterBefore(new ControleSessionFiltre(em), AuthorizationFilter.class)
             // Les callbacks du service WhatsApp n'ont ni session ni jeton CSRF : ils portent le jeton partage
             .csrf(csrf -> csrf.spa().ignoringRequestMatchers("/api/passerelle/**"))
             .securityContext(ctx -> ctx.securityContextRepository(securityContextRepository()))

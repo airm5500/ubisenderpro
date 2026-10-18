@@ -57,13 +57,13 @@ public class DelegationServiceImpl implements DelegationService {
     @Transactional
     public DelegationDTO creer(DelegationDemandeDTO demande) {
         if (demande.getTitulaireId().equals(demande.getRemplacantId())) {
-            throw new ErreurMetierException("Le remplacant doit etre un autre agent.");
+            throw new ErreurMetierException("Le remplaçant doit être un autre agent.");
         }
         if (demande.getDateFin().isBefore(demande.getDateDebut())) {
-            throw new ErreurMetierException("La date de retour precede la date de debut.");
+            throw new ErreurMetierException("La date de retour précède la date de début.");
         }
         if (demande.getDateFin().isBefore(LocalDate.now(ZoneOffset.UTC))) {
-            throw new ErreurMetierException("La date de retour est deja passee.");
+            throw new ErreurMetierException("La date de retour est déjà passée.");
         }
         String titulaire = nomAgent(demande.getTitulaireId());
         String remplacant = nomAgent(demande.getRemplacantId());
@@ -83,7 +83,7 @@ public class DelegationServiceImpl implements DelegationService {
                 .getResultList();
         if (!chevauchements.isEmpty()) {
             Tuple c = chevauchements.getFirst();
-            throw new ErreurMetierException(titulaire + " est deja remplace par " + c.get("remplacant", String.class) + " du "
+            throw new ErreurMetierException(titulaire + " est déjà remplacé par " + c.get("remplacant", String.class) + " du "
                     + c.get("dateDebut", LocalDate.class).format(DATE_LISIBLE) + " au " + c.get("dateFin", LocalDate.class).format(DATE_LISIBLE) + ".");
         }
 
@@ -153,7 +153,7 @@ public class DelegationServiceImpl implements DelegationService {
                 .setParameter("id", id)
                 .executeUpdate();
         if (annulees == 0) {
-            throw new RessourceIntrouvableException("Delegation introuvable");
+            throw new RessourceIntrouvableException("Délégation introuvable");
         }
         journalActionService.enregistrer("DELEGATION_ANNULATION", "crm_delegation", id, null);
         return consulter(id);
@@ -169,7 +169,7 @@ public class DelegationServiceImpl implements DelegationService {
                 .setParameter("id", id)
                 .getResultList();
         if (noms.isEmpty()) {
-            throw new ErreurMetierException("La delegation se fait entre deux agents de recouvrement actifs.");
+            throw new ErreurMetierException("La délégation se fait entre deux agents de recouvrement actifs.");
         }
         return noms.getFirst();
     }

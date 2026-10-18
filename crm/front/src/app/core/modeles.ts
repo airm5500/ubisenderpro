@@ -5,7 +5,19 @@ export interface Erreur { statut: number; message: string; reference?: string; c
 
 export interface Utilisateur {
   id: number; login: string; nomComplet: string; roles: string[]; modules: string[];
-  visionGlobale: boolean; agenceIds: number[];
+  visionGlobale: boolean; agenceIds: number[]; motDePasseProvisoire: boolean;
+}
+
+export interface Habilitation { roleCode: string; roleLibelle?: string; moduleCode: string | null; moduleLibelle?: string; }
+export interface CompteUtilisateur {
+  id: number; login: string; nomComplet: string; email: string | null; numeroWhatsapp: string | null; statut: string;
+  motDePasseProvisoire: boolean; echecsConnexion: number; derniereConnexion: string | null; createdAt: string;
+  habilitations: Habilitation[]; agences: { agenceId: number; libelle: string; depuis: string }[];
+}
+export interface CompteProvisoire { utilisateur: CompteUtilisateur; motDePasseProvisoire: string; }
+export interface ReferentielHabilitation {
+  roles: { code: string; libelle: string; description: string; visionGlobale: boolean }[];
+  modules: { code: string; libelle: string }[];
 }
 
 export interface Agence { id: number; code: string; libelle: string; }

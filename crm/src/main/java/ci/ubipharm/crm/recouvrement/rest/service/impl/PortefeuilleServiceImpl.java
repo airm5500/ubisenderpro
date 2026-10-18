@@ -168,7 +168,7 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
     @Transactional
     public AgentDTO enregistrerNumero(Long agentId, NumeroAgentDTO numero) {
         String normalise = ValeursImport.numeroWhatsapp(numero.getNumeroWhatsapp(), parametreService.valeur("whatsapp.prefixe_pays", "225"))
-                .orElseThrow(() -> new ErreurMetierException("Numero invalide : 10 chiffres attendus, par exemple 07 00 00 00 01."));
+                .orElseThrow(() -> new ErreurMetierException("Numéro invalide : 10 chiffres attendus, par exemple 07 00 00 00 01."));
         AgentDTO agent = agent(agentId);
         @SuppressWarnings("unchecked")
         List<String> autres = em.createNativeQuery("select nom_complet from crm_utilisateur where numero_whatsapp = :numero and id <> :id")
@@ -176,7 +176,7 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
                 .setParameter("id", agentId)
                 .getResultList();
         if (!autres.isEmpty()) {
-            throw new ErreurMetierException("Ce numero est deja celui de " + autres.getFirst() + ".");
+            throw new ErreurMetierException("Ce numéro est déjà celui de " + autres.getFirst() + ".");
         }
         em.createNativeQuery("update crm_utilisateur set numero_whatsapp = :numero, updated_at = utc_timestamp() where id = :id")
                 .setParameter("numero", normalise)

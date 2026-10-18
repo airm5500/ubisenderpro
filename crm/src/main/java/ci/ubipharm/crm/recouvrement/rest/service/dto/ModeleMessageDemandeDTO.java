@@ -16,14 +16,14 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ModeleMessageDemandeDTO {
 
-    @NotBlank(message = "Saisissez le nom du modele.")
-    @Size(max = 150, message = "Le nom ne peut pas depasser 150 caracteres.")
+    @NotBlank(message = "Saisissez le nom du modèle.")
+    @Size(max = 150, message = "Le nom ne peut pas dépasser 150 caractères.")
     private String nom;
 
     @NotBlank(message = "Choisissez le type de relance.")
     private String typeCampagne;
 
     @NotBlank(message = "Saisissez le texte du message.")
-    @Size(max = 4000, message = "Le message ne peut pas depasser 4000 caracteres.")
+    @Size(max = 4000, message = "Le message ne peut pas dépasser 4000 caractères.")
     private String contenu;
 }

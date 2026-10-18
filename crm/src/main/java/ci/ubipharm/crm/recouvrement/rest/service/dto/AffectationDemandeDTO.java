@@ -26,6 +26,6 @@ public class AffectationDemandeDTO {
     @NotNull(message = "Choisissez l'agent.")
     private Long agentId;
 
-    @Size(max = 255, message = "Le motif ne peut pas depasser 255 caracteres.")
+    @Size(max = 255, message = "Le motif ne peut pas dépasser 255 caractères.")
     private String motif;
 }

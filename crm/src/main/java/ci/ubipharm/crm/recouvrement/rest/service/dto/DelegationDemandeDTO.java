@@ -21,15 +21,15 @@ public class DelegationDemandeDTO {
     @NotNull(message = "Choisissez l'agent absent.")
     private Long titulaireId;
 
-    @NotNull(message = "Choisissez le remplacant.")
+    @NotNull(message = "Choisissez le remplaçant.")
     private Long remplacantId;
 
-    @NotNull(message = "Saisissez la date de debut.")
+    @NotNull(message = "Saisissez la date de début.")
     private LocalDate dateDebut;
 
     @NotNull(message = "Saisissez la date de retour.")
     private LocalDate dateFin;
 
-    @Size(max = 255, message = "Le motif ne peut pas depasser 255 caracteres.")
+    @Size(max = 255, message = "Le motif ne peut pas dépasser 255 caractères.")
     private String motif;
 }

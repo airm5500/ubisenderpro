@@ -58,22 +58,22 @@ class SelectionCampagne {
             return;
         }
         if (c.getJoursAvantMin() != null && c.getJoursAvantMin() < 1 || c.getJoursAvantMax() != null && c.getJoursAvantMax() < 1) {
-            throw new ErreurMetierException("Une relance avant echeance part au plus tard la veille (J-1).");
+            throw new ErreurMetierException("Une relance avant échéance part au plus tard la veille (J-1).");
         }
         if (c.getJoursAvantMin() != null && c.getJoursAvantMax() != null && c.getJoursAvantMin() > c.getJoursAvantMax()) {
-            throw new ErreurMetierException("Le premier jour de relance avant echeance doit preceder le dernier.");
+            throw new ErreurMetierException("Le premier jour de relance avant échéance doit précéder le dernier.");
         }
         if (c.getJoursRetardMin() != null && c.getJoursRetardMin() < 1) {
-            throw new ErreurMetierException("Une relance apres echeance commence au premier jour de retard.");
+            throw new ErreurMetierException("Une relance après échéance commence au premier jour de retard.");
         }
         if (c.getJoursRetardMin() != null && c.getJoursRetardMax() != null && c.getJoursRetardMin() > c.getJoursRetardMax()) {
-            throw new ErreurMetierException("Le retard minimum depasse le retard maximum.");
+            throw new ErreurMetierException("Le retard minimum dépasse le retard maximum.");
         }
         if (c.getSoldeMin() != null && c.getSoldeMax() != null && c.getSoldeMin().compareTo(c.getSoldeMax()) > 0) {
-            throw new ErreurMetierException("Le solde minimum depasse le solde maximum.");
+            throw new ErreurMetierException("Le solde minimum dépasse le solde maximum.");
         }
         if (c.getEcheanceDu() != null && c.getEcheanceAu() != null && c.getEcheanceDu().isAfter(c.getEcheanceAu())) {
-            throw new ErreurMetierException("La periode d'echeance est inversee.");
+            throw new ErreurMetierException("La période d'échéance est inversée.");
         }
     }
 
@@ -204,13 +204,13 @@ class SelectionCampagne {
             return "Client sans agent de recouvrement";
         }
         if (!"ACTIF".equals(t.get("agentStatut", String.class))) {
-            return "Agent " + t.get("agentNom", String.class) + " desactive";
+            return "Agent " + t.get("agentNom", String.class) + " désactivé";
         }
         if (t.get("agentNumero") == null) {
-            return "Agent " + t.get("agentNom", String.class) + " sans numero WhatsApp";
+            return "Agent " + t.get("agentNom", String.class) + " sans numéro WhatsApp";
         }
         if (t.get("contactId") == null) {
-            return "Client sans numero WhatsApp";
+            return "Client sans numéro WhatsApp";
         }
         if (t.get("campagneEnAttente") != null) {
             return "Deja dans la campagne « " + t.get("campagneEnAttente", String.class) + " » en attente d'envoi";

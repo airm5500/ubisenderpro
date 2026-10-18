@@ -17,6 +17,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CorrectionLigneDTO {
 
-    @NotNull(message = "Aucune valeur corrigee.")
+    @NotNull(message = "Aucune valeur corrigée.")
     private Map<String, String> valeurs;
 }

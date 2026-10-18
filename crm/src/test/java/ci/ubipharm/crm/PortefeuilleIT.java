@@ -149,7 +149,7 @@ class PortefeuilleIT extends IntegrationBase {
         // Pas de chevauchement, et seule la direction autorise un interim
         deleguer(admin, agent1, agentVridi, aujourdhui.plusDays(3), aujourdhui.plusDays(8))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("est deja remplace par Test it-agent2")));
+                .andExpect(jsonPath("$.message", containsString("est déjà remplacé par Test it-agent2")));
         deleguer(remplacant, agent2, agent1, aujourdhui, aujourdhui).andExpect(status().isForbidden());
 
         mvc.perform(post("/api/recouvrement/delegations/" + delegationId + "/annulation").session(admin).with(csrf()))
@@ -183,7 +183,7 @@ class PortefeuilleIT extends IntegrationBase {
         mvc.perform(put("/api/recouvrement/agents/" + agent2 + "/numero").session(admin).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"numeroWhatsapp\":\"+225 0711223344\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Ce numero est deja celui de Test it-agent1."));
+                .andExpect(jsonPath("$.message").value("Ce numéro est déjà celui de Test it-agent1."));
         mvc.perform(put("/api/recouvrement/agents/" + agent2 + "/numero").session(admin).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"numeroWhatsapp\":\"1234\"}"))
                 .andExpect(status().isBadRequest());
