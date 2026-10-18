@@ -3,8 +3,10 @@ package ci.ubipharm.crm.recouvrement.rest.service.impl;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -30,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     private static final String SELECT = """
-            select m.id as id, m.nom as nom, m.type_campagne as typeCampagne, m.contenu as contenu, m.statut as statut,
+            select m.id as id, m.nom as nom, m.type_campagne as typeCampagne, m.canal as canal, m.objet as objet, m.contenu as contenu, m.statut as statut,
                    c.nom_complet as creePar, u.nom_complet as modifiePar, m.created_at as createdAt, m.updated_at as updatedAt
             from crm_modele_message m
             join crm_utilisateur c on c.id = m.cree_par
@@ -51,6 +53,10 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         if (criteres.getTypeCampagne() != null) {
             where.append(" and m.type_campagne = :typeCampagne");
             parametres.put("typeCampagne", criteres.getTypeCampagne());
+        }
+        if (criteres.getCanal() != null) {
+            where.append(" and m.canal = :canal");
+            parametres.put("canal", criteres.getCanal());
         }
         Query requete = em.createNativeQuery(SELECT + where + " order by m.type_campagne, m.nom", Tuple.class);
         parametres.forEach(requete::setParameter);
@@ -75,11 +81,13 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     public ModeleMessageDTO creer(ModeleMessageDemandeDTO demande) {
         verifier(demande, null);
         em.createNativeQuery("""
-                insert into crm_modele_message (nom, type_campagne, contenu, cree_par, created_at)
-                values (:nom, :typeCampagne, :contenu, :creePar, utc_timestamp())
+                insert into crm_modele_message (nom, type_campagne, canal, objet, contenu, cree_par, created_at)
+                values (:nom, :typeCampagne, :canal, :objet, :contenu, :creePar, utc_timestamp())
                 """)
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("typeCampagne", demande.getTypeCampagne())
+                .setParameter("canal", canal(demande))
+                .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
                 .setParameter("creePar", utilisateurCourantService.utilisateur().getId())
                 .executeUpdate();
@@ -96,13 +104,22 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             throw new ErreurMetierException("Le modèle « " + existant.getNom() + " » est archivé.");
         }
         verifier(demande, id);
+        if (!existant.getCanal().equals(canal(demande))) {
+            Number utilisations = (Number) em.createNativeQuery("select count(*) from crm_campagne where modele_id = :id")
+                    .setParameter("id", id).getSingleResult();
+            if (utilisations.longValue() > 0) {
+                throw new ErreurMetierException("Ce modèle sert déjà à des campagnes : son canal ne change plus. Créez un autre modèle.");
+            }
+        }
         em.createNativeQuery("""
-                update crm_modele_message set nom = :nom, type_campagne = :typeCampagne, contenu = :contenu,
+                update crm_modele_message set nom = :nom, type_campagne = :typeCampagne, canal = :canal, objet = :objet, contenu = :contenu,
                        modifie_par = :modifiePar, updated_at = utc_timestamp()
                 where id = :id
                 """)
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("typeCampagne", demande.getTypeCampagne())
+                .setParameter("canal", canal(demande))
+                .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
                 .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
                 .setParameter("id", id)
@@ -134,9 +151,14 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         if (!GabaritMessage.TYPES_CAMPAGNE.contains(demande.getTypeCampagne())) {
             throw new ErreurMetierException("Type de relance inconnu : " + demande.getTypeCampagne() + ".");
         }
+        if ("EMAIL".equals(canal(demande)) && objet(demande) == null) {
+            throw new ErreurMetierException("Saisissez l'objet de l'e-mail.");
+        }
         Set<String> connues = variableMessageService.sourcesParCode().keySet();
         List<String> inconnues = new ArrayList<>();
-        GabaritMessage.variables(demande.getContenu()).stream().filter(v -> !connues.contains(v)).forEach(v -> inconnues.add("{" + v + "}"));
+        Set<String> utilisees = new LinkedHashSet<>(GabaritMessage.variables(demande.getContenu()));
+        utilisees.addAll(GabaritMessage.variables(Objects.requireNonNullElse(objet(demande), "")));
+        utilisees.stream().filter(v -> !connues.contains(v)).forEach(v -> inconnues.add("{" + v + "}"));
         if (!inconnues.isEmpty()) {
             throw new ErreurMetierException((inconnues.size() == 1 ? "Variable inconnue : " : "Variables inconnues : ") + String.join(", ", inconnues) + ".");
         }
@@ -149,12 +171,23 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         }
     }
 
+    private static String canal(ModeleMessageDemandeDTO demande) {
+        return demande.getCanal() == null || demande.getCanal().isBlank() ? "WHATSAPP" : demande.getCanal();
+    }
+
+    /** L'objet n'a de sens que pour un e-mail. */
+    private static String objet(ModeleMessageDemandeDTO demande) {
+        return "EMAIL".equals(canal(demande)) && demande.getObjet() != null && !demande.getObjet().isBlank() ? demande.getObjet().trim() : null;
+    }
+
     ModeleMessageDTO mapTupleToDto(Tuple tuple) {
         String contenu = tuple.get("contenu", String.class);
         return ModeleMessageDTO.builder()
                 .id(tuple.get("id", Long.class))
                 .nom(tuple.get("nom", String.class))
                 .typeCampagne(tuple.get("typeCampagne", String.class))
+                .canal(tuple.get("canal", String.class))
+                .objet(tuple.get("objet", String.class))
                 .contenu(contenu)
                 .statut(tuple.get("statut", String.class))
                 .variables(List.copyOf(GabaritMessage.variables(contenu)))

@@ -73,7 +73,14 @@
       <section class="sec" aria-labelledby="s2">
         <span class="num">2</span>
         <div>
-          <div><h2 id="s2" class="h">Message</h2><p class="sous-titre">Seuls les modèles actifs prévus pour ce type de relance sont proposés.</p></div>
+          <div><h2 id="s2" class="h">Message</h2><p class="sous-titre">Seuls les modèles actifs prévus pour ce type de relance et ce canal sont proposés.</p></div>
+          <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
+            <label class="opt" [class.optn]="canal() === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [checked]="canal() === 'WHATSAPP'" (change)="changerCanal('WHATSAPP')"><span>WhatsApp<br><span class="discret">depuis le numéro de l'agent du client</span></span></label>
+            <label class="opt" [class.optn]="canal() === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [checked]="canal() === 'EMAIL'" (change)="changerCanal('EMAIL')"><span>E-mail<br><span class="discret">à l'adresse du client, réponses à l'agent</span></span></label>
+          </div>
+          @if (canal() === 'EMAIL' && etatEmail() && !etatEmail()!.configure) {
+            <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Le serveur d'envoi des e-mails n'est pas encore configuré : la campagne peut être préparée et validée, les e-mails partiront une fois le serveur renseigné.</span></div>
+          }
           <label class="f">Modèle
             <select class="sel" name="modele" [(ngModel)]="modeleId" (ngModelChange)="modifie()">
               @for (m of modelesDuType(); track m.id) { <option [ngValue]="m.id">{{ m.nom }}</option> }
@@ -100,7 +107,11 @@
               <label class="f">Heure<input class="sel" type="time" name="heure" [(ngModel)]="heureEnvoi"></label>
             </div>
           }
-          <p class="discret">Les messages partent entre 8 h et 18 h, heure d'Abidjan, au rythme lent imposé par WhatsApp Web : 20 à 45 secondes entre deux messages d'un même numéro, 200 par jour au plus.</p>
+          @if (canal() === 'EMAIL') {
+            <p class="discret">Les e-mails partent entre {{ etatEmail()?.heureDebut ?? 8 }} h et {{ etatEmail()?.heureFin ?? 18 }} h, heure d'Abidjan, depuis {{ etatEmail()?.expediteur || "l'adresse d'envoi d'UBIPHARM" }}, l'un après l'autre.</p>
+          } @else {
+            <p class="discret">Les messages partent entre 8 h et 18 h, heure d'Abidjan, au rythme lent imposé par WhatsApp Web : 20 à 45 secondes entre deux messages d'un même numéro, 200 par jour au plus.</p>
+          }
         </div>
       </section>
     </form>
@@ -114,7 +125,7 @@
           <div class="sum"><span>Messages à envoyer</span><strong>{{ r.nbMessages }}, un par facture</strong></div>
           <div class="sum"><span>Montant visé</span><strong>{{ r.totalSolde | montant }} FCFA</strong></div>
           @for (a of r.agents; track a.agentId) {
-            <div class="sum"><span>{{ a.agentNom }}</span><strong>{{ a.nbMessages }} msg · {{ (a.numeroExpediteur | telephone) || 'sans numéro' }}</strong></div>
+            <div class="sum"><span>{{ a.agentNom }}</span><strong>{{ a.nbMessages }} {{ canal() === 'EMAIL' ? 'e-mail' + (a.nbMessages > 1 ? 's' : '') : 'msg · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</strong></div>
           }
           @for (e of r.exclusions; track e.motif) {
             <div class="sum"><span>Exclues : {{ e.motif }}</span><strong>{{ e.nb }}</strong></div>
@@ -137,9 +148,21 @@
             <h2 class="h" style="margin: 0">Aperçu pour {{ recap()!.exemples[exemple()].clientRaisonSociale }}</h2>
             @if (recap()!.exemples.length > 1) { <a (click)="exempleSuivant()">Suivant</a> }
           </div>
-          <div class="fil-wa">
-            <div class="out">{{ recap()!.exemples[exemple()].contenu }}<span class="meta">{{ recap()!.exemples[exemple()].factureReference }} · vers {{ recap()!.exemples[exemple()].numeroDestinataire | telephone }}</span></div>
-          </div>
+          @if (recap()!.exemples[exemple()]; as m) {
+            @if (m.canal === 'EMAIL') {
+              <div class="courriel">
+                <div class="ent">
+                  <span>À <strong>{{ m.emailDestinataire }}</strong>{{ m.emailReponse ? ' · réponse à ' + m.emailReponse : '' }}</span>
+                  <span class="objet">{{ m.objet }}</span>
+                </div>
+                <div class="corps">{{ m.contenu }}</div>
+              </div>
+            } @else {
+              <div class="fil-wa">
+                <div class="out">{{ m.contenu }}<span class="meta">{{ m.factureReference }} · vers {{ m.numeroDestinataire | telephone }}</span></div>
+              </div>
+            }
+          }
         </section>
       }
     </aside>

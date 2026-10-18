@@ -26,7 +26,7 @@
           <div class="grp">{{ g.libelle }}</div>
           @for (m of g.modeles; track m.id) {
             <button class="it" [class.iton]="choisi()?.id === m.id && !enEdition()" (click)="choisir(m)">
-              <strong>{{ m.nom }}</strong><span class="second">modifié le {{ (m.updatedAt || m.createdAt) | jour }}{{ m.modifiePar || m.creePar ? ' par ' + (m.modifiePar || m.creePar) : '' }}</span>
+              <strong>{{ m.nom }}</strong><span class="second">{{ L.canal[m.canal] }} · modifié le {{ (m.updatedAt || m.createdAt) | jour }}{{ m.modifiePar || m.creePar ? ' par ' + (m.modifiePar || m.creePar) : '' }}</span>
             </button>
           }
         } @empty {
@@ -44,17 +44,26 @@
               <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
             </label>
           </div>
+          <div class="f">Canal d'envoi
+            <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
+              <label class="opt" [class.optn]="edition.canal === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">WhatsApp, depuis le numéro de l'agent</label>
+              <label class="opt" [class.optn]="edition.canal === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">E-mail, l'agent en adresse de réponse</label>
+            </div>
+          </div>
+          @if (edition.canal === 'EMAIL') {
+            <label class="f">Objet de l'e-mail<input class="sel" [(ngModel)]="edition.objet" (ngModelChange)="objet.set($event)" maxlength="200" placeholder="Ex. Facture {reference_facture} échue"></label>
+          }
           <div class="f">Variables disponibles <span class="discret">(cliquez pour insérer)</span>
             <div class="chips">@for (v of variables(); track v.id) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
           </div>
           <label class="f">Message<textarea #zone class="sel" style="min-height: 200px" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)"></textarea></label>
           <div class="actions">
             <button class="bs" (click)="enEdition.set(false)">Annuler</button>
-            <button class="bp" (click)="enregistrer()" [disabled]="!edition.nom.trim() || !edition.contenu.trim()">Enregistrer</button>
+            <button class="bp" (click)="enregistrer()" [disabled]="!edition.nom.trim() || !edition.contenu.trim() || (edition.canal === 'EMAIL' && !edition.objet.trim())">Enregistrer</button>
           </div>
         } @else if (choisi(); as m) {
           <div class="entete">
-            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
+            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
             @if (auth.gestionnaire() && m.statut === 'ACTIF') {
               <div class="actions"><button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button></div>
             }
@@ -66,9 +75,19 @@
 
         @if (enEdition() || choisi()) {
           <div class="lbl">Aperçu avec les valeurs d'exemple</div>
-          <div class="fil-wa">
-            <div class="out">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}<span class="meta">09:30</span></div>
-          </div>
+          @if (canalApercu() === 'EMAIL') {
+            <div class="courriel">
+              <div class="ent">
+                <span>De <strong>UBIPHARM CI - Recouvrement</strong> · répondre à l'agent du client</span>
+                <span class="objet">@for (p of apercuObjet(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</span>
+              </div>
+              <div class="corps">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>
+            </div>
+          } @else {
+            <div class="fil-wa">
+              <div class="out">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}<span class="meta">09:30</span></div>
+            </div>
+          }
           @if (apercuInconnues()) { <p class="avert" style="margin: 0">Une variable surlignée en rouge n'existe pas : le modèle sera refusé à l'enregistrement.</p> }
         }
       </div>

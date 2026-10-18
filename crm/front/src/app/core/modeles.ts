@@ -71,7 +71,7 @@ export interface Delegation {
 export interface Variable { id: number; code: string; libelle: string; source: string; exemple: string; statut: string; }
 export interface SourceVariable { source: string; libelle: string; }
 export interface ModeleMessage {
-  id: number; nom: string; typeCampagne: string; contenu: string; statut: string; variables: string[];
+  id: number; nom: string; typeCampagne: string; canal: string; objet: string | null; contenu: string; statut: string; variables: string[];
   creePar: string; modifiePar: string; createdAt: string; updatedAt: string;
 }
 
@@ -82,7 +82,7 @@ export interface CriteresCampagne {
 }
 export interface CampagneDemande { nom: string; typeCampagne: string; modeleId: number | null; criteres: CriteresCampagne; dateExecution: string | null; }
 export interface Campagne {
-  id: number; nom: string; typeCampagne: string; modeleId: number; modeleNom: string; criteres: CriteresCampagne;
+  id: number; nom: string; typeCampagne: string; modeleId: number; modeleNom: string; canal: string; criteres: CriteresCampagne;
   dateExecution: string | null; statut: string; nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number;
   nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string; createdAt: string; soumiseLe: string | null;
   validePar: string | null; valideLe: string | null; motifRejet: string | null; rejetePar: string | null;
@@ -90,10 +90,13 @@ export interface Campagne {
 }
 export interface MessageCampagne {
   id: number | null; factureId: number; factureReference: string; dateEcheance: string; solde: number; clientId: number;
-  clientCode: string; clientRaisonSociale: string; agenceId: number; numeroDestinataire: string | null; agentId: number | null;
-  agentNom: string | null; numeroExpediteur: string | null; contenu: string | null; statut: string; motif: string | null;
+  clientCode: string; clientRaisonSociale: string; agenceId: number; canal: string; numeroDestinataire: string | null;
+  emailDestinataire: string | null; agentId: number | null; agentNom: string | null; numeroExpediteur: string | null;
+  emailReponse: string | null; objet: string | null; contenu: string | null; statut: string; motif: string | null;
   envoyeLe: string | null; distribueLe: string | null; luLe: string | null;
 }
+export interface EtatEmail { configure: boolean; expediteur: string; enAttente: number; envoyesAujourdhui: number; heureDebut: number; heureFin: number; }
+
 export interface Recapitulatif {
   nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number; totalSolde: number;
   agents: { agentId: number; agentNom: string; numeroExpediteur: string; nbClients: number; nbMessages: number }[];

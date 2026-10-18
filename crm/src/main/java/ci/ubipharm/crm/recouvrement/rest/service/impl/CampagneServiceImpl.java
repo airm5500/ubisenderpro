@@ -58,7 +58,7 @@ public class CampagneServiceImpl implements CampagneService {
 
     private static final String SELECT = """
             select cp.id as id, cp.nom as nom, cp.type_campagne as typeCampagne, cp.modele_id as modeleId, mo.nom as modeleNom,
-                   mo.contenu as modeleContenu, mo.statut as modeleStatut, cp.criteres as criteres, cp.date_execution as dateExecution,
+                   mo.canal as canal, mo.objet as modeleObjet, mo.contenu as modeleContenu, mo.statut as modeleStatut, cp.criteres as criteres, cp.date_execution as dateExecution,
                    cp.statut as statut, cp.perimetre_agences as perimetreAgences, cp.perimetre_agents as perimetreAgents,
                    cp.nb_clients as nbClients, cp.nb_factures as nbFactures, cp.nb_messages as nbMessages, cp.nb_exclus as nbExclus,
                    cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs, cp.cree_par as creeParId, uc.nom_complet as creePar,
@@ -76,8 +76,9 @@ public class CampagneServiceImpl implements CampagneService {
     private static final String SELECT_MESSAGES = """
             select m.id as id, m.facture_id as factureId, f.reference as factureReference, f.date_echeance as dateEcheance,
                    f.solde as solde, m.client_id as clientId, c.code as clientCode, c.raison_sociale as clientRaisonSociale,
-                   c.agence_id as agenceId, m.numero_destinataire as numeroDestinataire, m.agent_id as agentId, u.nom_complet as agentNom,
-                   m.numero_expediteur as numeroExpediteur, m.contenu as contenu, m.statut as statut, m.motif as motif,
+                   c.agence_id as agenceId, m.canal as canal, m.numero_destinataire as numeroDestinataire, m.email_destinataire as emailDestinataire,
+                   m.agent_id as agentId, u.nom_complet as agentNom, m.numero_expediteur as numeroExpediteur, m.email_reponse as emailReponse,
+                   m.objet as objet, m.contenu as contenu, m.statut as statut, m.motif as motif,
                    m.envoye_le as envoyeLe, m.distribue_le as distribueLe, m.lu_le as luLe
             from crm_campagne_message m
             join crm_facture f on f.id = m.facture_id
@@ -97,7 +98,7 @@ public class CampagneServiceImpl implements CampagneService {
     private final JournalActionService journalActionService;
 
     /** Campagne lue en base, avec ce qu'il faut pour regenerer ses messages. */
-    private record Campagne(CampagneDTO dto, String modeleContenu, String modeleStatut, Perimetre perimetre) {
+    private record Campagne(CampagneDTO dto, SelectionCampagne.Modele modele, String modeleStatut, Perimetre perimetre) {
     }
 
     @Override
@@ -261,7 +262,7 @@ public class CampagneServiceImpl implements CampagneService {
             throw new ErreurMetierException("Seul un brouillon peut être soumis à validation.");
         }
         List<Ligne> lignes = generer(campagne);
-        long envoyables = lignes.stream().filter(l -> l.contactId() != null).count();
+        long envoyables = lignes.stream().filter(Ligne::envoyable).count();
         if (envoyables == 0) {
             throw new ErreurMetierException("La campagne ne contient aucun message à envoyer.");
         }
@@ -283,7 +284,7 @@ public class CampagneServiceImpl implements CampagneService {
             throw new ErreurMetierException("Le modèle « " + campagne.dto().getModeleNom() + " » a été archivé ; choisissez-en un autre.");
         }
         List<Ligne> lignes = generer(campagne);
-        if (lignes.stream().noneMatch(l -> l.contactId() != null)) {
+        if (lignes.stream().noneMatch(Ligne::envoyable)) {
             throw new ErreurMetierException("La campagne ne contient plus aucun message à envoyer.");
         }
         SqlParameterSource[] lots = lignes.stream().map(l -> new MapSqlParameterSource()
@@ -291,17 +292,21 @@ public class CampagneServiceImpl implements CampagneService {
                 .addValue("factureId", l.message().getFactureId())
                 .addValue("clientId", l.message().getClientId())
                 .addValue("contactId", l.contactId())
+                .addValue("canal", campagne.modele().canal())
                 .addValue("numeroDestinataire", l.message().getNumeroDestinataire())
+                .addValue("emailDestinataire", l.message().getEmailDestinataire())
                 .addValue("agentId", l.message().getAgentId())
                 .addValue("numeroExpediteur", l.message().getNumeroExpediteur())
+                .addValue("emailReponse", l.message().getEmailReponse())
+                .addValue("objet", l.message().getObjet())
                 .addValue("contenu", l.message().getContenu())
                 .addValue("statut", l.message().getStatut())
                 .addValue("motif", l.message().getMotif())).toArray(SqlParameterSource[]::new);
         jdbc.batchUpdate("""
-                insert into crm_campagne_message (campagne_id, facture_id, client_id, contact_id, numero_destinataire, agent_id,
-                                                  numero_expediteur, contenu, statut, motif, created_at)
-                values (:campagneId, :factureId, :clientId, :contactId, :numeroDestinataire, :agentId, :numeroExpediteur, :contenu,
-                        :statut, :motif, utc_timestamp())
+                insert into crm_campagne_message (campagne_id, facture_id, client_id, canal, contact_id, numero_destinataire, email_destinataire,
+                                                  agent_id, numero_expediteur, email_reponse, objet, contenu, statut, motif, created_at)
+                values (:campagneId, :factureId, :clientId, :canal, :contactId, :numeroDestinataire, :emailDestinataire, :agentId,
+                        :numeroExpediteur, :emailReponse, :objet, :contenu, :statut, :motif, utc_timestamp())
                 """, lots);
         em.createNativeQuery("update crm_campagne set statut = 'VALIDEE', valide_par = :validePar, valide_le = utc_timestamp(), "
                 + "updated_at = utc_timestamp() where id = :id")
@@ -315,7 +320,7 @@ public class CampagneServiceImpl implements CampagneService {
                 where m.campagne_id = :id and m.statut = 'A_ENVOYER' and f.statut = 'A_RELANCER'
                 """).setParameter("id", id).executeUpdate();
         journalActionService.enregistrer("CAMPAGNE_VALIDATION", "crm_campagne", id,
-                lignes.stream().filter(l -> l.contactId() != null).count() + " message(s)");
+                lignes.stream().filter(Ligne::envoyable).count() + " message(s)");
 
         LocalDateTime execution = campagne.dto().getDateExecution();
         if (execution == null || !execution.isAfter(maintenant())) {
@@ -403,7 +408,7 @@ public class CampagneServiceImpl implements CampagneService {
 
     /**
      * Passe la campagne en cours. Une facture soldee depuis la validation n'est plus relancee. L'envoi effectif
-     * des messages A_ENVOYER depuis le numero de chaque agent est assure par le service WhatsApp.
+     * des messages A_ENVOYER est assure par le service WhatsApp (numero de chaque agent) ou par l'envoi d'e-mails.
      */
     private void demarrer(Long id, boolean systeme) {
         int annules = em.createNativeQuery("""
@@ -444,11 +449,11 @@ public class CampagneServiceImpl implements CampagneService {
         LocalDate reference = dto.getDateExecution() == null || dto.getDateExecution().isBefore(maintenant())
                 ? maintenant().toLocalDate() : dto.getDateExecution().toLocalDate();
         return selectionCampagne.selectionner(dto.getId(), dto.getTypeCampagne(), dto.getCriteres(), campagne.perimetre(), reference,
-                campagne.modeleContenu());
+                campagne.modele());
     }
 
     private void enregistrerComptes(Long id, List<Ligne> lignes) {
-        List<MessageCampagneDTO> envoyables = lignes.stream().filter(l -> l.contactId() != null).map(Ligne::message).toList();
+        List<MessageCampagneDTO> envoyables = lignes.stream().filter(Ligne::envoyable).map(Ligne::message).toList();
         em.createNativeQuery("""
                 update crm_campagne set nb_clients = :nbClients, nb_factures = :nbFactures, nb_messages = :nbMessages, nb_exclus = :nbExclus
                 where id = :id
@@ -570,6 +575,7 @@ public class CampagneServiceImpl implements CampagneService {
                 .typeCampagne(tuple.get("typeCampagne", String.class))
                 .modeleId(tuple.get("modeleId", Long.class))
                 .modeleNom(tuple.get("modeleNom", String.class))
+                .canal(tuple.get("canal", String.class))
                 .criteres(jsonMapper.readValue(tuple.get("criteres", String.class), CriteresCampagneDTO.class))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
                 .statut(tuple.get("statut", String.class))
@@ -593,7 +599,9 @@ public class CampagneServiceImpl implements CampagneService {
                 .annuleLe(tuple.get("annuleLe", LocalDateTime.class))
                 .motifAnnulation(tuple.get("motifAnnulation", String.class))
                 .build();
-        return new Campagne(dto, tuple.get("modeleContenu", String.class), tuple.get("modeleStatut", String.class),
+        SelectionCampagne.Modele modele = new SelectionCampagne.Modele(dto.getCanal(), tuple.get("modeleObjet", String.class),
+                tuple.get("modeleContenu", String.class));
+        return new Campagne(dto, modele, tuple.get("modeleStatut", String.class),
                 new Perimetre(separer(tuple.get("perimetreAgences", String.class)), separer(tuple.get("perimetreAgents", String.class))));
     }
 
@@ -608,10 +616,14 @@ public class CampagneServiceImpl implements CampagneService {
                 .clientCode(tuple.get("clientCode", String.class))
                 .clientRaisonSociale(tuple.get("clientRaisonSociale", String.class))
                 .agenceId(tuple.get("agenceId", Long.class))
+                .canal(tuple.get("canal", String.class))
                 .numeroDestinataire(tuple.get("numeroDestinataire", String.class))
+                .emailDestinataire(tuple.get("emailDestinataire", String.class))
                 .agentId(tuple.get("agentId", Long.class))
                 .agentNom(tuple.get("agentNom", String.class))
                 .numeroExpediteur(tuple.get("numeroExpediteur", String.class))
+                .emailReponse(tuple.get("emailReponse", String.class))
+                .objet(tuple.get("objet", String.class))
                 .contenu(tuple.get("contenu", String.class))
                 .statut(tuple.get("statut", String.class))
                 .motif(tuple.get("motif", String.class))

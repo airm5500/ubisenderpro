@@ -33,7 +33,7 @@
 
     <div class="kvs" style="padding: 18px 0; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet)">
       <div class="kv"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }}</strong></div>
-      <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }}</strong></div>
+      <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }} · {{ L.canal[c.canal] }}</strong></div>
       <div class="kv"><span>Créée le</span><strong>{{ c.createdAt | jour }} par {{ c.creePar }}</strong></div>
       @if (c.validePar) { <div class="kv"><span>Validée par</span><strong>{{ c.validePar }}, {{ c.valideLe | jour }}</strong></div> }
       <div class="kv"><span>Critères</span><strong>{{ resume(c.criteres).join(' · ') || 'Toutes les factures du type' }}</strong></div>
@@ -49,9 +49,9 @@
         </section>
         @if (r.agents.length) {
           <section class="bloc">
-            <div class="titre"><h2 class="h2">Numéros d'envoi</h2></div>
+            <div class="titre"><h2 class="h2">{{ c.canal === 'EMAIL' ? 'Agents en adresse de réponse' : "Numéros d'envoi" }}</h2></div>
             @for (a of r.agents; track a.agentId) {
-              <div class="li"><span>{{ a.agentNom }} · {{ (a.numeroExpediteur | telephone) || 'sans numéro' }}</span><strong>{{ a.nbMessages }} messages, {{ a.nbClients }} clients</strong></div>
+              <div class="li"><span>{{ a.agentNom }}{{ c.canal === 'EMAIL' ? '' : ' · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</span><strong>{{ a.nbMessages }} messages, {{ a.nbClients }} clients</strong></div>
             }
           </section>
         }
@@ -64,7 +64,9 @@
         <div><span>Exclues</span><strong>{{ c.nbExclus }}</strong></div>
       </section>
       @if (c.statut === 'EN_COURS') {
-        <div class="info"><i class="pi pi-clock"></i><span>Envoi en cours, un message toutes les 20 à 45 secondes par numéro d'agent, entre 8 h et 18 h. Cette page se met à jour toute seule.</span></div>
+        <div class="info"><i class="pi pi-clock"></i><span>{{ c.canal === 'EMAIL'
+          ? "Envoi en cours, les e-mails partent l'un après l'autre entre 8 h et 18 h."
+          : "Envoi en cours, un message toutes les 20 à 45 secondes par numéro d'agent, entre 8 h et 18 h." }} Cette page se met à jour toute seule.</span></div>
       }
     }
 
@@ -78,7 +80,7 @@
       </div>
       <div class="defile">
         <table class="t">
-          <thead><tr><th>Client</th><th>Facture</th><th class="n">Solde</th><th>Agent · numéro d'envoi</th><th>Numéro du client</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Client</th><th>Facture</th><th class="n">Solde</th><th>{{ c.canal === 'EMAIL' ? 'Agent' : "Agent · numéro d'envoi" }}</th><th>{{ c.canal === 'EMAIL' ? 'E-mail du client' : 'Numéro du client' }}</th><th>Statut</th><th></th></tr></thead>
           <tbody>
             @for (m of page()?.elements; track m.factureId) {
               <tr>
@@ -86,7 +88,7 @@
                 <td class="nw">{{ m.factureReference }}<div class="second">échéance {{ m.dateEcheance | jour }}</div></td>
                 <td class="n">{{ m.solde | montant }}</td>
                 <td>{{ m.agentNom || '—' }}<div class="second">{{ m.numeroExpediteur | telephone }}</div></td>
-                <td class="nw">{{ (m.numeroDestinataire | telephone) || '—' }}</td>
+                <td class="nw">{{ m.canal === 'EMAIL' ? (m.emailDestinataire || '—') : ((m.numeroDestinataire | telephone) || '—') }}</td>
                 <td><span class="dot" [style.background]="L.couleurMessage[m.statut]"></span>{{ L.statutMessage[m.statut] ?? m.statut }}
                   @if (m.motif) {<div class="second">{{ m.motif }}</div>}
                   @if (m.luLe) {<div class="second">lu le {{ m.luLe | jour: true }}</div>}
@@ -115,7 +117,17 @@
 
 <p-dialog [header]="ouvert()?.clientRaisonSociale ?? ''" [visible]="ouvert() !== null" (visibleChange)="!$event && ouvert.set(null)" [modal]="true" [style]="{ width: '480px' }">
   @if (ouvert(); as m) {
-    <div class="fil-wa"><div class="out">{{ m.contenu }}<span class="meta">{{ m.factureReference }} · de {{ m.numeroExpediteur | telephone }} vers {{ m.numeroDestinataire | telephone }}</span></div></div>
+    @if (m.canal === 'EMAIL') {
+      <div class="courriel">
+        <div class="ent">
+          <span>À <strong>{{ m.emailDestinataire }}</strong>{{ m.emailReponse ? ' · réponse à ' + m.emailReponse : '' }}</span>
+          <span class="objet">{{ m.objet }}</span>
+        </div>
+        <div class="corps">{{ m.contenu }}</div>
+      </div>
+    } @else {
+      <div class="fil-wa"><div class="out">{{ m.contenu }}<span class="meta">{{ m.factureReference }} · de {{ m.numeroExpediteur | telephone }} vers {{ m.numeroDestinataire | telephone }}</span></div></div>
+    }
   }
 </p-dialog>
 

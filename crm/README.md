@@ -247,3 +247,40 @@ Regles :
   tant qu'il n'est pas remplace (403 sinon).
 - Desactivation, changement de roles ou d'agences, reinitialisation : la session ouverte de la personne est fermee
   a son appel suivant (401), elle se reconnecte avec ses nouveaux droits (`ControleSessionFiltre`).
+
+## Canal e-mail (lot 8)
+
+Chaque modele de message porte un canal, WhatsApp ou e-mail ; une campagne prend le canal de son modele.
+Un modele e-mail a un objet, qui accepte les memes variables que le message. Le canal d'un modele deja utilise
+par une campagne ne change plus.
+
+- **Destinataire** : l'adresse e-mail de la fiche client (la premiere si plusieurs sont separees par `;` ou `,`).
+  Client sans adresse ou adresse invalide : facture exclue de la campagne, avec le motif.
+- **Expediteur** : `email.expediteur` (a defaut `spring.mail.username`), nom affiche `email.nom_expediteur`.
+  L'adresse de reponse est l'e-mail de l'agent du client : le client repond directement a son agent.
+- **Envoi** : un e-mail a la fois, `email.envoi.delai_secondes` (2) entre deux, `email.envoi.plafond_jour` (1000)
+  par jour, entre `email.envoi.heure_debut` et `email.envoi.heure_fin` (8 h a 18 h, heure d'Abidjan).
+  Adresse refusee par le serveur : echec immediat, la facture redevient a relancer. Serveur injoignable ou en
+  erreur : nouvel essai, puis echec apres `whatsapp.envoi.tentatives_max` essais. Suivi : statut ENVOYE (pas
+  d'accuse de lecture par e-mail).
+- **Serveur SMTP** : a renseigner dans `application-prod.yml` a cote de l'executable. Sans `spring.mail.host`,
+  le canal est signale non configure dans l'ecran de campagne et rien ne part.
+
+```yaml
+spring:
+  mail:
+    host: smtp.exemple.ci
+    port: 587
+    username: relances@ubipharm.ci
+    password: "..."
+    properties.mail.smtp.auth: true
+    properties.mail.smtp.starttls.enable: true
+```
+
+Essai en local : une boite GreenMail (`greenmail-standalone`, SMTP 3025, IMAP 3143) et
+`--spring.mail.host=127.0.0.1 --spring.mail.port=3025` ; les tests d'integration (`EmailIT`) l'embarquent.
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/email/etat` | Canal configure ou non, expediteur, plage horaire, e-mails en attente et envoyes du jour |
+| GET | `/api/recouvrement/modeles-messages?canal=EMAIL` | Modeles filtres par canal |

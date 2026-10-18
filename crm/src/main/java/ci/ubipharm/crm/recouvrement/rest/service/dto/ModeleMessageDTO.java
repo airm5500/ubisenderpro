@@ -20,6 +20,8 @@ public class ModeleMessageDTO {
     private Long id;
     private String nom;
     private String typeCampagne;
+    private String canal;
+    private String objet;
     private String contenu;
     private String statut;
     private List<String> variables;

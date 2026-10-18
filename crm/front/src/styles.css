@@ -205,3 +205,12 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .mdp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: var(--bleu); background: #EAF0F4; border-radius: 10px; padding: 14px 16px; text-align: center; user-select: all; }
 .etat-compte { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .sous-sec { margin-top: 6px; font-size: 13px; font-weight: 800; color: var(--bleu); text-transform: uppercase; letter-spacing: .4px; }
+
+/* Apercu d'un e-mail de relance */
+.courriel { background: #fff; border: 1px solid var(--filet); border-radius: 12px; overflow: hidden; }
+.courriel .ent { padding: 12px 16px; border-bottom: 1px solid var(--filet); display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--texte-2); }
+.courriel .ent strong { color: var(--bleu); font-weight: 700; }
+.courriel .objet { font-size: 15px; font-weight: 800; color: var(--bleu); }
+.courriel .corps { padding: 16px; font-size: 14px; line-height: 1.6; color: #1F2D38; white-space: pre-wrap; }
+.courriel .v { background: #E5F8EE; color: #157A47; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.canal { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--texte-2); }

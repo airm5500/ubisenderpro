@@ -31,6 +31,7 @@ export const LIBELLES = {
     A_RELANCER: '#9DB0BF', RELANCE_PROGRAMMEE: '#F4B740', RELANCE_ENVOYEE: '#7FA8C9', MESSAGE_DISTRIBUE: '#0B5C8E',
     MESSAGE_LU: '#05253D', REPONSE_RECUE: '#51D78E', SOLDEE: '#157A47'
   } as Partial<Record<string, string>>,
+  canal: { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail' } as Partial<Record<string, string>>,
   typeCampagne: {
     AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée'
   } as Partial<Record<string, string>>,

@@ -5,11 +5,19 @@ spring:
     password: ${CRM_DB_PASSWORD:ubicrm}
   flyway:
     clean-disabled: false
+  # Serveur SMTP en memoire demarre par EmailIT (GreenMail)
+  mail:
+    host: localhost
+    port: 3025
+    username: crm@ubipharm.ci
+    password: secret
 
-# Les tests demarrent les campagnes eux-memes
+# Les tests demarrent les campagnes et les envois eux-memes
 crm:
   campagnes:
     planificateur: false
   whatsapp:
     envoi: false
     jeton: jeton-de-test
+  email:
+    envoi: false

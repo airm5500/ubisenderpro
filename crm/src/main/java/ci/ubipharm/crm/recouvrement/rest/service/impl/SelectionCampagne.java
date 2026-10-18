@@ -9,7 +9,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -28,7 +30,8 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Selection des factures d'une campagne et generation de leurs messages : une facture = un message (4.7),
- * envoye au numero WhatsApp principal du client depuis le numero de son agent.
+ * envoye au numero WhatsApp principal du client depuis le numero de son agent, ou a l'adresse e-mail du client
+ * avec l'adresse de l'agent en reponse.
  */
 @Component
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ class SelectionCampagne {
 
     private static final DateTimeFormatter DATE_LISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Pattern COLONNE = Pattern.compile("[a-z][a-z0-9_]*");
+    private static final Pattern EMAIL = Pattern.compile("[^@\\s;,]+@[^@\\s;,]+\\.[^@\\s;,]+");
 
     private final EntityManager em;
     private final VariableMessageService variableMessageService;
@@ -50,6 +54,14 @@ class SelectionCampagne {
 
     /** Message genere et le contact destinataire, garde hors du DTO. */
     record Ligne(MessageCampagneDTO message, Long contactId) {
+
+        boolean envoyable() {
+            return A_ENVOYER.equals(message.getStatut());
+        }
+    }
+
+    /** Modele de la campagne : canal, objet (e-mail) et texte. */
+    record Modele(String canal, String objet, String contenu) {
     }
 
     /** Refuse des criteres incoherents avant tout enregistrement. */
@@ -78,10 +90,13 @@ class SelectionCampagne {
     }
 
     List<Ligne> selectionner(Long campagneId, String typeCampagne, CriteresCampagneDTO criteres, Perimetre perimetre,
-            LocalDate reference, String contenu) {
+            LocalDate reference, Modele modele) {
         CriteresCampagneDTO c = criteres == null ? new CriteresCampagneDTO() : criteres;
         Map<String, String> sourcesParCode = variableMessageService.sourcesParCode();
-        Set<String> utilisees = GabaritMessage.variables(contenu);
+        Set<String> utilisees = new LinkedHashSet<>(GabaritMessage.variables(modele.contenu()));
+        if (modele.objet() != null) {
+            utilisees.addAll(GabaritMessage.variables(modele.objet()));
+        }
         Map<String, String> aliasParSource = new LinkedHashMap<>();
         StringBuilder colonnes = new StringBuilder();
         for (String code : utilisees) {
@@ -103,6 +118,7 @@ class SelectionCampagne {
                        datediff(:reference, f.date_echeance) as ecart, c.id as clientId, c.code as clientCode,
                        c.raison_sociale as clientRaisonSociale, c.agence_id as agenceId, ag.libelle as agence, sg.libelle as segment, st.libelle as sousType,
                        u.id as agentId, u.nom_complet as agentNom, u.numero_whatsapp as agentNumero, u.statut as agentStatut,
+                       u.email as agentEmail, c.email as clientEmail,
                        ct.id as contactId, ct.numero_whatsapp as numeroDestinataire,
                        (select cp.nom from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id
                         where m.facture_id = f.id and m.statut = 'A_ENVOYER' and cp.id <> :campagneId limit 1) as campagneEnAttente
@@ -166,18 +182,22 @@ class SelectionCampagne {
         List<Tuple> lignes = requete.getResultList();
         List<Ligne> resultat = new ArrayList<>(lignes.size());
         for (Tuple t : lignes) {
-            resultat.add(ligne(t, contenu, sourcesParCode, aliasParSource));
+            resultat.add(ligne(t, modele, sourcesParCode, aliasParSource));
         }
         return resultat;
     }
 
-    private Ligne ligne(Tuple t, String contenu, Map<String, String> sourcesParCode, Map<String, String> aliasParSource) {
-        String motif = motifExclusion(t);
+    private Ligne ligne(Tuple t, Modele modele, Map<String, String> sourcesParCode, Map<String, String> aliasParSource) {
+        boolean email = "EMAIL".equals(modele.canal());
+        String adresse = email ? premiereAdresse(t.get("clientEmail", String.class)) : null;
+        String motif = email ? motifExclusionEmail(t, adresse) : motifExclusion(t);
         String texte = null;
+        String objet = null;
         if (motif == null) {
             Map<String, String> valeurs = new HashMap<>();
             sourcesParCode.forEach((code, source) -> valeurs.put(code, valeur(t, source, aliasParSource)));
-            texte = GabaritMessage.rendre(contenu, valeurs);
+            texte = GabaritMessage.rendre(modele.contenu(), valeurs);
+            objet = email ? GabaritMessage.rendre(modele.objet(), valeurs) : null;
         }
         MessageCampagneDTO message = MessageCampagneDTO.builder()
                 .factureId(t.get("factureId", Long.class))
@@ -188,15 +208,19 @@ class SelectionCampagne {
                 .clientCode(t.get("clientCode", String.class))
                 .clientRaisonSociale(t.get("clientRaisonSociale", String.class))
                 .agenceId(t.get("agenceId", Long.class))
-                .numeroDestinataire(t.get("numeroDestinataire", String.class))
+                .canal(modele.canal())
+                .numeroDestinataire(email ? null : t.get("numeroDestinataire", String.class))
+                .emailDestinataire(adresse)
                 .agentId(t.get("agentId", Long.class))
                 .agentNom(t.get("agentNom", String.class))
-                .numeroExpediteur(t.get("agentNumero", String.class))
+                .numeroExpediteur(email ? null : t.get("agentNumero", String.class))
+                .emailReponse(email ? t.get("agentEmail", String.class) : null)
+                .objet(objet)
                 .contenu(texte)
                 .statut(motif == null ? A_ENVOYER : EXCLU)
                 .motif(motif)
                 .build();
-        return new Ligne(message, motif == null ? t.get("contactId", Long.class) : null);
+        return new Ligne(message, motif == null && !email ? t.get("contactId", Long.class) : null);
     }
 
     private String motifExclusion(Tuple t) {
@@ -213,7 +237,42 @@ class SelectionCampagne {
             return "Client sans numéro WhatsApp";
         }
         if (t.get("campagneEnAttente") != null) {
-            return "Deja dans la campagne « " + t.get("campagneEnAttente", String.class) + " » en attente d'envoi";
+            return enAttente(t);
+        }
+        return null;
+    }
+
+    /** E-mail : il part de l'adresse d'UBIPHARM, l'agent n'a besoin ni de numero ni d'adresse. */
+    private String motifExclusionEmail(Tuple t, String adresse) {
+        if (t.get("agentId") == null) {
+            return "Client sans agent de recouvrement";
+        }
+        if (!"ACTIF".equals(t.get("agentStatut", String.class))) {
+            return "Agent " + t.get("agentNom", String.class) + " désactivé";
+        }
+        if (adresse == null) {
+            return t.get("clientEmail") == null || t.get("clientEmail", String.class).isBlank()
+                    ? "Client sans adresse e-mail" : "Adresse e-mail du client invalide";
+        }
+        if (t.get("campagneEnAttente") != null) {
+            return enAttente(t);
+        }
+        return null;
+    }
+
+    private String enAttente(Tuple t) {
+        return "Déjà dans la campagne « " + t.get("campagneEnAttente", String.class) + " » en attente d'envoi";
+    }
+
+    /** Premiere adresse valide d'un champ qui peut en contenir plusieurs (separees par ; ou ,). */
+    static String premiereAdresse(String texte) {
+        if (texte == null) {
+            return null;
+        }
+        for (String morceau : texte.split("[;,\\s]+")) {
+            if (EMAIL.matcher(morceau).matches()) {
+                return morceau.toLowerCase(Locale.ROOT);
+            }
         }
         return null;
     }

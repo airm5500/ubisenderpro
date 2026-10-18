@@ -16,4 +16,5 @@ public class ModeleMessageCriteresDTO {
 
     private String typeCampagne;
     private String statut;
+    private String canal;
 }

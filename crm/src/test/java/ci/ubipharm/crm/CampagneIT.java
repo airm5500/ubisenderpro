@@ -171,7 +171,7 @@ class CampagneIT extends IntegrationBase {
         Long doublon = idDe(creerCampagne(admin, "Doublon", "APRES_ECHEANCE", modeleRetard, "{\"clientIds\":[" + c1 + "]}", null));
         mvc.perform(get("/api/recouvrement/campagnes/" + doublon + "/recapitulatif").session(admin))
                 .andExpect(jsonPath("$.nbMessages").value(0))
-                .andExpect(jsonPath("$.exclusions[0].motif").value("Deja dans la campagne « Retards agent » en attente d'envoi"))
+                .andExpect(jsonPath("$.exclusions[0].motif").value("Déjà dans la campagne « Retards agent » en attente d'envoi"))
                 .andExpect(jsonPath("$.exclusions[0].nb").value(2));
         action(admin, doublon, "soumission", null).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La campagne ne contient aucun message à envoyer."));

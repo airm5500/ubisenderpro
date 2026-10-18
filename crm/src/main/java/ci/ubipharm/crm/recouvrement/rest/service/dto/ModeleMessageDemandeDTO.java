@@ -1,6 +1,7 @@
 package ci.ubipharm.crm.recouvrement.rest.service.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +23,14 @@ public class ModeleMessageDemandeDTO {
 
     @NotBlank(message = "Choisissez le type de relance.")
     private String typeCampagne;
+
+    /** WHATSAPP ou EMAIL ; vide = WHATSAPP. */
+    @Pattern(regexp = "WHATSAPP|EMAIL", message = "Canal inconnu.")
+    private String canal;
+
+    /** Objet de l'e-mail, obligatoire pour le canal EMAIL ; peut contenir des variables. */
+    @Size(max = 200, message = "L'objet ne peut pas dépasser 200 caractères.")
+    private String objet;
 
     @NotBlank(message = "Saisissez le texte du message.")
     @Size(max = 4000, message = "Le message ne peut pas dépasser 4000 caractères.")

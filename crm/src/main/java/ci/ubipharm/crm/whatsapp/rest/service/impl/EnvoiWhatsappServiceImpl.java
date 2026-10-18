@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import ci.ubipharm.crm.commun.rest.service.ParametreService;
+import ci.ubipharm.crm.commun.rest.service.SuiviEnvoiService;
 import ci.ubipharm.crm.whatsapp.rest.service.EnvoiWhatsappService;
 import ci.ubipharm.crm.whatsapp.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.whatsapp.rest.service.dto.ResultatEnvoiDTO;
@@ -27,13 +28,11 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
     private static final ZoneId ABIDJAN = ZoneId.of("Africa/Abidjan");
 
-    /** Statuts de facture que l'envoi fait avancer ; les suivants (distribue, lu, reponse...) ne reculent jamais. */
-    private static final String AVANT_ENVOI = "('A_RELANCER', 'RELANCE_PROGRAMMEE')";
-
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final PasserelleWhatsappService passerelle;
     private final ParametreService parametreService;
+    private final SuiviEnvoiService suiviEnvoi;
 
     /** Prochain envoi autorise par numero d'agent. */
     private final Map<String, Instant> prochainEnvoi = new ConcurrentHashMap<>();
@@ -82,13 +81,13 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     @Override
     public int reprendreEnvoisInterrompus() {
         return transaction.execute(statut -> {
-            List<Long> campagnes = jdbc.queryForList("select distinct campagne_id from crm_campagne_message where statut = 'ENVOI'", Map.of(), Long.class);
+            List<Long> campagnes = jdbc.queryForList("select distinct campagne_id from crm_campagne_message where statut = 'ENVOI' and canal = 'WHATSAPP'", Map.of(), Long.class);
             int interrompus = jdbc.update("""
                     update crm_campagne_message set statut = 'ECHEC', updated_at = utc_timestamp(),
                            motif = 'Envoi interrompu : verifiez dans le WhatsApp de l''agent avant de relancer'
-                    where statut = 'ENVOI'
+                    where statut = 'ENVOI' and canal = 'WHATSAPP'
                     """, Map.of());
-            campagnes.forEach(this::recompter);
+            campagnes.forEach(suiviEnvoi::recompter);
             return interrompus;
         });
     }
@@ -114,7 +113,6 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
     private void enregistrer(Message message, ResultatEnvoiDTO resultat) {
         MapSqlParameterSource p = new MapSqlParameterSource("id", message.id())
-                .addValue("factureId", message.factureId())
                 .addValue("identifiant", resultat.getIdentifiant())
                 .addValue("motif", resultat.getErreur());
         if (resultat.isSucces()) {
@@ -123,8 +121,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
                            tentatives = tentatives + 1, motif = null, updated_at = utc_timestamp()
                     where id = :id
                     """, p);
-            jdbc.update("update crm_facture set statut = 'RELANCE_ENVOYEE', updated_at = utc_timestamp() where id = :factureId and statut in "
-                    + AVANT_ENVOI, p);
+            suiviEnvoi.factureRelancee(message.factureId());
         } else if (resultat.isSessionIndisponible()) {
             // Le message attend la reconnexion du telephone de l'agent, sans compter d'essai
             jdbc.update("update crm_campagne_message set statut = 'A_ENVOYER', updated_at = utc_timestamp() where id = :id", p);
@@ -136,31 +133,9 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
         } else {
             jdbc.update("update crm_campagne_message set statut = 'ECHEC', tentatives = tentatives + 1, motif = :motif, "
                     + "updated_at = utc_timestamp() where id = :id", p);
-            // La facture redevient a relancer si aucune autre campagne ne doit l'envoyer
-            jdbc.update("""
-                    update crm_facture f set f.statut = 'A_RELANCER', f.updated_at = utc_timestamp()
-                    where f.id = :factureId and f.statut = 'RELANCE_PROGRAMMEE'
-                      and not exists (select 1 from crm_campagne_message m where m.facture_id = f.id and m.statut in ('A_ENVOYER', 'ENVOI'))
-                    """, p);
+            suiviEnvoi.factureNonRelancee(message.factureId());
         }
-        recompter(message.campagneId());
-    }
-
-    /**
-     * Compteurs du journal de campagne, et fin de campagne quand plus rien n'attend. MariaDB applique les affectations
-     * dans l'ordre : termine_le est calcule avant que statut ne change.
-     */
-    private void recompter(Long campagneId) {
-        jdbc.update("""
-                update crm_campagne c set
-                    nb_envoyes = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut in ('ENVOYE', 'DISTRIBUE', 'LU')),
-                    nb_echecs = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut = 'ECHEC'),
-                    termine_le = case when c.statut = 'EN_COURS' and not exists (select 1 from crm_campagne_message m
-                                  where m.campagne_id = c.id and m.statut in ('A_ENVOYER', 'ENVOI')) then utc_timestamp() else c.termine_le end,
-                    statut = case when c.statut = 'EN_COURS' and not exists (select 1 from crm_campagne_message m
-                                  where m.campagne_id = c.id and m.statut in ('A_ENVOYER', 'ENVOI')) then 'TERMINEE' else c.statut end
-                where c.id = :id
-                """, Map.of("id", campagneId));
+        suiviEnvoi.recompter(message.campagneId());
     }
 
     private long attente() {

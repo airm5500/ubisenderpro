@@ -6,7 +6,7 @@ import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
-import { Agence, Agent, Campagne, CampagneDemande, CriteresCampagne, ModeleMessage, Recapitulatif, SousType } from '../../core/modeles';
+import { Agence, Agent, Campagne, CampagneDemande, CriteresCampagne, EtatEmail, ModeleMessage, Recapitulatif, SousType } from '../../core/modeles';
 import { LIBELLES, MontantPipe, aujourdhui, resumeCriteres, TelephonePipe } from '../../core/format';
 
 const SEGMENTS = [{ code: 'P', libelle: 'Platinum' }, { code: 'S', libelle: 'Silver' }, { code: 'B', libelle: 'Bronze' }];
@@ -50,7 +50,11 @@ export class CampagneEdition implements OnInit {
   /** Le recapitulatif ne correspond plus au formulaire. */
   protected readonly perime = signal(true);
 
-  protected readonly modelesDuType = computed(() => this.modeles().filter(m => m.typeCampagne === this.typeSignal()));
+  /** Le canal (WhatsApp ou e-mail) est celui du modele choisi ; on choisit d'abord le canal, puis un modele de ce canal. */
+  protected readonly canal = signal('WHATSAPP');
+  protected readonly etatEmail = signal<EtatEmail | null>(null);
+  protected readonly modelesDuType = computed(() => this.modeles()
+    .filter(m => m.typeCampagne === this.typeSignal() && m.canal === this.canal()));
   private readonly typeSignal = signal('APRES_ECHEANCE');
   protected readonly puces = signal<string[]>([]);
   protected readonly aujourdhui = aujourdhui();
@@ -73,6 +77,13 @@ export class CampagneEdition implements OnInit {
       this.criteres.clientIds = this.clients()!.split(',').map(Number).filter(Boolean);
       this.nom = `Relance de ${this.criteres.clientIds.length} client${this.criteres.clientIds.length > 1 ? 's' : ''} · ${aujourdhui().split('-').reverse().join('/')}`;
     }
+    this.api.getSilencieux<EtatEmail>('/api/email/etat').subscribe({ next: e => this.etatEmail.set(e), error: () => undefined });
+    this.modifie();
+  }
+
+  changerCanal(canal: string): void {
+    this.canal.set(canal);
+    this.choisirModeleParDefaut();
     this.modifie();
   }
 
@@ -171,6 +182,7 @@ export class CampagneEdition implements OnInit {
     this.typeCampagne = c.typeCampagne;
     this.typeSignal.set(c.typeCampagne);
     this.modeleId = c.modeleId;
+    this.canal.set(c.canal);
     this.criteres = { ...this.criteresVides(), ...c.criteres };
     this.motifRejet.set(c.motifRejet);
     if (c.dateExecution) {

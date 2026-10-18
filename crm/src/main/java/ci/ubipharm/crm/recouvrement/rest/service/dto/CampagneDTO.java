@@ -21,6 +21,8 @@ public class CampagneDTO {
     private String typeCampagne;
     private Long modeleId;
     private String modeleNom;
+    /** Canal du modele : WHATSAPP ou EMAIL. */
+    private String canal;
     private CriteresCampagneDTO criteres;
     private LocalDateTime dateExecution;
     private String statut;

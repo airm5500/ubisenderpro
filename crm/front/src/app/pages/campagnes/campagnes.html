@@ -27,7 +27,7 @@
           <tbody>
             @for (c of page()?.elements; track c.id) {
               <tr class="cliquable" [class.choisi]="choisie()?.id === c.id" (click)="ouvrir(c)">
-                <td><strong>{{ c.nom }}</strong><div class="second">{{ L.typeCampagne[c.typeCampagne] }} · {{ c.modeleNom }}</div></td>
+                <td><strong>{{ c.nom }}</strong><div class="second">{{ L.canal[c.canal] }} · {{ L.typeCampagne[c.typeCampagne] }} · {{ c.modeleNom }}</div></td>
                 <td>{{ c.creePar }}</td>
                 <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
                 <td class="n">{{ c.nbFactures || '—' }}</td>
@@ -56,14 +56,18 @@
       <aside class="panneau" aria-labelledby="detail-campagne">
         <div class="surtitre">{{ c.statut === 'A_VALIDER' && auth.gestionnaire() ? 'En attente de votre validation' : L.statutCampagne[c.statut] }}</div>
         <h2 id="detail-campagne">{{ c.nom }}</h2>
-        <div class="ligne"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }}</strong></div>
+        <div class="ligne"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }} · {{ L.canal[c.canal] }}</strong></div>
         <div class="ligne"><span>Critères</span><strong style="text-align: right">{{ resume(c.criteres).join(' · ') || 'Toutes les factures du type' }}</strong></div>
         @if (recap(); as r) {
           <div class="ligne"><span>Clients · factures</span><strong>{{ r.nbClients }} · {{ r.nbFactures }}</strong></div>
           <div class="ligne"><span>Messages</span><strong>{{ r.nbMessages }}</strong></div>
           <div class="ligne"><span>Montant visé</span><strong>{{ r.totalSolde | montant }} FCFA</strong></div>
           @if (r.nbExclus) { <div class="ligne"><span>Exclues</span><strong>{{ r.nbExclus }}</strong></div> }
+          @if (c.canal === 'EMAIL') {
+            <div class="ligne"><span>Envoi</span><strong style="text-align: right">par e-mail, réponses aux agents</strong></div>
+          } @else {
           <div class="ligne"><span>Envoi depuis</span><strong style="text-align: right">{{ r.agents.length === 1 ? r.agents[0].agentNom + ' · ' + ((r.agents[0].numeroExpediteur | telephone) || 'sans numéro') : r.agents.length + ' numéros d\'agents' }}</strong></div>
+          }
         } @else {
           <div class="ligne"><span>Clients · factures</span><strong>{{ c.nbClients }} · {{ c.nbFactures }}</strong></div>
           <div class="ligne"><span>Messages</span><strong>{{ c.nbMessages }}{{ c.nbEnvoyes ? ' · ' + c.nbEnvoyes + ' envoyés' : '' }}{{ c.nbEchecs ? ' · ' + c.nbEchecs + ' échecs' : '' }}</strong></div>

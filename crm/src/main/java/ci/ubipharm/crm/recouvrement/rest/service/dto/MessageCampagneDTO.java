@@ -27,10 +27,15 @@ public class MessageCampagneDTO {
     private String clientCode;
     private String clientRaisonSociale;
     private Long agenceId;
+    private String canal;
     private String numeroDestinataire;
+    private String emailDestinataire;
     private Long agentId;
     private String agentNom;
     private String numeroExpediteur;
+    /** Adresse de reponse (Reply-To) d'un e-mail : celle de l'agent. */
+    private String emailReponse;
+    private String objet;
     private String contenu;
     private String statut;
     private String motif;

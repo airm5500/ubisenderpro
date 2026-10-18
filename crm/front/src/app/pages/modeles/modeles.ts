@@ -31,8 +31,11 @@ export class Modeles implements OnInit {
   protected readonly sources = signal<SourceVariable[]>([]);
   protected readonly choisi = signal<ModeleMessage | null>(null);
   protected readonly enEdition = signal(false);
-  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', contenu: '' };
+  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
   protected readonly contenu = signal('');
+  protected readonly objet = signal('');
+  /** Canal du modele affiche ou edite : l'apercu change de forme (bulle WhatsApp ou e-mail). */
+  protected readonly canalApercu = signal('WHATSAPP');
 
   protected readonly fenetreVariable = signal<Variable | 'nouvelle' | null>(null);
   variable = { code: '', libelle: '', source: '', exemple: '' };
@@ -42,8 +45,12 @@ export class Modeles implements OnInit {
     .filter(g => g.modeles.length));
 
   /** Apercu : variables remplacees par leur exemple, surlignees ; une variable inconnue est signalee. */
-  protected readonly apercu = computed<Morceau[]>(() => {
-    const texte = this.enEdition() ? this.contenu() : this.choisi()?.contenu ?? '';
+  protected readonly apercu = computed<Morceau[]>(() => this.morceaux(this.enEdition() ? this.contenu() : this.choisi()?.contenu ?? ''));
+  protected readonly apercuObjet = computed<Morceau[]>(() => this.morceaux(this.enEdition() ? this.objet() : this.choisi()?.objet ?? ''));
+
+  protected readonly apercuInconnues = computed(() => [...this.apercu(), ...this.apercuObjet()].some(m => m.inconnue));
+
+  private morceaux(texte: string): Morceau[] {
     const exemples = new Map(this.variables().map(v => [v.code, v.exemple || v.libelle]));
     const morceaux: Morceau[] = [];
     let dernier = 0;
@@ -55,9 +62,7 @@ export class Modeles implements OnInit {
     }
     morceaux.push({ texte: texte.substring(dernier), variable: false, inconnue: false });
     return morceaux;
-  });
-
-  protected readonly apercuInconnues = computed(() => this.apercu().some(m => m.inconnue));
+  }
 
   ngOnInit(): void {
     this.chargerModeles();
@@ -74,19 +79,24 @@ export class Modeles implements OnInit {
 
   choisir(m: ModeleMessage): void {
     this.choisi.set(m);
+    this.canalApercu.set(m.canal);
     this.enEdition.set(false);
   }
 
   nouveau(): void {
     this.choisi.set(null);
-    this.edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', contenu: '' };
+    this.edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
     this.contenu.set('');
+    this.objet.set('');
+    this.canalApercu.set('WHATSAPP');
     this.enEdition.set(true);
   }
 
   modifier(m: ModeleMessage): void {
-    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, contenu: m.contenu };
+    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, canal: m.canal, objet: m.objet ?? '', contenu: m.contenu };
     this.contenu.set(m.contenu);
+    this.objet.set(m.objet ?? '');
+    this.canalApercu.set(m.canal);
     this.enEdition.set(true);
   }
 
@@ -147,6 +157,7 @@ export class Modeles implements OnInit {
       this.modeles.set(m);
       const cible = m.find(x => x.id === (choisirId ?? this.choisi()?.id)) ?? (this.enEdition() ? null : m[0] ?? null);
       this.choisi.set(cible);
+      if (cible && !this.enEdition()) this.canalApercu.set(cible.canal);
     });
   }
 
