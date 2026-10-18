@@ -42,6 +42,12 @@ server:
         same-site: strict
         name: CRMSESSION
 
+crm:
+  whatsapp:
+    # Service compagnon wa-web (dossier wa-web/) ; le jeton est le meme que WA_WEB_TOKEN
+    url: ${CRM_WHATSAPP_URL:http://localhost:3000}
+    jeton: ${CRM_WHATSAPP_JETON:}
+
 logging:
   level:
     root: INFO

@@ -10,3 +10,6 @@ spring:
 crm:
   campagnes:
     planificateur: false
+  whatsapp:
+    envoi: false
+    jeton: jeton-de-test

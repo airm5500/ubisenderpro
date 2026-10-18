@@ -169,3 +169,31 @@ echeance, nom et numero de l'agent) : une colonne ajoutee a la base devient une 
 | POST | `/api/recouvrement/campagnes/{id}/rejet` | `{motif}`, ADMIN, DIR_RECOUVREMENT |
 | POST | `/api/recouvrement/campagnes/{id}/lancement` | Demarre maintenant une campagne programmee |
 | POST | `/api/recouvrement/campagnes/{id}/annulation` | `{motif}` ; une fois validee, direction seulement |
+
+## Envoi WhatsApp (lot 5)
+
+Le service compagnon `wa-web/` (Node, Baileys, repris d'UbiSenderPro) tient une session WhatsApp Web par
+numero professionnel d'agent. Canal non officiel : debit lent impose pour limiter le risque de blocage.
+Voir `wa-web/README.md` pour le lancer ; le CRM le joint par `CRM_WHATSAPP_URL` et partage le jeton
+`CRM_WHATSAPP_JETON` (= `WA_WEB_TOKEN`).
+
+- **Liaison** : l'agent (ou ADMIN / DIR_RECOUVREMENT) demarre la session de son numero et scanne le QR.
+- **Envoi** : toutes les 5 s (`crm.whatsapp.intervalle`), un message au plus par numero d'agent, puis une attente
+  aleatoire de 20 a 45 s ; seulement entre 8 h et 18 h (heure d'Abidjan) et 200 messages par numero et par jour
+  (parametres `whatsapp.envoi.*`). Telephone deconnecte : le message attend sans essai compte. Numero absent de
+  WhatsApp : echec, la facture redevient a relancer. Service injoignable : 3 essais puis echec. Un message reste
+  en cours d'envoi apres un arret brutal passe en echec a verifier, jamais renvoye en double. La campagne se
+  termine quand plus rien n'attend.
+- **Suivi** : statut du message ENVOYE -> DISTRIBUE -> LU ; statut de la facture RELANCE_ENVOYEE ->
+  MESSAGE_DISTRIBUE -> MESSAGE_LU -> REPONSE_RECUE, sans jamais reculer.
+- **Reponses** : l'agent repond depuis son WhatsApp ; le CRM garde une copie rattachee au client et a sa
+  derniere relance (une reponse vaut lecture).
+
+| Methode | Route | Role |
+| --- | --- | --- |
+| GET | `/api/whatsapp/sessions` | Numeros des agents, etat de session, envoyes du jour, messages en attente |
+| POST | `/api/whatsapp/sessions/{agentId}/connexion` | Demarre la session, renvoie le QR (data URL) |
+| GET | `/api/whatsapp/sessions/{agentId}` | Etat en direct (et QR tant que non lie) |
+| POST | `/api/whatsapp/sessions/{agentId}/deconnexion` | Delie le telephone |
+| GET | `/api/recouvrement/reponses?clientId=&agentId=&page=&taille=` | Reponses des clients |
+| POST | `/api/passerelle/wa-web/status`, `/ack`, `/message` | Callbacks du service, en-tete `X-Api-Token` |

@@ -29,7 +29,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filtres(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.spa())
+            // Les callbacks du service WhatsApp n'ont ni session ni jeton CSRF : ils portent le jeton partage
+            .csrf(csrf -> csrf.spa().ignoringRequestMatchers("/api/passerelle/**"))
             .securityContext(ctx -> ctx.securityContextRepository(securityContextRepository()))
             .sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
             .formLogin(form -> form.disable())
@@ -43,6 +44,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/connexion").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/passerelle/wa-web/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll());
         return http.build();
