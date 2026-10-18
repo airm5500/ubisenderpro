@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { accueil, connecte, roles } from './core/gardes';
+import { accueil, connecte, moduleRecouvrement, roles } from './core/gardes';
 import { Shell } from './shell/shell';
 
 const DIRECTION = ['ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE'];
@@ -8,9 +8,10 @@ const PILOTAGE = [...DIRECTION, 'DG', 'DIR_COMMERCIAL'];
 export const routes: Routes = [
   { path: 'connexion', loadComponent: () => import('./pages/connexion/connexion').then(m => m.Connexion), title: 'Connexion' },
   {
-    path: '', component: Shell, canActivate: [connecte],
+    path: '', component: Shell, canActivate: [connecte], canActivateChild: [moduleRecouvrement],
     children: [
       { path: '', pathMatch: 'full', canActivate: [accueil], children: [] },
+      { path: 'marketing', loadComponent: () => import('./pages/marketing/marketing').then(m => m.Marketing), title: 'Marketing' },
       { path: 'ma-journee', loadComponent: () => import('./pages/ma-journee/ma-journee').then(m => m.MaJournee), title: 'Ma journée' },
       { path: 'factures', loadComponent: () => import('./pages/factures/factures').then(m => m.Factures), title: 'Factures' },
       { path: 'clients', loadComponent: () => import('./pages/clients/clients').then(m => m.Clients), title: 'Clients' },

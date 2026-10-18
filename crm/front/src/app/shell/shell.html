@@ -4,10 +4,17 @@
       <img src="logo.svg" alt="" width="44" height="44">
       <div><div class="nom">UBIPHARM CI</div><div class="sous">Relation client</div></div>
     </div>
-    <div role="group" aria-label="Module" class="modules">
-      <span class="md mdon">Recouvrement</span>
-      <span class="md" title="Disponible dans une prochaine version">Marketing</span>
-    </div>
+    <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
+    @if (auth.recouvrement() && auth.marketing()) {
+      <div role="group" aria-label="Module" class="modules">
+        <a class="md" [class.mdon]="!surMarketing()" routerLink="/">Recouvrement</a>
+        <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing">Marketing</a>
+      </div>
+    } @else {
+      <div class="module-seul">{{ auth.recouvrement() ? 'Recouvrement' : 'Marketing' }}</div>
+    }
+
+    @if (auth.recouvrement() && !surMarketing()) {
 
     @if (auth.agent() && !auth.direction()) {
       <div class="gl">Mon activité</div>
@@ -29,6 +36,10 @@
     <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a>
     <div class="gl">{{ auth.gestionnaire() ? 'Administration' : 'WhatsApp' }}</div>
     <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.gestionnaire() ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+    } @else {
+      <div class="gl">Marketing</div>
+      <a class="nv" routerLink="/marketing" routerLinkActive="on">Accueil</a>
+    }
 
     <div class="profil">
       <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>

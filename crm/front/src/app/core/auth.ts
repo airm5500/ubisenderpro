@@ -23,6 +23,10 @@ export class Auth {
   readonly agent = computed(() => this.aUnRole('AGENT'));
   readonly auteurCampagnes = computed(() => this.aUnRole('ADMIN', 'DIR_RECOUVREMENT', 'DIR_AGENCE', 'AGENT'));
 
+  readonly modules = computed(() => this.utilisateur()?.modules ?? []);
+  readonly recouvrement = computed(() => this.modules().includes('RECOUVREMENT'));
+  readonly marketing = computed(() => this.modules().includes('MARKETING'));
+
   aUnRole(...roles: string[]): boolean {
     return this.roles().some(r => roles.includes(r));
   }
@@ -71,6 +75,7 @@ export class Auth {
 
   /** Page d'accueil selon le profil. */
   accueil(): string {
+    if (!this.recouvrement()) return '/marketing';
     return this.agent() && !this.direction() ? '/ma-journee' : '/factures';
   }
 

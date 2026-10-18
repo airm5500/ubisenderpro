@@ -24,3 +24,11 @@ export const accueil: CanActivateFn = async () => {
   await auth.verifier();
   return router.createUrlTree([auth.utilisateur() ? auth.accueil() : '/connexion']);
 };
+
+/** Un compte sans le module Recouvrement ne voit que l'espace Marketing. */
+export const moduleRecouvrement: CanActivateFn = async (_route, etat) => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  await auth.verifier();
+  return auth.recouvrement() || etat.url.startsWith('/marketing') ? true : router.createUrlTree(['/marketing']);
+};
