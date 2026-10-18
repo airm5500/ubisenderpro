@@ -1,5 +1,15 @@
 package ci.ubipharm.crm.commun.rest;
 
+import java.util.List;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import ci.ubipharm.crm.commun.rest.service.dto.ClientDemandeDTO;
+import ci.ubipharm.crm.commun.rest.service.dto.SegmentDTO;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,5 +37,22 @@ public class ClientRessource {
     @GetMapping("/{id}")
     public ClientDTO consulter(@PathVariable Long id) {
         return clientService.consulter(id);
+    }
+
+    @GetMapping("/segments")
+    public List<SegmentDTO> segments() {
+        return clientService.segments();
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public ClientDTO creer(@Valid @RequestBody ClientDemandeDTO demande) {
+        return clientService.creer(demande);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public ClientDTO modifier(@PathVariable Long id, @Valid @RequestBody ClientDemandeDTO demande) {
+        return clientService.modifier(id, demande);
     }
 }

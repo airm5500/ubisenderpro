@@ -11,7 +11,7 @@ import jakarta.persistence.Tuple;
 
 class ClientServiceImplTest {
 
-    private final ClientServiceImpl service = new ClientServiceImpl(null, null);
+    private final ClientServiceImpl service = new ClientServiceImpl(null, null, null, null);
 
     @Test
     void mapTupleToDtoRecopieChaqueColonne() {

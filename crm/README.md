@@ -366,3 +366,17 @@ actif ne l'a. Une case decochee reste en base (`actif = false`) et chaque change
 - **Garde-fous** : le role Administrateur garde toujours `UTILISATEURS` et `ROLES` et ne se desactive pas. Quand les
   droits d'un role changent, les comptes qui l'ont se reconnectent (`droits_revises_le`).
 - Les roles livres gardent les droits qu'ils avaient avant ce lot (migration `V1.0.17`).
+
+## Creation des clients a la main (lot 13)
+
+Les clients arrives un par un se saisissent sans import : bouton **Nouveau client** dans Clients, **Modifier** sur la fiche.
+
+- **Droit** `CLIENTS_GERER` (Creances, tous modules), donne par la migration `V1.0.18` a chaque role qui importe deja
+  des clients (Administrateur, directions). Les agents ne l'ont pas ; il se coche dans Roles et droits.
+- **API** : `POST /api/clients`, `PUT /api/clients/{id}`, `GET /api/clients/segments`. Memes controles que l'import :
+  numero de compte unique (non modifiable ensuite), agence du perimetre, segment connu, e-mail valide, numeros a
+  10 chiffres normalises avec le prefixe `whatsapp.prefixe_pays`.
+- **Numeros** : les six types de l'import ; le principal sert aux relances. Un numero remplace ou efface est archive
+  (`statut = 'ARCHIVE'`), jamais supprime.
+- **Agent** : a la creation, un profil qui affecte les portefeuilles peut choisir l'agent tout de suite.
+- **Journal** : `CLIENT_CREATION`, et `CLIENT_MODIFICATION` avec chaque champ change (avant -> apres).

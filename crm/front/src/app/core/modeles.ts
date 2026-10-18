@@ -35,7 +35,10 @@ export interface Client {
   id: number; code: string; raisonSociale: string; segmentation: string; segmentationLibelle: string;
   nomPharmacien: string; ville: string; agenceId: number; agenceLibelle: string; sousAgence: string;
   adresse: string; email: string; commentaire: string; numeroPrincipal: string; numeroSecondaire: string; statut: string;
+  /** Numeros actifs par role, renseignes sur la fiche client seulement. */
+  numeros?: Record<string, string>;
 }
+export interface Segment { code: string; libelle: string; }
 
 export interface Facture {
   id: number; reference: string; clientId: number; clientCode: string; clientRaisonSociale: string;

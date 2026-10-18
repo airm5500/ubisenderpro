@@ -6,8 +6,11 @@
         ? 'Les clients de votre portefeuille, et ceux des agents que vous remplacez.'
         : 'Les pharmacies de vos agences, avec leur agent de recouvrement et leur solde dû.' }}</p>
     </div>
-    @if (auth.peut('IMPORTS')) {
-      <div class="actions"><a class="bs" routerLink="/imports/nouveau" [queryParams]="{ type: 'clients' }">Importer des clients</a></div>
+    @if (auth.peut('IMPORTS') || auth.peut('CLIENTS_GERER')) {
+      <div class="actions">
+        @if (auth.peut('IMPORTS')) { <a class="bs" routerLink="/imports/nouveau" [queryParams]="{ type: 'clients' }">Importer des clients</a> }
+        @if (auth.peut('CLIENTS_GERER')) { <button class="bp" type="button" (click)="creation.set(true)">Nouveau client</button> }
+      </div>
     }
   </div>
 
@@ -73,3 +76,7 @@
     </div>
   }
 </div>
+
+@if (auth.peut('CLIENTS_GERER')) {
+  <app-client-formulaire [(ouvert)]="creation" (enregistre)="router.navigate(['/clients', $event.id])" />
+}

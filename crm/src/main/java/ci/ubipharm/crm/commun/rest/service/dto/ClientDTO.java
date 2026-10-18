@@ -1,5 +1,7 @@
 package ci.ubipharm.crm.commun.rest.service.dto;
 
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,4 +31,6 @@ public class ClientDTO {
     private String numeroPrincipal;
     private String numeroSecondaire;
     private String statut;
+    /** Numeros actifs par role (fiche client seulement), pour la modification. */
+    private Map<String, String> numeros;
 }

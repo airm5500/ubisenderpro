@@ -43,6 +43,10 @@ export class Api {
     return this.http.put<T>(url, corps);
   }
 
+  putSilencieux<T>(url: string, corps: unknown): Observable<T> {
+    return this.http.put<T>(url, corps, { context: new HttpContext().set(SILENCIEUX, true) });
+  }
+
   envoyerFichier<T>(url: string, fichier: File, json?: { nom: string; valeur: unknown }, criteres: Record<string, Valeur> = {}): Observable<T> {
     const donnees = new FormData();
     donnees.append('fichier', fichier);

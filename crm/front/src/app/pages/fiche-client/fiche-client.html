@@ -6,9 +6,12 @@
         <h1>{{ c.raisonSociale }}</h1>
         <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.segmentationLibelle ? ' · segment ' + c.segmentationLibelle : '' }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
       </div>
-      @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length) {
-        <div class="actions"><a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a></div>
-      }
+      <div class="actions">
+        @if (auth.peut('CLIENTS_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="modification.set(true)">Modifier</button> }
+        @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length) {
+          <a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a>
+        }
+      </div>
     </div>
 
     <div class="kvs bandeau">
@@ -22,7 +25,7 @@
       <div class="kv"><span>E-mail</span><strong>{{ c.email || '—' }}</strong></div>
     </div>
     @if (!c.numeroPrincipal) {
-      <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ce client n'a pas de numéro WhatsApp : il sera exclu des campagnes tant qu'un import ne l'aura pas complété.</span></div>
+      <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ce client n'a pas de numéro WhatsApp : il sera exclu des campagnes tant qu'on ne l'aura pas complété (Modifier, ou un import).</span></div>
     }
     @if (c.commentaire) { <div class="info"><span>{{ c.commentaire }}</span></div> }
 
@@ -90,3 +93,7 @@
     <p class="discret">Chargement…</p>
   }
 </div>
+
+@if (auth.peut('CLIENTS_GERER')) {
+  <app-client-formulaire [(ouvert)]="modification" [client]="client()" (enregistre)="client.set($event)" />
+}

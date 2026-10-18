@@ -8,10 +8,11 @@ import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
 import { Agent, Page, PortefeuilleClient } from '../../core/modeles';
 import { MontantPipe, TelephonePipe } from '../../core/format';
+import { ClientFormulaire } from './client-formulaire';
 
 @Component({
   selector: 'app-clients',
-  imports: [FormsModule, AsyncPipe, RouterLink, MontantPipe, TelephonePipe],
+  imports: [FormsModule, AsyncPipe, RouterLink, MontantPipe, TelephonePipe, ClientFormulaire],
   templateUrl: './clients.html'
 })
 export class Clients implements OnInit {
@@ -23,6 +24,7 @@ export class Clients implements OnInit {
   criteres = { q: '', agenceId: null as number | null, agentId: null as number | null, sansAgent: false, avecSolde: false };
   protected readonly page = signal<Page<PortefeuilleClient> | null>(null);
   protected agents: Observable<Agent[]> = of([]);
+  protected readonly creation = signal(false);
   private numeroPage = 0;
   private readonly taille = 50;
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));

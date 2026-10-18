@@ -78,7 +78,7 @@ public class ImportClientServiceImpl implements ImportClientService {
         return numeros;
     }
 
-    private static final Map<String, String> LIBELLES_NUMEROS = Map.of(
+    static final Map<String, String> LIBELLES_NUMEROS = Map.of(
             "PRINCIPAL", "Numéro WhatsApp", "TITULAIRE", "Numéro du titulaire", "ASSISTANT", "Numéro du pharmacien assistant",
             "CHARGE_COMMANDE", "Numéro du chargé de commande", "COMPTABLE", "Numéro du comptable", "SECONDAIRE", "Numéro secondaire");
 
