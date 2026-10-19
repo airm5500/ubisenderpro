@@ -526,3 +526,21 @@ rattrape).
   `liste_produits_id`. Migration `V1.0.25`.
 - **API** : `POST /api/marketing/pieces-jointes` (multipart, champ `fichier`), `GET /api/marketing/pieces-jointes/{id}`
   (droit `CAMPAGNES_MARKETING`) ; `afficheId` et `joindreProduits` dans la demande de campagne.
+
+## Promesse de paiement, litige et contentieux (pilote)
+
+Depuis la liste des factures, lien **Suivi** (droit `FACTURES_SUIVI` : agent, directeur d'agence, direction du recouvrement, admin) :
+
+- **Promesse de paiement** : date promise (aujourd'hui ou plus tard), montant promis facultatif (positif, au plus le solde), commentaire facultatif.
+  La facture n'est plus relancee jusqu'a cette date incluse ; le lendemain, si elle n'est pas soldee, elle redevient relancable
+  (filtre « Promesse non tenue »).
+- **Litige** : motif obligatoire ; relances suspendues jusqu'a la levee.
+- **Contentieux** : motif obligatoire ; seul le droit `FACTURES_CONTENTIEUX` (direction du recouvrement, admin) le pose ou le leve.
+- **Lever et reprendre les relances** : efface le suivi en cours.
+
+Une facture soldee ou un avoir ne prend pas de suivi. Chaque changement est garde dans `crm_facture_suivi` (historique affiche
+dans la fenetre) et journalise (`FACTURE_SUIVI`). Le recapitulatif d'une campagne compte ces factures dans les exclusions avec
+le motif « Promesse de paiement jusqu'au jj/mm/aaaa », « Facture en litige » ou « Facture au contentieux », quel que soit le canal.
+
+API : `POST /api/recouvrement/factures/{id}/suivi` (`{"suivi":"PROMESSE","datePromesse":"2026-10-31","montantPromis":50000,"commentaire":"..."}`,
+corps sans `suivi` pour lever), `GET /api/recouvrement/factures/{id}/suivis`, filtre `suivi=PROMESSE|PROMESSE_ECHUE|LITIGE|CONTENTIEUX|AUCUN`.

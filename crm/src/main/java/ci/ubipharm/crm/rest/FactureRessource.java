@@ -16,6 +16,8 @@ import ci.ubipharm.crm.rest.service.dto.FactureCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.FactureDTO;
 import ci.ubipharm.crm.rest.service.dto.FactureDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.SousTypeDTO;
+import ci.ubipharm.crm.rest.service.dto.SuiviFactureDTO;
+import ci.ubipharm.crm.rest.service.dto.SuiviFactureDemandeDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,17 @@ public class FactureRessource {
     @PreAuthorize("hasAuthority('DROIT_FACTURES_GERER')")
     public FactureDTO modifier(@PathVariable Long id, @Valid @RequestBody FactureDemandeDTO demande) {
         return factureService.modifier(id, demande);
+    }
+
+    @PostMapping("/factures/{id}/suivi")
+    @PreAuthorize("hasAnyAuthority('DROIT_FACTURES_SUIVI', 'DROIT_FACTURES_CONTENTIEUX')")
+    public FactureDTO poserSuivi(@PathVariable Long id, @Valid @RequestBody SuiviFactureDemandeDTO demande) {
+        return factureService.poserSuivi(id, demande);
+    }
+
+    @GetMapping("/factures/{id}/suivis")
+    public List<SuiviFactureDTO> historiqueSuivi(@PathVariable Long id) {
+        return factureService.historiqueSuivi(id);
     }
 
     @GetMapping("/sous-types")

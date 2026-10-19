@@ -44,6 +44,11 @@ export interface Facture {
   id: number; reference: string; clientId: number; clientCode: string; clientRaisonSociale: string;
   agenceId: number; agenceLibelle: string; sousTypeId: number; sousTypeLibelle: string; nature: string;
   dateFacture: string; dateEcheance: string; montant: number; solde: number; statut: string; joursRetard: number;
+  suivi: string | null; datePromesse: string | null; montantPromis: number | null; suiviCommentaire: string | null;
+  suiviPar: string | null; suiviLe: string | null; relancesSuspendues: boolean;
+}
+export interface SuiviFacture {
+  id: number; suivi: string | null; datePromesse: string | null; montantPromis: number | null; commentaire: string | null; par: string; le: string;
 }
 
 export interface Import {

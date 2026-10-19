@@ -31,6 +31,10 @@ public class FactureCriteresDTO {
     @Pattern(regexp = "[A-Z_]{1,20}", message = "Statut invalide.")
     private String statut;
 
+    /** PROMESSE (en cours), PROMESSE_ECHUE (date passee, non soldee), LITIGE, CONTENTIEUX ou AUCUN. */
+    @Pattern(regexp = "PROMESSE|PROMESSE_ECHUE|LITIGE|CONTENTIEUX|AUCUN", message = "Suivi inconnu.")
+    private String suivi;
+
     @Pattern(regexp = "FACTURE|AVOIR", message = "Nature inconnue.")
     private String nature;
 

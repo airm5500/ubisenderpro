@@ -264,6 +264,58 @@ class CampagneIT extends IntegrationBase {
         mvc.perform(get("/api/recouvrement/campagnes/" + avant).session(admin)).andExpect(jsonPath("$.statut").value("TERMINEE"));
     }
 
+    @Test
+    void unePromesseUnLitigeOuUnContentieuxSuspendentLesRelances() throws Exception {
+        Long f1 = id("crm_facture", "reference", "K-F1");
+        Long f2 = id("crm_facture", "reference", "K-F2");
+        String demain = aujourdhui.plusDays(1).toString();
+        suivi(agent, f1, "{\"suivi\":\"PROMESSE\",\"datePromesse\":\"" + aujourdhui.minusDays(1) + "\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("La date promise est déjà passée."));
+        suivi(agent, f1, "{\"suivi\":\"PROMESSE\",\"datePromesse\":\"" + demain + "\",\"montantPromis\":200000}")
+                .andExpect(status().isBadRequest());
+        suivi(agent, f1, "{\"suivi\":\"PROMESSE\",\"datePromesse\":\"" + demain + "\",\"montantPromis\":100000}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.suivi").value("PROMESSE"))
+                .andExpect(jsonPath("$.relancesSuspendues").value(true))
+                .andExpect(jsonPath("$.suiviPar").value("Test it-agent1"));
+        suivi(agent, f2, "{\"suivi\":\"LITIGE\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Décrivez le litige (motif du client)."));
+        suivi(agent, f2, "{\"suivi\":\"CONTENTIEUX\",\"commentaire\":\"Impayes repetes\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Seule la Direction du Recouvrement passe une facture au contentieux ou l'en sort."));
+        suivi(agent, f2, "{\"suivi\":\"LITIGE\",\"commentaire\":\"Livraison incomplete\"}").andExpect(status().isOk());
+
+        Long id = idDe(creerCampagne(agent, "Retards agent", "APRES_ECHEANCE", modeleRetard, "{}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + id + "/recapitulatif").session(agent))
+                .andExpect(jsonPath("$.nbMessages").value(0))
+                .andExpect(jsonPath("$.exclusions[*].motif", containsInAnyOrder("Client sans numéro WhatsApp",
+                        "Promesse de paiement jusqu'au " + aujourdhui.plusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        "Facture en litige")));
+        mvc.perform(get("/api/recouvrement/factures").param("suivi", "LITIGE").session(agent)).andExpect(jsonPath("$.total").value(1));
+
+        // Promesse non tenue : la facture redevient relancable ; le litige leve, aussi
+        jdbc.update("update crm_facture set suivi_date = utc_date() - interval 1 day where id = ?", f1);
+        mvc.perform(get("/api/recouvrement/factures").param("suivi", "PROMESSE_ECHUE").session(agent)).andExpect(jsonPath("$.total").value(1));
+        suivi(agent, f2, "{}").andExpect(status().isOk()).andExpect(jsonPath("$.suivi").doesNotExist());
+        suivi(agent, f2, "{}").andExpect(status().isBadRequest());
+        Long relance = idDe(creerCampagne(agent, "Retards agent 2", "APRES_ECHEANCE", modeleRetard, "{}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + relance + "/recapitulatif").session(agent))
+                .andExpect(jsonPath("$.nbMessages").value(2));
+        mvc.perform(get("/api/recouvrement/factures/" + f2 + "/suivis").session(agent))
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].suivi").doesNotExist())
+                .andExpect(jsonPath("$[1].commentaire").value("Livraison incomplete"));
+        assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where action = 'FACTURE_SUIVI'", Integer.class)).isEqualTo(3);
+
+        suivi(admin, f2, "{\"suivi\":\"CONTENTIEUX\",\"commentaire\":\"Impayes repetes\"}").andExpect(status().isOk());
+        suivi(agent, f2, "{}").andExpect(status().isBadRequest());
+    }
+
+    private ResultActions suivi(MockHttpSession session, Long factureId, String json) throws Exception {
+        return mvc.perform(post("/api/recouvrement/factures/" + factureId + "/suivi").session(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(json));
+    }
+
     private void envoyerTout(Long id) {
         jdbc.update("update crm_campagne_message set statut = 'ENVOYE', envoye_le = utc_timestamp() where campagne_id = ? and statut = 'A_ENVOYER'", id);
         suiviEnvoiService.recompter(id);

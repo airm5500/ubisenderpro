@@ -31,6 +31,15 @@ public class FactureDTO {
     private BigDecimal montant;
     private BigDecimal solde;
     private String statut;
+    /** PROMESSE, LITIGE ou CONTENTIEUX ; vide = relances normales. */
+    private String suivi;
+    private LocalDate datePromesse;
+    private BigDecimal montantPromis;
+    private String suiviCommentaire;
+    private String suiviPar;
+    private java.time.LocalDateTime suiviLe;
+    /** Relances suspendues aujourd'hui (litige, contentieux ou promesse dont la date n'est pas passee). */
+    private boolean relancesSuspendues;
     /** Jours depuis l'echeance, 0 si elle n'est pas depassee. */
     private int joursRetard;
 }

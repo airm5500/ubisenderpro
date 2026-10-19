@@ -9,6 +9,7 @@ import { Referentiels } from '../../core/referentiels';
 import { Facture, Page } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, aujourdhui } from '../../core/format';
 import { FactureFormulaire } from './facture-formulaire';
+import { FactureSuivi } from './facture-suivi';
 
 interface Onglet { code: string; libelle: string; statut?: string; enRetard?: boolean; }
 
@@ -24,7 +25,7 @@ const ONGLETS: Onglet[] = [
 
 @Component({
   selector: 'app-factures',
-  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe, FactureFormulaire],
+  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe, FactureFormulaire, FactureSuivi],
   templateUrl: './factures.html'
 })
 export class Factures implements OnInit {
@@ -35,13 +36,15 @@ export class Factures implements OnInit {
   protected readonly L = LIBELLES;
   protected readonly onglets = ONGLETS;
 
-  criteres = { q: '', agenceId: null as number | null, sousTypeId: null as number | null, nature: '', echeanceDu: '', echeanceAu: '' };
+  criteres = { q: '', agenceId: null as number | null, sousTypeId: null as number | null, nature: '', suivi: '', echeanceDu: '', echeanceAu: '' };
   protected readonly onglet = signal<Onglet>(ONGLETS[0]);
   protected readonly page = signal<Page<Facture> | null>(null);
   protected readonly compteurs = signal<Record<string, number>>({});
   protected readonly selection = signal<Map<number, Facture>>(new Map());
   protected readonly saisie = signal(false);
   protected readonly cible = signal<Facture | null>(null);
+  protected readonly suiviOuvert = signal(false);
+  protected readonly suiviCible = signal<Facture | null>(null);
   private numeroPage = 0;
   private readonly taille = 25;
 
@@ -66,7 +69,7 @@ export class Factures implements OnInit {
   }
 
   reinitialiser(): void {
-    this.criteres = { q: '', agenceId: null, sousTypeId: null, nature: '', echeanceDu: '', echeanceAu: '' };
+    this.criteres = { q: '', agenceId: null, sousTypeId: null, nature: '', suivi: '', echeanceDu: '', echeanceAu: '' };
     this.onglet.set(ONGLETS[0]);
     this.rechercher();
   }
@@ -90,6 +93,11 @@ export class Factures implements OnInit {
   modifier(f: Facture): void {
     this.cible.set(f);
     this.saisie.set(true);
+  }
+
+  suivre(f: Facture): void {
+    this.suiviCible.set(f);
+    this.suiviOuvert.set(true);
   }
 
   enregistree(): void {

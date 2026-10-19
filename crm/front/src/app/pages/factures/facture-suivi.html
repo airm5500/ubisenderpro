@@ -1,0 +1,61 @@
+<p-dialog header="Suivi de la créance" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '640px' }">
+  @if (facture(); as fa) {
+    <p style="margin-top: 0"><strong>{{ fa.reference }}</strong> · {{ fa.clientRaisonSociale }} · solde {{ fa.solde | montant }} FCFA</p>
+    @if (fa.suivi) {
+      <div class="avert">
+        <i class="pi pi-pause-circle"></i>
+        <span><strong>{{ L.suiviFacture[fa.suivi] }}</strong>
+          @if (fa.suivi === 'PROMESSE') { au {{ fa.datePromesse | jour }}@if (fa.montantPromis) { pour {{ fa.montantPromis | montant }} FCFA } }
+          @if (fa.suiviCommentaire) { · {{ fa.suiviCommentaire }} }
+          <span class="discret"> · {{ fa.suiviPar }}, le {{ fa.suiviLe | jour: true }}</span>
+          @if (!fa.relancesSuspendues) { <br>La date promise est passée sans paiement : la facture est de nouveau relancée. }
+        </span>
+      </div>
+    }
+    <form class="formulaire" (ngSubmit)="poser()">
+      <div class="grille">
+        <label class="f">Situation
+          <select class="sel" name="suivi" [(ngModel)]="formulaire.suivi">
+            <option value="PROMESSE">Promesse de paiement</option>
+            <option value="LITIGE">Litige</option>
+            @if (peutContentieux()) { <option value="CONTENTIEUX">Contentieux</option> }
+          </select>
+        </label>
+        @if (formulaire.suivi === 'PROMESSE') {
+          <label class="f">Date promise<input class="sel" type="date" name="datePromesse" [min]="demain" [(ngModel)]="formulaire.datePromesse" required></label>
+          <label class="f">Montant promis (FCFA, facultatif)
+            <input class="sel" type="number" min="1" step="1" name="montantPromis" [(ngModel)]="formulaire.montantPromis">
+          </label>
+        }
+        <label class="f large">{{ formulaire.suivi === 'PROMESSE' ? 'Commentaire (facultatif)' : formulaire.suivi === 'LITIGE' ? 'Motif du litige' : 'Motif du contentieux' }}
+          <textarea class="sel" name="commentaire" rows="2" maxlength="500" [(ngModel)]="formulaire.commentaire"></textarea>
+        </label>
+      </div>
+      <p class="discret" style="margin: 0">Tant que la promesse court, ou que la facture est en litige ou au contentieux, aucune campagne ne la relance.</p>
+      @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+      <div class="pied">
+        @if (peutLever()) { <button class="bs" type="button" [disabled]="enCours()" (click)="lever()">Lever et reprendre les relances</button> }
+        <button class="bs" type="button" (click)="ouvert.set(false)">Fermer</button>
+        <button class="bp" type="submit" [disabled]="enCours() || !pret()">Enregistrer</button>
+      </div>
+    </form>
+    @if (historique().length) {
+      <h3 style="margin: 18px 0 6px">Historique</h3>
+      <table class="t">
+        <thead><tr><th>Date</th><th>Situation</th><th>Détail</th><th>Par</th></tr></thead>
+        <tbody>
+          @for (h of historique(); track h.id) {
+            <tr>
+              <td class="nw">{{ h.le | jour: true }}</td>
+              <td class="nw">{{ h.suivi ? L.suiviFacture[h.suivi] : 'Levée' }}</td>
+              <td>@if (h.datePromesse) { au {{ h.datePromesse | jour }} }@if (h.montantPromis) { · {{ h.montantPromis | montant }} FCFA }
+                @if (h.commentaire) { <div class="second">{{ h.commentaire }}</div> }</td>
+              <td>{{ h.par }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+</p-dialog>

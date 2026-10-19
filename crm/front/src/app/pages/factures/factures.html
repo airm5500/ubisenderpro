@@ -36,6 +36,12 @@
           <option value="">Toutes</option><option value="FACTURE">Factures</option><option value="AVOIR">Avoirs</option>
         </select>
       </label>
+      <label class="f">Suivi
+        <select class="sel" name="suivi" [(ngModel)]="criteres.suivi">
+          <option value="">Tous</option><option value="AUCUN">Sans suivi</option><option value="PROMESSE">Promesse en cours</option>
+          <option value="PROMESSE_ECHUE">Promesse non tenue</option><option value="LITIGE">Litige</option><option value="CONTENTIEUX">Contentieux</option>
+        </select>
+      </label>
       <label class="f">Échéance du<input class="sel" type="date" name="echeanceDu" [(ngModel)]="criteres.echeanceDu"></label>
       <label class="f">au<input class="sel" type="date" name="echeanceAu" [(ngModel)]="criteres.echeanceAu"></label>
     </div>
@@ -69,7 +75,7 @@
       <thead><tr>
         <th><input type="checkbox" aria-label="Tout sélectionner" [checked]="toutCoche()" (change)="toutBasculer($any($event.target).checked)"></th>
         <th>Référence</th><th>Client</th><th>Agence</th><th>Sous-type</th><th>Date facture</th><th>Échéance</th>
-        <th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th>@if (auth.peut('FACTURES_GERER')) { <th></th> }
+        <th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th>@if (auth.peut('FACTURES_GERER') || auth.peut('FACTURES_SUIVI')) { <th></th> }
       </tr></thead>
       <tbody>
         @for (f of page()?.elements; track f.id) {
@@ -89,11 +95,22 @@
             </td>
             <td class="n">{{ f.montant | montant }}</td>
             <td class="n" style="font-weight: 700">{{ f.solde | montant }}</td>
-            <td class="nw"><span class="dot" [style.background]="L.couleurFacture[f.statut]"></span>{{ L.statutFacture[f.statut] ?? f.statut }}</td>
-            @if (auth.peut('FACTURES_GERER')) { <td class="nw"><a (click)="modifier(f)">Modifier</a></td> }
+            <td class="nw"><span class="dot" [style.background]="L.couleurFacture[f.statut]"></span>{{ L.statutFacture[f.statut] ?? f.statut }}
+              @if (f.suivi) {
+                <div class="second" [class.retard]="!f.relancesSuspendues" [title]="f.suiviCommentaire ?? ''">
+                  {{ L.suiviFacture[f.suivi] }}@if (f.suivi === 'PROMESSE') { au {{ f.datePromesse | jour }}@if (!f.relancesSuspendues) { · non tenue } }
+                </div>
+              }
+            </td>
+            @if (auth.peut('FACTURES_GERER') || auth.peut('FACTURES_SUIVI')) {
+              <td class="nw">
+                @if (auth.peut('FACTURES_SUIVI') && f.nature !== 'AVOIR' && (f.solde > 0 || f.suivi)) { <a (click)="suivre(f)">Suivi</a> }
+                @if (auth.peut('FACTURES_GERER')) { @if (auth.peut('FACTURES_SUIVI')) { · } <a (click)="modifier(f)">Modifier</a> }
+              </td>
+            }
           </tr>
         } @empty {
-          <tr><td [attr.colspan]="auth.peut('FACTURES_GERER') ? 11 : 10" class="vide">{{ page() ? 'Aucune facture ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          <tr><td [attr.colspan]="auth.peut('FACTURES_GERER') || auth.peut('FACTURES_SUIVI') ? 11 : 10" class="vide">{{ page() ? 'Aucune facture ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>
@@ -109,4 +126,7 @@
 
 @if (auth.peut('FACTURES_GERER')) {
   <app-facture-formulaire [(ouvert)]="saisie" [facture]="cible()" (enregistre)="enregistree()" />
+}
+@if (auth.peut('FACTURES_SUIVI')) {
+  <app-facture-suivi [(ouvert)]="suiviOuvert" [facture]="suiviCible()" (enregistre)="enregistree()" />
 }

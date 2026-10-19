@@ -3,6 +3,8 @@ package ci.ubipharm.crm.rest.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,11 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.FactureService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
+import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.dto.FactureCriteresDTO;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.dto.FactureDTO;
 import ci.ubipharm.crm.rest.service.dto.FactureDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.SousTypeDTO;
+import ci.ubipharm.crm.rest.service.dto.SuiviFactureDTO;
+import ci.ubipharm.crm.rest.service.dto.SuiviFactureDemandeDTO;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
@@ -39,9 +44,12 @@ public class FactureServiceImpl implements FactureService {
                    c.raison_sociale as clientRaisonSociale, a.id as agenceId, a.libelle as agenceLibelle,
                    st.id as sousTypeId, st.libelle as sousTypeLibelle, f.nature as nature,
                    f.date_facture as dateFacture, f.date_echeance as dateEcheance, f.montant as montant, f.solde as solde,
-                   f.statut as statut, greatest(datediff(utc_date(), f.date_echeance), 0) as joursRetard
+                   f.statut as statut, greatest(datediff(utc_date(), f.date_echeance), 0) as joursRetard,
+                   f.suivi as suivi, f.suivi_date as datePromesse, f.suivi_montant as montantPromis, f.suivi_commentaire as suiviCommentaire,
+                   us.nom_complet as suiviPar, f.suivi_le as suiviLe
             from crm_facture f
             join crm_client c on c.id = f.client_id
+            left join crm_utilisateur us on us.id = f.suivi_par
             join crm_agence a on a.id = c.agence_id
             join crm_sous_type_compte st on st.id = f.sous_type_id
             """;
@@ -55,6 +63,7 @@ public class FactureServiceImpl implements FactureService {
     private final PerimetreService perimetreService;
     private final PortefeuilleService portefeuilleService;
     private final JournalActionService journalActionService;
+    private final UtilisateurCourantService utilisateurCourantService;
 
     private static final DateTimeFormatter DATE_LISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -99,6 +108,14 @@ public class FactureServiceImpl implements FactureService {
         if (criteres.getStatut() != null) {
             where.append(" and f.statut = :statut");
             parametres.put("statut", criteres.getStatut());
+        }
+        if (criteres.getSuivi() != null) {
+            where.append(switch (criteres.getSuivi()) {
+                case "PROMESSE" -> " and f.suivi = 'PROMESSE' and f.suivi_date >= utc_date()";
+                case "PROMESSE_ECHUE" -> " and f.suivi = 'PROMESSE' and f.suivi_date < utc_date() and f.solde > 0";
+                case "AUCUN" -> " and f.suivi is null";
+                default -> " and f.suivi = '" + criteres.getSuivi() + "'";
+            });
         }
         if (criteres.getNature() != null) {
             where.append(" and f.nature = :nature");
@@ -230,6 +247,82 @@ public class FactureServiceImpl implements FactureService {
         return apres;
     }
 
+    @Override
+    @Transactional
+    public FactureDTO poserSuivi(Long id, SuiviFactureDemandeDTO demande) {
+        FactureDTO facture = consulter(id);
+        String suivi = demande.getSuivi();
+        String commentaire = vide(demande.getCommentaire());
+        if (("CONTENTIEUX".equals(suivi) || "CONTENTIEUX".equals(facture.getSuivi())) && !aLeDroit("DROIT_FACTURES_CONTENTIEUX")) {
+            throw new ErreurMetierException("Seule la Direction du Recouvrement passe une facture au contentieux ou l'en sort.");
+        }
+        if (suivi == null && facture.getSuivi() == null) {
+            throw new ErreurMetierException("La facture n'a ni promesse, ni litige, ni contentieux à lever.");
+        }
+        if (suivi != null && ("AVOIR".equals(facture.getNature()) || facture.getSolde().signum() <= 0)) {
+            throw new ErreurMetierException("La facture " + facture.getReference() + " n'a plus de solde à recouvrer.");
+        }
+        LocalDate date = null;
+        BigDecimal montant = null;
+        if ("PROMESSE".equals(suivi)) {
+            date = demande.getDatePromesse();
+            if (date == null) {
+                throw new ErreurMetierException("Indiquez la date à laquelle le client promet de payer.");
+            }
+            if (date.isBefore(LocalDate.now(ZoneOffset.UTC))) {
+                throw new ErreurMetierException("La date promise est déjà passée.");
+            }
+            montant = demande.getMontantPromis();
+            if (montant != null && (montant.signum() <= 0 || montant.compareTo(facture.getSolde()) > 0)) {
+                throw new ErreurMetierException("Le montant promis doit être positif et ne pas dépasser le solde (" + facture.getSolde().toPlainString() + ").");
+            }
+        } else if (suivi != null && commentaire == null) {
+            throw new ErreurMetierException("LITIGE".equals(suivi) ? "Décrivez le litige (motif du client)." : "Indiquez le motif du passage au contentieux.");
+        }
+        Long utilisateur = utilisateurCourantService.utilisateur().getId();
+        em.createNativeQuery("""
+                update crm_facture set suivi = :suivi, suivi_date = :date, suivi_montant = :montant, suivi_commentaire = :commentaire,
+                       suivi_par = :par, suivi_le = utc_timestamp(), updated_at = utc_timestamp()
+                where id = :id
+                """)
+                .setParameter("suivi", suivi).setParameter("date", date).setParameter("montant", montant)
+                .setParameter("commentaire", commentaire).setParameter("par", utilisateur).setParameter("id", id)
+                .executeUpdate();
+        em.createNativeQuery("""
+                insert into crm_facture_suivi (facture_id, suivi, suivi_date, suivi_montant, commentaire, cree_par, created_at)
+                values (:id, :suivi, :date, :montant, :commentaire, :par, utc_timestamp())
+                """)
+                .setParameter("suivi", suivi).setParameter("date", date).setParameter("montant", montant)
+                .setParameter("commentaire", commentaire).setParameter("par", utilisateur).setParameter("id", id)
+                .executeUpdate();
+        String details = facture.getReference() + " : " + switch (suivi == null ? "LEVEE" : suivi) {
+            case "PROMESSE" -> "promesse de paiement au " + date.format(DATE_LISIBLE) + (montant == null ? "" : " (" + montant.toPlainString() + ")");
+            case "LITIGE" -> "litige";
+            case "CONTENTIEUX" -> "contentieux";
+            default -> "suivi leve (" + facture.getSuivi() + ")";
+        } + (commentaire == null ? "" : " - " + commentaire);
+        journalActionService.enregistrer("FACTURE_SUIVI", "crm_facture", id, details);
+        return consulter(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SuiviFactureDTO> historiqueSuivi(Long id) {
+        consulter(id);
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery("""
+                select s.id as id, s.suivi as suivi, s.suivi_date as datePromesse, s.suivi_montant as montantPromis, s.commentaire as commentaire,
+                       u.nom_complet as par, s.created_at as le
+                from crm_facture_suivi s left join crm_utilisateur u on u.id = s.cree_par
+                where s.facture_id = :id order by s.created_at desc, s.id desc
+                """, Tuple.class).setParameter("id", id).getResultList();
+        return lignes.stream().map(this::mapTupleToSuiviDto).toList();
+    }
+
+    private boolean aLeDroit(String autorite) {
+        return utilisateurCourantService.utilisateur().getAuthorities().stream().anyMatch(a -> autorite.equals(a.getAuthority()));
+    }
+
     private record Saisie(String nature, BigDecimal montant, BigDecimal solde) {
     }
 
@@ -311,6 +404,30 @@ public class FactureServiceImpl implements FactureService {
                 .solde(tuple.get("solde", BigDecimal.class))
                 .statut(tuple.get("statut", String.class))
                 .joursRetard(((Number) tuple.get("joursRetard")).intValue())
+                .suivi(tuple.get("suivi", String.class))
+                .datePromesse(tuple.get("datePromesse", LocalDate.class))
+                .montantPromis(tuple.get("montantPromis", BigDecimal.class))
+                .suiviCommentaire(tuple.get("suiviCommentaire", String.class))
+                .suiviPar(tuple.get("suiviPar", String.class))
+                .suiviLe(tuple.get("suiviLe", LocalDateTime.class))
+                .relancesSuspendues(suspendue(tuple.get("suivi", String.class), tuple.get("datePromesse", LocalDate.class)))
+                .build();
+    }
+
+    private static boolean suspendue(String suivi, LocalDate datePromesse) {
+        return "LITIGE".equals(suivi) || "CONTENTIEUX".equals(suivi)
+                || "PROMESSE".equals(suivi) && !datePromesse.isBefore(LocalDate.now(ZoneOffset.UTC));
+    }
+
+    SuiviFactureDTO mapTupleToSuiviDto(Tuple tuple) {
+        return SuiviFactureDTO.builder()
+                .id(tuple.get("id", Long.class))
+                .suivi(tuple.get("suivi", String.class))
+                .datePromesse(tuple.get("datePromesse", LocalDate.class))
+                .montantPromis(tuple.get("montantPromis", BigDecimal.class))
+                .commentaire(tuple.get("commentaire", String.class))
+                .par(tuple.get("par", String.class))
+                .le(tuple.get("le", LocalDateTime.class))
                 .build();
     }
 

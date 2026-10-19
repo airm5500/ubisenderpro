@@ -119,7 +119,9 @@ class SelectionCampagne {
                        c.raison_sociale as clientRaisonSociale, c.agence_id as agenceId, ag.libelle as agence, sg.libelle as segment, st.libelle as sousType,
                        u.id as agentId, u.nom_complet as agentNom, u.numero_whatsapp as agentNumero, u.statut as agentStatut,
                        u.email as agentEmail, c.email as clientEmail,
-                       ct.id as contactId, ct.numero_whatsapp as numeroDestinataire,
+                       ct.id as contactId, ct.numero_whatsapp as numeroDestinataire, f.suivi_date as datePromesse,
+                       case when f.suivi in ('LITIGE', 'CONTENTIEUX') then f.suivi
+                            when f.suivi = 'PROMESSE' and f.suivi_date >= :reference then 'PROMESSE' end as suspension,
                        (select cp.nom from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id
                         where m.facture_id = f.id and m.statut = 'A_ENVOYER' and cp.id <> :campagneId limit 1) as campagneEnAttente
                 """).append(colonnes).append("""
@@ -197,7 +199,10 @@ class SelectionCampagne {
         boolean email = "EMAIL".equals(modele.canal());
         boolean sms = "SMS".equals(modele.canal());
         String adresse = email ? premiereAdresse(t.get("clientEmail", String.class)) : null;
-        String motif = email ? motifExclusionEmail(t, adresse) : sms ? motifExclusionSms(t) : motifExclusion(t);
+        String motif = motifSuspension(t);
+        if (motif == null) {
+            motif = email ? motifExclusionEmail(t, adresse) : sms ? motifExclusionSms(t) : motifExclusion(t);
+        }
         String texte = null;
         String objet = null;
         if (motif == null) {
@@ -228,6 +233,19 @@ class SelectionCampagne {
                 .motif(motif)
                 .build();
         return new Ligne(message, motif == null && !email ? t.get("contactId", Long.class) : null);
+    }
+
+    /** Promesse de paiement en cours, litige ou contentieux : la facture n'est pas relancee. */
+    private static String motifSuspension(Tuple t) {
+        String suspension = t.get("suspension", String.class);
+        if (suspension == null) {
+            return null;
+        }
+        return switch (suspension) {
+            case "PROMESSE" -> "Promesse de paiement jusqu'au " + t.get("datePromesse", LocalDate.class).format(DATE_LISIBLE);
+            case "LITIGE" -> "Facture en litige";
+            default -> "Facture au contentieux";
+        };
     }
 
     private String motifExclusion(Tuple t) {
