@@ -1,3 +1,4 @@
+import { TooltipModule } from 'primeng/tooltip';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
@@ -11,7 +12,7 @@ interface ListeCourte { id: number; nom: string; statut: string; }
 /** Un meme message WhatsApp a des numeros colles ou aux clients d'une liste, depuis son numero, au debit des relances. */
 @Component({
   selector: 'app-envoi-masse',
-  imports: [FormsModule, JourPipe, TelephonePipe],
+  imports: [FormsModule, JourPipe, TelephonePipe, TooltipModule],
   templateUrl: './envoi-masse.html'
 })
 export class EnvoiMassePage implements OnInit {
@@ -94,7 +95,10 @@ export class EnvoiMassePage implements OnInit {
           this.apercu.set(r);
           return;
         }
-        this.messages.add({ severity: 'success', summary: 'Envoi lancé', detail: `${r.nbRetenus} message(s) partiront depuis votre numéro, au rythme des relances.` });
+        this.messages.add(r.horsPlage
+          ? { severity: 'info', summary: 'Envoi programmé', life: 10000,
+              detail: `Il est hors de la plage d'envoi WhatsApp : les ${r.nbRetenus} message(s) partiront depuis votre numéro à son ouverture (entre ${r.plageHoraire}, heure d'Abidjan), après les campagnes.` }
+          : { severity: 'success', summary: 'Envoi lancé', detail: `${r.nbRetenus} message(s) partiront depuis votre numéro, au rythme des relances.` });
         this.saisie.set(false);
         this.charger();
         if (r.envoi) this.ouvrir(r.envoi);

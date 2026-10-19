@@ -122,7 +122,8 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
         }
         journalActionService.enregistrer("ENVOI_MASSE_CREATION", "crm_envoi_masse", id,
                 demande.getNom().trim() + " : " + retenus.size() + " destinataire(s), " + exclus.size() + " exclu(s), depuis " + expediteur);
-        return EnvoiMasseApercuDTO.builder().envoi(consulter(id)).nbRetenus(retenus.size()).exclus(exclus).exemple(exemple).build();
+        return EnvoiMasseApercuDTO.builder().envoi(consulter(id)).nbRetenus(retenus.size()).exclus(exclus).exemple(exemple)
+                .horsPlage(!cadence.dansLaPlage()).plageHoraire(cadence.plage()).build();
     }
 
     @Override

@@ -398,3 +398,4 @@ tr.inactif td { color: var(--gris, #6B7C88); }
 [data-charte="A"] .t tbody tr.choisi .bi:hover, [data-charte="C"] .t tbody tr.choisi .bi:hover { background: rgba(255, 255, 255, .14); }
 [data-charte="A"] .t tbody tr.choisi .bi.bi-plein, [data-charte="C"] .t tbody tr.choisi .bi.bi-plein { background: var(--vert); color: var(--bleu); }
 @media (prefers-reduced-motion: reduce) { .bi { transition: none; } }
+.attente { cursor: help; } .attente .pi-clock { font-size: 11px; margin-left: 5px; color: var(--texte-2); }

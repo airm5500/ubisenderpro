@@ -1,3 +1,4 @@
+import { TooltipModule } from 'primeng/tooltip';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -9,7 +10,7 @@ import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 /** Tous les messages partis : relances, promotions, discussions et envois en masse, sur tous les canaux. */
 @Component({
   selector: 'app-historique-envois',
-  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe],
+  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe, TooltipModule],
   templateUrl: './historique-envois.html'
 })
 export class HistoriqueEnvois implements OnInit {
