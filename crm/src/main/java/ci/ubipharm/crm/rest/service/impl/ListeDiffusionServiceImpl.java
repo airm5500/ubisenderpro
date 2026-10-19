@@ -149,6 +149,18 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<Long> clients(Long id, List<Long> agences) {
+        Map<String, Object> parametres = new LinkedHashMap<>();
+        Query requete = em.createNativeQuery("select c.id " + requeteMembres(definition(consulter(id)), parametres, agences)
+                + " order by c.raison_sociale, c.code");
+        parametres.forEach(requete::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Number> ids = requete.getResultList();
+        return ids.stream().map(Number::longValue).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ApercuListeDTO simuler(ListeDiffusionDemandeDTO demande) {
         // Le nom n'a pas a etre unique ni saisi pour un simple comptage
         Definition d = definition(null, demande);
@@ -286,7 +298,12 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
 
     /** « from crm_client c ... where ... » des clients de la liste, dans le perimetre du lecteur. */
     private String requeteMembres(Definition d, Map<String, Object> parametres) {
-        StringBuilder sql = new StringBuilder("from crm_client c").append(perimetreSql(parametres, "c")).append(" and (");
+        return requeteMembres(d, parametres, agencesCourantes());
+    }
+
+    /** Idem dans un perimetre donne (agences ; null = toutes), celui fige d'une campagne par exemple. */
+    private String requeteMembres(Definition d, Map<String, Object> parametres, List<Long> agences) {
+        StringBuilder sql = new StringBuilder("from crm_client c").append(perimetreSql(parametres, "c", agences)).append(" and (");
         Long liste = d.id() == null ? -1L : d.id();
         parametres.put("liste", liste);
         sql.append("exists (select 1 from crm_liste_diffusion_client x where x.liste_id = :liste and x.client_id = c.id and x.actif = true and x.sens = 'AJOUT')");
@@ -320,12 +337,21 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
     }
 
     private String perimetreSql(Map<String, Object> parametres, String alias) {
-        PerimetreDTO perimetre = perimetreService.perimetreCourant();
-        if (perimetre.isVisionGlobale()) {
+        return perimetreSql(parametres, alias, agencesCourantes());
+    }
+
+    private String perimetreSql(Map<String, Object> parametres, String alias, List<Long> agences) {
+        if (agences == null) {
             return " where " + alias + ".statut = 'ACTIF'";
         }
-        parametres.put("agencesVisibles", perimetre.getAgenceIds().isEmpty() ? List.of(-1L) : perimetre.getAgenceIds());
+        parametres.put("agencesVisibles", agences.isEmpty() ? List.of(-1L) : agences);
         return " where " + alias + ".statut = 'ACTIF' and " + alias + ".agence_id in (:agencesVisibles)";
+    }
+
+    /** Agences du lecteur ; null en vision globale. */
+    private List<Long> agencesCourantes() {
+        PerimetreDTO perimetre = perimetreService.perimetreCourant();
+        return perimetre.isVisionGlobale() ? null : perimetre.getAgenceIds();
     }
 
     // --- Controles -----------------------------------------------------------------------------

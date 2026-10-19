@@ -27,6 +27,9 @@ public interface ListeDiffusionService {
     /** Destinataires d'une liste enregistree, avec le motif des non joignables. */
     ApercuListeDTO membres(Long id, MembresCriteresDTO criteres);
 
+    /** Clients actifs de la liste dans les agences donnees (null = toutes), desabonnes compris. */
+    List<Long> clients(Long id, List<Long> agences);
+
     /** Compteurs d'une liste pas encore enregistree, pendant la saisie des criteres. */
     ApercuListeDTO simuler(ListeDiffusionDemandeDTO demande);
 

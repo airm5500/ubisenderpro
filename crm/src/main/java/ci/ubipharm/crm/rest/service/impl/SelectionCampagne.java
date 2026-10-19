@@ -315,8 +315,8 @@ class SelectionCampagne {
             case "calcul.sous_type" -> t.get("sousType", String.class);
             case "calcul.jours_retard" -> String.valueOf(Math.max(ecart, 0));
             case "calcul.jours_avant_echeance" -> String.valueOf(Math.max(-ecart, 0));
-            case "calcul.agent_nom" -> t.get("agentNom", String.class);
-            case "calcul.agent_numero" -> numeroLisible(t.get("agentNumero", String.class));
+            case "calcul.agent_nom", "calcul.expediteur_nom" -> t.get("agentNom", String.class);
+            case "calcul.agent_numero", "calcul.expediteur_numero" -> numeroLisible(t.get("agentNumero", String.class));
             default -> {
                 String alias = aliasParSource.get(source);
                 yield alias == null ? "" : formater(t.get(alias));

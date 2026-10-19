@@ -39,6 +39,8 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.jours_avant_echeance", "Jours avant l'échéance à la date d'exécution");
         SOURCES_CALCULEES.put("calcul.agent_nom", "Nom de l'agent du client");
         SOURCES_CALCULEES.put("calcul.agent_numero", "Numéro WhatsApp de l'agent du client");
+        SOURCES_CALCULEES.put("calcul.expediteur_nom", "Nom de l'expéditeur (l'agent en relance, le préparateur en Marketing)");
+        SOURCES_CALCULEES.put("calcul.expediteur_numero", "Numéro WhatsApp de l'expéditeur");
     }
 
     /** Colonnes techniques jamais proposees. */
@@ -59,6 +61,12 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = em.createNativeQuery(SELECT + " where statut = 'ACTIF' order by libelle", Tuple.class).getResultList();
         return lignes.stream().map(this::mapTupleToDto).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VariableMessageDTO> variablesMarketing() {
+        return variables().stream().filter(v -> ModeleMessageServiceImpl.sourceMarketing(v.getSource())).toList();
     }
 
     @Override

@@ -1,0 +1,29 @@
+<p-dialog [header]="campagne() ? 'Modifier la campagne' : 'Nouvelle campagne promotionnelle'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '640px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">Nom de la campagne<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Promotion de novembre" required></label>
+    <label class="f">Liste de diffusion
+      <select class="sel" name="listeId" [(ngModel)]="formulaire.listeId" required>
+        <option [ngValue]="null" disabled>Choisir…</option>
+        @for (l of listes(); track l.id) { <option [ngValue]="l.id">{{ l.nom }} · {{ l.nbJoignables }} joignable{{ l.nbJoignables > 1 ? 's' : '' }}</option> }
+      </select>
+    </label>
+    <label class="f">Modèle de message
+      <select class="sel" name="modeleId" [(ngModel)]="formulaire.modeleId" required>
+        <option [ngValue]="null" disabled>Choisir…</option>
+        @for (m of modeles(); track m.id) { <option [ngValue]="m.id">{{ m.nom }} · {{ L.canal[m.canal] }}</option> }
+      </select>
+    </label>
+    @if (!modeles().length) { <p class="discret" style="margin: 0">Aucun modèle promotionnel : créez-en un dans Modèles promotionnels.</p> }
+    <label class="f">Date et heure d'envoi (heure d'Abidjan)
+      <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">
+    </label>
+    <p class="discret" style="margin: 0">Laissez vide pour envoyer dès la validation. Rien ne part avant qu'une personne habilitée ait validé la campagne.</p>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.nom.trim() || !formulaire.listeId || !formulaire.modeleId">
+        {{ campagne() ? 'Enregistrer' : 'Créer la campagne' }}</button>
+    </div>
+  </form>
+</p-dialog>

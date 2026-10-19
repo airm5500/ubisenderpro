@@ -15,10 +15,10 @@ import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
 import ci.ubipharm.crm.rest.service.dto.SessionAgentDTO;
 import lombok.RequiredArgsConstructor;
 
-/** Liaison par QR du telephone professionnel de chaque agent. */
+/** Liaison par QR du telephone professionnel de chaque agent, ou du Marketing pour ses campagnes. */
 @RestController
 @RequestMapping("/api/whatsapp/sessions")
-@PreAuthorize("hasAuthority('MODULE_RECOUVREMENT')")
+@PreAuthorize("hasAnyAuthority('MODULE_RECOUVREMENT', 'DROIT_NUMERO_MARKETING')")
 @RequiredArgsConstructor
 public class SessionWhatsappRessource {
 

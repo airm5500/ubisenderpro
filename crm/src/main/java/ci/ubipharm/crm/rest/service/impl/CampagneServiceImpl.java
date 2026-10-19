@@ -400,7 +400,7 @@ public class CampagneServiceImpl implements CampagneService {
     @Transactional
     public int demarrerCampagnesEchues() {
         @SuppressWarnings("unchecked")
-        List<Long> ids = em.createNativeQuery("select id from crm_campagne where statut = 'VALIDEE' and date_execution <= utc_timestamp() "
+        List<Long> ids = em.createNativeQuery("select id from crm_campagne where module = 'RECOUVREMENT' and statut = 'VALIDEE' and date_execution <= utc_timestamp() "
                 + "order by date_execution for update").getResultList();
         ids.forEach(id -> demarrer(id, true));
         return ids.size();
@@ -481,6 +481,8 @@ public class CampagneServiceImpl implements CampagneService {
 
     /** Campagnes visibles : toutes en vision globale, sinon celles creees par l'utilisateur ou qui touchent son perimetre. */
     private void restreindre(StringBuilder where, Map<String, Object> parametres) {
+        // Les campagnes du Marketing ont leur propre service
+        where.append(" and cp.module = 'RECOUVREMENT'");
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         if (perimetre.isVisionGlobale()) {
             return;
@@ -520,7 +522,7 @@ public class CampagneServiceImpl implements CampagneService {
             throw new ErreurMetierException("Type de relance inconnu : " + demande.getTypeCampagne() + ".");
         }
         @SuppressWarnings("unchecked")
-        List<Tuple> modeles = em.createNativeQuery("select nom as nom, type_campagne as typeCampagne, statut as statut from crm_modele_message where id = :id",
+        List<Tuple> modeles = em.createNativeQuery("select nom as nom, type_campagne as typeCampagne, statut as statut from crm_modele_message where id = :id and module = 'RECOUVREMENT'",
                 Tuple.class).setParameter("id", demande.getModeleId()).getResultList();
         if (modeles.isEmpty() || !"ACTIF".equals(modeles.getFirst().get("statut", String.class))) {
             throw new ErreurMetierException("Choisissez un modèle de message actif.");

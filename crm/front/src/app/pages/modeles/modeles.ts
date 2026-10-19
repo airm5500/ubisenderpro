@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -21,7 +21,16 @@ export class Modeles implements OnInit {
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;
-  protected readonly types = Object.entries(LIBELLES.typeCampagne);
+
+  /** Donnee de route : les modeles des relances ou ceux des promotions du Marketing. */
+  readonly module = input<'RECOUVREMENT' | 'MARKETING'>('RECOUVREMENT');
+  protected readonly marketing = computed(() => this.module() === 'MARKETING');
+  protected readonly types = computed(() => this.marketing() ? [['PROMOTION', 'Promotion']]
+    : Object.entries(LIBELLES.typeCampagne).filter(([code]) => code !== 'PROMOTION'));
+  /** Ecrire les modeles ; les variables ne s'administrent que cote Recouvrement. */
+  protected readonly peutGerer = computed(() => this.auth.peut(this.marketing() ? 'MODELES_MARKETING' : 'MODELES_GERER'));
+  protected readonly peutVariables = computed(() => !this.marketing() && this.auth.peut('MODELES_GERER'));
+  private readonly base = computed(() => this.marketing() ? '/api/marketing/modeles' : '/api/recouvrement/modeles-messages');
   private readonly zone = viewChild<ElementRef<HTMLTextAreaElement>>('zone');
 
   protected readonly vue = signal<'modeles' | 'variables'>('modeles');
@@ -40,7 +49,7 @@ export class Modeles implements OnInit {
   protected readonly fenetreVariable = signal<Variable | 'nouvelle' | null>(null);
   variable = { code: '', libelle: '', source: '', exemple: '' };
 
-  protected readonly parType = computed(() => this.types
+  protected readonly parType = computed(() => this.types()
     .map(([code, libelle]) => ({ code, libelle, modeles: this.modeles().filter(m => m.typeCampagne === code) }))
     .filter(g => g.modeles.length));
 
@@ -73,7 +82,7 @@ export class Modeles implements OnInit {
     this.chargerModeles();
     this.chargerVariables();
     this.api.get<EtatSms>('/api/sms/etat').subscribe(e => this.etatSms.set(e));
-    if (this.auth.peut('MODELES_GERER')) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
+    if (this.peutVariables()) this.api.get<SourceVariable[]>('/api/recouvrement/variables/sources').subscribe(s => this.sources.set(s));
   }
 
   basculerArchives(): void {
@@ -91,7 +100,7 @@ export class Modeles implements OnInit {
 
   nouveau(): void {
     this.choisi.set(null);
-    this.edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
+    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
     this.contenu.set('');
     this.objet.set('');
     this.canalApercu.set('WHATSAPP');
@@ -120,8 +129,8 @@ export class Modeles implements OnInit {
   enregistrer(): void {
     const m = this.choisi();
     const requete = m
-      ? this.api.put<ModeleMessage>(`/api/recouvrement/modeles-messages/${m.id}`, this.edition)
-      : this.api.post<ModeleMessage>('/api/recouvrement/modeles-messages', this.edition);
+      ? this.api.put<ModeleMessage>(`${this.base()}/${m.id}`, this.edition)
+      : this.api.post<ModeleMessage>(this.base(), this.edition);
     requete.subscribe(enregistre => {
       this.messages.add({ severity: 'success', summary: 'Modèle enregistré', detail: enregistre.nom });
       this.enEdition.set(false);
@@ -130,7 +139,7 @@ export class Modeles implements OnInit {
   }
 
   archiver(m: ModeleMessage): void {
-    this.api.post(`/api/recouvrement/modeles-messages/${m.id}/archivage`).subscribe(() => {
+    this.api.post(`${this.base()}/${m.id}/archivage`).subscribe(() => {
       this.messages.add({ severity: 'info', summary: 'Modèle archivé', detail: `${m.nom} n'est plus proposé dans les nouvelles campagnes.` });
       this.choisi.set(null);
       this.chargerModeles();
@@ -159,7 +168,7 @@ export class Modeles implements OnInit {
   }
 
   private chargerModeles(choisirId?: number): void {
-    this.api.get<ModeleMessage[]>('/api/recouvrement/modeles-messages', { statut: this.archives() ? 'ARCHIVE' : 'ACTIF' }).subscribe(m => {
+    this.api.get<ModeleMessage[]>(this.base(), { statut: this.archives() ? 'ARCHIVE' : 'ACTIF' }).subscribe(m => {
       this.modeles.set(m);
       const cible = m.find(x => x.id === (choisirId ?? this.choisi()?.id)) ?? (this.enEdition() ? null : m[0] ?? null);
       this.choisi.set(cible);
@@ -168,6 +177,6 @@ export class Modeles implements OnInit {
   }
 
   private chargerVariables(): void {
-    this.api.get<Variable[]>('/api/recouvrement/variables').subscribe(v => this.variables.set(v));
+    this.api.get<Variable[]>(this.marketing() ? '/api/marketing/variables' : '/api/recouvrement/variables').subscribe(v => this.variables.set(v));
   }
 }

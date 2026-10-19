@@ -162,3 +162,16 @@ export interface MembreListe {
 }
 export interface ApercuListe { nbClients: number; nbJoignables: number; nbDesabonnes: number; nbSansCoordonnees: number; membres: Page<MembreListe>; }
 export interface ValeursCriteres { sousAgences: string[]; villes: string[]; }
+
+/** Marketing : campagne promotionnelle sur une liste de diffusion. */
+export interface CampagneMarketing {
+  id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; canal: string; dateExecution: string | null;
+  statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
+  numeroExpediteur: string | null; agencesCibles: number[] | null; createdAt: string; soumiseLe: string | null; validePar: string | null;
+  valideLe: string | null; motifRejet: string | null; rejetePar: string | null; lanceLe: string | null; termineLe: string | null;
+  annulePar: string | null; annuleLe: string | null; motifAnnulation: string | null;
+}
+export interface RecapitulatifMarketing {
+  nbClients: number; nbMessages: number; nbExclus: number; expediteur: string; numeroExpediteur: string | null; emailReponse: string | null;
+  exclusions: { motif: string; nb: number }[]; exemples: MessageCampagne[];
+}

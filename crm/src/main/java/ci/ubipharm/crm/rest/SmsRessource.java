@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/sms")
-@PreAuthorize("hasAuthority('MODULE_RECOUVREMENT')")
+@PreAuthorize("hasAnyAuthority('MODULE_RECOUVREMENT', 'DROIT_MODELES_MARKETING', 'DROIT_CAMPAGNES_MARKETING')")
 @RequiredArgsConstructor
 public class SmsRessource {
 

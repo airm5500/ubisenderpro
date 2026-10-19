@@ -26,7 +26,10 @@ import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
 
-/** Modeles de messages : la Direction du Recouvrement les ecrit, les agents ne font que les utiliser (4.8). */
+/**
+ * Modeles de messages : la Direction du Recouvrement ecrit ceux des relances, les agents ne font que les utiliser (4.8) ;
+ * le Marketing ecrit ses modeles promotionnels, qui ne citent ni facture ni agent de recouvrement.
+ */
 @Service
 @RequiredArgsConstructor
 public class ModeleMessageServiceImpl implements ModeleMessageService {
@@ -39,6 +42,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             left join crm_utilisateur u on u.id = m.modifie_par
             """;
 
+    /** Sources utilisables sans facture ni agent de recouvrement. */
+    private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero");
+
     /** 4 SMS de 153 caracteres. */
     private static final int SMS_LONGUEUR_MAX = 612;
 
@@ -49,9 +55,10 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ModeleMessageDTO> rechercher(ModeleMessageCriteresDTO criteres) {
-        StringBuilder where = new StringBuilder(" where m.statut = :statut");
+    public List<ModeleMessageDTO> rechercher(String module, ModeleMessageCriteresDTO criteres) {
+        StringBuilder where = new StringBuilder(" where m.module = :module and m.statut = :statut");
         Map<String, Object> parametres = new LinkedHashMap<>();
+        parametres.put("module", module);
         parametres.put("statut", criteres.getStatut() == null ? "ACTIF" : criteres.getStatut());
         if (criteres.getTypeCampagne() != null) {
             where.append(" and m.type_campagne = :typeCampagne");
@@ -70,9 +77,10 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public ModeleMessageDTO consulter(Long id) {
+    public ModeleMessageDTO consulter(String module, Long id) {
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery(SELECT + " where m.id = :id", Tuple.class).setParameter("id", id).getResultList();
+        List<Tuple> lignes = em.createNativeQuery(SELECT + " where m.id = :id and m.module = :module", Tuple.class)
+                .setParameter("id", id).setParameter("module", module).getResultList();
         if (lignes.isEmpty()) {
             throw new RessourceIntrouvableException("Modèle introuvable");
         }
@@ -81,14 +89,15 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     @Override
     @Transactional
-    public ModeleMessageDTO creer(ModeleMessageDemandeDTO demande) {
-        verifier(demande, null);
+    public ModeleMessageDTO creer(String module, ModeleMessageDemandeDTO demande) {
+        verifier(module, demande, null);
         em.createNativeQuery("""
-                insert into crm_modele_message (nom, type_campagne, canal, objet, contenu, cree_par, created_at)
-                values (:nom, :typeCampagne, :canal, :objet, :contenu, :creePar, utc_timestamp())
+                insert into crm_modele_message (module, nom, type_campagne, canal, objet, contenu, cree_par, created_at)
+                values (:module, :nom, :typeCampagne, :canal, :objet, :contenu, :creePar, utc_timestamp())
                 """)
+                .setParameter("module", module)
                 .setParameter("nom", demande.getNom().trim())
-                .setParameter("typeCampagne", demande.getTypeCampagne())
+                .setParameter("typeCampagne", type(module, demande))
                 .setParameter("canal", canal(demande))
                 .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
@@ -96,17 +105,17 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .executeUpdate();
         Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
         journalActionService.enregistrer("MODELE_CREATION", "crm_modele_message", id, demande.getNom().trim());
-        return consulter(id);
+        return consulter(module, id);
     }
 
     @Override
     @Transactional
-    public ModeleMessageDTO modifier(Long id, ModeleMessageDemandeDTO demande) {
-        ModeleMessageDTO existant = consulter(id);
+    public ModeleMessageDTO modifier(String module, Long id, ModeleMessageDemandeDTO demande) {
+        ModeleMessageDTO existant = consulter(module, id);
         if ("ARCHIVE".equals(existant.getStatut())) {
             throw new ErreurMetierException("Le modèle « " + existant.getNom() + " » est archivé.");
         }
-        verifier(demande, id);
+        verifier(module, demande, id);
         if (!existant.getCanal().equals(canal(demande))) {
             Number utilisations = (Number) em.createNativeQuery("select count(*) from crm_campagne where modele_id = :id")
                     .setParameter("id", id).getSingleResult();
@@ -120,7 +129,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 where id = :id
                 """)
                 .setParameter("nom", demande.getNom().trim())
-                .setParameter("typeCampagne", demande.getTypeCampagne())
+                .setParameter("typeCampagne", type(module, demande))
                 .setParameter("canal", canal(demande))
                 .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
@@ -128,13 +137,13 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("id", id)
                 .executeUpdate();
         journalActionService.enregistrer("MODELE_MODIFICATION", "crm_modele_message", id, demande.getNom().trim());
-        return consulter(id);
+        return consulter(module, id);
     }
 
     @Override
     @Transactional
-    public ModeleMessageDTO archiver(Long id) {
-        ModeleMessageDTO modele = consulter(id);
+    public ModeleMessageDTO archiver(String module, Long id) {
+        ModeleMessageDTO modele = consulter(module, id);
         @SuppressWarnings("unchecked")
         List<String> campagnes = em.createNativeQuery("""
                 select nom from crm_campagne where modele_id = :id and statut in ('BROUILLON', 'A_VALIDER') order by nom
@@ -147,11 +156,11 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("id", id)
                 .executeUpdate();
         journalActionService.enregistrer("MODELE_ARCHIVAGE", "crm_modele_message", id, modele.getNom());
-        return consulter(id);
+        return consulter(module, id);
     }
 
-    private void verifier(ModeleMessageDemandeDTO demande, Long id) {
-        if (!GabaritMessage.TYPES_CAMPAGNE.contains(demande.getTypeCampagne())) {
+    private void verifier(String module, ModeleMessageDemandeDTO demande, Long id) {
+        if (!"MARKETING".equals(module) && !GabaritMessage.TYPES_CAMPAGNE.contains(demande.getTypeCampagne())) {
             throw new ErreurMetierException("Type de relance inconnu : " + demande.getTypeCampagne() + ".");
         }
         if ("EMAIL".equals(canal(demande)) && objet(demande) == null) {
@@ -161,14 +170,22 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         if ("SMS".equals(canal(demande)) && demande.getContenu() != null && demande.getContenu().length() > SMS_LONGUEUR_MAX) {
             throw new ErreurMetierException("Un modèle SMS tient en " + SMS_LONGUEUR_MAX + " caractères, variables comprises.");
         }
-        Set<String> connues = variableMessageService.sourcesParCode().keySet();
+        Map<String, String> connues = variableMessageService.sourcesParCode();
         List<String> inconnues = new ArrayList<>();
         Set<String> utilisees = new LinkedHashSet<>(GabaritMessage.variables(demande.getContenu()));
         utilisees.addAll(GabaritMessage.variables(Objects.requireNonNullElse(objet(demande), "")));
-        utilisees.stream().filter(v -> !connues.contains(v)).forEach(v -> inconnues.add("{" + v + "}"));
+        utilisees.stream().filter(v -> !connues.containsKey(v)).forEach(v -> inconnues.add("{" + v + "}"));
         if (!inconnues.isEmpty()) {
             throw new ErreurMetierException((inconnues.size() == 1 ? "Variable inconnue : " : "Variables inconnues : ") + String.join(", ", inconnues) + ".");
         }
+        if ("MARKETING".equals(module)) {
+            List<String> horsMarketing = utilisees.stream().filter(v -> !sourceMarketing(connues.get(v))).map(v -> "{" + v + "}").toList();
+            if (!horsMarketing.isEmpty()) {
+                throw new ErreurMetierException("Une promotion ne porte sur aucune facture ni agent de recouvrement : retirez "
+                        + String.join(", ", horsMarketing) + ".");
+            }
+        }
+        // Le nom reste unique tous modules confondus : les journaux et les campagnes le citent
         long homonymes = ((Number) em.createNativeQuery("select count(*) from crm_modele_message where nom = :nom and id <> :id")
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("id", id == null ? 0L : id)
@@ -176,6 +193,15 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         if (homonymes > 0) {
             throw new ErreurMetierException("Un modèle s'appelle déjà « " + demande.getNom().trim() + " ».");
         }
+    }
+
+    /** Variables d'une promotion : celles du client et de l'expediteur. */
+    static boolean sourceMarketing(String source) {
+        return source != null && (source.startsWith("client.") || SOURCES_MARKETING.contains(source));
+    }
+
+    private static String type(String module, ModeleMessageDemandeDTO demande) {
+        return "MARKETING".equals(module) ? "PROMOTION" : demande.getTypeCampagne();
     }
 
     private static String canal(ModeleMessageDemandeDTO demande) {

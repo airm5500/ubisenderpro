@@ -25,35 +25,36 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ModeleMessageRessource {
 
+    private static final String MODULE = "RECOUVREMENT";
     private static final String DIRECTION = "hasAuthority('DROIT_MODELES_GERER')";
 
     private final ModeleMessageService modeleMessageService;
 
     @GetMapping
     public List<ModeleMessageDTO> rechercher(ModeleMessageCriteresDTO criteres) {
-        return modeleMessageService.rechercher(criteres);
+        return modeleMessageService.rechercher(MODULE, criteres);
     }
 
     @GetMapping("/{id}")
     public ModeleMessageDTO consulter(@PathVariable Long id) {
-        return modeleMessageService.consulter(id);
+        return modeleMessageService.consulter(MODULE, id);
     }
 
     @PostMapping
     @PreAuthorize(DIRECTION)
     public ModeleMessageDTO creer(@Valid @RequestBody ModeleMessageDemandeDTO demande) {
-        return modeleMessageService.creer(demande);
+        return modeleMessageService.creer(MODULE, demande);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize(DIRECTION)
     public ModeleMessageDTO modifier(@PathVariable Long id, @Valid @RequestBody ModeleMessageDemandeDTO demande) {
-        return modeleMessageService.modifier(id, demande);
+        return modeleMessageService.modifier(MODULE, id, demande);
     }
 
     @PostMapping("/{id}/archivage")
     @PreAuthorize(DIRECTION)
     public ModeleMessageDTO archiver(@PathVariable Long id) {
-        return modeleMessageService.archiver(id);
+        return modeleMessageService.archiver(MODULE, id);
     }
 }

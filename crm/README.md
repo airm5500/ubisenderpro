@@ -415,3 +415,27 @@ Le critere "tournee" n'existe pas : les tournees sont decidees par les agences.
   `POST /clients/{id}/desabonnement`, `POST /clients/{id}/reabonnement`.
 - **Journal** : `LISTE_CREATION`, `LISTE_MODIFICATION`, `LISTE_CLIENTS`, `LISTE_ARCHIVAGE`, `LISTE_REACTIVATION`,
   `CLIENT_DESABONNEMENT`, `CLIENT_REABONNEMENT`.
+
+## Marketing : campagnes promotionnelles (Marketing lot 2)
+
+Ecrans **Marketing > Campagnes promotionnelles**, **Modeles promotionnels** et **Mon numero WhatsApp**. Une campagne =
+une liste de diffusion + un modele du Marketing (WhatsApp, e-mail ou SMS) + une date d'envoi (vide = des la validation).
+Meme cycle que les relances : brouillon, soumission, validation ou renvoi avec motif, envoi, annulation.
+
+- **Expediteur** : le WhatsApp part du numero de la personne qui prepare la campagne (numero saisi par l'administrateur
+  dans Utilisateurs, relie par QR dans Mon numero WhatsApp) ; l'e-mail part de l'adresse d'UBIPHARM avec son adresse en
+  reponse ; le SMS part au nom du fournisseur. Sans numero WhatsApp, la campagne ne peut pas etre soumise.
+- **Destinataires** : les clients de la liste dans le perimetre fige de l'auteur ; un message par numero des fonctions
+  de la liste (un numero partage par deux clients ne recoit qu'un message), ou un e-mail par client. Exclus avec motif :
+  desabonne (STOP), sans numero, sans adresse. Un client desabonne entre la validation et l'envoi ne recoit rien.
+- **Validation** : droit `CAMPAGNES_MARKETING_VALIDER` (directeur d'agence, directions, administrateur). Un valideur
+  limite a ses agences ne valide pas une campagne qui vise d'autres agences (`crm_campagne.agences_cibles`).
+- **Modeles** : `crm_modele_message.module = MARKETING`, type `PROMOTION` ; seules les variables du client et de
+  l'expediteur (`{expediteur_nom}`, `{expediteur_numero}`, `{segment}`, `{agence}`) sont admises, pas celles des factures.
+- **Tables** : memes `crm_campagne` (colonnes `module`, `liste_id`, `agences_cibles`) et `crm_campagne_message`
+  (`facture_id` vide) que les relances ; la chaine d'envoi WhatsApp, e-mail et SMS est commune. Migration `V1.0.21`.
+- **Droits** (groupe Campagnes, module Marketing) : `CAMPAGNES_MARKETING`, `CAMPAGNES_MARKETING_PREPARER`,
+  `CAMPAGNES_MARKETING_VALIDER`, `MODELES_MARKETING`, `NUMERO_MARKETING`. Le Charge marketing a tout sauf la validation.
+- **API** : `/api/marketing/campagnes` (`GET`, `POST`, `PUT /{id}`, `GET /{id}/recapitulatif`, `GET /{id}/messages`,
+  `POST /{id}/soumission|validation|rejet|lancement|annulation`), `/api/marketing/modeles`, `GET /api/marketing/variables`.
+- **Journal** : `CAMPAGNE_MARKETING_CREATION`, `_MODIFICATION`, `_SOUMISSION`, `_VALIDATION`, `_REJET`, `_LANCEMENT`, `_ANNULATION`.

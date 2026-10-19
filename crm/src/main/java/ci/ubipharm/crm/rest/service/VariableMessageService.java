@@ -12,6 +12,9 @@ public interface VariableMessageService {
     /** Variables actives, a inserer dans les modeles sous la forme {code}. */
     List<VariableMessageDTO> variables();
 
+    /** Variables utilisables dans une promotion : client et expediteur, sans facture ni agent de recouvrement. */
+    List<VariableMessageDTO> variablesMarketing();
+
     /** Champs de la base qu'une variable peut restituer, colonnes ajoutees depuis comprises. */
     List<SourceVariableDTO> sources();
 

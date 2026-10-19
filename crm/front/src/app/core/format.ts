@@ -33,7 +33,8 @@ export const LIBELLES = {
   } as Partial<Record<string, string>>,
   canal: { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail', SMS: 'SMS' } as Partial<Record<string, string>>,
   typeCampagne: {
-    AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée'
+    AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée',
+    PROMOTION: 'Promotion'
   } as Partial<Record<string, string>>,
   statutCampagne: {
     BROUILLON: 'Brouillon', A_VALIDER: 'En attente de validation', VALIDEE: 'Programmée', EN_COURS: 'En cours',
