@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -19,17 +21,30 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import ci.ubipharm.crm.rest.service.SupportDiagnosticService;
 import ci.ubipharm.crm.socle.dto.ChampEnErreurDTO;
 import ci.ubipharm.crm.socle.dto.ErreurDTO;
 
 /**
  * Traduit toutes les exceptions en reponses sans detail technique.
- * Le detail ne part que dans les journaux, sous une reference montree a l'utilisateur.
+ * Le detail ne part que dans les journaux, sous une reference montree a l'utilisateur,
+ * et dans le diagnostic du centre de support pour les erreurs inattendues.
  */
 @RestControllerAdvice
 public class GestionnaireErreurs {
 
     private static final Logger LOG = LoggerFactory.getLogger(GestionnaireErreurs.class);
+
+    private final ObjectProvider<SupportDiagnosticService> diagnostic;
+
+    public GestionnaireErreurs() {
+        this(null);
+    }
+
+    @Autowired
+    public GestionnaireErreurs(ObjectProvider<SupportDiagnosticService> diagnostic) {
+        this.diagnostic = diagnostic;
+    }
 
     @ExceptionHandler(ErreurMetierException.class)
     public ResponseEntity<ErreurDTO> erreurMetier(ErreurMetierException e) {
@@ -84,12 +99,25 @@ public class GestionnaireErreurs {
     public ResponseEntity<ErreurDTO> erreurInattendue(Exception e) {
         String reference = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         LOG.error("Erreur inattendue, reference {}", reference, e);
+        capturer(e, reference);
         ErreurDTO corps = ErreurDTO.builder()
                 .statut(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .message("Une erreur est survenue. Communiquez la référence " + reference + " à l'administrateur.")
                 .reference(reference)
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(corps);
+    }
+
+    /** Best-effort : la capture ne doit jamais changer la reponse. */
+    private void capturer(Exception e, String reference) {
+        try {
+            SupportDiagnosticService service = diagnostic == null ? null : diagnostic.getIfAvailable();
+            if (service != null) {
+                service.capturerServeur(e, reference);
+            }
+        } catch (Throwable t) {
+            LOG.warn("Capture de l'erreur {} impossible : {}", reference, t.toString());
+        }
     }
 
     private ResponseEntity<ErreurDTO> reponse(HttpStatus statut, String message, List<ChampEnErreurDTO> champs) {

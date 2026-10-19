@@ -165,6 +165,13 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; background: #EAF0F4; color: var(--bleu); }
 .tag.vert { background: #DDF6E8; color: #0F5E36; }
 .tag.gris { background: #EEF2F4; color: var(--texte-2); }
+.tag.alerte { background: #FFF4E5; color: #6B3F00; }
+.tag.ko { background: #FDECE7; color: #7E2A12; }
+
+/* FAQ du centre de support */
+details.faq { padding: 12px 0; border-bottom: 1px solid var(--filet-2); }
+details.faq summary { cursor: pointer; font-size: 14px; color: var(--bleu); }
+.faq-reponse { margin: 10px 0 8px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #1F2D38; }
 
 /* Listes a gauche (modeles, conversations) */
 .liste-g { display: flex; flex-direction: column; gap: 2px; }

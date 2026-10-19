@@ -65,6 +65,9 @@
       @if (auth.peut('PARAMETRES')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
       @if (auth.peut('FOURNISSEURS_SMS')) { <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a> }
     }
+    <!-- Centre de support : ouvert a tout utilisateur connecte -->
+    <div class="gl">Aide</div>
+    <a class="nv" routerLink="/support" routerLinkActive="on">Centre de support</a>
     }
 
     <div class="profil">

@@ -3,6 +3,27 @@
 export interface Page<T> { elements: T[]; total: number; page: number; taille: number; }
 export interface Erreur { statut: number; message: string; reference?: string; champs?: { champ: string; message: string }[]; }
 
+/* Centre de support */
+export interface SupportMessage {
+  id: number; type: 'MESSAGE' | 'SYSTEME'; auteurId: number; auteur: string; support: boolean; contenu: string; creeLe: string;
+}
+export interface SupportTicket {
+  id: number; sujet: string; categorie: 'QUESTION' | 'INCIDENT' | 'DEMANDE'; priorite: 'NORMALE' | 'HAUTE' | 'URGENTE';
+  statut: 'OUVERT' | 'EN_COURS' | 'RESOLU' | 'FERME'; auteurId: number; auteur: string; assigneId: number | null; assigne: string | null;
+  nbMessages: number; dernierMessageLe: string | null; creeLe: string; modifieLe: string | null; messages: SupportMessage[] | null;
+}
+export interface SupportIntervenant { id: number; login: string; nomComplet: string; }
+export interface SupportErreur {
+  id: number; signature: string; origine: 'SERVEUR' | 'NAVIGATEUR'; type: string; message: string | null; detail: string | null;
+  chemin: string | null; utilisateur: string | null; occurrences: number; premiereLe: string; derniereLe: string; traite: boolean;
+  traitePar: string | null; traiteLe: string | null;
+}
+export interface SupportSonde { code: string; libelle: string; etat: 'OK' | 'ALERTE' | 'KO'; detail: string; dureeMs: number; }
+export interface SupportFaq {
+  id: number; categorie: string; question: string; reponse: string; ordre: number; statut: 'ACTIF' | 'ARCHIVE';
+  modifiePar: string | null; modifieLe: string | null;
+}
+
 export interface Utilisateur {
   id: number; login: string; nomComplet: string; roles: string[]; modules: string[];
   visionGlobale: boolean; agenceIds: number[]; motDePasseProvisoire: boolean;

@@ -1,4 +1,4 @@
-import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withInterceptors, withXsrfConfiguration } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { registerLocaleData } from '@angular/common';
@@ -10,6 +10,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 
 import { routes } from './app.routes';
 import { intercepteurErreurs } from './core/intercepteur';
+import { ErreursNavigateur } from './core/erreurs-navigateur';
 
 registerLocaleData(localeFr);
 
@@ -26,6 +27,8 @@ const Charte = definePreset(Aura, {
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    // Erreurs JavaScript remontees au diagnostic du centre de support
+    { provide: ErrorHandler, useClass: ErreursNavigateur },
     provideRouter(routes, withComponentInputBinding()),
     // Spring Security (csrf.spa) : cookie XSRF-TOKEN, en-tete X-XSRF-TOKEN
     provideHttpClient(withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }), withInterceptors([intercepteurErreurs])),
