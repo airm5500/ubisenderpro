@@ -1,7 +1,7 @@
-<div class="page">
+<div [class.page]="!integre()">
   <div class="entete">
     <div>
-      <h1>Fournisseurs SMS</h1>
+      @if (integre()) { <h2 class="h2">Fournisseurs SMS</h2> } @else { <h1>Fournisseurs SMS</h1> }
       <p class="sous-titre">Les relances SMS partent par le fournisseur par défaut. Chaque fournisseur est décrit par son API : un nouveau se paramètre ici, sans développement.</p>
     </div>
     <div class="actions"><button class="ba" (click)="creer()">Nouveau fournisseur</button></div>

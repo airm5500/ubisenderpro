@@ -5,6 +5,7 @@ import java.util.List;
 import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 
@@ -25,4 +26,10 @@ public interface DiscussionService {
      * message du client.
      */
     MessageDiscussionDTO repondre(ReponseDiscussionDTO reponse);
+
+    /** Numeros depuis lesquels l'utilisateur peut ecrire : le sien d'abord, puis ceux des agents qu'il remplace. */
+    List<String> mesNumeros();
+
+    /** Ecrit a un client qui n'a pas encore de discussion (ou la reprend) : memes regles que la reponse. */
+    MessageDiscussionDTO demarrer(NouvelleDiscussionDTO demande);
 }

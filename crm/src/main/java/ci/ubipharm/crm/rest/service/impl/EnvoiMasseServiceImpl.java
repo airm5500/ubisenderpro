@@ -95,7 +95,8 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
                 .toList();
         String exemple = retenus.isEmpty() ? null : personnaliser(demande.getContenu(), retenus.getFirst().nom());
         if (demande.isApercu()) {
-            return EnvoiMasseApercuDTO.builder().nbRetenus(retenus.size()).exclus(exclus).exemple(exemple).build();
+            return EnvoiMasseApercuDTO.builder().nbRetenus(retenus.size()).exclus(exclus).exemple(exemple)
+                    .horsPlage(!cadence.dansLaPlage()).plageHoraire(cadence.plage()).build();
         }
         if (retenus.isEmpty()) {
             throw new ErreurMetierException("Aucun destinataire à qui envoyer : tous sont exclus.");
@@ -154,7 +155,10 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
                         .setParameter("id", id).getSingleResult()).longValue())) {
             throw new RessourceIntrouvableException("Envoi introuvable.");
         }
-        return mapTupleToDto(lignes.getFirst());
+        EnvoiMasseDTO envoi = mapTupleToDto(lignes.getFirst());
+        envoi.setHorsPlage(!cadence.dansLaPlage());
+        envoi.setPlageHoraire(cadence.plage());
+        return envoi;
     }
 
     @Override

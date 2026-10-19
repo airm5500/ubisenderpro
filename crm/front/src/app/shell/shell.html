@@ -9,8 +9,8 @@
     <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
     @if (auth.recouvrement() && auth.marketing()) {
       <div role="group" aria-label="Module" class="modules">
-        <a class="md" [class.mdon]="!surMarketing()" routerLink="/">Recouvrement</a>
-        <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing">Marketing</a>
+        <a class="md" [class.mdon]="!surMarketing()" routerLink="/" (click)="module.choisir('RECOUVREMENT')">Recouvrement</a>
+        <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing" (click)="module.choisir('MARKETING')">Marketing</a>
       </div>
     } @else {
       <div class="module-seul">{{ auth.recouvrement() ? 'Recouvrement' : 'Marketing' }}</div>
@@ -55,6 +55,7 @@
       @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }
       @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on">Promotions</a> }
       @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
+      @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a> }
       @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on">Informations clients</a> }
       @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on">Calendrier des événements</a> }
       @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
@@ -63,13 +64,12 @@
       @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
     }
     <!-- Administration : la meme dans les deux modules -->
-    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'FOURNISSEURS_SMS', 'AGENCES')) {
+    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'REFERENTIELS', 'FOURNISSEURS_SMS', 'AGENCES')) {
       <div class="gl">Administration</div>
       @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a> }
       @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on">Rôles et droits</a> }
-      @if (auth.peut('AGENCES')) { <a class="nv" routerLink="/agences" routerLinkActive="on">Agences</a> }
-      @if (auth.peut('PARAMETRES')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
-      @if (auth.peut('FOURNISSEURS_SMS')) { <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a> }
+      <!-- Agences et fournisseurs SMS se tiennent dans les Parametres -->
+      @if (auth.peut('PARAMETRES', 'REFERENTIELS', 'AGENCES', 'FOURNISSEURS_SMS')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
     }
     <!-- Centre de support : ouvert a tout utilisateur connecte -->
     <div class="gl">Aide</div>

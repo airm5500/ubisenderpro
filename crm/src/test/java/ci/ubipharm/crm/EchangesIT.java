@@ -151,6 +151,24 @@ class EchangesIT extends IntegrationBase {
         mvc.perform(get("/api/utilisateurs/" + id + "/actions").session(charge)).andExpect(status().isForbidden());
     }
 
+    @Test
+    void uneNouvelleDiscussionPartDuNumeroDeLUtilisateurEtApparaitDansLaListe() throws Exception {
+        mvc.perform(get("/api/discussions/numeros").session(charge)).andExpect(jsonPath("$[0]").value(NUMERO));
+        when(passerelle.envoyerTexte(NUMERO, "2250700000007", "Bonjour Docteur"))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("N-1").build());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"07 00 00 00 07\",\"contenu\":\"Bonjour Docteur\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.contenu").value("Bonjour Docteur"));
+        mvc.perform(get("/api/discussions").session(charge))
+                .andExpect(jsonPath("$.elements[0].numeroClient").value("2250700000007"))
+                .andExpect(jsonPath("$.elements[0].peutRepondre").value(true));
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"123\",\"contenu\":\"Test\"}")
+                .andExpect(jsonPath("$.message", containsString("n'est pas un numéro WhatsApp valide")));
+        // L'administrateur de test n'a pas de numero relie
+        jdbc.update("update crm_utilisateur set numero_whatsapp = null where login = 'admin'");
+        envoyer(admin, post("/api/discussions"), "{\"numeroClient\":\"0700000007\",\"contenu\":\"Test\"}")
+                .andExpect(jsonPath("$.message", containsString("Aucun numéro WhatsApp")));
+    }
+
     private ResultActions envoyer(MockHttpSession session, MockHttpServletRequestBuilder requete, String json) throws Exception {
         return mvc.perform(requete.session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json));
     }

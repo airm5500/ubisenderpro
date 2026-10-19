@@ -18,3 +18,5 @@
 .saisie-d { padding: 12px; background: #fff; border-top: 1px solid var(--filet, #E3E8EC); display: flex; gap: 10px; align-items: flex-end; }
 .saisie-d textarea { flex: 1; resize: vertical; min-height: 44px; }
 @media (max-width: 860px) { .discussions { grid-template-columns: 1fr; } .liste-d { border-right: 0; } }
+.nouvelle-d { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; }
+.choix-clients { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px; }

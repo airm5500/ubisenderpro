@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -23,6 +23,8 @@ const VIDE: Edition = {
 export class FournisseursSms implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
+  /** Affiche dans les Parametres : pas de cadre de page ni de grand titre. */
+  readonly integre = input(false);
 
   protected readonly fournisseurs = signal<FournisseurSms[]>([]);
   protected readonly choisi = signal<FournisseurSms | null>(null);

@@ -36,6 +36,7 @@
           <div class="kv"><span>Destinataires retenus</span><strong>{{ a.nbRetenus }}</strong></div>
           <div class="kv"><span>Écartés</span><strong>{{ a.exclus.length }}</strong></div>
         </div>
+        @if (a.horsPlage) { <div class="info"><i class="pi pi-clock"></i><span>Il est hors de la plage d'envoi WhatsApp (entre {{ a.plageHoraire }}, heure d'Abidjan) : les messages partiront à son ouverture. La plage se règle dans Paramètres > WhatsApp.</span></div> }
         @if (a.exemple) { <div class="info"><i class="pi pi-whatsapp"></i><span style="white-space: pre-wrap">{{ a.exemple }}</span></div> }
         @if (a.exclus.length) {
           <div class="defile" style="max-height: 220px">
@@ -66,6 +67,9 @@
           @if (e.statut === 'EN_COURS') { <button class="bd petit" type="button" (click)="annuler(e)">Annuler l'envoi</button> }
         </div>
       </div>
+      @if (e.statut === 'EN_COURS' && e.horsPlage && e.nbEnAttente) {
+        <div class="info"><i class="pi pi-clock"></i><span>En attente de la plage d'envoi WhatsApp (entre {{ e.plageHoraire }}, heure d'Abidjan) : les {{ e.nbEnAttente }} message(s) partiront à son ouverture, après les campagnes.</span></div>
+      }
       <div class="kvs bandeau">
         <div class="kv"><span>À envoyer</span><strong>{{ e.nbEnAttente }}</strong></div>
         <div class="kv"><span>Envoyés</span><strong>{{ e.nbEnvoyes }}</strong></div>

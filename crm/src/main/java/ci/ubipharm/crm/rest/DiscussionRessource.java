@@ -14,6 +14,7 @@ import ci.ubipharm.crm.rest.service.DiscussionService;
 import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import jakarta.validation.Valid;
@@ -36,6 +37,16 @@ public class DiscussionRessource {
     @GetMapping("/messages")
     public List<MessageDiscussionDTO> fil(@RequestParam String numeroAgent, @RequestParam String numeroClient) {
         return discussionService.fil(numeroAgent, numeroClient);
+    }
+
+    @GetMapping("/numeros")
+    public List<String> mesNumeros() {
+        return discussionService.mesNumeros();
+    }
+
+    @PostMapping
+    public MessageDiscussionDTO demarrer(@Valid @RequestBody NouvelleDiscussionDTO demande) {
+        return discussionService.demarrer(demande);
     }
 
     @PostMapping("/messages")

@@ -352,3 +352,24 @@ tr.inactif td { color: var(--gris, #6B7C88); }
 [data-charte="C"] .t tbody tr.choisi, [data-charte="C"] .t tbody tr.choisi:hover { background: var(--bleu); color: #fff; }
 [data-charte="C"] .t tbody tr.choisi td a, [data-charte="C"] .t tbody tr.choisi td .discret { color: var(--vert); }
 @media (prefers-reduced-motion: reduce) { .t tbody tr { transition: none; } }
+
+/* Survol visible partout : onglets, listes de gauche (modeles, parametres...), raccourcis de l'accueil Marketing */
+.tab { transition: color .12s, border-color .12s; }
+.tab:hover { color: var(--bleu); border-bottom-color: color-mix(in srgb, var(--vert) 60%, transparent); }
+.tabon:hover { border-bottom-color: var(--bleu); }
+.tab:focus-visible { outline: 2px solid var(--vert); outline-offset: 2px; }
+.it { transition: background .12s, box-shadow .12s; }
+.it:hover { background: var(--survol); box-shadow: inset 3px 0 0 var(--vert); }
+.iton, .iton:hover { background: var(--bleu); color: #fff; box-shadow: inset 3px 0 0 var(--vert); }
+.iton :is(.discret, .second, small, span) { color: #C6D2DC; }
+[data-charte="B"] .iton, [data-charte="B"] .iton:hover { background: var(--survol); color: var(--texte); }
+[data-charte="B"] .iton :is(.discret, .second, small, span) { color: var(--texte-2); }
+.raccourcis { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.raccourci { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; background: #fff; border: 1px solid var(--filet); border-radius: 8px;
+  text-decoration: none; color: var(--texte); transition: background .12s, border-color .12s, box-shadow .12s; }
+.raccourci b { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; color: var(--bleu); }
+.raccourci b .pi { font-size: 13px; color: var(--vert-texte); transition: transform .12s; }
+.raccourci:hover { background: var(--survol); border-color: var(--vert); box-shadow: inset 4px 0 0 var(--vert); color: var(--texte); }
+.raccourci:hover b .pi { transform: translateX(3px); }
+[data-charte="A"] .raccourci b { color: var(--bleu); }
+@media (prefers-reduced-motion: reduce) { .tab, .it, .raccourci, .raccourci b .pi { transition: none; } }

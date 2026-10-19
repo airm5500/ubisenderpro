@@ -21,6 +21,7 @@ import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
+import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
@@ -157,13 +158,45 @@ public class DiscussionServiceImpl implements DiscussionService {
             throw new ErreurMetierException("Vous ne pouvez répondre que depuis votre numéro ou celui d'un agent que vous remplacez.");
         }
         verifierAcces(agent, client);
+        return envoyer(agent, client, reponse.getContenu().strip());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> mesNumeros() {
+        return numerosUtilisables();
+    }
+
+    @Override
+    @Transactional
+    public MessageDiscussionDTO demarrer(NouvelleDiscussionDTO demande) {
+        if (!parametreService.oui("discussions.reponse_active", true)) {
+            throw new ErreurMetierException("L'envoi depuis le CRM est désactivé (Paramètres) : écrivez depuis le téléphone.");
+        }
+        List<String> miens = numerosUtilisables();
+        if (miens.isEmpty()) {
+            throw new ErreurMetierException("Aucun numéro WhatsApp n'est relié à votre compte : demandez-le à l'administrateur (Utilisateurs).");
+        }
+        String agent = demande.getNumeroAgent() == null || demande.getNumeroAgent().isBlank() ? miens.getFirst() : demande.getNumeroAgent();
+        if (!miens.contains(agent)) {
+            throw new ErreurMetierException("Vous ne pouvez écrire que depuis votre numéro ou celui d'un agent que vous remplacez.");
+        }
+        String client = ValeursImport.numeroWhatsapp(demande.getNumeroClient().trim(), parametreService.valeur("whatsapp.prefixe_pays", "225"))
+                .orElseThrow(() -> new ErreurMetierException("Le numéro " + demande.getNumeroClient().trim() + " n'est pas un numéro WhatsApp valide."));
+        if (client.equals(agent)) {
+            throw new ErreurMetierException("Le numéro du client est celui de l'expéditeur.");
+        }
+        return envoyer(agent, client, demande.getContenu().strip());
+    }
+
+    /** Envoie aussitot depuis un numero connecte, garde le message et le journalise. */
+    private MessageDiscussionDTO envoyer(String agent, String client, String texte) {
         @SuppressWarnings("unchecked")
         List<Object[]> sessions = em.createNativeQuery("select statut, fournisseur, meta_phone_number_id from crm_session_whatsapp where numero = :numero")
                 .setParameter("numero", agent).getResultList();
         if (sessions.isEmpty() || !"CONNECTE".equals(sessions.getFirst()[0])) {
             throw new ErreurMetierException("Le numéro " + agent + " n'est pas connecté : reliez le téléphone dans Numéros WhatsApp.");
         }
-        String texte = reponse.getContenu().strip();
         ResultatEnvoiDTO resultat;
         if ("META".equals(sessions.getFirst()[1])) {
             Number recus = (Number) em.createNativeQuery("""
@@ -203,6 +236,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         List<String> numeros = em.createNativeQuery("""
                 select u.numero_whatsapp from crm_utilisateur u where u.numero_whatsapp is not null and (u.id = :moi or u.id in (
                     select d.titulaire_id from crm_delegation d where d.remplacant_id = :moi and %s))
+                order by u.id = :moi desc, u.nom_complet
                 """.formatted(RequetesRecouvrement.DELEGATION_EN_COURS))
                 .setParameter("moi", perimetreService.perimetreCourant().getUtilisateurId()).getResultList();
         return numeros;

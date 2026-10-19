@@ -39,4 +39,8 @@ public class EnvoiMasseDTO {
     private LocalDateTime creeLe;
     private String annulePar;
     private LocalDateTime termineLe;
+    /** Vrai hors de la plage d'envoi WhatsApp : les messages attendent son ouverture. */
+    private boolean horsPlage;
+    /** Plage d'envoi, par ex. « 8 h et 18 h » (heure d'Abidjan). */
+    private String plageHoraire;
 }

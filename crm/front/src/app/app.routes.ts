@@ -39,7 +39,7 @@ export const routes: Routes = [
       { path: 'modeles', canActivate: [droit('MODELES', 'MODELES_GERER')], loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles de messages' },
       { path: 'agences', canActivate: [droit('AGENCES')], loadComponent: () => import('./pages/agences/agences').then(m => m.Agences), title: 'Agences' },
       { path: 'numeros', canActivate: [droit('NUMEROS', 'NUMEROS_TOUS')], loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Numéros WhatsApp' },
-      { path: 'parametres', canActivate: [droit('PARAMETRES')], loadComponent: () => import('./pages/parametres/parametres').then(m => m.Parametres), title: 'Paramètres' },
+      { path: 'parametres', canActivate: [droit('PARAMETRES', 'REFERENTIELS', 'AGENCES', 'FOURNISSEURS_SMS')], loadComponent: () => import('./pages/parametres/parametres').then(m => m.Parametres), title: 'Paramètres' },
       { path: 'fournisseurs-sms', canActivate: [droit('FOURNISSEURS_SMS')], loadComponent: () => import('./pages/fournisseurs-sms/fournisseurs-sms').then(m => m.FournisseursSms), title: 'Fournisseurs SMS' },
       { path: 'utilisateurs', canActivate: [droit('UTILISATEURS')], loadComponent: () => import('./pages/utilisateurs/utilisateurs').then(m => m.Utilisateurs), title: 'Utilisateurs et habilitations' },
       { path: 'roles', canActivate: [droit('ROLES')], loadComponent: () => import('./pages/roles/roles').then(m => m.Roles), title: 'Rôles et droits' },

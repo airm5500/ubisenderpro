@@ -34,6 +34,11 @@ class CadenceWhatsapp {
         return heure >= parametreService.entier("whatsapp.envoi.heure_debut", 8) && heure < parametreService.entier("whatsapp.envoi.heure_fin", 18);
     }
 
+    /** Plage d'envoi lisible, par ex. « 8 h et 18 h ». */
+    String plage() {
+        return parametreService.entier("whatsapp.envoi.heure_debut", 8) + " h et " + parametreService.entier("whatsapp.envoi.heure_fin", 18) + " h";
+    }
+
     /** Le numero a attendu assez depuis son dernier message et n'a pas atteint son plafond du jour. */
     boolean peutEnvoyer(String numero) {
         Instant prochain = prochainEnvoi.get(numero);

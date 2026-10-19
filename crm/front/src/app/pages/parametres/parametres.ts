@@ -8,6 +8,7 @@ import { Charte, CharteService } from '../../core/charte';
 import { Auth } from '../../core/auth';
 import { ReferentielsListe, TypeReferentiel } from '../referentiels/referentiels';
 import { Agences } from '../agences/agences';
+import { FournisseursSms } from '../fournisseurs-sms/fournisseurs-sms';
 
 const CATEGORIES: [string, string, string][] = [
   ['GENERAL', 'Général', "Nom de l'application, adresse publique HTTPS du CRM et coordonnées de l'entreprise citées dans les messages."],
@@ -21,7 +22,15 @@ const CATEGORIES: [string, string, string][] = [
   ['SECURITE', 'Sécurité', 'Mots de passe et verrouillage des comptes.'],
   ['IMPORT', 'Imports', 'Taille des fichiers importés.'],
   ['MARKETING', 'Marketing', 'Désabonnement des clients par une réponse WhatsApp.'],
-  ['SUPPORT', 'Centre de support', "Conservation et rythme de capture des erreurs du diagnostic, seuil d'alerte du disque d'archivage."]
+  ['SUPPORT', 'Centre de support', "Conservation et rythme de capture des erreurs du diagnostic, seuil d'alerte du disque d'archivage."],
+  ['FOURNISSEURS_SMS', 'Fournisseurs SMS', '']
+];
+
+/** Regroupement des categories dans la liste de gauche, comme les referentiels. */
+const GROUPES: [string, string[]][] = [
+  ['Entreprise', ['GENERAL', 'CHARTE', 'ARCHIVAGE']],
+  ['Envois', ['ENVOI', 'CAMPAGNE', 'WHATSAPP', 'EMAIL', 'SMS', 'FOURNISSEURS_SMS', 'MARKETING']],
+  ['Sécurité et système', ['SECURITE', 'IMPORT', 'SUPPORT']]
 ];
 
 /** Listes de reference tenues dans les Parametres (droit Referentiels). */
@@ -37,7 +46,7 @@ const REFERENTIELS: [string, string, string][] = [
 /** Parametres de l'application, par categorie ; seuls ceux qui ont change sont envoyes. */
 @Component({
   selector: 'app-parametres',
-  imports: [FormsModule, JourPipe, ReferentielsListe, Agences],
+  imports: [FormsModule, JourPipe, ReferentielsListe, Agences, FournisseursSms],
   templateUrl: './parametres.html'
 })
 export class Parametres implements OnInit {
@@ -51,14 +60,28 @@ export class Parametres implements OnInit {
   protected readonly categorie = signal('GENERAL');
   protected saisies: Record<string, string | number | null> = {};
 
-  protected readonly categories = computed(() => CATEGORIES.filter(([code]) => code === 'CHARTE' || this.parametres().some(p => p.categorie === code)));
+  protected readonly categories = computed(() => CATEGORIES.filter(([code]) => this.disponible(code)));
+  protected readonly groupes = computed(() => GROUPES
+    .map(([titre, codes]) => [titre, CATEGORIES.filter(([code]) => codes.includes(code) && this.disponible(code))] as [string, [string, string, string][]])
+    .filter(([, liste]) => liste.length));
   protected readonly courante = computed(() => [...CATEGORIES, ...REFERENTIELS].find(([code]) => code === this.categorie()));
   protected readonly typeReferentiel = computed(() => this.categorie() as TypeReferentiel);
   protected readonly estReferentiel = computed(() => REFERENTIELS.some(([code]) => code === this.categorie()));
   protected readonly liste = computed(() => this.parametres().filter(p => p.categorie === this.categorie()));
 
   ngOnInit(): void {
-    this.api.get<Parametre[]>('/api/parametres').subscribe(p => this.remplir(p));
+    if (this.auth.peut('PARAMETRES')) {
+      this.api.get<Parametre[]>('/api/parametres').subscribe(p => this.remplir(p));
+    } else {
+      this.categorie.set(this.auth.peut('FOURNISSEURS_SMS') ? 'FOURNISSEURS_SMS' : this.auth.peut('AGENCES') ? 'AGENCES' : 'REGION');
+    }
+  }
+
+  /** Categorie montree : la charte toujours (avec le droit Parametres), les fournisseurs SMS avec leur droit, les autres si elles ont des parametres. */
+  private disponible(code: string): boolean {
+    if (code === 'FOURNISSEURS_SMS') return this.auth.peut('FOURNISSEURS_SMS');
+    if (!this.auth.peut('PARAMETRES')) return false;
+    return code === 'CHARTE' || this.parametres().some(p => p.categorie === code);
   }
 
   /** Choix d'un parametre CHOIX, ecrits CODE=Libelle|CODE=Libelle. */

@@ -27,4 +27,6 @@ public class EnvoiMasseApercuDTO {
     private int nbRetenus;
     private List<DestinataireMasseDTO> exclus;
     private String exemple;
+    private boolean horsPlage;
+    private String plageHoraire;
 }
