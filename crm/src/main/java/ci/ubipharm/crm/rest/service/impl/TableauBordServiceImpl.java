@@ -22,8 +22,10 @@ import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.TableauBordService;
 import ci.ubipharm.crm.rest.service.dto.CampagneResumeDTO;
+import ci.ubipharm.crm.rest.service.dto.EvolutionDTO;
 import ci.ubipharm.crm.rest.service.dto.IndicateursDTO;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
+import ci.ubipharm.crm.rest.service.dto.PointEvolutionDTO;
 import ci.ubipharm.crm.rest.service.dto.RepartitionDTO;
 import ci.ubipharm.crm.rest.service.dto.TableauBordDTO;
 import ci.ubipharm.crm.rest.service.dto.TableauBordMarketingDTO;
@@ -383,6 +385,144 @@ public class TableauBordServiceImpl implements TableauBordService {
                         .echecs(nombre(t, "echecs"))
                         .reponses(nombre(t, "reponses"))
                         .build()).toList())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvolutionDTO evolutionRecouvrement(LocalDate du, LocalDate au, Long agenceId, Long agentId) {
+        LocalDate jour = LocalDate.now(ZoneOffset.UTC);
+        LocalDate fin = au == null ? jour : au;
+        LocalDate debut = du == null ? fin.minusDays(29) : du;
+        verifierPeriode(debut, fin);
+        Filtre f = filtre(perimetreService.perimetreCourant(), portefeuilleService.agentsGeres(), agenceId, agentId, debut, fin, jour);
+        int pas = pas(debut, fin, f);
+        // Solde echu a la fin de chaque intervalle (jusqu'a aujourd'hui) : dernier solde connu avant cette date dans
+        // l'historique des soldes, sinon l'ancien solde du premier changement suivant, sinon le solde actuel.
+        String sql = """
+                with recursive p (idx) as (select 0 union all select idx + 1 from p where idx + 1 < :nb)
+                select date_add(:debutJour, interval x.idx * :pas day) as date, sum(x.envoyes) as envoyes, sum(x.distribues) as distribues,
+                       sum(x.lus) as lus, 0 as reponses, 0 as desabonnements, sum(x.encaisse) as montantEncaisse,
+                       case when date_add(:debutJour, interval x.idx * :pas day) <= :jour then sum(x.echu) end as soldeEchu
+                from (
+                    select cast(floor(datediff(coalesce(m.envoye_le, m.updated_at), :debutJour) / :pas) as signed) as idx,
+                           sum(m.statut in %s) as envoyes, sum(m.statut in ('DISTRIBUE', 'LU')) as distribues, sum(m.statut = 'LU') as lus,
+                           0 as encaisse, 0 as echu
+                    from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id and cp.module = 'RECOUVREMENT'
+                    join crm_client c on c.id = m.client_id
+                    where m.statut in %s and coalesce(m.envoye_le, m.updated_at) >= :du and coalesce(m.envoye_le, m.updated_at) < :fin and%s
+                    group by 1
+                    union all
+                    select cast(floor(datediff(s.created_at, :debutJour) / :pas) as signed), 0, 0, 0,
+                           coalesce(sum(case when s.nouveau_solde < s.ancien_solde then s.ancien_solde - greatest(s.nouveau_solde, 0) end), 0), 0
+                    from crm_facture_solde s join crm_facture f on f.id = s.facture_id and f.nature = 'FACTURE'
+                    join crm_client c on c.id = f.client_id%s
+                    where s.created_at >= :du and s.created_at < :fin and%s
+                    group by 1
+                    union all
+                    select e.idx, 0, 0, 0, 0, coalesce(sum(greatest(e.solde, 0)), 0) from (
+                        select q.idx as idx, coalesce(
+                                   (select s.nouveau_solde from crm_facture_solde s where s.facture_id = f.id
+                                      and s.created_at < date_add(q.dernier, interval 1 day) order by s.created_at desc, s.id desc limit 1),
+                                   (select s.ancien_solde from crm_facture_solde s where s.facture_id = f.id
+                                      and s.created_at >= date_add(q.dernier, interval 1 day) order by s.created_at, s.id limit 1),
+                                   f.solde) as solde
+                        from (select p.idx as idx, least(date_add(:debutJour, interval (p.idx + 1) * :pas - 1 day), :auJour, :jour) as dernier
+                              from p where date_add(:debutJour, interval p.idx * :pas day) <= :jour) q
+                        join crm_facture f on f.nature = 'FACTURE' and f.date_echeance < q.dernier and f.created_at < date_add(q.dernier, interval 1 day)
+                        join crm_client c on c.id = f.client_id%s
+                        where%s) e
+                    group by e.idx
+                ) x
+                where x.idx >= 0 and x.idx < :nb
+                group by x.idx
+                """.formatted(ENVOYES, ENVOYES, f.messages(), AFFECTATION, f.clients(), AFFECTATION, f.clients());
+        return evolution(f, debut, fin, pas, sql, jour);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvolutionDTO evolutionMarketing(LocalDate du, LocalDate au) {
+        LocalDate jour = LocalDate.now(ZoneOffset.UTC);
+        LocalDate fin = au == null ? jour : au;
+        LocalDate debut = du == null ? fin.minusDays(29) : du;
+        verifierPeriode(debut, fin);
+        Filtre f = filtre(perimetreService.perimetreCourant(), null, null, null, debut, fin, jour);
+        int pas = pas(debut, fin, f);
+        String sql = """
+                select date_add(:debutJour, interval x.idx * :pas day) as date, sum(x.envoyes) as envoyes, sum(x.distribues) as distribues,
+                       sum(x.lus) as lus, sum(x.reponses) as reponses, sum(x.desabonnements) as desabonnements,
+                       null as montantEncaisse, null as soldeEchu
+                from (
+                    select cast(floor(datediff(coalesce(m.envoye_le, m.updated_at), :debutJour) / :pas) as signed) as idx,
+                           sum(m.statut in %s) as envoyes, sum(m.statut in ('DISTRIBUE', 'LU')) as distribues, sum(m.statut = 'LU') as lus,
+                           0 as reponses, 0 as desabonnements
+                    from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id and cp.module = 'MARKETING'
+                    join crm_client c on c.id = m.client_id
+                    where m.statut in %s and coalesce(m.envoye_le, m.updated_at) >= :du and coalesce(m.envoye_le, m.updated_at) < :fin and%s
+                    group by 1
+                    union all
+                    select cast(floor(datediff(r.recu_le, :debutJour) / :pas) as signed), 0, 0, 0, count(*), 0
+                    from crm_message_recu r join crm_campagne_message m on m.id = r.campagne_message_id
+                    join crm_campagne cp on cp.id = m.campagne_id and cp.module = 'MARKETING' join crm_client c on c.id = r.client_id
+                    where r.recu_le >= :du and r.recu_le < :fin and%s
+                    group by 1
+                    union all
+                    select cast(floor(datediff(c.desabonne_marketing_le, :debutJour) / :pas) as signed), 0, 0, 0, 0, count(*)
+                    from crm_client c
+                    where c.desabonne_marketing_le >= :du and c.desabonne_marketing_le < :fin and%s
+                    group by 1
+                ) x
+                where x.idx >= 0 and x.idx < :nb
+                group by x.idx
+                """.formatted(ENVOYES, ENVOYES, f.messages(), f.messages(), f.clients());
+        return evolution(f, debut, fin, pas, sql, null);
+    }
+
+    /** Un point par jour jusqu'a 60 jours, par semaine (a partir du premier jour de la periode) au-dela. */
+    private static int pas(LocalDate debut, LocalDate fin, Filtre f) {
+        long jours = ChronoUnit.DAYS.between(debut, fin) + 1;
+        int pas = jours > 60 ? 7 : 1;
+        f.parametres().put("debutJour", debut);
+        f.parametres().put("auJour", fin);
+        f.parametres().put("pas", pas);
+        f.parametres().put("nb", (int) ((jours + pas - 1) / pas));
+        return pas;
+    }
+
+    /**
+     * Complete les intervalles sans activite pour que chaque courbe ait tous ses points ; avec les montants (recouvrement),
+     * un intervalle vide vaut zero, et le solde echu n'est donne que jusqu'a aujourd'hui.
+     */
+    private EvolutionDTO evolution(Filtre f, LocalDate debut, LocalDate fin, int pas, String sql, LocalDate montantsJusquau) {
+        Map<LocalDate, PointEvolutionDTO> trouves = new HashMap<>();
+        lignes(f, sql).stream().map(this::mapTupleToDto).forEach(p -> trouves.put(p.getDate(), p));
+        List<PointEvolutionDTO> points = new ArrayList<>();
+        for (LocalDate d = debut; !d.isAfter(fin); d = d.plusDays(pas)) {
+            PointEvolutionDTO point = trouves.getOrDefault(d, PointEvolutionDTO.builder().date(d).build());
+            if (montantsJusquau != null) {
+                point.setMontantEncaisse(point.getMontantEncaisse() == null ? BigDecimal.ZERO : point.getMontantEncaisse());
+                if (point.getSoldeEchu() == null && !d.isAfter(montantsJusquau)) {
+                    point.setSoldeEchu(BigDecimal.ZERO);
+                }
+            }
+            points.add(point);
+        }
+        return EvolutionDTO.builder().du(debut).au(fin).pas(pas == 1 ? "JOUR" : "SEMAINE").points(points).build();
+    }
+
+    PointEvolutionDTO mapTupleToDto(Tuple tuple) {
+        Object date = tuple.get("date");
+        return PointEvolutionDTO.builder()
+                .date(date instanceof java.sql.Date sql ? sql.toLocalDate() : date instanceof LocalDateTime dt ? dt.toLocalDate()
+                        : LocalDate.parse(date.toString().substring(0, 10)))
+                .envoyes(nombre(tuple, "envoyes"))
+                .distribues(nombre(tuple, "distribues"))
+                .lus(nombre(tuple, "lus"))
+                .reponses(nombre(tuple, "reponses"))
+                .desabonnements(nombre(tuple, "desabonnements"))
+                .montantEncaisse(tuple.get("montantEncaisse") == null ? null : montant(tuple, "montantEncaisse"))
+                .soldeEchu(tuple.get("soldeEchu") == null ? null : montant(tuple, "soldeEchu"))
                 .build();
     }
 

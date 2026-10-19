@@ -6,13 +6,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
-import { Agent, TableauBord } from '../../core/modeles';
+import { Agent, Evolution, TableauBord } from '../../core/modeles';
+import { Courbe, Serie } from '../../core/courbe';
 import { JourPipe, MontantPipe, aujourdhui } from '../../core/format';
 
 /** Tableau de bord du recouvrement : l'agent voit son portefeuille, la direction d'agence ses agences, la direction tout. */
 @Component({
   selector: 'app-tableau-bord',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, JourPipe, MontantPipe],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink, JourPipe, MontantPipe, Courbe],
   templateUrl: './tableau-bord.html'
 })
 export class TableauBordPage implements OnInit {
@@ -23,6 +24,14 @@ export class TableauBordPage implements OnInit {
   filtres = { du: aujourdhui(-29), au: aujourdhui(), agenceId: null as number | null, agentId: null as number | null };
   protected readonly tb = signal<TableauBord | null>(null);
   protected readonly erreur = signal<string | null>(null);
+  protected readonly evolution = signal<Evolution | null>(null);
+  protected readonly seriesRelances: Serie[] = [
+    { libelle: 'Envoyées', valeur: p => p.envoyes, teinte: 'bleu' },
+    { libelle: 'Distribuées', valeur: p => p.distribues, teinte: 'bleu-clair' },
+    { libelle: 'Lues', valeur: p => p.lus, teinte: 'vert' }
+  ];
+  protected readonly seriesEncaisse: Serie[] = [{ libelle: 'Montant encaissé', valeur: p => p.montantEncaisse, teinte: 'vert', barres: true }];
+  protected readonly seriesEchu: Serie[] = [{ libelle: 'Solde dû échu', valeur: p => p.soldeEchu, teinte: 'bleu' }];
   protected readonly agents = signal<Agent[]>([]);
   private readonly toutesAgences = toSignal(this.ref.agences, { initialValue: [] });
   protected readonly agences = computed(() => {
@@ -61,6 +70,10 @@ export class TableauBordPage implements OnInit {
     this.api.getSilencieux<TableauBord>('/api/recouvrement/tableau-de-bord', this.filtres).subscribe({
       next: tb => this.tb.set(tb),
       error: e => this.erreur.set(e?.error?.message ?? 'Tableau de bord indisponible.')
+    });
+    this.api.getSilencieux<Evolution>('/api/recouvrement/tableau-de-bord/evolution', this.filtres).subscribe({
+      next: ev => this.evolution.set(ev),
+      error: () => this.evolution.set(null)
     });
   }
 

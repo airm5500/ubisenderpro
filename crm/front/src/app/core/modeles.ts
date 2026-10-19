@@ -93,6 +93,12 @@ export interface TableauBordMarketing {
   parCanal: Repartition[]; echecs: Repartition[];
   campagnes: { id: number; nom: string; statut: string; canal: string; lanceLe: string; envoyes: number; lus: number; reponses: number; echecs: number }[];
 }
+/** Un point des courbes d'evolution : un jour, ou la semaine qui commence ce jour. */
+export interface PointEvolution {
+  date: string; envoyes: number; distribues: number; lus: number; echecs: number; reponses: number; desabonnements: number;
+  montantEncaisse: number | null; soldeEchu: number | null;
+}
+export interface Evolution { du: string; au: string; pas: 'JOUR' | 'SEMAINE'; points: PointEvolution[]; }
 /** Marketing : fete, jour ferie ou fermeture annonce aux clients. */
 export interface Evenement {
   id: number; nom: string; nature: string; dateDebut: string; dateFin: string | null; annuel: boolean; statut: string;

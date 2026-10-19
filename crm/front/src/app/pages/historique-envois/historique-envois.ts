@@ -2,13 +2,14 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
-import { EnvoiHistorique, Page } from '../../core/modeles';
+import { EnvoiHistorique, Evolution, Page } from '../../core/modeles';
+import { Courbe, Serie } from '../../core/courbe';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 
 /** Tous les messages partis : relances, promotions, discussions et envois en masse, sur tous les canaux. */
 @Component({
   selector: 'app-historique-envois',
-  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe],
+  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe],
   templateUrl: './historique-envois.html'
 })
 export class HistoriqueEnvois implements OnInit {
@@ -20,6 +21,12 @@ export class HistoriqueEnvois implements OnInit {
   criteres = { du: avant(30), au: '', origine: '', canal: '', statut: '', q: '' };
   protected readonly page = signal<Page<EnvoiHistorique> | null>(null);
   protected readonly ouvert = signal<string | null>(null);
+  protected readonly evolution = signal<Evolution | null>(null);
+  protected readonly seriesEnvois: Serie[] = [
+    { libelle: 'Envoyés', valeur: p => p.envoyes, teinte: 'bleu' },
+    { libelle: 'Lus', valeur: p => p.lus, teinte: 'vert' },
+    { libelle: 'En échec', valeur: p => p.echecs, teinte: 'gris' }
+  ];
   private numeroPage = 0;
   private readonly taille = 50;
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));
@@ -31,6 +38,10 @@ export class HistoriqueEnvois implements OnInit {
   rechercher(): void {
     this.numeroPage = 0;
     this.charger();
+    this.api.getSilencieux<Evolution>('/api/historique-envois/evolution', this.filtres()).subscribe({
+      next: ev => this.evolution.set(ev),
+      error: () => this.evolution.set(null)
+    });
   }
 
   allerA(decalage: number): void {

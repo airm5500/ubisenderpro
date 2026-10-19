@@ -101,6 +101,21 @@
       </section>
     </div>
 
+    @if (evolution(); as ev) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Évolution des relances</h2><span class="discret">@if (ev.pas === 'SEMAINE') { Par semaine } @else { Par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesRelances" [pas]="ev.pas" libelle="Relances envoyées, distribuées et lues sur la période" />
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Montants encaissés</h2><span class="discret">FCFA, @if (ev.pas === 'SEMAINE') { par semaine } @else { par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesEncaisse" [pas]="ev.pas" [montant]="true" libelle="Montants encaissés sur la période" />
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Évolution du solde dû échu</h2><span class="discret">FCFA, à la fin de chaque @if (ev.pas === 'SEMAINE') { semaine } @else { journée }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesEchu" [pas]="ev.pas" [montant]="true" libelle="Solde dû échu sur la période" />
+      </section>
+    }
+
     @if (t.parAgence.length) {
       <section class="bloc">
         <div class="titre"><h2 class="h2">Performances par agence</h2></div>
