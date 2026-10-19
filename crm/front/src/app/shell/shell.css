@@ -9,7 +9,7 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .md { text-decoration: none; cursor: pointer; }
 .md:hover { color: #fff; }
 .mdon, .mdon:hover { background: #51D78E; color: #05253D; }
-.gl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #7F95A6; padding: 16px 12px 6px; font-weight: 700; }
+.gl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--vert); padding: 16px 12px 6px; font-weight: 700; }
 .nv { display: block; padding: 8px 12px; border-radius: 8px; color: #B8C7D3; text-decoration: none; font-size: 14px; font-weight: 500; }
 .nv:hover { color: #fff; background: rgba(255,255,255,.06); }
 .nv.on { color: #fff; background: rgba(81,215,142,.16); font-weight: 700; }
