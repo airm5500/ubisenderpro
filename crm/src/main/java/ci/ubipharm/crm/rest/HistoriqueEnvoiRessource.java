@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ci.ubipharm.crm.rest.service.HistoriqueEnvoiService;
 import ci.ubipharm.crm.rest.service.dto.EnvoiHistoriqueCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.EnvoiHistoriqueDTO;
+import ci.ubipharm.crm.rest.service.dto.EvolutionDTO;
 import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import jakarta.validation.Valid;
@@ -29,6 +30,11 @@ public class HistoriqueEnvoiRessource {
     @GetMapping
     public PageDTO<EnvoiHistoriqueDTO> rechercher(@Valid EnvoiHistoriqueCriteresDTO criteres) {
         return historiqueEnvoiService.rechercher(criteres);
+    }
+
+    @GetMapping("/evolution")
+    public EvolutionDTO evolution(@Valid EnvoiHistoriqueCriteresDTO criteres) {
+        return historiqueEnvoiService.evolution(criteres);
     }
 
     @GetMapping("/export")

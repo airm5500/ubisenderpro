@@ -57,6 +57,17 @@
       </section>
     </div>
 
+    @if (evolution(); as ev) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Évolution des messages de campagnes</h2><span class="discret">@if (ev.pas === 'SEMAINE') { Par semaine } @else { Par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesMessages" [pas]="ev.pas" libelle="Messages de campagnes envoyés et lus sur la période" />
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Réponses et désabonnements</h2><span class="discret">@if (ev.pas === 'SEMAINE') { Par semaine } @else { Par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesRetours" [pas]="ev.pas" libelle="Réponses reçues et désabonnements STOP sur la période" />
+      </section>
+    }
+
     <section class="bloc">
       <div class="titre"><h2 class="h2">Campagnes lancées sur la période</h2></div>
       <div class="defile">

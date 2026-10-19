@@ -577,8 +577,14 @@ API : `GET /api/recouvrement/delais-relance[?archives=true]`, `GET .../defauts`,
     campagnes arretees automatiquement).
 - **Marketing** : menu **Marketing > Tableau de bord** (droit `TABLEAU_BORD_MARKETING`) : audience joignable, listes, promotions
   en cours, desabonnements, messages par canal, taux de lecture et de reponse, campagnes lancees sur la periode.
+- **Courbes d'evolution** (PrimeNG Chart / chart.js 4.5.1, couleurs `--bleu` / `--vert` de la charte) sur la periode choisie, un point par jour
+  ou par semaine au-dela de 60 jours, meme perimetre que les chiffres : Recouvrement relances envoyees / distribuees / lues, montants
+  encaisses et solde du echu (reconstitue a la fin de chaque jour par `crm_facture_solde`, factures connues du CRM a cette date) ;
+  Marketing messages envoyes / lus, reponses et desabonnements STOP ; Historique des envois envoyes / lus / echecs avec ses filtres
+  (`GET /api/historique-envois/evolution`, un an au plus).
 
-API : `GET /api/recouvrement/tableau-de-bord?du=&au=&agenceId=&agentId=`, `GET /api/marketing/tableau-de-bord?du=&au=`.
+API : `GET /api/recouvrement/tableau-de-bord?du=&au=&agenceId=&agentId=`, `GET /api/marketing/tableau-de-bord?du=&au=` ;
+courbes : `GET /api/recouvrement/tableau-de-bord/evolution` et `GET /api/marketing/tableau-de-bord/evolution` (memes parametres).
 
 ## Messages de disponibilite (pilote)
 

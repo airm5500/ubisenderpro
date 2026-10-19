@@ -33,6 +33,14 @@
     <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
   </form>
 
+  @if (evolution(); as ev) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Envois @if (ev.pas === 'SEMAINE') { par semaine } @else { par jour }</h2>
+        <span class="discret">Du {{ ev.du | jour }} au {{ ev.au | jour }}, avec les filtres ci-dessus</span></div>
+      <app-courbe [points]="ev.points" [series]="seriesEnvois" [pas]="ev.pas" hauteur="220px" libelle="Messages envoyés, lus et en échec par jour" />
+    </section>
+  }
+
   <div class="defile">
     <table class="t">
       <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th></tr></thead>

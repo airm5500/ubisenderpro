@@ -1,8 +1,13 @@
 package ci.ubipharm.crm.rest.service.impl;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +21,11 @@ import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.dto.EnvoiHistoriqueCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.EnvoiHistoriqueDTO;
+import ci.ubipharm.crm.rest.service.dto.EvolutionDTO;
 import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
+import ci.ubipharm.crm.rest.service.dto.PointEvolutionDTO;
+import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -97,6 +105,45 @@ public class HistoriqueEnvoiServiceImpl implements HistoriqueEnvoiService {
         return FichierDTO.builder().nom(nom).typeContenu("text/csv;charset=UTF-8").contenu(contenu).build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public EvolutionDTO evolution(EnvoiHistoriqueCriteresDTO criteres) {
+        LocalDate fin = criteres.getAu() == null ? LocalDate.now(ZoneOffset.UTC) : criteres.getAu();
+        LocalDate debut = criteres.getDu() == null ? fin.minusDays(29) : criteres.getDu();
+        if (debut.isAfter(fin)) {
+            throw new ErreurMetierException("Le début de la période doit précéder sa fin.");
+        }
+        if (debut.isBefore(fin.minusDays(365))) {
+            debut = fin.minusDays(365);
+        }
+        criteres.setDu(debut);
+        criteres.setAu(fin);
+        long jours = ChronoUnit.DAYS.between(debut, fin) + 1;
+        int pas = jours > 60 ? 7 : 1;
+        Map<String, Object> parametres = new LinkedHashMap<>();
+        String where = where(criteres, parametres);
+        parametres.put("debutJour", debut);
+        parametres.put("pas", pas);
+        Query requete = em.createNativeQuery("""
+                select date_add(:debutJour, interval x.idx * :pas day) as date, x.envoyes as envoyes, x.distribues as distribues,
+                       x.lus as lus, x.echecs as echecs
+                from (select cast(floor(datediff(h.le, :debutJour) / :pas) as signed) as idx,
+                             coalesce(sum(h.statut in ('ENVOYE', 'DISTRIBUE', 'LU')), 0) as envoyes,
+                             coalesce(sum(h.statut in ('DISTRIBUE', 'LU')), 0) as distribues,
+                             coalesce(sum(h.statut = 'LU'), 0) as lus, coalesce(sum(h.statut = 'ECHEC'), 0) as echecs
+                      from """ + ENVOIS + where + " group by 1) x", Tuple.class);
+        parametres.forEach(requete::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = requete.getResultList();
+        Map<LocalDate, PointEvolutionDTO> trouves = new HashMap<>();
+        lignes.stream().map(this::mapTupleToPointDto).forEach(p -> trouves.put(p.getDate(), p));
+        List<PointEvolutionDTO> points = new ArrayList<>();
+        for (LocalDate d = debut; !d.isAfter(fin); d = d.plusDays(pas)) {
+            points.add(trouves.getOrDefault(d, PointEvolutionDTO.builder().date(d).build()));
+        }
+        return EvolutionDTO.builder().du(debut).au(fin).pas(pas == 1 ? "JOUR" : "SEMAINE").points(points).build();
+    }
+
     private String where(EnvoiHistoriqueCriteresDTO criteres, Map<String, Object> parametres) {
         StringBuilder where = new StringBuilder(" where 1 = 1");
         List<Long> agentsGeres = portefeuilleService.agentsGeres();
@@ -152,6 +199,18 @@ public class HistoriqueEnvoiServiceImpl implements HistoriqueEnvoiService {
 
     private static String cellule(String valeur) {
         return valeur == null ? "" : "\"" + valeur.replace("\"", "\"\"").replace("\r", "").replace("\n", " ") + "\"";
+    }
+
+    PointEvolutionDTO mapTupleToPointDto(Tuple tuple) {
+        Object date = tuple.get("date");
+        return PointEvolutionDTO.builder()
+                .date(date instanceof java.sql.Date jour ? jour.toLocalDate() : date instanceof LocalDateTime dt ? dt.toLocalDate()
+                        : LocalDate.parse(date.toString().substring(0, 10)))
+                .envoyes(((Number) tuple.get("envoyes")).longValue())
+                .distribues(((Number) tuple.get("distribues")).longValue())
+                .lus(((Number) tuple.get("lus")).longValue())
+                .echecs(((Number) tuple.get("echecs")).longValue())
+                .build();
     }
 
     EnvoiHistoriqueDTO mapTupleToDto(Tuple tuple) {
