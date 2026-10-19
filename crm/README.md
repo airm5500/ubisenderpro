@@ -491,3 +491,38 @@ catalogue avec leur avantage. La personne qui la cree en est la responsable.
   `/api/marketing/imports/promotions` (simulation et validation).
 - **Journal** : `PROMOTION_CREATION`, `_MODIFICATION`, `_ACTIVATION`, `_ARCHIVAGE`, `_REACTIVATION`, `_FIN` (systeme),
   `PROMOTION_PRODUIT_AJOUT`, `_MODIFICATION`, `_RETRAIT`.
+
+## Campagnes automatiques et recurrentes (pilote)
+
+Champ **Repetition** des campagnes de relance et des campagnes Marketing : une seule fois (par defaut), chaque jour,
+chaque semaine ou chaque mois, jusqu'a une date de fin obligatoire. La campagne est validee une fois, puis repart
+seule a la meme heure (les envois se calculent depuis le premier ; un envoi manque, serveur arrete, n'est pas
+rattrape).
+
+- **Relances** : a chaque envoi apres le premier, les messages sont regeneres avec les factures du jour. Une facture
+  deja relancee par la campagne avant ou le jour de l'echeance ne l'est plus ; apres l'echeance, elle l'est a chaque
+  envoi tant qu'elle n'est pas soldee (et jamais si le message de l'envoi precedent n'est pas encore parti).
+- **Marketing** : a chaque envoi, la liste de diffusion et les promotions du moment. La campagne s'arrete d'elle-meme
+  (statut annulee, motif explique) si une promotion citee est terminee, si le modele est archive ou si son auteur ne
+  peut plus envoyer (compte desactive, plus de numero WhatsApp).
+- **Statuts** : entre deux envois, la campagne est « Programmee » avec la date du prochain envoi ; apres le dernier,
+  « Executee ». L'annulation arrete la repetition. Les compteurs cumulent tous les envois.
+- **Tables** : `crm_campagne.recurrence`, `fin_recurrence`, `debut_recurrence`, `nb_executions` ;
+  `crm_campagne_message.execution` (numero de l'envoi). Migration `V1.0.24`.
+
+## Marketing : pieces jointes (pilote)
+
+- **Affiche** : image JPEG ou PNG, ou PDF (type verifie sur le contenu du fichier, pas sur son nom), 5 000 Ko au plus
+  (parametre `marketing.affiche_taille_max_ko`). Deposee depuis le formulaire de campagne.
+- **Liste des produits** : case « Joindre la liste Excel des produits des promotions cochees ». Le classeur
+  (`produits_en_promotion.xlsx` : promotion, fin, code, produit, conditionnement, prix public, quantite minimale,
+  avantage, prix promotionnel) est etabli a la validation, puis a chaque envoi d'une campagne recurrente.
+- **Envoi WhatsApp** : une affiche en image porte le texte du message en legende (texte de 1 000 caracteres au plus ;
+  au-dela, l'affiche puis le texte) ; une affiche PDF part en document avant le texte ; la liste Excel suit en
+  document. Le message compte comme envoye des que son texte est parti ; une piece jointe perdue ensuite est notee
+  dans son motif, sans renvoyer le texte.
+- **E-mail** : affiche et liste en pieces jointes du courrier. **SMS** : refuse les pieces jointes.
+- **Tables** : `crm_piece_jointe` (contenu en base, jamais supprime), `crm_campagne.affiche_id`, `joindre_produits`,
+  `liste_produits_id`. Migration `V1.0.25`.
+- **API** : `POST /api/marketing/pieces-jointes` (multipart, champ `fichier`), `GET /api/marketing/pieces-jointes/{id}`
+  (droit `CAMPAGNES_MARKETING`) ; `afficheId` et `joindreProduits` dans la demande de campagne.

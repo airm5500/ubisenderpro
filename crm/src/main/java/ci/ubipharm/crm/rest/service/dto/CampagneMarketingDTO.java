@@ -29,6 +29,11 @@ public class CampagneMarketingDTO {
     private String canal;
     private LocalDateTime dateExecution;
     private String recurrence;
+    private Long afficheId;
+    private String afficheNom;
+    private String afficheType;
+    private boolean joindreProduits;
+    private Long listeProduitsId;
     private java.time.LocalDate finRecurrence;
     private int nbExecutions;
     private String statut;

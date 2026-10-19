@@ -22,6 +22,17 @@
       } @empty { <span class="discret">Aucune promotion active.</span> }
     </div>
     <p class="discret" style="margin: 0">Les variables {{ '{' }}promotion_nom{{ '}' }}, {{ '{' }}promotion_fin{{ '}' }} et {{ '{' }}produits_promotion{{ '}' }} du modèle se remplissent avec les promotions cochées.</p>
+    <div class="f">Affiche (image JPEG ou PNG, ou PDF)
+      @if (formulaire.afficheId) {
+        <span style="display: flex; gap: 10px; align-items: center"><i class="pi pi-image"></i> {{ formulaire.afficheNom }}
+          <button class="bs petit" type="button" (click)="retirerAffiche()">Retirer</button></span>
+      } @else {
+        <input class="sel" type="file" accept="image/jpeg,image/png,application/pdf" (change)="deposer($any($event.target))" [disabled]="depot()">
+      }
+    </div>
+    <label class="droit"><input type="checkbox" name="joindreProduits" [(ngModel)]="formulaire.joindreProduits" [disabled]="!formulaire.promotionIds.size">
+      Joindre la liste Excel des produits des promotions cochées</label>
+    <p class="discret" style="margin: 0">Les pièces jointes partent par WhatsApp et par e-mail, pas par SMS. Une affiche en image porte le texte du message en légende.</p>
     <label class="f">Date et heure d'envoi (heure d'Abidjan)
       <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">
     </label>
@@ -45,7 +56,7 @@
     @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
     <div class="pied">
       <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
-      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.nom.trim() || !formulaire.listeId || !formulaire.modeleId">
+      <button class="bp" type="submit" [disabled]="enCours() || depot() || !formulaire.nom.trim() || !formulaire.listeId || !formulaire.modeleId">
         {{ campagne() ? 'Enregistrer' : 'Créer la campagne' }}</button>
     </div>
   </form>

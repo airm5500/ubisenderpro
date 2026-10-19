@@ -1,5 +1,8 @@
 package ci.ubipharm.crm.rest.service.impl;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -13,6 +16,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -321,6 +330,60 @@ public class PromotionServiceImpl implements PromotionService {
         }
         valeurs.put("calcul.produits_promotion", String.join("\n", lignes.values()));
         return valeurs;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FichierDTO classeurCampagne(List<Long> ids) {
+        try (XSSFWorkbook classeur = new XSSFWorkbook(); ByteArrayOutputStream sortie = new ByteArrayOutputStream()) {
+            Sheet feuille = classeur.createSheet("Produits en promotion");
+            CellStyle gras = classeur.createCellStyle();
+            Font police = classeur.createFont();
+            police.setBold(true);
+            gras.setFont(police);
+            String[] entetes = {"Promotion", "Valable jusqu'au", "Code produit", "Produit", "Conditionnement", "Prix public (F)",
+                    "Quantité minimale", "Avantage", "Prix promotionnel (F)"};
+            Row entete = feuille.createRow(0);
+            for (int i = 0; i < entetes.length; i++) {
+                Cell cellule = entete.createCell(i);
+                cellule.setCellValue(entetes[i]);
+                cellule.setCellStyle(gras);
+            }
+            int rang = 1;
+            for (Long id : ids) {
+                PromotionDTO promotion = consulter(id);
+                for (PromotionProduitDTO p : produits(id, false)) {
+                    if (!"ACTIF".equals(p.getProduitStatut())) {
+                        continue;
+                    }
+                    Row ligne = feuille.createRow(rang++);
+                    ligne.createCell(0).setCellValue(promotion.getNom());
+                    ligne.createCell(1).setCellValue(promotion.getDateFin().format(DATE_LISIBLE));
+                    ligne.createCell(2).setCellValue(p.getProduitCode());
+                    ligne.createCell(3).setCellValue(p.getProduitLibelle());
+                    ligne.createCell(4).setCellValue(Objects.toString(p.getConditionnement(), ""));
+                    if (p.getPrixPublic() != null) {
+                        ligne.createCell(5).setCellValue(p.getPrixPublic().doubleValue());
+                    }
+                    ligne.createCell(6).setCellValue(p.getQuantiteMin());
+                    ligne.createCell(7).setCellValue(p.getResume());
+                    if (p.getPrixPromo() != null) {
+                        ligne.createCell(8).setCellValue(p.getPrixPromo().doubleValue());
+                    }
+                }
+            }
+            // Largeurs fixes : autoSizeColumn exige des polices installees sur le serveur
+            int[] largeurs = {28, 16, 14, 40, 18, 14, 16, 45, 20};
+            for (int i = 0; i < largeurs.length; i++) {
+                feuille.setColumnWidth(i, largeurs[i] * 256);
+            }
+            feuille.createFreezePane(0, 1);
+            classeur.write(sortie);
+            return FichierDTO.builder().nom("produits_en_promotion.xlsx")
+                    .typeContenu("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").contenu(sortie.toByteArray()).build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

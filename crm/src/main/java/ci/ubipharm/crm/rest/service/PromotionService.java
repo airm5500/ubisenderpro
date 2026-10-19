@@ -44,6 +44,9 @@ public interface PromotionService {
     /** Valeurs des variables de promotion (source calcul.promotion_* et calcul.produits_promotion) pour une campagne. */
     Map<String, String> valeursCampagne(List<Long> ids);
 
+    /** Classeur Excel des produits des promotions citees par une campagne, joint a ses messages. */
+    FichierDTO classeurCampagne(List<Long> ids);
+
     /** Passe en terminee les promotions actives dont la periode est depassee ; renvoie leur nombre. */
     int terminerPromotionsEchues();
 }

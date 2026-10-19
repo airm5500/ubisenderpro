@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
-import { CampagneMarketing, ListeDiffusion, ModeleMessage, Promotion } from '../../core/modeles';
+import { CampagneMarketing, ListeDiffusion, ModeleMessage, PieceJointe, Promotion } from '../../core/modeles';
 import { JourPipe } from '../../core/format';
 import { LIBELLES } from '../../core/format';
 
 interface Formulaire {
   nom: string; listeId: number | null; modeleId: number | null; promotionIds: Set<number>; dateExecution: string; recurrence: string; finRecurrence: string;
+  afficheId: number | null; afficheNom: string; joindreProduits: boolean;
 }
 
 /** Creation ou modification d'une campagne promotionnelle : une liste, un modele, des promotions actives, une date. */
@@ -31,18 +32,42 @@ export class CampagneMarketingFormulaire {
   protected readonly promotions = signal<Promotion[]>([]);
   protected readonly enCours = signal(false);
   protected readonly erreur = signal<string | null>(null);
-  formulaire: Formulaire = { nom: '', listeId: null, modeleId: null, promotionIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '' };
+  formulaire: Formulaire = this.vide();
+  protected readonly depot = signal(false);
 
   preparer(): void {
     const c = this.campagne();
     this.erreur.set(null);
     this.formulaire = c
       ? { nom: c.nom, listeId: c.listeId, modeleId: c.modeleId, promotionIds: new Set(c.promotionIds),
-          dateExecution: c.dateExecution ? c.dateExecution.substring(0, 16) : '', recurrence: c.recurrence ?? '', finRecurrence: c.finRecurrence ?? '' }
-      : { nom: '', listeId: null, modeleId: null, promotionIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '' };
+          dateExecution: c.dateExecution ? c.dateExecution.substring(0, 16) : '', recurrence: c.recurrence ?? '', finRecurrence: c.finRecurrence ?? '',
+          afficheId: c.afficheId, afficheNom: c.afficheNom ?? '', joindreProduits: c.joindreProduits }
+      : this.vide();
     this.api.get<ListeDiffusion[]>('/api/marketing/listes').subscribe(l => this.listes.set(l));
     this.api.get<ModeleMessage[]>('/api/marketing/modeles').subscribe(m => this.modeles.set(m));
     this.api.get<Promotion[]>('/api/marketing/promotions', { statut: 'ACTIVE' }).subscribe(p => this.promotions.set(p));
+  }
+
+  /** L'affiche part au serveur des qu'elle est choisie ; la campagne n'en garde que l'identifiant. */
+  deposer(entree: HTMLInputElement): void {
+    const fichier = entree.files?.[0];
+    if (!fichier) return;
+    this.depot.set(true);
+    this.erreur.set(null);
+    this.api.envoyerFichier<PieceJointe>('/api/marketing/pieces-jointes', fichier).subscribe({
+      next: p => { this.depot.set(false); this.formulaire.afficheId = p.id; this.formulaire.afficheNom = p.nomFichier; entree.value = ''; },
+      error: e => { this.depot.set(false); this.erreur.set(e?.error?.message ?? "Dépôt de l'affiche impossible."); entree.value = ''; }
+    });
+  }
+
+  retirerAffiche(): void {
+    this.formulaire.afficheId = null;
+    this.formulaire.afficheNom = '';
+  }
+
+  private vide(): Formulaire {
+    return { nom: '', listeId: null, modeleId: null, promotionIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '',
+      afficheId: null, afficheNom: '', joindreProduits: false };
   }
 
   basculer(id: number, coche: boolean): void {
@@ -53,7 +78,8 @@ export class CampagneMarketingFormulaire {
     const c = this.campagne();
     const f = this.formulaire;
     const corps = { nom: f.nom.trim(), listeId: f.listeId, modeleId: f.modeleId, promotionIds: [...f.promotionIds], dateExecution: f.dateExecution ? f.dateExecution + ':00' : null,
-      recurrence: f.recurrence || null, finRecurrence: f.recurrence && f.finRecurrence ? f.finRecurrence : null };
+      recurrence: f.recurrence || null, finRecurrence: f.recurrence && f.finRecurrence ? f.finRecurrence : null,
+      afficheId: f.afficheId, joindreProduits: f.joindreProduits && f.promotionIds.size > 0 };
     this.enCours.set(true);
     this.erreur.set(null);
     const requete = c ? this.api.putSilencieux<CampagneMarketing>(`/api/marketing/campagnes/${c.id}`, corps)

@@ -27,6 +27,7 @@ import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
+import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.PromotionService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.VariableMessageService;
@@ -67,7 +68,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private static final String SELECT = """
             select cp.id as id, cp.nom as nom, cp.liste_id as listeId, l.nom as listeNom, cp.modele_id as modeleId, mo.nom as modeleNom,
                    mo.canal as canal, mo.objet as modeleObjet, mo.contenu as modeleContenu, mo.statut as modeleStatut,
-                   cp.promotion_ids as promotionIds,
+                   cp.promotion_ids as promotionIds, cp.affiche_id as afficheId, pa.nom_fichier as afficheNom, pa.type_mime as afficheType,
+                   cp.joindre_produits as joindreProduits, cp.liste_produits_id as listeProduitsId,
                    (select group_concat(concat(p.code, ' · ', p.nom) order by p.code separator '|') from crm_promotion p
                     where find_in_set(p.id, cp.promotion_ids) > 0) as promotionsLibelles,
                    cp.date_execution as dateExecution, cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence,
@@ -81,6 +83,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             from crm_campagne cp
             join crm_modele_message mo on mo.id = cp.modele_id
             join crm_liste_diffusion l on l.id = cp.liste_id
+            left join crm_piece_jointe pa on pa.id = cp.affiche_id
             join crm_utilisateur uc on uc.id = cp.cree_par
             left join crm_utilisateur uv on uv.id = cp.valide_par
             left join crm_utilisateur ur on ur.id = cp.rejete_par
@@ -103,6 +106,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private final ListeDiffusionService listeDiffusionService;
     private final VariableMessageService variableMessageService;
     private final PromotionService promotionService;
+    private final PieceJointeService pieceJointeService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
@@ -164,11 +168,13 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         em.createNativeQuery("""
-                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, criteres, date_execution,
-                                          recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
-                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, '{}', :dateExecution, :recurrence, :finRecurrence,
-                        :perimetreAgences, :creePar, utc_timestamp())
+                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, affiche_id, joindre_produits, criteres,
+                                          date_execution, recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
+                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, :afficheId, :joindreProduits, '{}', :dateExecution,
+                        :recurrence, :finRecurrence, :perimetreAgences, :creePar, utc_timestamp())
                 """)
+                .setParameter("afficheId", demande.getAfficheId())
+                .setParameter("joindreProduits", demande.isJoindreProduits())
                 .setParameter("recurrence", demande.getRecurrence())
                 .setParameter("finRecurrence", demande.getFinRecurrence())
                 .setParameter("promotionIds", joindre(promotions(demande)))
@@ -195,12 +201,15 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         em.createNativeQuery("""
                 update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, promotion_ids = :promotionIds,
+                       affiche_id = :afficheId, joindre_produits = :joindreProduits,
                        date_execution = :dateExecution, recurrence = :recurrence, fin_recurrence = :finRecurrence, statut = 'BROUILLON',
                        soumise_le = null, updated_at = utc_timestamp()
                 where id = :id
                 """)
                 .setParameter("recurrence", demande.getRecurrence())
                 .setParameter("finRecurrence", demande.getFinRecurrence())
+                .setParameter("afficheId", demande.getAfficheId())
+                .setParameter("joindreProduits", demande.isJoindreProduits())
                 .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
@@ -305,6 +314,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         enregistrerComptes(id, lignes);
         journalActionService.enregistrer("CAMPAGNE_MARKETING_VALIDATION", "crm_campagne", id,
                 lignes.stream().filter(Ligne::envoyable).count() + " message(s)");
+        joindreListeProduits(campagne);
 
         LocalDateTime execution = campagne.dto().getDateExecution();
         if (execution == null || !execution.isAfter(maintenant())) {
@@ -401,6 +411,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             }
             enregistrerMessages(id, generer(campagne), execution);
             recompterCumul(id);
+            joindreListeProduits(campagne);
         }
         int annules = em.createNativeQuery("""
                 update crm_campagne_message m join crm_client c on c.id = m.client_id
@@ -434,6 +445,17 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         } else {
             journalActionService.enregistrer("CAMPAGNE_MARKETING_LANCEMENT", "crm_campagne", id, details);
         }
+    }
+
+    /** Liste Excel des produits des promotions citees, figee pour l'envoi qui commence. */
+    private void joindreListeProduits(Campagne campagne) {
+        CampagneMarketingDTO dto = campagne.dto();
+        if (!dto.isJoindreProduits() || dto.getPromotionIds().isEmpty()) {
+            return;
+        }
+        Long liste = pieceJointeService.enregistrerGenere("LISTE_PRODUITS", promotionService.classeurCampagne(dto.getPromotionIds()));
+        em.createNativeQuery("update crm_campagne set liste_produits_id = :liste where id = :id")
+                .setParameter("liste", liste).setParameter("id", dto.getId()).executeUpdate();
     }
 
     /** Arret d'une campagne recurrente qui ne peut plus repartir. */
@@ -651,6 +673,25 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .setParameter("id", demande.getModeleId()).getResultList();
         verifierPromotionsDuModele(contenus.getFirst(), promotions(demande));
         Recurrence.verifier(demande.getRecurrence(), demande.getFinRecurrence(), demande.getDateExecution(), maintenant().toLocalDate());
+        verifierPiecesJointes(demande);
+    }
+
+    /** L'affiche doit avoir ete deposee ; la liste des produits demande une promotion ; un SMS ne transporte aucun fichier. */
+    private void verifierPiecesJointes(CampagneMarketingDemandeDTO demande) {
+        if (demande.getAfficheId() == null && !demande.isJoindreProduits()) {
+            return;
+        }
+        String canal = (String) em.createNativeQuery("select canal from crm_modele_message where id = :id")
+                .setParameter("id", demande.getModeleId()).getSingleResult();
+        if ("SMS".equals(canal)) {
+            throw new ErreurMetierException("Un SMS ne transporte pas de pièce jointe : retirez l'affiche et la liste des produits.");
+        }
+        if (demande.getAfficheId() != null && !"AFFICHE".equals(pieceJointeService.decrire(demande.getAfficheId()).getNature())) {
+            throw new ErreurMetierException("Déposez l'affiche avant de l'associer à la campagne.");
+        }
+        if (demande.isJoindreProduits() && promotions(demande).isEmpty()) {
+            throw new ErreurMetierException("Cochez au moins une promotion pour joindre la liste de ses produits.");
+        }
     }
 
     private static List<Long> promotions(CampagneMarketingDemandeDTO demande) {
@@ -787,6 +828,11 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .modeleNom(tuple.get("modeleNom", String.class))
                 .canal(tuple.get("canal", String.class))
                 .promotionIds(Objects.requireNonNullElse(separer(tuple.get("promotionIds", String.class)), List.of()))
+                .afficheId(tuple.get("afficheId", Long.class))
+                .afficheNom(tuple.get("afficheNom", String.class))
+                .afficheType(tuple.get("afficheType", String.class))
+                .joindreProduits(Boolean.TRUE.equals(tuple.get("joindreProduits", Boolean.class)))
+                .listeProduitsId(tuple.get("listeProduitsId", Long.class))
                 .promotions(tuple.get("promotionsLibelles") == null ? List.of() : List.of(tuple.get("promotionsLibelles", String.class).split("\\|")))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
                 .recurrence(tuple.get("recurrence", String.class))

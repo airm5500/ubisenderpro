@@ -32,6 +32,12 @@ public class CampagneMarketingDemandeDTO {
     /** Promotions actives citees ; leurs variables se remplissent d'office. */
     private java.util.List<Long> promotionIds;
 
+    /** Affiche deposee (image ou PDF) jointe a chaque message WhatsApp ou e-mail. */
+    private Long afficheId;
+
+    /** Joindre la liste Excel des produits des promotions citees. */
+    private boolean joindreProduits;
+
     /** Vide : execution des la validation. */
     private LocalDateTime dateExecution;
 

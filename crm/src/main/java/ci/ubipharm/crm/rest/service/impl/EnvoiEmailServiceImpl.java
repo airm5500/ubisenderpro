@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.mail.MailException;
@@ -19,9 +20,11 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
 import ci.ubipharm.crm.rest.service.EnvoiEmailService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.EtatEmailDTO;
 import jakarta.mail.MessagingException;
 import jakarta.mail.SendFailedException;
@@ -43,6 +46,7 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
     private final ObjectProvider<JavaMailSender> serveur;
     private final ParametreService parametreService;
     private final SuiviEnvoiService suiviEnvoi;
+    private final PieceJointeService pieceJointeService;
     private final String compteSmtp;
 
     private final AtomicReference<Instant> prochainEnvoi = new AtomicReference<>(Instant.EPOCH);
@@ -54,12 +58,14 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
     private enum Issue { ENVOYE, A_REESSAYER, REFUSE }
 
     public EnvoiEmailServiceImpl(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, ObjectProvider<JavaMailSender> serveur,
-            ParametreService parametreService, SuiviEnvoiService suiviEnvoi, @Value("${spring.mail.username:}") String compteSmtp) {
+            ParametreService parametreService, SuiviEnvoiService suiviEnvoi, PieceJointeService pieceJointeService,
+            @Value("${spring.mail.username:}") String compteSmtp) {
         this.jdbc = jdbc;
         this.transaction = transaction;
         this.serveur = serveur;
         this.parametreService = parametreService;
         this.suiviEnvoi = suiviEnvoi;
+        this.pieceJointeService = pieceJointeService;
         this.compteSmtp = compteSmtp;
     }
 
@@ -136,7 +142,8 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
 
     private MimeMessage composer(JavaMailSender envoi, Message message) throws MessagingException, UnsupportedEncodingException {
         MimeMessage mime = envoi.createMimeMessage();
-        MimeMessageHelper courrier = new MimeMessageHelper(mime, false, "UTF-8");
+        List<FichierDTO> pieces = pieceJointeService.piecesDeCampagne(message.campagneId());
+        MimeMessageHelper courrier = new MimeMessageHelper(mime, !pieces.isEmpty(), "UTF-8");
         String expediteur = expediteur();
         String nom = parametreService.valeur("email.nom_expediteur", "");
         if (nom.isBlank()) {
@@ -150,6 +157,9 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
         }
         courrier.setSubject(message.objet());
         courrier.setText(message.contenu(), false);
+        for (FichierDTO piece : pieces) {
+            courrier.addAttachment(piece.getNom(), new ByteArrayResource(piece.getContenu()), piece.getTypeContenu());
+        }
         return mime;
     }
 

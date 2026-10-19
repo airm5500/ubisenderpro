@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service;
 
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 
@@ -15,4 +16,7 @@ public interface PasserelleWhatsappService {
 
     /** Ne leve jamais d'exception : l'issue est decrite dans le resultat. */
     ResultatEnvoiDTO envoyerTexte(String numero, String destinataire, String texte);
+
+    /** Image (avec legende eventuelle) ou document ; ne leve jamais d'exception. */
+    ResultatEnvoiDTO envoyerFichier(String numero, String destinataire, FichierDTO fichier, String legende);
 }

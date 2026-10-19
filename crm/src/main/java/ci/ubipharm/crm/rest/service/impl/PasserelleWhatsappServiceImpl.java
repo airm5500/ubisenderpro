@@ -2,6 +2,8 @@ package ci.ubipharm.crm.rest.service.impl;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,7 @@ import org.springframework.web.client.RestClientException;
 
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 import lombok.extern.slf4j.Slf4j;
@@ -52,9 +55,27 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
 
     @Override
     public ResultatEnvoiDTO envoyerTexte(String numero, String destinataire, String texte) {
+        return envoyer(numero, "/sessions/{id}/send", Map.of("to", destinataire, "text", texte));
+    }
+
+    @Override
+    public ResultatEnvoiDTO envoyerFichier(String numero, String destinataire, FichierDTO fichier, String legende) {
+        Map<String, Object> corps = new HashMap<>();
+        corps.put("to", destinataire);
+        corps.put("type", fichier.getTypeContenu().startsWith("image/") ? "image" : "document");
+        corps.put("mediaBase64", Base64.getEncoder().encodeToString(fichier.getContenu()));
+        corps.put("mimeType", fichier.getTypeContenu());
+        corps.put("fileName", fichier.getNom());
+        if (legende != null) {
+            corps.put("caption", legende);
+        }
+        return envoyer(numero, "/sessions/{id}/send-media", corps);
+    }
+
+    private ResultatEnvoiDTO envoyer(String numero, String chemin, Map<String, Object> corps) {
         try {
-            Map<String, Object> reponse = client.post().uri("/sessions/{id}/send", numero)
-                    .body(Map.of("to", destinataire, "text", texte))
+            Map<String, Object> reponse = client.post().uri(chemin, numero)
+                    .body(corps)
                     .retrieve().body(REPONSE);
             if (reponse != null && Boolean.TRUE.equals(reponse.get("success"))) {
                 return ResultatEnvoiDTO.builder().succes(true).identifiant((String) reponse.get("id")).build();

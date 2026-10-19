@@ -3,6 +3,7 @@ package ci.ubipharm.crm.rest.service.impl;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,10 +14,12 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import ci.ubipharm.crm.rest.service.ParametreService;
-import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
+import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
+import ci.ubipharm.crm.rest.service.PieceJointeService;
+import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,12 +30,16 @@ import lombok.extern.slf4j.Slf4j;
 public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
     private static final ZoneId ABIDJAN = ZoneId.of("Africa/Abidjan");
+    /** WhatsApp coupe les legendes d'image trop longues : au-dela, le texte part a part. */
+    private static final int LEGENDE_MAX = 1000;
+    private static final String CLASSEUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final PasserelleWhatsappService passerelle;
     private final ParametreService parametreService;
     private final SuiviEnvoiService suiviEnvoi;
+    private final PieceJointeService pieceJointeService;
 
     /** Prochain envoi autorise par numero d'agent. */
     private final Map<String, Instant> prochainEnvoi = new ConcurrentHashMap<>();
@@ -70,12 +77,45 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             if (message == null) {
                 continue;
             }
-            ResultatEnvoiDTO resultat = passerelle.envoyerTexte(numero, message.numeroDestinataire(), message.contenu());
+            ResultatEnvoiDTO resultat = envoyer(numero, message);
             transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
             prochainEnvoi.put(numero, Instant.now().plusSeconds(attente()));
             envoyes++;
         }
         return envoyes;
+    }
+
+    /**
+     * Sans piece jointe : le texte seul. Avec une affiche en image et un texte court : l'image legendee du texte ; sinon
+     * l'affiche puis le texte. La liste des produits suit en document. Le message compte comme envoye des que son texte
+     * est parti ; une piece jointe perdue ensuite est signalee dans son motif, sans renvoyer le texte.
+     */
+    private ResultatEnvoiDTO envoyer(String numero, Message message) {
+        List<FichierDTO> reste = new ArrayList<>(pieceJointeService.piecesDeCampagne(message.campagneId()));
+        String destinataire = message.numeroDestinataire();
+        ResultatEnvoiDTO principal;
+        if (!reste.isEmpty() && reste.getFirst().getTypeContenu().startsWith("image/") && message.contenu().length() <= LEGENDE_MAX) {
+            principal = passerelle.envoyerFichier(numero, destinataire, reste.removeFirst(), message.contenu());
+        } else {
+            if (!reste.isEmpty() && !CLASSEUR.equals(reste.getFirst().getTypeContenu())) {
+                ResultatEnvoiDTO affiche = passerelle.envoyerFichier(numero, destinataire, reste.removeFirst(), null);
+                if (!affiche.isSucces()) {
+                    return affiche;
+                }
+            }
+            principal = passerelle.envoyerTexte(numero, destinataire, message.contenu());
+        }
+        if (!principal.isSucces()) {
+            return principal;
+        }
+        for (FichierDTO fichier : reste) {
+            ResultatEnvoiDTO piece = passerelle.envoyerFichier(numero, destinataire, fichier, null);
+            if (!piece.isSucces()) {
+                principal.setErreur(fichier.getNom() + " non envoyé : " + piece.getErreur());
+                break;
+            }
+        }
+        return principal;
     }
 
     @Override
@@ -118,7 +158,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
         if (resultat.isSucces()) {
             jdbc.update("""
                     update crm_campagne_message set statut = 'ENVOYE', identifiant_whatsapp = :identifiant, envoye_le = utc_timestamp(),
-                           tentatives = tentatives + 1, motif = null, updated_at = utc_timestamp()
+                           tentatives = tentatives + 1, motif = :motif, updated_at = utc_timestamp()
                     where id = :id
                     """, p);
             suiviEnvoi.factureRelancee(message.factureId());

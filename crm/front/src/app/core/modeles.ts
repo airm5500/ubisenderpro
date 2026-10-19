@@ -167,10 +167,13 @@ export interface MembreListe {
 export interface ApercuListe { nbClients: number; nbJoignables: number; nbDesabonnes: number; nbSansCoordonnees: number; membres: Page<MembreListe>; }
 export interface ValeursCriteres { sousAgences: string[]; villes: string[]; }
 
+export interface PieceJointe { id: number; nature: string; nomFichier: string; typeMime: string; taille: number; }
+
 /** Marketing : campagne promotionnelle sur une liste de diffusion. */
 export interface CampagneMarketing {
   id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
   canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
+  afficheId: number | null; afficheNom: string | null; afficheType: string | null; joindreProduits: boolean; listeProduitsId: number | null;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
   numeroExpediteur: string | null; agencesCibles: number[] | null; createdAt: string; soumiseLe: string | null; validePar: string | null;
   valideLe: string | null; motifRejet: string | null; rejetePar: string | null; lanceLe: string | null; termineLe: string | null;

@@ -1,20 +1,27 @@
 package ci.ubipharm.crm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -25,6 +32,7 @@ import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 
 /** Campagnes promotionnelles : liste de diffusion, modele du Marketing, numero de l'auteur, validation par agence. */
@@ -176,6 +184,63 @@ class CampagneMarketingIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(admin))
                 .andExpect(jsonPath("$.statut").value("ANNULEE"))
                 .andExpect(jsonPath("$.motifAnnulation", org.hamcrest.Matchers.endsWith("Répétition arrêtée.")));
+    }
+
+    @Test
+    void lAfficheEtLaListeDesProduitsPartentAvecLeMessage() throws Exception {
+        Long produit = idDe(envoyer(charge, post("/api/marketing/produits"), "{\"code\":\"DOL500\",\"libelle\":\"Doliprane 500 mg\",\"prix\":1250}"));
+        Long promo = idDe(envoyer(charge, post("/api/marketing/promotions"), """
+                {"code":"NOV26","nom":"Promo de novembre","dateDebut":"%s","dateFin":"%s"}"""
+                .formatted(java.time.LocalDate.now(java.time.ZoneOffset.UTC), java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(30))));
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/produits"),
+                "{\"produitId\":" + produit + ",\"quantiteMin\":10,\"avantage\":\"UG_QUANTITE\",\"ugQuantite\":2}").andExpect(status().isOk());
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/activation"), "").andExpect(status().isOk());
+
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+        mvc.perform(multipart("/api/marketing/pieces-jointes").file(new MockMultipartFile("fichier", "affiche.png", "image/png", "pas une image".getBytes()))
+                .session(charge).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("L'affiche doit être une image JPEG ou PNG, ou un PDF."));
+        String depot = mvc.perform(multipart("/api/marketing/pieces-jointes").file(new MockMultipartFile("fichier", "affiche.png", "image/png", png))
+                .session(charge).with(csrf())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long affiche = ((Number) JsonPath.read(depot, "$.id")).longValue();
+
+        envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Sans promotion","listeId":%d,"modeleId":%d,"joindreProduits":true}""".formatted(liste, modele))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Cochez au moins une promotion pour joindre la liste de ses produits."));
+        Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Novembre","listeId":%d,"modeleId":%d,"promotionIds":[%d],"afficheId":%d,"joindreProduits":true}"""
+                .formatted(liste, modele, promo, affiche)));
+        envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "");
+        envoyer(admin, post("/api/marketing/campagnes/" + campagne + "/validation"), "")
+                .andExpect(jsonPath("$.afficheNom").value("affiche.png"))
+                .andExpect(jsonPath("$.listeProduitsId").isNumber());
+
+        jdbc.update("insert into crm_session_whatsapp (numero, statut, updated_at) values (?, 'CONNECTE', utc_timestamp())", NUMERO_MARKETING);
+        when(passerelle.envoyerFichier(eq(NUMERO_MARKETING), anyString(), any(), any()))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WM-1").build());
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        ArgumentCaptor<FichierDTO> fichiers = ArgumentCaptor.forClass(FichierDTO.class);
+        ArgumentCaptor<String> legendes = ArgumentCaptor.forClass(String.class);
+        verify(passerelle, times(2)).envoyerFichier(eq(NUMERO_MARKETING), eq("2250700000001"), fichiers.capture(), legendes.capture());
+        verify(passerelle, never()).envoyerTexte(anyString(), anyString(), anyString());
+        assertThat(fichiers.getAllValues()).extracting(FichierDTO::getNom).containsExactly("affiche.png", "produits_en_promotion.xlsx");
+        assertThat(legendes.getAllValues().getFirst()).startsWith("Bonjour Pharmacie Deux Numeros");
+        assertThat(legendes.getAllValues().get(1)).isNull();
+        try (var classeur = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(fichiers.getAllValues().get(1).getContenu()))) {
+            var ligne = classeur.getSheetAt(0).getRow(1);
+            assertThat(ligne.getCell(3).getStringCellValue()).isEqualTo("Doliprane 500 mg");
+            assertThat(ligne.getCell(7).getStringCellValue()).isEqualTo("2 offerts pour 10 achetés");
+        }
+
+        // Un SMS ne transporte pas de fichier
+        Long sms = idDe(envoyer(admin, post("/api/marketing/modeles"), """
+                {"nom":"Promo SMS","typeCampagne":"PROMOTION","canal":"SMS","contenu":"Promo {nom_pharmacie}"}"""));
+        envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"SMS","listeId":%d,"modeleId":%d,"afficheId":%d}""".formatted(liste, sms, affiche))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Un SMS ne transporte pas de pièce jointe : retirez l'affiche et la liste des produits."));
     }
 
     private String campagne(String nom, Long modeleId) {
