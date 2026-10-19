@@ -1,5 +1,5 @@
 <div class="page">
-  <a class="retour" routerLink="/imports">← Imports</a>
+  <a class="retour" [routerLink]="config().retour">← {{ config().libelleRetour }}</a>
   <div class="entete">
     <div>
       <h1>Importer des {{ libelleType() }}</h1>
@@ -85,19 +85,19 @@
     @case (2) {
       @if (simulation(); as s) {
         <section class="chiffres" aria-label="Résultat de la simulation">
-          <div><span>{{ type() === 'clients' ? 'Nouveaux clients' : 'Nouvelles factures' }}</span><strong>{{ s.nbCreations }}</strong><span>{{ type() === 'clients' ? 'seront ajoutés' : 'seront ajoutées' }}</span></div>
-          <div><span>{{ type() === 'clients' ? 'Déjà connus' : 'Déjà connues' }}, avec écarts</span><strong>{{ s.nbMisesAJour }}</strong><span>à mettre à jour ou non, au choix</span></div>
-          <div><span>{{ type() === 'clients' ? 'Identiques' : 'Identiques' }}</span><strong>{{ s.nbIdentiques }}</strong><span>rien à faire</span></div>
+          <div><span>{{ config().feminin ? 'Nouvelles' : 'Nouveaux' }} {{ libelleType() }}</span><strong>{{ s.nbCreations }}</strong><span>seront ajouté{{ accord() }}s</span></div>
+          <div><span>Déjà connu{{ accord() }}s, avec écarts</span><strong>{{ s.nbMisesAJour }}</strong><span>à mettre à jour ou non, au choix</span></div>
+          <div><span>Identiques</span><strong>{{ s.nbIdentiques }}</strong><span>rien à faire</span></div>
           <div><span>Lignes rejetées</span><strong>{{ s.nbRejets }}</strong><span>non importées, corrigeables</span></div>
         </section>
 
         @if (misesAJour().length) {
           <section class="bloc">
-            <div class="titre"><h2 class="h2">{{ type() === 'clients' ? 'Clients' : 'Factures' }} déjà connu{{ type() === 'clients' ? 's' : 'es' }}</h2>
+            <div class="titre"><h2 class="h2"><span class="maj">{{ libelleType() }}</span> déjà connu{{ accord() }}s</h2>
               <label class="case"><input type="checkbox" [checked]="cochees().size === misesAJour().length" (change)="toutCocher($any($event.target).checked)">Tout mettre à jour</label></div>
             <div class="defile">
               <table class="t">
-                <thead><tr><th>Mettre à jour</th><th>{{ type() === 'clients' ? 'Code client' : 'Référence' }}</th><th>Champ modifié</th><th>Valeur actuelle</th><th>Valeur du fichier</th></tr></thead>
+                <thead><tr><th>Mettre à jour</th><th>{{ config().cle }}</th><th>Champ modifié</th><th>Valeur actuelle</th><th>Valeur du fichier</th></tr></thead>
                 <tbody>
                   @for (l of misesAJour(); track l.id) {
                     @for (e of ecarts(l); track $index; let premier = $first; let nb = $count) {
@@ -137,7 +137,7 @@
         }
 
         <div class="pied-etape">
-          <p class="sous-titre">En validant, vous importez {{ s.nbCreations }} {{ libelleType() }} et mettez à jour {{ cochees().size }} {{ libelleType() }} connu{{ type() === 'clients' ? 's' : 'es' }}. Votre validation est enregistrée dans le journal d'audit.</p>
+          <p class="sous-titre">En validant, vous importez {{ s.nbCreations }} {{ libelleType() }} et mettez à jour {{ cochees().size }} {{ libelleType() }} connu{{ accord() }}s. Votre validation est enregistrée dans le journal d'audit.</p>
           <div class="actions">
             <button class="bs" type="button" (click)="abandonner()">Abandonner</button>
             <button class="bp" type="button" (click)="valider()" [disabled]="occupe()">{{ occupe() ? 'Import…' : "Valider l'import" }}</button>
@@ -156,7 +156,7 @@
           <div><span>Rejetés</span><strong>{{ r.nbRejets }}</strong></div>
         </section>
         <div class="actions">
-          <a class="bp" [routerLink]="type() === 'clients' ? '/clients' : '/factures'">Voir les {{ libelleType() }}</a>
+          <a class="bp" [routerLink]="config().fin">{{ config().libelleFin }}</a>
           <button class="bs" (click)="recommencer()">Importer un autre fichier</button>
         </div>
       }

@@ -11,6 +11,25 @@ interface Ecart { champ: string; actuel: string; importe: string; }
 
 const ETAPES = ['Fichier', 'Colonnes', 'Simulation', 'Rapport'];
 
+/** Ce qui change d'un type d'import a l'autre : ou simuler et valider, comment nommer les lignes, ou revenir. */
+interface TypeImport {
+  simulation: string; pluriel: string; feminin: boolean; cle: string; retour: string; libelleRetour: string; fin: string; libelleFin: string;
+}
+const TYPES: Record<string, TypeImport> = {
+  clients: {
+    simulation: '/api/imports/clients', pluriel: 'clients', feminin: false, cle: 'Code client',
+    retour: '/imports', libelleRetour: 'Imports', fin: '/clients', libelleFin: 'Voir les clients'
+  },
+  factures: {
+    simulation: '/api/recouvrement/imports/factures', pluriel: 'factures', feminin: true, cle: 'Référence',
+    retour: '/imports', libelleRetour: 'Imports', fin: '/factures', libelleFin: 'Voir les factures'
+  },
+  produits: {
+    simulation: '/api/marketing/imports/produits', pluriel: 'produits', feminin: false, cle: 'Code produit',
+    retour: '/marketing/catalogue', libelleRetour: 'Catalogue', fin: '/marketing/catalogue', libelleFin: 'Voir le catalogue'
+  }
+};
+
 @Component({
   selector: 'app-assistant-import',
   imports: [FormsModule, RouterLink, DialogModule],
@@ -22,7 +41,7 @@ export class AssistantImport implements OnInit {
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
 
-  /** clients ou factures, depuis l'URL ; import = reprise d'une simulation. */
+  /** clients, factures ou produits, depuis l'URL ; import = reprise d'une simulation. */
   readonly type = input<string>('factures');
   readonly import = input<string>();
 
@@ -52,7 +71,10 @@ export class AssistantImport implements OnInit {
   // Etape 4
   protected readonly rapport = signal<Import | null>(null);
 
-  protected readonly libelleType = computed(() => this.type() === 'clients' ? 'clients' : 'factures');
+  protected readonly config = computed(() => TYPES[this.type()] ?? TYPES['factures']);
+  protected readonly libelleType = computed(() => this.config().pluriel);
+  /** Accord des adjectifs : « connus » ou « connues ». */
+  protected readonly accord = computed(() => this.config().feminin ? 'e' : '');
   protected readonly manquants = computed(() => {
     const a = this.apercu();
     return a ? a.champs.filter(c => c.obligatoire && !this.correspondanceDe(c.code)).map(c => c.libelle) : [];
@@ -117,8 +139,7 @@ export class AssistantImport implements OnInit {
   simuler(): void {
     if (!this.fichier) return;
     this.occupe.set(true);
-    const url = this.type() === 'clients' ? '/api/imports/clients' : '/api/recouvrement/imports/factures';
-    this.api.envoyerFichier<Import>(url, this.fichier, { nom: 'parametres', valeur: { correspondance: this.nettoyee() } }).subscribe({
+    this.api.envoyerFichier<Import>(this.config().simulation, this.fichier, { nom: 'parametres', valeur: { correspondance: this.nettoyee() } }).subscribe({
       next: i => { this.occupe.set(false); this.afficherSimulation(i); },
       error: () => this.occupe.set(false)
     });
@@ -164,15 +185,15 @@ export class AssistantImport implements OnInit {
 
   abandonner(): void {
     const s = this.simulation();
-    if (!s) { this.router.navigate(['/imports']); return; }
-    this.api.post(`/api/imports/${s.id}/annulation`).subscribe(() => this.router.navigate(['/imports']));
+    if (!s) { this.router.navigate([this.config().retour]); return; }
+    this.api.post(`/api/imports/${s.id}/annulation`).subscribe(() => this.router.navigate([this.config().retour]));
   }
 
   valider(): void {
     const s = this.simulation();
     if (!s) return;
     const toutes = this.misesAJour().length > 0 && this.cochees().size === this.misesAJour().length;
-    const url = this.type() === 'clients' ? `/api/imports/clients/${s.id}/validation` : `/api/recouvrement/imports/factures/${s.id}/validation`;
+    const url = `${this.config().simulation}/${s.id}/validation`;
     this.occupe.set(true);
     this.api.post<Import>(url, { toutesLesMisesAJour: toutes, clesAMettreAJour: toutes ? [] : [...this.cochees()] }).subscribe({
       next: i => { this.occupe.set(false); this.rapport.set(i); this.etape.set(3); },
@@ -181,7 +202,9 @@ export class AssistantImport implements OnInit {
   }
 
   recommencer(): void {
-    this.router.navigate(['/imports/nouveau'], { queryParams: { type: this.type() } }).then(() => {
+    const cible = this.type() === 'produits' ? this.router.navigate(['/marketing/catalogue/import'])
+      : this.router.navigate(['/imports/nouveau'], { queryParams: { type: this.type() } });
+    cible.then(() => {
       this.etape.set(0); this.fichier = null; this.apercu.set(null); this.simulation.set(null); this.rapport.set(null);
     });
   }

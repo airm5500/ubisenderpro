@@ -175,3 +175,9 @@ export interface RecapitulatifMarketing {
   nbClients: number; nbMessages: number; nbExclus: number; expediteur: string; numeroExpediteur: string | null; emailReponse: string | null;
   exclusions: { motif: string; nb: number }[]; exemples: MessageCampagne[];
 }
+export interface Produit {
+  id: number; code: string; libelle: string; categorie: string | null; laboratoire: string | null; conditionnement: string | null;
+  prix: number | null; description: string | null; statut: 'ACTIF' | 'ARCHIVE'; importe: boolean; creePar: string | null; creeLe: string;
+  modifiePar: string | null; modifieLe: string | null;
+}
+export interface FiltresCatalogue { categories: string[]; laboratoires: string[]; }

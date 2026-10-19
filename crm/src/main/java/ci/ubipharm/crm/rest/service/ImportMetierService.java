@@ -13,11 +13,16 @@ import ci.ubipharm.crm.rest.service.dto.ValidationImportDTO;
 /** Ce que chaque type d'import fournit a l'assistant : ses champs, sa simulation, sa validation, ses corrections. */
 public interface ImportMetierService {
 
-    /** CLIENTS, FACTURES... */
+    /** CLIENTS, FACTURES, PRODUITS... */
     String type();
 
     /** Module exige en plus du role pour utiliser cet import, ou null. */
     String moduleRequis();
+
+    /** Droit exige pour utiliser cet import : Imports par defaut, le catalogue du Marketing a le sien. */
+    default String droitRequis() {
+        return "IMPORTS";
+    }
 
     List<ChampImportDTO> champs();
 

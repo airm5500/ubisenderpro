@@ -46,6 +46,7 @@
       <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
       @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on">Campagnes promotionnelles</a> }
       @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
+      @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }
       @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
       @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
     }

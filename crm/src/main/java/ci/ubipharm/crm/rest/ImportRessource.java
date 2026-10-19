@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/imports")
-@PreAuthorize("hasAuthority('DROIT_IMPORTS')")
+@PreAuthorize("hasAnyAuthority('DROIT_IMPORTS', 'DROIT_PRODUITS_GERER')")
 @RequiredArgsConstructor
 public class ImportRessource {
 

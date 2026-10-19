@@ -439,3 +439,25 @@ Meme cycle que les relances : brouillon, soumission, validation ou renvoi avec m
 - **API** : `/api/marketing/campagnes` (`GET`, `POST`, `PUT /{id}`, `GET /{id}/recapitulatif`, `GET /{id}/messages`,
   `POST /{id}/soumission|validation|rejet|lancement|annulation`), `/api/marketing/modeles`, `GET /api/marketing/variables`.
 - **Journal** : `CAMPAGNE_MARKETING_CREATION`, `_MODIFICATION`, `_SOUMISSION`, `_VALIDATION`, `_REJET`, `_LANCEMENT`, `_ANNULATION`.
+
+## Marketing : catalogue des produits (Marketing lot 3)
+
+Ecran **Marketing > Catalogue des produits**. L'equipe Marketing importe son fichier Excel de produits ou les saisit a
+la main ; un produit n'est jamais supprime, il est archive puis reactive au besoin.
+
+- **Fiche produit** : code (unique, archives compris), libelle, categorie, laboratoire, conditionnement, prix public
+  indicatif en FCFA (facultatif), description. Table `crm_produit`, migration `V1.0.22`.
+- **Saisie a la main** : bouton Nouveau produit ; categories et laboratoires deja saisis sont proposes a la frappe.
+  Un produit archive ne se modifie pas : on le reactive d'abord.
+- **Import** : bouton Importer des produits, meme assistant que les clients et les factures (correspondance des
+  colonnes, modeles de correspondance, simulation, correction des lignes, rapport des rejets). Colonnes reconnues
+  par exemple : Code article, Designation, Famille, Labo, PP. Une cellule vide n'efface jamais une valeur ; un produit
+  deja connu n'est mis a jour que si on le coche ; un produit archive n'est pas reactive par le fichier.
+- **Droits** (groupe Catalogue, module Marketing) : `PRODUITS` (consulter) et `PRODUITS_GERER` (importer, saisir,
+  modifier, archiver), donnes aux roles Administrateur, DG, Directeur commercial, Directeur d'agence et Charge
+  marketing. L'import des produits ne demande pas le droit `IMPORTS` : sans lui, l'historique des imports ne montre
+  que les imports du catalogue.
+- **API** : `/api/marketing/produits` (`GET` avec `q`, `categorie`, `laboratoire`, `statut`, `GET /filtres`, `POST`,
+  `PUT /{id}`, `POST /{id}/archivage|reactivation`), `/api/marketing/imports/produits` (simulation et validation) et
+  `/api/imports/produits/...` (etapes communes de l'assistant).
+- **Journal** : `PRODUIT_CREATION`, `PRODUIT_MODIFICATION`, `PRODUIT_ARCHIVAGE`, `PRODUIT_REACTIVATION`.

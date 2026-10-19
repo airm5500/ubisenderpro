@@ -13,6 +13,8 @@ export const routes: Routes = [
       { path: 'marketing/campagnes', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagnes-marketing/campagnes-marketing').then(m => m.CampagnesMarketing), title: 'Campagnes promotionnelles' },
       { path: 'marketing/campagnes/:id', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagne-marketing/campagne-marketing').then(m => m.CampagneMarketingSuivi), title: 'Campagne promotionnelle' },
       { path: 'marketing/modeles', canActivate: [droit('MODELES_MARKETING')], data: { module: 'MARKETING' }, loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles promotionnels' },
+      { path: 'marketing/catalogue', canActivate: [droit('PRODUITS')], loadComponent: () => import('./pages/catalogue/catalogue').then(m => m.Catalogue), title: 'Catalogue des produits' },
+      { path: 'marketing/catalogue/import', canActivate: [droit('PRODUITS_GERER')], data: { type: 'produits' }, loadComponent: () => import('./pages/assistant-import/assistant-import').then(m => m.AssistantImport), title: 'Importer des produits' },
       { path: 'marketing/numero', canActivate: [droit('NUMERO_MARKETING')], loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Mon numéro WhatsApp' },
       { path: 'marketing/listes/:id', canActivate: [droit('LISTES')], loadComponent: () => import('./pages/liste-diffusion/liste-diffusion').then(m => m.ListeDiffusionDetail), title: 'Liste de diffusion' },
       { path: 'ma-journee', canActivate: [droit('MA_JOURNEE')], loadComponent: () => import('./pages/ma-journee/ma-journee').then(m => m.MaJournee), title: 'Ma journée' },

@@ -18,6 +18,7 @@ import ci.ubipharm.crm.rest.service.dto.ImportLigneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ImportLigneDTO;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
+import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
@@ -52,6 +53,7 @@ public class ImportServiceImpl implements ImportService {
     private final JsonMapper jsonMapper;
     private final PerimetreService perimetreService;
     private final JournalActionService journalActionService;
+    private final UtilisateurCourantService utilisateurCourantService;
 
     @Override
     @Transactional
@@ -101,6 +103,10 @@ public class ImportServiceImpl implements ImportService {
         if (!perimetre.isVisionGlobale()) {
             where.append(" and i.utilisateur_id = :utilisateurId");
             parametres.put("utilisateurId", perimetre.getUtilisateurId());
+        }
+        if (!importsGeneraux()) {
+            // Sans le droit Imports, seul le catalogue du Marketing s'importe
+            where.append(" and i.type = 'PRODUITS'");
         }
         if (criteres.getType() != null) {
             where.append(" and i.type = :type");
@@ -267,12 +273,18 @@ public class ImportServiceImpl implements ImportService {
     private void verifierAcces(Long id) {
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         @SuppressWarnings("unchecked")
-        List<Number> auteurs = em.createNativeQuery("select utilisateur_id from crm_import where id = :id")
+        List<Tuple> imports = em.createNativeQuery("select utilisateur_id as auteur, type as type from crm_import where id = :id", Tuple.class)
                 .setParameter("id", id)
                 .getResultList();
-        if (auteurs.isEmpty() || (!perimetre.isVisionGlobale() && auteurs.getFirst().longValue() != perimetre.getUtilisateurId())) {
+        if (imports.isEmpty()
+                || (!perimetre.isVisionGlobale() && imports.getFirst().get("auteur", Number.class).longValue() != perimetre.getUtilisateurId())
+                || (!importsGeneraux() && !"PRODUITS".equals(imports.getFirst().get("type", String.class)))) {
             throw new RessourceIntrouvableException("Import introuvable");
         }
+    }
+
+    private boolean importsGeneraux() {
+        return utilisateurCourantService.utilisateur().getAuthorities().stream().anyMatch(a -> "DROIT_IMPORTS".equals(a.getAuthority()));
     }
 
     /** Pose un verrou sur l'import pour qu'il ne soit valide ou annule qu'une seule fois. */

@@ -132,11 +132,15 @@ public class AssistantImportServiceImpl implements AssistantImportService {
         return csv("rejets_import_" + importId + ".csv", lignes);
     }
 
-    /** Le type vient de l'URL (clients, factures) ; un import d'un module non attribue est refuse. */
+    /** Le type vient de l'URL (clients, factures, produits) ; un import d'un droit ou d'un module non attribue est refuse. */
     private ImportMetierService metier(String type) {
         ImportMetierService metier = metiers.get(type == null ? "" : type.toUpperCase(Locale.ROOT));
         if (metier == null) {
             throw new RessourceIntrouvableException("Type d'import inconnu");
+        }
+        if (utilisateurCourantService.utilisateur().getAuthorities().stream()
+                .noneMatch(a -> a.getAuthority().equals("DROIT_" + metier.droitRequis()))) {
+            throw new AccessDeniedException("Droit " + metier.droitRequis() + " non attribue");
         }
         if (metier.moduleRequis() != null && utilisateurCourantService.utilisateur().getAuthorities().stream()
                 .noneMatch(a -> a.getAuthority().equals("MODULE_" + metier.moduleRequis()))) {

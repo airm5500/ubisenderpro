@@ -10,7 +10,7 @@ import { Auth } from '../../core/auth';
     <div class="page">
       <div class="entete"><div>
         <h1>Marketing</h1>
-        <p class="sous-titre">Listes de diffusion, puis campagnes promotionnelles WhatsApp, e-mail et SMS.</p>
+        <p class="sous-titre">Listes de diffusion, campagnes promotionnelles WhatsApp, e-mail et SMS, catalogue des produits.</p>
       </div></div>
       @if (auth.peut('CAMPAGNES_MARKETING')) {
         <a class="bloc tuile" routerLink="/marketing/campagnes" style="text-decoration: none; max-width: 420px">
@@ -24,7 +24,13 @@ import { Auth } from '../../core/auth';
           <span class="discret">Les clients visés par vos campagnes, par critères ou choisis un par un. Les clients qui répondent STOP sont écartés.</span>
         </a>
       }
-      <div class="info"><i class="pi pi-info-circle"></i><span>Le catalogue des produits et les promotions arrivent dans les prochaines livraisons.</span></div>
+      @if (auth.peut('PRODUITS')) {
+        <a class="bloc tuile" routerLink="/marketing/catalogue" style="text-decoration: none; max-width: 420px">
+          <b style="font-size: 16px">Catalogue des produits</b>
+          <span class="discret">Les produits à mettre en avant, importés depuis votre fichier Excel ou saisis à la main.</span>
+        </a>
+      }
+      <div class="info"><i class="pi pi-info-circle"></i><span>Les promotions sur les produits du catalogue arrivent dans la prochaine livraison.</span></div>
       @if (auth.recouvrement()) { <a routerLink="/">Revenir au Recouvrement</a> }
     </div>`
 })

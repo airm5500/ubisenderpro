@@ -1,0 +1,24 @@
+<p-dialog [header]="produit() ? 'Modifier le produit' : 'Nouveau produit'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '640px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Code produit<input class="sel" name="code" [(ngModel)]="formulaire.code" placeholder="Ex. code CIP ou code article" required maxlength="50"></label>
+      <label class="f large">Libellé<input class="sel" name="libelle" [(ngModel)]="formulaire.libelle" placeholder="Ex. Paracétamol 500 mg comprimés" required maxlength="200"></label>
+      <label class="f">Catégorie<input class="sel" name="categorie" [(ngModel)]="formulaire.categorie" list="categories-produit" placeholder="Ex. Antalgiques" maxlength="100"></label>
+      <label class="f">Laboratoire<input class="sel" name="laboratoire" [(ngModel)]="formulaire.laboratoire" list="laboratoires-produit" placeholder="Ex. Sanofi" maxlength="150"></label>
+      <label class="f">Conditionnement<input class="sel" name="conditionnement" [(ngModel)]="formulaire.conditionnement" placeholder="Ex. Boîte de 16" maxlength="100"></label>
+      <label class="f">Prix public (FCFA)<input class="sel" type="number" min="0" step="1" name="prix" [(ngModel)]="formulaire.prix" placeholder="Facultatif"></label>
+      <label class="f large">Description<textarea class="sel" rows="3" name="description" [(ngModel)]="formulaire.description" maxlength="1000"
+        placeholder="Facultatif : indications, argumentaire…"></textarea></label>
+    </div>
+    <datalist id="categories-produit">@for (c of filtres()?.categories; track c) { <option [value]="c"></option> }</datalist>
+    <datalist id="laboratoires-produit">@for (l of filtres()?.laboratoires; track l) { <option [value]="l"></option> }</datalist>
+
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.code.trim() || !formulaire.libelle.trim()">
+        {{ produit() ? 'Enregistrer' : 'Ajouter le produit' }}</button>
+    </div>
+  </form>
+</p-dialog>
