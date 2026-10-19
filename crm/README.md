@@ -367,13 +367,13 @@ actif ne l'a. Une case decochee reste en base (`actif = false`) et chaque change
 - **Interface** : menus, boutons et gardes de route suivent les memes droits (`auth.peut(...)`).
 - **Garde-fous** : le role Administrateur garde toujours `UTILISATEURS` et `ROLES` et ne se desactive pas. Quand les
   droits d'un role changent, les comptes qui l'ont se reconnectent (`droits_revises_le`).
-- Les roles livres gardent les droits qu'ils avaient avant ce lot (migration `V1.0.17`).
+- Les roles livres gardent les droits qu'ils avaient avant ce lot (migration `V1.1.7`).
 
 ## Creation des clients a la main (lot 13)
 
 Les clients arrives un par un se saisissent sans import : bouton **Nouveau client** dans Clients, **Modifier** sur la fiche.
 
-- **Droit** `CLIENTS_GERER` (Creances, tous modules), donne par la migration `V1.0.18` a chaque role qui importe deja
+- **Droit** `CLIENTS_GERER` (Creances, tous modules), donne par la migration `V1.1.8` a chaque role qui importe deja
   des clients (Administrateur, directions). Les agents ne l'ont pas ; il se coche dans Roles et droits.
 - **API** : `POST /api/clients`, `PUT /api/clients/{id}`, `GET /api/clients/segments`. Memes controles que l'import :
   numero de compte unique (non modifiable ensuite), agence du perimetre, segment connu, e-mail valide, numeros a
@@ -388,7 +388,7 @@ Les clients arrives un par un se saisissent sans import : bouton **Nouveau clien
 Regle : tout ce qui s'importe peut aussi se saisir. **Nouvelle facture** dans Factures (et sur la fiche client),
 **Modifier** sur chaque ligne pour corriger une facture ou enregistrer un reglement.
 
-- **Droit** `FACTURES_GERER` (Creances, Recouvrement), donne par `V1.0.19` aux roles qui importent deja.
+- **Droit** `FACTURES_GERER` (Creances, Recouvrement), donne par `V1.1.9` aux roles qui importent deja.
 - **API** : `GET /api/recouvrement/factures/{id}`, `POST /api/recouvrement/factures`, `PUT /api/recouvrement/factures/{id}`.
 - **Controles de l'import** : reference unique (figee ensuite, comme le client), client du perimetre (et du portefeuille
   pour un agent), sous-type connu, echeance apres la date de facture, solde au plus egal au montant. Un avoir est
@@ -408,7 +408,7 @@ Le critere "tournee" n'existe pas : les tournees sont decidees par les agences.
   parametre `marketing.mots_desabonnement` (STOP, ARRET, DESABONNER par defaut) desabonne le client de tout le Marketing.
   Les relances du Recouvrement continuent. Desabonner et reabonner a la main depuis la liste.
 - **Droits** `LISTES` (consulter) et `LISTES_GERER` (creer, modifier, archiver, desabonner), groupe Diffusion du module
-  Marketing ; nouveau role systeme `CHARGE_MARKETING` (Charge marketing). Migration `V1.0.20`.
+  Marketing ; nouveau role systeme `CHARGE_MARKETING` (Charge marketing). Migration `V1.2.0`.
 - **API** (`/api/marketing`) : `GET /listes`, `GET /listes/{id}`, `GET /listes/{id}/membres?filtre=TOUS|JOIGNABLES|NON_JOIGNABLES|EXCLUS`,
   `GET /listes/criteres`, `POST /listes/simulation`, `POST /listes`, `PUT /listes/{id}`, `POST /listes/{id}/clients`
   (`sens` AJOUT, EXCLUSION ou RETRAIT), `POST /listes/{id}/archivage`, `POST /listes/{id}/reactivation`,
@@ -433,7 +433,7 @@ Meme cycle que les relances : brouillon, soumission, validation ou renvoi avec m
 - **Modeles** : `crm_modele_message.module = MARKETING`, type `PROMOTION` ; seules les variables du client et de
   l'expediteur (`{expediteur_nom}`, `{expediteur_numero}`, `{segment}`, `{agence}`) sont admises, pas celles des factures.
 - **Tables** : memes `crm_campagne` (colonnes `module`, `liste_id`, `agences_cibles`) et `crm_campagne_message`
-  (`facture_id` vide) que les relances ; la chaine d'envoi WhatsApp, e-mail et SMS est commune. Migration `V1.0.21`.
+  (`facture_id` vide) que les relances ; la chaine d'envoi WhatsApp, e-mail et SMS est commune. Migration `V1.2.1`.
 - **Droits** (groupe Campagnes, module Marketing) : `CAMPAGNES_MARKETING`, `CAMPAGNES_MARKETING_PREPARER`,
   `CAMPAGNES_MARKETING_VALIDER`, `MODELES_MARKETING`, `NUMERO_MARKETING`. Le Charge marketing a tout sauf la validation.
 - **API** : `/api/marketing/campagnes` (`GET`, `POST`, `PUT /{id}`, `GET /{id}/recapitulatif`, `GET /{id}/messages`,
@@ -446,7 +446,7 @@ Ecran **Marketing > Catalogue des produits**. L'equipe Marketing importe son fic
 la main ; un produit n'est jamais supprime, il est archive puis reactive au besoin.
 
 - **Fiche produit** : code (unique, archives compris), libelle, categorie, laboratoire, conditionnement, prix public
-  indicatif en FCFA (facultatif), description. Table `crm_produit`, migration `V1.0.22`.
+  indicatif en FCFA (facultatif), description. Table `crm_produit`, migration `V1.2.2`.
 - **Saisie a la main** : bouton Nouveau produit ; categories et laboratoires deja saisis sont proposes a la frappe.
   Un produit archive ne se modifie pas : on le reactive d'abord.
 - **Import** : bouton Importer des produits, meme assistant que les clients et les factures (correspondance des
@@ -483,7 +483,7 @@ catalogue avec leur avantage. La personne qui la cree en est la responsable.
   avantage) se remplissent d'office ; un modele qui les cite exige une promotion, et une promotion terminee entre-temps
   bloque la soumission et la validation. Ces variables sont refusees dans les modeles de relance.
 - **Tables** : `crm_promotion`, `crm_promotion_produit` (ligne retiree = `actif` faux), `crm_campagne.promotion_ids`.
-  Migration `V1.0.23`.
+  Migration `V1.2.3`.
 - **Droits** (groupe Catalogue, module Marketing) : `PROMOTIONS`, `PROMOTIONS_GERER`, memes roles que le catalogue.
 - **API** : `/api/marketing/promotions` (`GET` avec `q` et `statut`, `POST`, `PUT /{id}`,
   `POST /{id}/activation|archivage|reactivation`, `GET /{id}/produits`, `GET /{id}/produits/export`,
@@ -508,7 +508,7 @@ rattrape).
 - **Statuts** : entre deux envois, la campagne est « Programmee » avec la date du prochain envoi ; apres le dernier,
   « Executee ». L'annulation arrete la repetition. Les compteurs cumulent tous les envois.
 - **Tables** : `crm_campagne.recurrence`, `fin_recurrence`, `debut_recurrence`, `nb_executions` ;
-  `crm_campagne_message.execution` (numero de l'envoi). Migration `V1.0.24`.
+  `crm_campagne_message.execution` (numero de l'envoi). Migration `V1.2.4`.
 
 ## Marketing : pieces jointes (pilote)
 
@@ -523,7 +523,7 @@ rattrape).
   dans son motif, sans renvoyer le texte.
 - **E-mail** : affiche et liste en pieces jointes du courrier. **SMS** : refuse les pieces jointes.
 - **Tables** : `crm_piece_jointe` (contenu en base, jamais supprime), `crm_campagne.affiche_id`, `joindre_produits`,
-  `liste_produits_id`. Migration `V1.0.25`.
+  `liste_produits_id`. Migration `V1.2.5`.
 - **API** : `POST /api/marketing/pieces-jointes` (multipart, champ `fichier`), `GET /api/marketing/pieces-jointes/{id}`
   (droit `CAMPAGNES_MARKETING`) ; `afficheId` et `joindreProduits` dans la demande de campagne.
 
