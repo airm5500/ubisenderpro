@@ -44,6 +44,9 @@ export const routes: Routes = [
       { path: 'utilisateurs', canActivate: [droit('UTILISATEURS')], loadComponent: () => import('./pages/utilisateurs/utilisateurs').then(m => m.Utilisateurs), title: 'Utilisateurs et habilitations' },
       { path: 'roles', canActivate: [droit('ROLES')], loadComponent: () => import('./pages/roles/roles').then(m => m.Roles), title: 'Rôles et droits' },
       { path: 'mot-de-passe', loadComponent: () => import('./pages/mot-de-passe/mot-de-passe').then(m => m.MotDePasse), title: 'Mon mot de passe' },
+      { path: 'discussions', canActivate: [droit('DISCUSSIONS')], loadComponent: () => import('./pages/discussions/discussions').then(m => m.Discussions), title: 'Discussions' },
+      { path: 'historique-envois', canActivate: [droit('HISTORIQUE_ENVOIS')], loadComponent: () => import('./pages/historique-envois/historique-envois').then(m => m.HistoriqueEnvois), title: 'Historique des envois' },
+      { path: 'envoi-masse', canActivate: [droit('ENVOI_MASSE')], loadComponent: () => import('./pages/envoi-masse/envoi-masse').then(m => m.EnvoiMassePage), title: 'Envoi WhatsApp en masse' },
       { path: 'reponses', canActivate: [droit('REPONSES')], loadComponent: () => import('./pages/reponses/reponses').then(m => m.Reponses), title: 'Réponses des clients' }
     ]
   },

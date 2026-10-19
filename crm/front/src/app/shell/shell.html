@@ -36,9 +36,12 @@
       @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a> }
       @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on">Délais de relance</a> }
     }
-    @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS')) {
+    @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS', 'DISCUSSIONS', 'HISTORIQUE_ENVOIS', 'ENVOI_MASSE')) {
       <div class="gl">Échanges</div>
+      @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
       @if (auth.peut('REPONSES')) { <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a> }
+      @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
+      @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
       @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
         <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
       }
@@ -54,6 +57,9 @@
       @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
       @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on">Informations clients</a> }
       @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on">Calendrier des événements</a> }
+      @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
+      @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
+      @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
       @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
     }
     <!-- Administration : la meme dans les deux modules -->

@@ -1,14 +1,9 @@
 package ci.ubipharm.crm.rest.service.impl;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -31,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
-    private static final ZoneId ABIDJAN = ZoneId.of("Africa/Abidjan");
     /** WhatsApp coupe les legendes d'image trop longues : au-dela, le texte part a part. */
     private static final int LEGENDE_MAX = 1000;
     private static final String CLASSEUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -43,9 +37,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     private final ParametreService parametreService;
     private final SuiviEnvoiService suiviEnvoi;
     private final PieceJointeService pieceJointeService;
-
-    /** Prochain envoi autorise par numero d'agent. */
-    private final Map<String, Instant> prochainEnvoi = new ConcurrentHashMap<>();
+    private final CadenceWhatsapp cadence;
 
     private record Message(Long id, Long campagneId, Long factureId, String numeroExpediteur, String numeroDestinataire, String contenu,
             int tentatives, String parametres, String modeleNom, String metaModele, String metaLangue, String metaEntete) {
@@ -60,11 +52,9 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
     @Override
     public int envoyerLot() {
-        int heure = ZonedDateTime.now(ABIDJAN).getHour();
-        if (heure < parametreService.entier("whatsapp.envoi.heure_debut", 8) || heure >= parametreService.entier("whatsapp.envoi.heure_fin", 18)) {
+        if (!cadence.dansLaPlage()) {
             return 0;
         }
-        int plafond = parametreService.entier("whatsapp.envoi.plafond_jour", 200);
         List<String> numeros = jdbc.queryForList("""
                 select distinct m.numero_expediteur from crm_campagne_message m
                 join crm_campagne c on c.id = m.campagne_id
@@ -73,14 +63,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
                 """, Map.of(), String.class);
         int envoyes = 0;
         for (String numero : numeros) {
-            Instant prochain = prochainEnvoi.get(numero);
-            if (prochain != null && prochain.isAfter(Instant.now())) {
-                continue;
-            }
-            Long aujourdhui = jdbc.queryForObject("""
-                    select count(*) from crm_campagne_message where numero_expediteur = :numero and envoye_le >= utc_date()
-                    """, Map.of("numero", numero), Long.class);
-            if (aujourdhui != null && aujourdhui >= plafond) {
+            if (!cadence.peutEnvoyer(numero)) {
                 continue;
             }
             Message message = reserver(numero);
@@ -89,7 +72,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             }
             ResultatEnvoiDTO resultat = envoyer(numero, phoneNumberIdMeta(numero), message);
             transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
-            prochainEnvoi.put(numero, Instant.now().plusSeconds(attente()));
+            cadence.envoye(numero);
             envoyes++;
         }
         return envoyes;
@@ -264,11 +247,5 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             suiviEnvoi.factureNonRelancee(message.factureId());
         }
         suiviEnvoi.recompter(message.campagneId());
-    }
-
-    private long attente() {
-        int min = parametreService.entier("whatsapp.envoi.delai_min_secondes", 20);
-        int max = Math.max(min, parametreService.entier("whatsapp.envoi.delai_max_secondes", 45));
-        return min == max ? min : ThreadLocalRandom.current().nextLong(min, max + 1L);
     }
 }

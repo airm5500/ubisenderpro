@@ -53,6 +53,7 @@ export const LIBELLES = {
   couleurCampagne: {
     BROUILLON: '#9DB0BF', A_VALIDER: '#F4B740', VALIDEE: '#0B5C8E', EN_COURS: '#51D78E', TERMINEE: '#05253D', ANNULEE: '#C2410C'
   } as Partial<Record<string, string>>,
+  origineEnvoi: { RELANCE: 'Relance', PROMOTION: 'Promotion', DISCUSSION: 'Discussion', ENVOI_MASSE: 'Envoi en masse', REPONSE: 'Message du client' } as Partial<Record<string, string>>,
   statutMessage: {
     EXCLU: 'Exclu', A_ENVOYER: 'À envoyer', ENVOI: "En cours d'envoi", ENVOYE: 'Envoyé', DISTRIBUE: 'Distribué',
     LU: 'Lu', ECHEC: 'Échec', ANNULE: 'Annulé'

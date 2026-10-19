@@ -277,3 +277,29 @@ export interface PromotionProduit {
   ugPourcentage: number | null; ugPlafond: number | null; prixPromo: number | null; resume: string; actif: boolean; importe: boolean;
   modifieLe: string | null;
 }
+
+export interface ConnexionHistorique { id: number; login: string; succes: boolean; adresseIp: string | null; navigateur: string | null; le: string; }
+export interface ActionJournal {
+  id: number; login: string; utilisateurNom: string | null; action: string; entite: string | null; entiteId: number | null;
+  details: string | null; adresseIp: string | null; le: string;
+}
+export interface EnvoiHistorique {
+  cle: string; origine: string; source: string | null; canal: string; expediteur: string | null; utilisateurNom: string | null;
+  destinataire: string | null; clientId: number | null; clientNom: string | null; contenu: string | null; statut: string; motif: string | null;
+  le: string; distribueLe: string | null; luLe: string | null;
+}
+export interface Discussion {
+  numeroAgent: string; agentNom: string | null; numeroClient: string; clientId: number | null; clientNom: string | null; nomAffiche: string | null;
+  dernierMessage: string | null; dernierSens: 'ENTRANT' | 'SORTANT' | null; derniereActivite: string; nbRecus: number; peutRepondre: boolean;
+}
+export interface MessageDiscussion {
+  cle: string; sens: 'ENTRANT' | 'SORTANT'; origine: string; source: string | null; type: string; contenu: string | null;
+  statut: string | null; motif: string | null; auteur: string | null; le: string;
+}
+export interface EnvoiMasse {
+  id: number; nom: string; numeroExpediteur: string; contenu: string; statut: 'EN_COURS' | 'TERMINE' | 'ANNULE'; nbDestinataires: number; nbExclus: number;
+  nbEnAttente: number; nbEnvoyes: number; nbDistribues: number; nbLus: number; nbEchecs: number; creePar: string; creeLe: string;
+  annulePar: string | null; termineLe: string | null;
+}
+export interface DestinataireMasse { id: number | null; saisi: string | null; numero: string | null; nom: string | null; clientId: number | null; statut: string; motif: string | null; envoyeLe: string | null; }
+export interface EnvoiMasseApercu { envoi: EnvoiMasse | null; nbRetenus: number; exclus: DestinataireMasse[]; exemple: string | null; }

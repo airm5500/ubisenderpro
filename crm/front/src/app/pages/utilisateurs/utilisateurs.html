@@ -57,6 +57,7 @@
               <td class="nw actions" style="flex-wrap: nowrap">
                 <a (click)="modifier(u)">Modifier</a>
                 <a (click)="reinitialiser(u)">Nouveau mot de passe</a>
+                <a (click)="voirHistorique(u)">Historique</a>
                 @if (u.statut === 'ACTIF') {
                   @if (u.id !== auth.utilisateur()?.id) { <a (click)="demanderDesactivation(u)">Désactiver</a> }
                 } @else {
@@ -155,3 +156,5 @@
     </div>
   </div>
 </p-dialog>
+
+<app-historique-utilisateur [(ouvert)]="historique" [utilisateur]="historiqueDe()" />

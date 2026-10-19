@@ -17,6 +17,10 @@ import ci.ubipharm.crm.rest.service.dto.UtilisateurDTO;
 import ci.ubipharm.crm.rest.service.dto.UtilisateurDemandeDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import jakarta.validation.Valid;
+import ci.ubipharm.crm.rest.service.HistoriqueUtilisateurService;
+import ci.ubipharm.crm.rest.service.dto.ActionJournalDTO;
+import ci.ubipharm.crm.rest.service.dto.ConnexionHistoriqueDTO;
+import ci.ubipharm.crm.rest.service.dto.HistoriqueCriteresDTO;
 import lombok.RequiredArgsConstructor;
 
 /** Comptes et habilitations : reserves a l'administrateur. */
@@ -27,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class UtilisateurRessource {
 
     private final UtilisateurService utilisateurService;
+    private final HistoriqueUtilisateurService historiqueUtilisateurService;
 
     @GetMapping
     public PageDTO<UtilisateurDTO> rechercher(@Valid UtilisateurCriteresDTO criteres) {
@@ -36,6 +41,16 @@ public class UtilisateurRessource {
     @GetMapping("/referentiel")
     public ReferentielHabilitationDTO referentiel() {
         return utilisateurService.referentiel();
+    }
+
+    @GetMapping("/{id}/connexions")
+    public PageDTO<ConnexionHistoriqueDTO> connexions(@PathVariable Long id, @Valid HistoriqueCriteresDTO criteres) {
+        return historiqueUtilisateurService.connexions(id, criteres);
+    }
+
+    @GetMapping("/{id}/actions")
+    public PageDTO<ActionJournalDTO> actions(@PathVariable Long id, @Valid HistoriqueCriteresDTO criteres) {
+        return historiqueUtilisateurService.actions(id, criteres);
     }
 
     @GetMapping("/{id}")

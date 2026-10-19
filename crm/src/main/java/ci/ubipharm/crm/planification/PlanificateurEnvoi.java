@@ -6,6 +6,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import ci.ubipharm.crm.rest.service.EnvoiMasseService;
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,10 +19,11 @@ import lombok.extern.slf4j.Slf4j;
 public class PlanificateurEnvoi {
 
     private final EnvoiWhatsappService envoiWhatsappService;
+    private final EnvoiMasseService envoiMasseService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void reprendre() {
-        int interrompus = envoiWhatsappService.reprendreEnvoisInterrompus();
+        int interrompus = envoiWhatsappService.reprendreEnvoisInterrompus() + envoiMasseService.reprendreEnvoisInterrompus();
         if (interrompus > 0) {
             log.warn("{} envoi(s) interrompu(s) par l'arret precedent passes en echec, a verifier", interrompus);
         }
@@ -30,5 +32,6 @@ public class PlanificateurEnvoi {
     @Scheduled(fixedDelayString = "${crm.whatsapp.intervalle:5000}", initialDelay = 15000)
     public void envoyer() {
         envoiWhatsappService.envoyerLot();
+        envoiMasseService.envoyerLot();
     }
 }

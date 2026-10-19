@@ -9,6 +9,7 @@ import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
 import { CompteProvisoire, CompteUtilisateur, Habilitation, Page, ReferentielHabilitation } from '../../core/modeles';
 import { JourPipe, TelephonePipe } from '../../core/format';
+import { HistoriqueUtilisateur } from './historique-utilisateur';
 
 interface Formulaire {
   login: string; nomComplet: string; email: string; numeroWhatsapp: string;
@@ -19,7 +20,7 @@ type Fenetre = 'compte' | 'mot-de-passe' | 'desactivation' | null;
 
 @Component({
   selector: 'app-utilisateurs',
-  imports: [FormsModule, RouterLink, AsyncPipe, DialogModule, JourPipe, TelephonePipe],
+  imports: [FormsModule, RouterLink, AsyncPipe, DialogModule, JourPipe, TelephonePipe, HistoriqueUtilisateur],
   templateUrl: './utilisateurs.html'
 })
 export class Utilisateurs implements OnInit {
@@ -36,6 +37,13 @@ export class Utilisateurs implements OnInit {
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));
 
   protected readonly fenetre = signal<Fenetre>(null);
+  protected readonly historique = signal(false);
+  protected readonly historiqueDe = signal<CompteUtilisateur | null>(null);
+
+  voirHistorique(u: CompteUtilisateur): void {
+    this.historiqueDe.set(u);
+    this.historique.set(true);
+  }
   protected readonly enCours = signal(false);
   protected cible: CompteUtilisateur | null = null;
   protected provisoire: CompteProvisoire | null = null;

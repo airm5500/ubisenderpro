@@ -1,0 +1,54 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Discussions</h1>
+      <p class="sous-titre">Les échanges WhatsApp avec chaque client : messages partis (relances, promotions, envois en masse) et réponses reçues. Vous répondez depuis votre numéro.</p>
+    </div>
+  </div>
+
+  <div class="discussions">
+    <div class="liste-d">
+      <form (ngSubmit)="rechercher()"><input class="sel" name="q" [(ngModel)]="q" placeholder="Pharmacie, code ou numéro" style="width: 100%"></form>
+      <div class="items">
+        @for (d of page()?.elements; track d.numeroAgent + d.numeroClient) {
+          <button type="button" class="item-d" [class.on]="choisie()?.numeroAgent === d.numeroAgent && choisie()?.numeroClient === d.numeroClient" (click)="ouvrir(d)">
+            <div class="ligne1"><strong>{{ d.clientNom || d.nomAffiche || (d.numeroClient | telephone) }}</strong><span class="second nw">{{ d.derniereActivite | jour }}</span></div>
+            <div class="second">{{ d.numeroClient | telephone }} · sur {{ d.agentNom || (d.numeroAgent | telephone) }}</div>
+            <div class="apercu">{{ d.dernierSens === 'SORTANT' ? 'Vous : ' : '' }}{{ d.dernierMessage || '[pièce jointe]' }}</div>
+          </button>
+        } @empty {
+          <p class="discret" style="padding: 14px">{{ page() ? 'Aucune discussion pour l\'instant.' : 'Chargement…' }}</p>
+        }
+      </div>
+    </div>
+
+    <div class="fil-d">
+      @if (choisie(); as d) {
+        <div class="tete">
+          <div><strong>{{ titre() }}</strong><div class="second">{{ d.numeroClient | telephone }} · numéro {{ d.numeroAgent | telephone }}{{ d.agentNom ? ' (' + d.agentNom + ')' : '' }}</div></div>
+          @if (d.clientId) { <a class="bs petit" [routerLink]="['/clients', d.clientId]">Fiche client</a> }
+        </div>
+        <div class="corps" #fil>
+          @for (m of messages(); track m.cle) {
+            <div class="bulle" [class]="'bulle ' + m.sens">
+              @if (m.sens === 'SORTANT') { <div class="origine">{{ L.origineEnvoi[m.origine] }}{{ m.source && m.origine !== 'DISCUSSION' ? ' · ' + m.source : '' }}</div> }
+              {{ m.contenu || '[' + m.type + ']' }}
+              <div class="meta">{{ m.le | jour: true }}{{ m.auteur ? ' · ' + m.auteur : '' }}{{ m.statut ? ' · ' + (L.statutMessage[m.statut] ?? m.statut) : '' }}{{ m.motif ? ' · ' + m.motif : '' }}</div>
+            </div>
+          }
+        </div>
+        @if (d.peutRepondre) {
+          <form class="saisie-d" (ngSubmit)="envoyer()">
+            <textarea class="sel" name="texte" rows="2" [(ngModel)]="texte" placeholder="Écrire une réponse…"></textarea>
+            <button class="bp" type="submit" [disabled]="enCours() || !texte.trim()">{{ enCours() ? 'Envoi…' : 'Envoyer' }}</button>
+          </form>
+        } @else {
+          <div class="saisie-d"><span class="discret">Lecture seule : seul le titulaire du numéro, ou son remplaçant, répond depuis ce numéro.</span></div>
+        }
+        @if (erreur()) { <div class="erreur" style="margin: 0 12px 12px">{{ erreur() }}</div> }
+      } @else {
+        <p class="discret" style="padding: 24px">Choisissez une discussion.</p>
+      }
+    </div>
+  </div>
+</div>

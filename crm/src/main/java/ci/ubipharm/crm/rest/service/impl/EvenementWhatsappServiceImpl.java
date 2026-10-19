@@ -78,6 +78,10 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                     where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut = 'ENVOYE'
                     """, p);
             avancerFacture(p, "MESSAGE_DISTRIBUE", AVANT_DISTRIBUE);
+            jdbc.update("""
+                    update crm_message_sortant set statut = 'DISTRIBUE', distribue_le = coalesce(distribue_le, utc_timestamp()), updated_at = utc_timestamp()
+                    where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut = 'ENVOYE'
+                    """, p);
         } else if ("LU".equals(e.getStatus())) {
             lu(p);
         }
@@ -116,6 +120,14 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
         if (nouveaux > 0 && !clients.isEmpty()) {
             desabonnementService.traiterReponse(clients.getFirst(), e.getText());
         }
+        if (nouveaux > 0) {
+            // Une reponse vaut lecture des messages hors campagne (discussion, envoi en masse)
+            jdbc.update("""
+                    update crm_message_sortant set statut = 'LU', distribue_le = coalesce(distribue_le, utc_timestamp()),
+                           lu_le = coalesce(lu_le, utc_timestamp()), updated_at = utc_timestamp()
+                    where numero_expediteur = :agent and numero_destinataire = :client and statut in ('ENVOYE', 'DISTRIBUE')
+                    """, Map.of("agent", e.getSessionId(), "client", numeroClient));
+        }
         if (nouveaux == 0 || relance == null) {
             return;
         }
@@ -134,6 +146,11 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                 where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut in ('ENVOYE', 'DISTRIBUE')
                 """, Map.of("numero", numero, "identifiant", identifiant));
         if (messages.isEmpty()) {
+            // Message d'une discussion ou d'un envoi en masse
+            jdbc.update("""
+                    update crm_message_sortant set statut = 'ECHEC', motif = :motif, updated_at = utc_timestamp()
+                    where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut in ('ENVOYE', 'DISTRIBUE')
+                    """, Map.of("numero", numero, "identifiant", identifiant, "motif", motif.length() > 255 ? motif.substring(0, 255) : motif));
             return;
         }
         Map<String, Object> m = messages.getFirst();
@@ -152,6 +169,11 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                 where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut in ('ENVOYE', 'DISTRIBUE')
                 """, p);
         avancerFacture(p, "MESSAGE_LU", AVANT_LU);
+        jdbc.update("""
+                update crm_message_sortant set statut = 'LU', distribue_le = coalesce(distribue_le, utc_timestamp()),
+                       lu_le = coalesce(lu_le, utc_timestamp()), updated_at = utc_timestamp()
+                where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut in ('ENVOYE', 'DISTRIBUE')
+                """, p);
     }
 
     private void avancerFacture(MapSqlParameterSource p, String statut, String statutsPrecedents) {

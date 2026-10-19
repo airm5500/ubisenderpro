@@ -1,0 +1,117 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Envoi WhatsApp en masse</h1>
+      <p class="sous-titre">Un même message envoyé depuis votre numéro WhatsApp à des numéros collés ou aux clients d'une liste de diffusion.
+        Les messages partent au rythme des relances, après elles ; les désabonnés (STOP) et les clients désactivés sont écartés.</p>
+    </div>
+    <div class="actions"><button class="bp" type="button" (click)="nouveau()"><i class="pi pi-plus"></i> Nouvel envoi</button></div>
+  </div>
+
+  @if (saisie()) {
+    <section class="bloc">
+      <h2 class="h2">Nouvel envoi</h2>
+      <div class="grille">
+        <label class="f large">Nom de l'envoi<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Nouvel arrivage de novembre"></label>
+        <label class="f large">Message
+          <textarea class="sel" name="contenu" rows="5" [(ngModel)]="formulaire.contenu" (ngModelChange)="modifie()"></textarea>
+          <span class="second">{{ '{' }}nom{{ '}' }} est remplacé par le nom saisi à côté du numéro, ou par le nom du client.</span>
+        </label>
+        <label class="f large">Numéros (un par ligne ; le nom peut suivre après un point-virgule ou une tabulation, comme un copier-coller d'Excel)
+          <textarea class="sel" name="numeros" rows="6" [(ngModel)]="formulaire.numeros" (ngModelChange)="modifie()"
+                    placeholder="07 08 09 10 11;Dr Kouassi&#10;05 06 07 08 09"></textarea>
+        </label>
+        @if (listes().length) {
+          <label class="f">Et/ou une liste de diffusion
+            <select class="sel" name="listeId" [(ngModel)]="formulaire.listeId" (ngModelChange)="modifie()">
+              <option [ngValue]="null">Aucune</option>
+              @for (l of listes(); track l.id) { <option [ngValue]="l.id">{{ l.nom }}</option> }
+            </select>
+          </label>
+        }
+      </div>
+      @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
+      @if (apercu(); as a) {
+        <div class="kvs bandeau">
+          <div class="kv"><span>Destinataires retenus</span><strong>{{ a.nbRetenus }}</strong></div>
+          <div class="kv"><span>Écartés</span><strong>{{ a.exclus.length }}</strong></div>
+        </div>
+        @if (a.exemple) { <div class="info"><i class="pi pi-whatsapp"></i><span style="white-space: pre-wrap">{{ a.exemple }}</span></div> }
+        @if (a.exclus.length) {
+          <div class="defile" style="max-height: 220px">
+            <table class="t">
+              <thead><tr><th>Saisi</th><th>Nom</th><th>Motif</th></tr></thead>
+              <tbody>@for (x of a.exclus; track $index) { <tr><td>{{ x.saisi }}</td><td>{{ x.nom || '—' }}</td><td>{{ x.motif }}</td></tr> }</tbody>
+            </table>
+          </div>
+        }
+      }
+      <div class="actions" style="justify-content: flex-end">
+        <button class="bs" type="button" (click)="saisie.set(false)">Annuler</button>
+        <button class="bs" type="button" (click)="verifier()" [disabled]="enCours() || !formulaire.contenu.trim() || (!formulaire.numeros.trim() && !formulaire.listeId)">Vérifier les destinataires</button>
+        <button class="bp" type="button" (click)="envoyer()" [disabled]="enCours() || !apercu() || !apercu()!.nbRetenus || !formulaire.nom.trim()">
+          Envoyer à {{ apercu()?.nbRetenus ?? 0 }} destinataire(s)</button>
+      </div>
+    </section>
+  }
+
+  @if (detail(); as e) {
+    <section class="bloc">
+      <div class="entete" style="margin: 0">
+        <div><h2 class="h2">{{ e.nom }}</h2>
+          <span class="discret">depuis le {{ e.numeroExpediteur | telephone }} · créé le {{ e.creeLe | jour: true }} par {{ e.creePar }}
+            {{ e.annulePar ? ' · annulé par ' + e.annulePar : '' }}</span></div>
+        <div class="actions">
+          <button class="bs petit" type="button" (click)="chargerDestinataires()"><i class="pi pi-refresh"></i> Actualiser</button>
+          @if (e.statut === 'EN_COURS') { <button class="bd petit" type="button" (click)="annuler(e)">Annuler l'envoi</button> }
+        </div>
+      </div>
+      <div class="kvs bandeau">
+        <div class="kv"><span>À envoyer</span><strong>{{ e.nbEnAttente }}</strong></div>
+        <div class="kv"><span>Envoyés</span><strong>{{ e.nbEnvoyes }}</strong></div>
+        <div class="kv"><span>Distribués</span><strong>{{ e.nbDistribues }}</strong></div>
+        <div class="kv"><span>Lus</span><strong>{{ e.nbLus }}</strong></div>
+        <div class="kv"><span>Échecs</span><strong>{{ e.nbEchecs }}</strong></div>
+        <div class="kv"><span>Écartés</span><strong>{{ e.nbExclus }}</strong></div>
+      </div>
+      <div class="info"><i class="pi pi-comment"></i><span style="white-space: pre-wrap">{{ e.contenu }}</span></div>
+      <label class="f" style="max-width: 260px">Statut
+        <select class="sel" name="filtreStatut" [(ngModel)]="filtreStatut" (ngModelChange)="chargerDestinataires()">
+          <option value="">Tous</option>
+          @for (s of ['A_ENVOYER', 'ENVOYE', 'DISTRIBUE', 'LU', 'ECHEC', 'EXCLU', 'ANNULE']; track s) { <option [value]="s">{{ L.statutMessage[s] }}</option> }
+        </select>
+      </label>
+      <div class="defile" style="max-height: 360px">
+        <table class="t">
+          <thead><tr><th>Numéro</th><th>Nom</th><th>Statut</th><th>Envoyé le</th></tr></thead>
+          <tbody>
+            @for (d of destinataires()?.elements; track d.id) {
+              <tr><td class="nw">{{ d.numero | telephone }}</td><td>{{ d.nom || '—' }}</td>
+                <td><span class="dot" [style.background]="L.couleurMessage[d.statut]"></span>{{ L.statutMessage[d.statut] ?? d.statut }}@if (d.motif) { <div class="second">{{ d.motif }}</div> }</td>
+                <td class="nw">{{ d.envoyeLe | jour: true }}</td></tr>
+            } @empty { <tr><td colspan="4" class="vide">Aucun destinataire.</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Envoi</th><th>Expéditeur</th><th>Créé le</th><th class="n">Destinataires</th><th class="n">Envoyés</th><th class="n">Lus</th><th class="n">Échecs</th><th>Statut</th></tr></thead>
+      <tbody>
+        @for (e of envois()?.elements; track e.id) {
+          <tr class="cliquable" (click)="ouvrir(e)">
+            <td><a class="ref">{{ e.nom }}</a><div class="second">{{ e.creePar }}</div></td>
+            <td class="nw">{{ e.numeroExpediteur | telephone }}</td>
+            <td class="nw">{{ e.creeLe | jour: true }}</td>
+            <td class="n">{{ e.nbDestinataires }}</td><td class="n">{{ e.nbEnvoyes }}</td><td class="n">{{ e.nbLus }}</td><td class="n">{{ e.nbEchecs }}</td>
+            <td class="nw">{{ e.statut === 'EN_COURS' ? 'En cours' : e.statut === 'TERMINE' ? 'Terminé' : 'Annulé' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8" class="vide">{{ envois() ? 'Aucun envoi en masse pour l\'instant.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
