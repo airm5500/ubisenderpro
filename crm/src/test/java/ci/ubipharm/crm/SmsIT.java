@@ -28,7 +28,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
-import ci.ubipharm.crm.sms.rest.service.EnvoiSmsService;
+import ci.ubipharm.crm.rest.service.EnvoiSmsService;
 
 /** Relances SMS par un fournisseur HTTP parametre en base, ici un faux LeTexto local. */
 class SmsIT extends IntegrationBase {

@@ -24,7 +24,7 @@ import com.icegreen.greenmail.util.GreenMailUtil;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import com.jayway.jsonpath.JsonPath;
 
-import ci.ubipharm.crm.email.rest.service.EnvoiEmailService;
+import ci.ubipharm.crm.rest.service.EnvoiEmailService;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 

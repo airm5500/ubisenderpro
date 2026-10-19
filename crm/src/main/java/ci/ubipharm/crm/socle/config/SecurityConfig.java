@@ -19,7 +19,7 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
-import ci.ubipharm.crm.securite.rest.service.impl.ControleSessionFiltre;
+import ci.ubipharm.crm.rest.service.impl.ControleSessionFiltre;
 import jakarta.persistence.EntityManager;
 
 /**

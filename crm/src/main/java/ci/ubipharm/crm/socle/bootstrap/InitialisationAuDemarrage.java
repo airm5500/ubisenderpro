@@ -4,7 +4,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import ci.ubipharm.crm.securite.rest.service.InitialisationAdminService;
+import ci.ubipharm.crm.rest.service.InitialisationAdminService;
 import lombok.RequiredArgsConstructor;
 
 @Component

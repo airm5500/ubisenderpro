@@ -40,15 +40,17 @@ connexion.
 
 ## Conventions de code
 
-Chaque module (`commun`, `securite`, puis `recouvrement`, `marketing`...) suit
-le meme decoupage :
+Les classes sont regroupees par couche, tous modules confondus (le module se lit dans le nom
+de la classe et dans la route, par exemple `CampagneRessource` et `/api/recouvrement/campagnes`) :
 
 | Package | Contenu |
 | --- | --- |
-| `ci.ubipharm.crm.<module>.rest` | Ressources : uniquement les routes, aucune logique metier |
-| `....rest.service` | Interfaces des services |
-| `....rest.service.impl` | Implementations : logique metier, requetes, `mapTupleToDto(Tuple)` |
-| `....rest.service.dto` | DTO Lombok `@Builder @Getter @Setter` |
+| `ci.ubipharm.crm.rest` | Ressources : uniquement les routes, aucune logique metier |
+| `ci.ubipharm.crm.rest.service` | Interfaces des services |
+| `ci.ubipharm.crm.rest.service.impl` | Implementations : logique metier, requetes, `mapTupleToDto(Tuple)` |
+| `ci.ubipharm.crm.rest.service.dto` | DTO Lombok `@Builder @Getter @Setter` |
+| `ci.ubipharm.crm.planification` | Taches planifiees (envois WhatsApp, e-mail, SMS, demarrage des campagnes) |
+| `ci.ubipharm.crm.socle` | Configuration, securite HTTP, erreurs, DTO communs |
 
 Les lectures passent en GET avec des query params, les ecritures en POST/PUT
 (protegees par CSRF). Le cloisonnement par agence s'applique dans les requetes SQL.

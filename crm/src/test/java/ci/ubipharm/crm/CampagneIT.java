@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
-import ci.ubipharm.crm.recouvrement.rest.service.CampagneService;
+import ci.ubipharm.crm.rest.service.CampagneService;
 
 /** Campagnes : modeles et variables, recapitulatif, validation, programmation, annulation et cloisonnement. */
 class CampagneIT extends IntegrationBase {

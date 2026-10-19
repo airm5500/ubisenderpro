@@ -26,10 +26,10 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
-import ci.ubipharm.crm.whatsapp.rest.service.EnvoiWhatsappService;
-import ci.ubipharm.crm.whatsapp.rest.service.PasserelleWhatsappService;
-import ci.ubipharm.crm.whatsapp.rest.service.dto.EtatSessionDTO;
-import ci.ubipharm.crm.whatsapp.rest.service.dto.ResultatEnvoiDTO;
+import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
+import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
+import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
+import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 
 /** Envoi WhatsApp : liaison des telephones, debit, issues d'envoi, accuses et reponses des clients. Le service wa-web est simule. */
 class WhatsappIT extends IntegrationBase {
