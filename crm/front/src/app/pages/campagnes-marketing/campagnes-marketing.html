@@ -54,5 +54,5 @@
 </div>
 
 @if (auth.peut('CAMPAGNES_MARKETING_PREPARER', 'CAMPAGNES_MARKETING_VALIDER')) {
-  <app-campagne-marketing-formulaire [(ouvert)]="saisie" (enregistre)="creee($event)" />
+  <app-campagne-marketing-formulaire [(ouvert)]="saisie" [produitsInitiaux]="produitsAnnonces()" (enregistre)="creee($event)" />
 }

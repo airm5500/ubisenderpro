@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
@@ -16,10 +16,12 @@ import { ProduitFormulaire } from './produit-formulaire';
 })
 export class Catalogue implements OnInit {
   private readonly api = inject(Api);
+  private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
 
-  criteres = { q: '', categorie: '', laboratoire: '', statut: 'ACTIF' };
+  criteres = { q: '', categorie: '', laboratoire: '', statut: 'ACTIF', disponibilite: '' };
+  protected readonly selection = signal<Set<number>>(new Set());
   protected readonly page = signal<Page<Produit> | null>(null);
   protected readonly filtres = signal<FiltresCatalogue | null>(null);
   protected readonly saisie = signal(false);
@@ -70,6 +72,28 @@ export class Catalogue implements OnInit {
       this.messages.add({ severity: 'success', summary: 'Produit réactivé', detail: p.libelle });
       this.enregistre();
     });
+  }
+
+  /** Rupture de stock ou remise en stock : un produit remis en stock peut etre annonce aux clients. */
+  changerDisponibilite(p: Produit, disponible: boolean): void {
+    this.api.post<Produit>(`/api/marketing/produits/${p.id}/${disponible ? 'retour-stock' : 'rupture'}`).subscribe(() => {
+      this.messages.add({ severity: 'success', summary: disponible ? 'Produit de retour en stock' : 'Produit en rupture', detail: p.libelle });
+      this.charger();
+    });
+  }
+
+  basculer(p: Produit, coche: boolean): void {
+    const s = new Set(this.selection());
+    if (coche) s.add(p.id); else s.delete(p.id);
+    this.selection.set(s);
+  }
+
+  viderSelection(): void {
+    this.selection.set(new Set());
+  }
+
+  annoncer(): void {
+    this.router.navigate(['/marketing/campagnes'], { queryParams: { produits: [...this.selection()].join(',') } });
   }
 
   private chargerFiltres(): void {

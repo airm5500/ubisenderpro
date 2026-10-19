@@ -208,6 +208,7 @@ export interface PieceJointe { id: number; nature: string; nomFichier: string; t
 /** Marketing : campagne promotionnelle sur une liste de diffusion. */
 export interface CampagneMarketing {
   id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
+  produitIds: number[]; produits: string[];
   canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   afficheId: number | null; afficheNom: string | null; afficheType: string | null; joindreProduits: boolean; listeProduitsId: number | null;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
@@ -221,7 +222,8 @@ export interface RecapitulatifMarketing {
 }
 export interface Produit {
   id: number; code: string; libelle: string; categorie: string | null; laboratoire: string | null; conditionnement: string | null;
-  prix: number | null; description: string | null; statut: 'ACTIF' | 'ARCHIVE'; importe: boolean; creePar: string | null; creeLe: string;
+  prix: number | null; description: string | null; statut: 'ACTIF' | 'ARCHIVE'; importe: boolean;
+  disponibilite: 'DISPONIBLE' | 'RUPTURE'; disponibiliteLe: string | null; deRetour: boolean; creePar: string | null; creeLe: string;
   modifiePar: string | null; modifieLe: string | null;
 }
 export interface FiltresCatalogue { categories: string[]; laboratoires: string[]; }

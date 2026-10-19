@@ -27,6 +27,10 @@ public class ProduitCriteresDTO {
     @Builder.Default
     private String statut = "ACTIF";
 
+    /** DISPONIBLE, RUPTURE ou RETOUR (remis en stock depuis peu). */
+    @jakarta.validation.constraints.Pattern(regexp = "DISPONIBLE|RUPTURE|RETOUR", message = "Disponibilité inconnue.")
+    private String disponibilite;
+
     @Min(value = 0, message = "La page doit être positive.")
     @Builder.Default
     private int page = 0;

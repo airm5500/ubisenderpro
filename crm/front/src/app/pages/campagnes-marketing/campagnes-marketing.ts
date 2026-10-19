@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
@@ -18,6 +18,7 @@ interface Onglet { statut: string; libelle: string; }
 export class CampagnesMarketing implements OnInit {
   private readonly api = inject(Api);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;
 
@@ -30,12 +31,19 @@ export class CampagnesMarketing implements OnInit {
   protected readonly compteurs = signal<Record<string, number>>({});
   protected readonly page = signal<Page<CampagneMarketing> | null>(null);
   protected readonly saisie = signal(false);
+  protected readonly produitsAnnonces = signal<number[]>([]);
   q = '';
   numero = 0;
   private readonly taille = 25;
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));
 
   ngOnInit(): void {
+    // Depuis le catalogue : « Annoncer leur retour » ouvre une campagne avec ces produits
+    const produits = this.route.snapshot.queryParamMap.get('produits');
+    if (produits) {
+      this.produitsAnnonces.set(produits.split(',').map(Number).filter(n => n > 0));
+      this.saisie.set(true);
+    }
     const requetes = Object.fromEntries(this.onglets.map(o =>
       [o.statut || 'TOUTES', this.api.get<Page<CampagneMarketing>>('/api/marketing/campagnes', { statut: o.statut, page: 0, taille: 1 })]));
     forkJoin(requetes).subscribe(r => {

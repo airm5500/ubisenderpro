@@ -54,6 +54,9 @@ public class ImportProduitServiceImpl implements ImportProduitService {
     static final List<String> CONDITIONNEMENT = List.of("conditionnement", "presentation", "forme", "unite");
     static final List<String> PRIX = List.of("prix", "prix_public", "pp", "prix_de_vente", "prix_unitaire", "ppv");
     static final List<String> DESCRIPTION = List.of("description", "commentaire", "observation", "details");
+    static final List<String> DISPONIBILITE = List.of("disponibilite", "disponible", "stock", "en_stock", "etat_stock", "statut_stock");
+    private static final Set<String> DISPONIBLE = Set.of("disponible", "oui", "o", "1", "en stock", "stock", "dispo", "retour");
+    private static final Set<String> RUPTURE = Set.of("rupture", "non", "n", "0", "epuise", "épuisé", "indisponible", "en rupture");
 
     /** Champs proposes par l'assistant, dans l'ordre de l'exemplaire. */
     static final List<ChampImportDTO> CHAMPS = List.of(
@@ -63,7 +66,8 @@ public class ImportProduitServiceImpl implements ImportProduitService {
             champ("Laboratoire", false, "Sanofi", LABORATOIRE),
             champ("Conditionnement", false, "Boîte de 16", CONDITIONNEMENT),
             champ("Prix public", false, "1250", PRIX),
-            champ("Description", false, "", DESCRIPTION));
+            champ("Description", false, "", DESCRIPTION),
+            champ("Disponibilité", false, "Disponible", DISPONIBILITE));
 
     private static final int TAILLE_LOT = 1000;
 
@@ -199,6 +203,15 @@ public class ImportProduitServiceImpl implements ImportProduitService {
                 motifs.add("Le prix ne peut pas être négatif (" + montantLisible(prix) + ").");
             }
         }
+        String disponibilite = null;
+        String disponibiliteSaisie = valeur(valeurs, DISPONIBILITE);
+        if (disponibiliteSaisie != null) {
+            String d = disponibiliteSaisie.trim().toLowerCase(Locale.ROOT);
+            disponibilite = DISPONIBLE.contains(d) ? "DISPONIBLE" : RUPTURE.contains(d) ? "RUPTURE" : null;
+            if (disponibilite == null) {
+                motifs.add("Disponibilité illisible : " + disponibiliteSaisie + " (Disponible ou Rupture).");
+            }
+        }
         if (existant != null && "ARCHIVE".equals(existant.statut())) {
             motifs.add("Ce produit est archivé : réactivez-le dans le catalogue avant de le réimporter.");
         }
@@ -206,7 +219,7 @@ public class ImportProduitServiceImpl implements ImportProduitService {
             return rejet(code, String.join(" ", motifs));
         }
 
-        ProduitLu lu = new ProduitLu(code, libelle, categorie, laboratoire, conditionnement, prix, description);
+        ProduitLu lu = new ProduitLu(code, libelle, categorie, laboratoire, conditionnement, prix, description, disponibilite);
         if (existant == null) {
             return new Evaluation(verdict("CREATION", code, null), lu, null);
         }
@@ -233,6 +246,9 @@ public class ImportProduitServiceImpl implements ImportProduitService {
             ecarts.add("Prix public : " + (existant.prix() == null ? "vide" : montantLisible(existant.prix())) + " -> " + montantLisible(lu.prix()));
         }
         ecart(ecarts, "Description", existant.description(), lu.description());
+        if (lu.disponibilite() != null && !lu.disponibilite().equals(existant.disponibilite())) {
+            ecarts.add("DISPONIBLE".equals(lu.disponibilite()) ? "Retour en stock" : "Rupture de stock");
+        }
         return ecarts;
     }
 
@@ -244,11 +260,12 @@ public class ImportProduitServiceImpl implements ImportProduitService {
 
     private void creer(ProduitLu lu, Long importId, Long utilisateurId) {
         em.createNativeQuery("""
-                insert into crm_produit (code, libelle, categorie, laboratoire, conditionnement, prix, description, statut,
+                insert into crm_produit (code, libelle, categorie, laboratoire, conditionnement, prix, disponibilite, description, statut,
                                          import_id, cree_par, created_at)
-                values (:code, :libelle, :categorie, :laboratoire, :conditionnement, :prix, :description, 'ACTIF',
-                        :importId, :par, utc_timestamp())
+                values (:code, :libelle, :categorie, :laboratoire, :conditionnement, :prix, coalesce(:disponibilite, 'DISPONIBLE'), :description,
+                        'ACTIF', :importId, :par, utc_timestamp())
                 """)
+                .setParameter("disponibilite", lu.disponibilite())
                 .setParameter("code", lu.code())
                 .setParameter("libelle", lu.libelle())
                 .setParameter("categorie", lu.categorie())
@@ -266,6 +283,9 @@ public class ImportProduitServiceImpl implements ImportProduitService {
                 update crm_produit set libelle = coalesce(:libelle, libelle), categorie = coalesce(:categorie, categorie),
                        laboratoire = coalesce(:laboratoire, laboratoire), conditionnement = coalesce(:conditionnement, conditionnement),
                        prix = coalesce(:prix, prix), description = coalesce(:description, description),
+                       disponibilite_le = case when :disponibilite is not null and :disponibilite <> disponibilite then utc_timestamp()
+                                               else disponibilite_le end,
+                       disponibilite = coalesce(:disponibilite, disponibilite),
                        import_id = :importId, modifie_par = :par, updated_at = utc_timestamp()
                 where id = :id
                 """)
@@ -275,6 +295,7 @@ public class ImportProduitServiceImpl implements ImportProduitService {
                 .setParameter("conditionnement", lu.conditionnement())
                 .setParameter("prix", lu.prix())
                 .setParameter("description", lu.description())
+                .setParameter("disponibilite", lu.disponibilite())
                 .setParameter("importId", importId)
                 .setParameter("par", utilisateurId)
                 .setParameter("id", existant.id())
@@ -299,7 +320,8 @@ public class ImportProduitServiceImpl implements ImportProduitService {
             @SuppressWarnings("unchecked")
             List<Tuple> lignes = em.createNativeQuery("""
                     select id as id, code as code, libelle as libelle, categorie as categorie, laboratoire as laboratoire,
-                           conditionnement as conditionnement, prix as prix, description as description, statut as statut
+                           conditionnement as conditionnement, prix as prix, description as description, statut as statut,
+                           disponibilite as disponibilite
                     from crm_produit where code in (:codes)
                     """, Tuple.class).setParameter("codes", liste.subList(debut, Math.min(debut + TAILLE_LOT, liste.size()))).getResultList();
             for (Tuple t : lignes) {
@@ -320,7 +342,8 @@ public class ImportProduitServiceImpl implements ImportProduitService {
                 tuple.get("conditionnement", String.class),
                 tuple.get("prix", BigDecimal.class),
                 tuple.get("description", String.class),
-                tuple.get("statut", String.class));
+                tuple.get("statut", String.class),
+                tuple.get("disponibilite", String.class));
     }
 
     private Evaluation rejet(String cle, String message) {
@@ -332,11 +355,11 @@ public class ImportProduitServiceImpl implements ImportProduitService {
     }
 
     record ProduitLu(String code, String libelle, String categorie, String laboratoire, String conditionnement, BigDecimal prix,
-            String description) {
+            String description, String disponibilite) {
     }
 
     record ProduitExistant(Long id, String code, String libelle, String categorie, String laboratoire, String conditionnement,
-            BigDecimal prix, String description, String statut) {
+            BigDecimal prix, String description, String statut, String disponibilite) {
     }
 
     record Evaluation(ResultatLigneDTO verdict, ProduitLu lu, ProduitExistant existant) {

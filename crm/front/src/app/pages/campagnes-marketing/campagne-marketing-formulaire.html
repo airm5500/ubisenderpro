@@ -22,6 +22,13 @@
       } @empty { <span class="discret">Aucune promotion active.</span> }
     </div>
     <p class="discret" style="margin: 0">Les variables {{ '{' }}promotion_nom{{ '}' }}, {{ '{' }}promotion_fin{{ '}' }} et {{ '{' }}produits_promotion{{ '}' }} du modèle se remplissent avec les promotions cochées.</p>
+    <div class="f">Produits de retour en stock annoncés
+      @for (p of produits(); track p.id) {
+        <label class="droit"><input type="checkbox" [checked]="formulaire.produitIds.has(p.id)" (change)="basculerProduit(p.id, $any($event.target).checked)">
+          {{ p.libelle }} <span class="discret">{{ p.detail }}</span></label>
+      } @empty { <span class="discret">Aucun produit remis en stock récemment : marquez-les dans le catalogue.</span> }
+    </div>
+    <p class="discret" style="margin: 0">La variable {{ '{' }}produits_disponibles{{ '}' }} liste les produits cochés. Si l'un repart en rupture avant l'envoi, la campagne est bloquée.</p>
     <div class="f">Affiche (image JPEG ou PNG, ou PDF)
       @if (formulaire.afficheId) {
         <span style="display: flex; gap: 10px; align-items: center"><i class="pi pi-image"></i> {{ formulaire.afficheNom }}
@@ -30,8 +37,8 @@
         <input class="sel" type="file" accept="image/jpeg,image/png,application/pdf" (change)="deposer($any($event.target))" [disabled]="depot()">
       }
     </div>
-    <label class="droit"><input type="checkbox" name="joindreProduits" [(ngModel)]="formulaire.joindreProduits" [disabled]="!formulaire.promotionIds.size">
-      Joindre la liste Excel des produits des promotions cochées</label>
+    <label class="droit"><input type="checkbox" name="joindreProduits" [(ngModel)]="formulaire.joindreProduits" [disabled]="!formulaire.promotionIds.size && !formulaire.produitIds.size">
+      Joindre la liste Excel des produits cochés (promotions et retours en stock)</label>
     <p class="discret" style="margin: 0">Les pièces jointes partent par WhatsApp et par e-mail, pas par SMS. Une affiche en image porte le texte du message en légende.</p>
     <label class="f">Date et heure d'envoi (heure d'Abidjan)
       <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">

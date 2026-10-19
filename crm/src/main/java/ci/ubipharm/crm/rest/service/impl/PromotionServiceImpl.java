@@ -334,55 +334,97 @@ public class PromotionServiceImpl implements PromotionService {
 
     @Override
     @Transactional(readOnly = true)
-    public FichierDTO classeurCampagne(List<Long> ids) {
+    public FichierDTO classeurCampagne(List<Long> promotionIds, List<Long> produitIds) {
         try (XSSFWorkbook classeur = new XSSFWorkbook(); ByteArrayOutputStream sortie = new ByteArrayOutputStream()) {
-            Sheet feuille = classeur.createSheet("Produits en promotion");
             CellStyle gras = classeur.createCellStyle();
             Font police = classeur.createFont();
             police.setBold(true);
             gras.setFont(police);
-            String[] entetes = {"Promotion", "Valable jusqu'au", "Code produit", "Produit", "Conditionnement", "Prix public (F)",
-                    "Quantité minimale", "Avantage", "Prix promotionnel (F)"};
-            Row entete = feuille.createRow(0);
-            for (int i = 0; i < entetes.length; i++) {
-                Cell cellule = entete.createCell(i);
-                cellule.setCellValue(entetes[i]);
-                cellule.setCellStyle(gras);
+            if (!promotionIds.isEmpty()) {
+                feuillePromotions(classeur, gras, promotionIds);
             }
-            int rang = 1;
-            for (Long id : ids) {
-                PromotionDTO promotion = consulter(id);
-                for (PromotionProduitDTO p : produits(id, false)) {
-                    if (!"ACTIF".equals(p.getProduitStatut())) {
-                        continue;
-                    }
-                    Row ligne = feuille.createRow(rang++);
-                    ligne.createCell(0).setCellValue(promotion.getNom());
-                    ligne.createCell(1).setCellValue(promotion.getDateFin().format(DATE_LISIBLE));
-                    ligne.createCell(2).setCellValue(p.getProduitCode());
-                    ligne.createCell(3).setCellValue(p.getProduitLibelle());
-                    ligne.createCell(4).setCellValue(Objects.toString(p.getConditionnement(), ""));
-                    if (p.getPrixPublic() != null) {
-                        ligne.createCell(5).setCellValue(p.getPrixPublic().doubleValue());
-                    }
-                    ligne.createCell(6).setCellValue(p.getQuantiteMin());
-                    ligne.createCell(7).setCellValue(p.getResume());
-                    if (p.getPrixPromo() != null) {
-                        ligne.createCell(8).setCellValue(p.getPrixPromo().doubleValue());
-                    }
-                }
+            if (!produitIds.isEmpty()) {
+                feuilleDisponibles(classeur, gras, produitIds);
             }
-            // Largeurs fixes : autoSizeColumn exige des polices installees sur le serveur
-            int[] largeurs = {28, 16, 14, 40, 18, 14, 16, 45, 20};
-            for (int i = 0; i < largeurs.length; i++) {
-                feuille.setColumnWidth(i, largeurs[i] * 256);
-            }
-            feuille.createFreezePane(0, 1);
             classeur.write(sortie);
-            return FichierDTO.builder().nom("produits_en_promotion.xlsx")
+            return FichierDTO.builder().nom(promotionIds.isEmpty() ? "produits_disponibles.xlsx" : "produits_en_promotion.xlsx")
                     .typeContenu("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").contenu(sortie.toByteArray()).build();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private void feuillePromotions(XSSFWorkbook classeur, CellStyle gras, List<Long> ids) {
+        Sheet feuille = classeur.createSheet("Produits en promotion");
+        String[] entetes = {"Promotion", "Valable jusqu'au", "Code produit", "Produit", "Conditionnement", "Prix public (F)",
+                "Quantité minimale", "Avantage", "Prix promotionnel (F)"};
+        entetes(feuille, gras, entetes);
+        int rang = 1;
+        for (Long id : ids) {
+            PromotionDTO promotion = consulter(id);
+            for (PromotionProduitDTO p : produits(id, false)) {
+                if (!"ACTIF".equals(p.getProduitStatut())) {
+                    continue;
+                }
+                Row ligne = feuille.createRow(rang++);
+                ligne.createCell(0).setCellValue(promotion.getNom());
+                ligne.createCell(1).setCellValue(promotion.getDateFin().format(DATE_LISIBLE));
+                ligne.createCell(2).setCellValue(p.getProduitCode());
+                ligne.createCell(3).setCellValue(p.getProduitLibelle());
+                ligne.createCell(4).setCellValue(Objects.toString(p.getConditionnement(), ""));
+                if (p.getPrixPublic() != null) {
+                    ligne.createCell(5).setCellValue(p.getPrixPublic().doubleValue());
+                }
+                ligne.createCell(6).setCellValue(p.getQuantiteMin());
+                ligne.createCell(7).setCellValue(p.getResume());
+                if (p.getPrixPromo() != null) {
+                    ligne.createCell(8).setCellValue(p.getPrixPromo().doubleValue());
+                }
+            }
+        }
+        largeurs(feuille, 28, 16, 14, 40, 18, 14, 16, 45, 20);
+    }
+
+    private void feuilleDisponibles(XSSFWorkbook classeur, CellStyle gras, List<Long> ids) {
+        Sheet feuille = classeur.createSheet("Produits disponibles");
+        entetes(feuille, gras, new String[] {"Code produit", "Produit", "Laboratoire", "Conditionnement", "Prix public (F)", "De retour depuis le"});
+        @SuppressWarnings("unchecked")
+        List<Tuple> produits = em.createNativeQuery("""
+                select code as code, libelle as libelle, laboratoire as laboratoire, conditionnement as conditionnement, prix as prix,
+                       disponibilite_le as disponibiliteLe
+                from crm_produit where id in (:ids) and statut = 'ACTIF' and disponibilite = 'DISPONIBLE' order by libelle
+                """, Tuple.class).setParameter("ids", ids).getResultList();
+        int rang = 1;
+        for (Tuple p : produits) {
+            Row ligne = feuille.createRow(rang++);
+            ligne.createCell(0).setCellValue(p.get("code", String.class));
+            ligne.createCell(1).setCellValue(p.get("libelle", String.class));
+            ligne.createCell(2).setCellValue(Objects.toString(p.get("laboratoire"), ""));
+            ligne.createCell(3).setCellValue(Objects.toString(p.get("conditionnement"), ""));
+            if (p.get("prix") != null) {
+                ligne.createCell(4).setCellValue(((Number) p.get("prix")).doubleValue());
+            }
+            if (p.get("disponibiliteLe") != null) {
+                ligne.createCell(5).setCellValue(p.get("disponibiliteLe", java.time.LocalDateTime.class).toLocalDate().format(DATE_LISIBLE));
+            }
+        }
+        largeurs(feuille, 14, 40, 22, 18, 14, 18);
+    }
+
+    private static void entetes(Sheet feuille, CellStyle gras, String[] entetes) {
+        Row entete = feuille.createRow(0);
+        for (int i = 0; i < entetes.length; i++) {
+            Cell cellule = entete.createCell(i);
+            cellule.setCellValue(entetes[i]);
+            cellule.setCellStyle(gras);
+        }
+        feuille.createFreezePane(0, 1);
+    }
+
+    /** Largeurs fixes : autoSizeColumn exige des polices installees sur le serveur. */
+    private static void largeurs(Sheet feuille, int... largeurs) {
+        for (int i = 0; i < largeurs.length; i++) {
+            feuille.setColumnWidth(i, largeurs[i] * 256);
         }
     }
 

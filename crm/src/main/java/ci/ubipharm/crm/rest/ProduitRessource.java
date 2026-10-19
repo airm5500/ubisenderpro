@@ -64,4 +64,16 @@ public class ProduitRessource {
     public ProduitDTO reactiver(@PathVariable Long id) {
         return produitService.reactiver(id);
     }
+
+    @PostMapping("/{id:\\d+}/rupture")
+    @PreAuthorize("hasAuthority('DROIT_PRODUITS_GERER')")
+    public ProduitDTO rupture(@PathVariable Long id) {
+        return produitService.changerDisponibilite(id, false);
+    }
+
+    @PostMapping("/{id:\\d+}/retour-stock")
+    @PreAuthorize("hasAuthority('DROIT_PRODUITS_GERER')")
+    public ProduitDTO retourStock(@PathVariable Long id) {
+        return produitService.changerDisponibilite(id, true);
+    }
 }

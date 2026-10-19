@@ -1,5 +1,8 @@
 package ci.ubipharm.crm.rest.service;
 
+import java.util.List;
+import java.util.Map;
+
 import ci.ubipharm.crm.rest.service.dto.FiltresCatalogueDTO;
 import ci.ubipharm.crm.rest.service.dto.ProduitCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ProduitDTO;
@@ -22,4 +25,13 @@ public interface ProduitService {
     ProduitDTO archiver(Long id);
 
     ProduitDTO reactiver(Long id);
+
+    /** Rupture de stock ou remise en stock (datee : le produit devient « de retour »). */
+    ProduitDTO changerDisponibilite(Long id, boolean disponible);
+
+    /** Les produits annonces doivent etre actifs et disponibles. */
+    void verifierAnnoncables(List<Long> ids);
+
+    /** Valeur de {produits_disponibles} pour ces produits. */
+    Map<String, String> valeursCampagne(List<Long> ids);
 }

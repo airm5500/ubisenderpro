@@ -40,6 +40,7 @@
       <div class="kv"><span>Liste</span><strong><a [routerLink]="['/marketing/listes', c.listeId]">{{ c.listeNom }}</a></strong></div>
       <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }} · {{ L.canal[c.canal] }}</strong></div>
       @if (c.promotions.length) { <div class="kv"><span>Promotions</span><strong>{{ c.promotions.join(', ') }}</strong></div> }
+      @if (c.produits.length) { <div class="kv"><span>De retour en stock</span><strong>{{ c.produits.join(', ') }}</strong></div> }
       @if (c.afficheId || c.joindreProduits) {
         <div class="kv"><span>Pièces jointes</span><strong>
           @if (c.afficheId) { <a [href]="'/api/marketing/pieces-jointes/' + c.afficheId" target="_blank" rel="noopener">{{ c.afficheNom }}</a> }

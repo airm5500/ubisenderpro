@@ -208,7 +208,7 @@ class CampagneMarketingIT extends IntegrationBase {
         envoyer(charge, post("/api/marketing/campagnes"), """
                 {"nom":"Sans promotion","listeId":%d,"modeleId":%d,"joindreProduits":true}""".formatted(liste, modele))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Cochez au moins une promotion pour joindre la liste de ses produits."));
+                .andExpect(jsonPath("$.message").value("Cochez au moins une promotion ou un produit de retour en stock pour joindre la liste des produits."));
         Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
                 {"nom":"Novembre","listeId":%d,"modeleId":%d,"promotionIds":[%d],"afficheId":%d,"joindreProduits":true}"""
                 .formatted(liste, modele, promo, affiche)));
@@ -241,6 +241,50 @@ class CampagneMarketingIT extends IntegrationBase {
                 {"nom":"SMS","listeId":%d,"modeleId":%d,"afficheId":%d}""".formatted(liste, sms, affiche))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Un SMS ne transporte pas de pièce jointe : retirez l'affiche et la liste des produits."));
+    }
+
+    @Test
+    void unMessageDeDisponibiliteAnnonceLesProduitsDeRetourEnStock() throws Exception {
+        Long dol = idDe(envoyer(charge, post("/api/marketing/produits"), "{\"code\":\"DOL500\",\"libelle\":\"Doliprane 500 mg\",\"conditionnement\":\"Boîte de 16\"}"));
+        Long amox = idDe(envoyer(charge, post("/api/marketing/produits"), "{\"code\":\"AMOX1\",\"libelle\":\"Amoxicilline 1 g\"}"));
+        envoyer(charge, post("/api/marketing/produits/" + dol + "/retour-stock"), "").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le produit DOL500 est déjà disponible."));
+        envoyer(charge, post("/api/marketing/produits/" + dol + "/rupture"), "").andExpect(jsonPath("$.disponibilite").value("RUPTURE"));
+        envoyer(charge, post("/api/marketing/produits/" + amox + "/rupture"), "");
+        envoyer(charge, post("/api/marketing/produits/" + dol + "/retour-stock"), "")
+                .andExpect(jsonPath("$.disponibilite").value("DISPONIBLE")).andExpect(jsonPath("$.deRetour").value(true));
+        mvc.perform(get("/api/marketing/produits").param("disponibilite", "RETOUR").session(charge))
+                .andExpect(jsonPath("$.elements[*].code", org.hamcrest.Matchers.contains("DOL500")));
+
+        Long retour = idDe(envoyer(charge, post("/api/marketing/modeles"), """
+                {"nom":"Retour en stock","typeCampagne":"PROMOTION","contenu":"Bonjour {nom_pharmacie}, de retour en stock :\\n{produits_disponibles}"}"""));
+        envoyer(charge, post("/api/marketing/campagnes"), campagne("Sans produit", retour)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le modèle cite {produits_disponibles} : choisissez au moins un produit de retour en stock."));
+        envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Rupture","listeId":%d,"modeleId":%d,"produitIds":[%d]}""".formatted(liste, retour, amox))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le produit AMOX1 est de nouveau en rupture : retirez-le du message."));
+        Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"De retour","listeId":%d,"modeleId":%d,"produitIds":[%d],"joindreProduits":true}""".formatted(liste, retour, dol))
+                .andExpect(jsonPath("$.produits[0]").value("DOL500 · Doliprane 500 mg")));
+        mvc.perform(get("/api/marketing/campagnes/" + campagne + "/recapitulatif").session(charge))
+                .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros, de retour en stock :\n• Doliprane 500 mg, Boîte de 16"));
+
+        // Le produit repart en rupture avant la validation : la campagne ne part pas
+        envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "").andExpect(status().isOk());
+        envoyer(charge, post("/api/marketing/produits/" + dol + "/rupture"), "");
+        envoyer(admin, post("/api/marketing/campagnes/" + campagne + "/validation"), "").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le produit DOL500 est de nouveau en rupture : retirez-le du message."));
+        envoyer(charge, post("/api/marketing/produits/" + dol + "/retour-stock"), "");
+        envoyer(admin, post("/api/marketing/campagnes/" + campagne + "/validation"), "")
+                .andExpect(jsonPath("$.listeProduitsId").isNumber());
+        String nom = jdbc.queryForObject("select pj.nom_fichier from crm_campagne c join crm_piece_jointe pj on pj.id = c.liste_produits_id where c.id = ?",
+                String.class, campagne);
+        assertThat(nom).isEqualTo("produits_disponibles.xlsx");
+
+        // Un modele de relance ne cite pas les produits disponibles
+        envoyer(admin, post("/api/recouvrement/modeles-messages"), """
+                {"nom":"Relance dispo","typeCampagne":"APRES_ECHEANCE","contenu":"{produits_disponibles}"}""").andExpect(status().isBadRequest());
     }
 
     private String campagne(String nom, Long modeleId) {

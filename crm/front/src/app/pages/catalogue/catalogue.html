@@ -30,6 +30,14 @@
           @for (l of filtres()?.laboratoires; track l) { <option [value]="l">{{ l }}</option> }
         </select>
       </label>
+      <label class="f">Disponibilité
+        <select class="sel" name="disponibilite" [(ngModel)]="criteres.disponibilite">
+          <option value="">Toutes</option>
+          <option value="RETOUR">De retour en stock</option>
+          <option value="DISPONIBLE">Disponibles</option>
+          <option value="RUPTURE">En rupture</option>
+        </select>
+      </label>
       <label class="f">Statut
         <select class="sel" name="statut" [(ngModel)]="criteres.statut">
           <option value="ACTIF">Actifs</option>
@@ -41,31 +49,53 @@
     <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
   </form>
 
+  @if (selection().size && auth.peut('CAMPAGNES_MARKETING')) {
+    <div class="barre-selection">
+      <span><strong>{{ selection().size }} produit{{ selection().size > 1 ? 's' : '' }} sélectionné{{ selection().size > 1 ? 's' : '' }}</strong></span>
+      <div class="actions">
+        <button class="ba" type="button" (click)="annoncer()">Annoncer leur retour aux clients</button>
+        <button class="bs" type="button" (click)="viderSelection()">Vider la sélection</button>
+      </div>
+    </div>
+  }
+
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Produit</th><th>Catégorie</th><th>Laboratoire</th><th>Conditionnement</th><th class="n">Prix public</th><th>Modifié</th><th>Statut</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Produit</th><th>Catégorie</th><th>Laboratoire</th><th>Conditionnement</th><th class="n">Prix public</th><th>Stock</th><th>Modifié</th><th>Statut</th><th></th></tr></thead>
       <tbody>
         @for (p of page()?.elements; track p.id) {
           <tr>
+            <td>@if (p.statut === 'ACTIF' && p.disponibilite === 'DISPONIBLE') {
+              <input type="checkbox" [attr.aria-label]="'Sélectionner ' + p.libelle" [checked]="selection().has(p.id)" (change)="basculer(p, $any($event.target).checked)"> }</td>
             <td><b>{{ p.libelle }}</b><div class="second">{{ p.code }}@if (p.importe) { · importé }</div>
               @if (p.description) { <div class="second">{{ p.description }}</div> }</td>
             <td>{{ p.categorie || '—' }}</td>
             <td>{{ p.laboratoire || '—' }}</td>
             <td>{{ p.conditionnement || '—' }}</td>
             <td class="n nw">@if (p.prix !== null) { {{ p.prix | montant }} F } @else { — }</td>
+            <td class="nw">
+              @if (p.disponibilite === 'RUPTURE') { <span class="retard">En rupture</span> }
+              @else if (p.deRetour) { <span class="avance">De retour</span><div class="second">le {{ p.disponibiliteLe | jour }}</div> }
+              @else { Disponible }
+            </td>
             <td class="nw">{{ (p.modifieLe ?? p.creeLe) | jour: true }}<div class="second">{{ p.modifiePar ?? p.creePar }}</div></td>
             <td class="nw">
               <span class="etat-compte"><span class="dot" [style.background]="p.statut === 'ACTIF' ? '#51D78E' : '#9AA5AE'"></span>{{ p.statut === 'ACTIF' ? 'Actif' : 'Archivé' }}</span>
             </td>
             <td class="nw actions">
               @if (auth.peut('PRODUITS_GERER')) {
-                @if (p.statut === 'ACTIF') { <a (click)="modifier(p)">Modifier</a> <a (click)="archiver(p)">Archiver</a> }
+                @if (p.statut === 'ACTIF') {
+                  <a (click)="modifier(p)">Modifier</a>
+                  @if (p.disponibilite === 'DISPONIBLE') { <a (click)="changerDisponibilite(p, false)">Rupture</a> }
+                  @else { <a (click)="changerDisponibilite(p, true)">De retour</a> }
+                  <a (click)="archiver(p)">Archiver</a>
+                }
                 @else { <a (click)="reactiver(p)">Réactiver</a> }
               }
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="8" class="vide">{{ page() ? 'Aucun produit pour ces critères.' : 'Chargement…' }}</td></tr>
+          <tr><td colspan="10" class="vide">{{ page() ? 'Aucun produit pour ces critères.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>

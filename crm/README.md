@@ -579,3 +579,18 @@ API : `GET /api/recouvrement/delais-relance[?archives=true]`, `GET .../defauts`,
   en cours, desabonnements, messages par canal, taux de lecture et de reponse, campagnes lancees sur la periode.
 
 API : `GET /api/recouvrement/tableau-de-bord?du=&au=&agenceId=&agentId=`, `GET /api/marketing/tableau-de-bord?du=&au=`.
+
+## Messages de disponibilite (pilote)
+
+- **Catalogue** : colonne **Stock** et filtre **Disponibilite** (disponibles, en rupture, de retour en stock). Actions
+  **Rupture** et **De retour** sur chaque produit (droit `PRODUITS`), date et auteur conserves ; l'import produits accepte une
+  colonne facultative **Disponibilite** (Disponible / Rupture).
+- Un produit est **de retour en stock** s'il est redevenu disponible depuis moins de `marketing.retour_stock_jours` jours (15).
+- **Annoncer un retour** : cocher des produits dans le catalogue puis **Annoncer leur retour aux clients**, ou les cocher dans
+  le formulaire de campagne promotionnelle (section **Produits de retour en stock annonces**). La variable
+  `{produits_disponibles}` (modeles marketing uniquement) liste les produits coches ; la liste Excel jointe peut les inclure.
+- Une campagne qui annonce un produit reparti en rupture est bloquee a la demande, a la soumission, a la validation et a
+  chaque envoi recurrent.
+
+API : `POST /api/marketing/produits/{id}/rupture`, `POST /api/marketing/produits/{id}/retour-stock`,
+`GET /api/marketing/produits?disponibilite=RUPTURE|DISPONIBLE|RETOUR`.

@@ -26,6 +26,10 @@ public class CampagneMarketingDTO {
     private List<Long> promotionIds;
     /** « CODE · Nom » de chaque promotion citee. */
     private List<String> promotions;
+    /** Produits de retour en stock cites par le message de disponibilite. */
+    private List<Long> produitIds;
+    /** « CODE · Libelle » de chaque produit cite. */
+    private List<String> produits;
     private String canal;
     private LocalDateTime dateExecution;
     private String recurrence;

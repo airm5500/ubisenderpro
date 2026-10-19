@@ -44,7 +44,8 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     /** Sources utilisables sans facture ni agent de recouvrement. */
     private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero",
-            "calcul.promotion_nom", "calcul.promotion_code", "calcul.promotion_debut", "calcul.promotion_fin", "calcul.produits_promotion");
+            "calcul.promotion_nom", "calcul.promotion_code", "calcul.promotion_debut", "calcul.promotion_fin", "calcul.produits_promotion",
+            "calcul.produits_disponibles");
 
     /** 4 SMS de 153 caracteres. */
     private static final int SMS_LONGUEUR_MAX = 612;
@@ -186,7 +187,8 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                         + String.join(", ", horsMarketing) + ".");
             }
         } else {
-            List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v))).map(v -> "{" + v + "}").toList();
+            List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v)) || sourceDisponibilite(connues.get(v)))
+                    .map(v -> "{" + v + "}").toList();
             if (!promotions.isEmpty()) {
                 throw new ErreurMetierException("Une relance ne cite aucune promotion : retirez " + String.join(", ", promotions) + ".");
             }
@@ -209,6 +211,11 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     /** Variables remplies par les promotions qu'une campagne Marketing cite. */
     static boolean sourcePromotion(String source) {
         return source != null && (source.startsWith("calcul.promotion_") || "calcul.produits_promotion".equals(source));
+    }
+
+    /** Variable remplie par les produits de retour en stock qu'une campagne Marketing annonce. */
+    static boolean sourceDisponibilite(String source) {
+        return "calcul.produits_disponibles".equals(source);
     }
 
     private static String type(String module, ModeleMessageDemandeDTO demande) {

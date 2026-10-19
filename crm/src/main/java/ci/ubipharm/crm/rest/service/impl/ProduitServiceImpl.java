@@ -2,14 +2,17 @@ package ci.ubipharm.crm.rest.service.impl;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.JournalActionService;
+import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.ProduitService;
 import ci.ubipharm.crm.rest.service.dto.FiltresCatalogueDTO;
@@ -31,6 +34,7 @@ public class ProduitServiceImpl implements ProduitService {
     private static final String SELECT = """
             select p.id as id, p.code as code, p.libelle as libelle, p.categorie as categorie, p.laboratoire as laboratoire,
                    p.conditionnement as conditionnement, p.prix as prix, p.description as description, p.statut as statut,
+                   p.disponibilite as disponibilite, p.disponibilite_le as disponibiliteLe,
                    p.import_id as importId, c.nom_complet as creePar, p.created_at as creeLe, m.nom_complet as modifiePar,
                    p.updated_at as modifieLe
             from crm_produit p
@@ -41,6 +45,7 @@ public class ProduitServiceImpl implements ProduitService {
     private final EntityManager em;
     private final PerimetreService perimetreService;
     private final JournalActionService journalActionService;
+    private final ParametreService parametreService;
 
     @Override
     @Transactional(readOnly = true)
@@ -58,6 +63,13 @@ public class ProduitServiceImpl implements ProduitService {
         if (vide(criteres.getCategorie()) != null) {
             where.append(" and p.categorie = :categorie");
             parametres.put("categorie", criteres.getCategorie().trim());
+        }
+        if (criteres.getDisponibilite() != null) {
+            where.append("RUPTURE".equals(criteres.getDisponibilite()) ? " and p.disponibilite = 'RUPTURE'" : " and p.disponibilite = 'DISPONIBLE'");
+            if ("RETOUR".equals(criteres.getDisponibilite())) {
+                where.append(" and p.disponibilite_le >= :retourDepuis");
+                parametres.put("retourDepuis", retourDepuis());
+            }
         }
         if (vide(criteres.getLaboratoire()) != null) {
             where.append(" and p.laboratoire = :laboratoire");
@@ -175,6 +187,69 @@ public class ProduitServiceImpl implements ProduitService {
         return consulter(id);
     }
 
+    @Override
+    @Transactional
+    public ProduitDTO changerDisponibilite(Long id, boolean disponible) {
+        ProduitDTO produit = consulter(id);
+        String disponibilite = disponible ? "DISPONIBLE" : "RUPTURE";
+        if ("ARCHIVE".equals(produit.getStatut())) {
+            throw new ErreurMetierException("Réactivez d'abord le produit " + produit.getCode() + ".");
+        }
+        if (disponibilite.equals(produit.getDisponibilite())) {
+            throw new ErreurMetierException(disponible ? "Le produit " + produit.getCode() + " est déjà disponible."
+                    : "Le produit " + produit.getCode() + " est déjà en rupture.");
+        }
+        em.createNativeQuery("""
+                update crm_produit set disponibilite = :disponibilite, disponibilite_le = utc_timestamp(), modifie_par = :par,
+                       updated_at = utc_timestamp()
+                where id = :id
+                """)
+                .setParameter("disponibilite", disponibilite).setParameter("par", perimetreService.perimetreCourant().getUtilisateurId())
+                .setParameter("id", id).executeUpdate();
+        journalActionService.enregistrer(disponible ? "PRODUIT_RETOUR_STOCK" : "PRODUIT_RUPTURE", "crm_produit", id,
+                produit.getCode() + " " + produit.getLibelle());
+        return consulter(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void verifierAnnoncables(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery("select id as id, code as code, statut as statut, disponibilite as disponibilite "
+                + "from crm_produit where id in (:ids)", Tuple.class).setParameter("ids", ids).getResultList();
+        if (lignes.size() < ids.size()) {
+            throw new ErreurMetierException("Un des produits annoncés n'existe pas.");
+        }
+        for (Tuple t : lignes) {
+            if (!"ACTIF".equals(t.get("statut", String.class))) {
+                throw new ErreurMetierException("Le produit " + t.get("code", String.class) + " est archivé : retirez-le du message.");
+            }
+            if (!"DISPONIBLE".equals(t.get("disponibilite", String.class))) {
+                throw new ErreurMetierException("Le produit " + t.get("code", String.class) + " est de nouveau en rupture : retirez-le du message.");
+            }
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, String> valeursCampagne(List<Long> ids) {
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery("""
+                select libelle as libelle, conditionnement as conditionnement from crm_produit
+                where id in (:ids) and statut = 'ACTIF' and disponibilite = 'DISPONIBLE' order by libelle
+                """, Tuple.class).setParameter("ids", ids).getResultList();
+        return Map.of("calcul.produits_disponibles", lignes.stream()
+                .map(t -> "• " + t.get("libelle", String.class) + (t.get("conditionnement") == null ? "" : ", " + t.get("conditionnement", String.class)))
+                .collect(Collectors.joining("\n")));
+    }
+
+    private LocalDateTime retourDepuis() {
+        return LocalDateTime.now(ZoneOffset.UTC).minusDays(parametreService.entier("marketing.retour_stock_jours", 15));
+    }
+
     /** Un code reste unique, archives compris : un produit archive se reactive plutot que d'etre ressaisi. */
     private void verifierCode(Long id, String code) {
         @SuppressWarnings("unchecked")
@@ -199,7 +274,12 @@ public class ProduitServiceImpl implements ProduitService {
     }
 
     ProduitDTO mapTupleToDto(Tuple tuple) {
+        LocalDateTime disponibiliteLe = tuple.get("disponibiliteLe", LocalDateTime.class);
+        String disponibilite = tuple.get("disponibilite", String.class);
         return ProduitDTO.builder()
+                .disponibilite(disponibilite)
+                .disponibiliteLe(disponibiliteLe)
+                .deRetour("DISPONIBLE".equals(disponibilite) && disponibiliteLe != null && disponibiliteLe.isAfter(retourDepuis()))
                 .id(tuple.get("id", Long.class))
                 .code(tuple.get("code", String.class))
                 .libelle(tuple.get("libelle", String.class))
