@@ -183,6 +183,21 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         return consulter(module, id);
     }
 
+    @Override
+    @Transactional
+    public ModeleMessageDTO reactiver(String module, Long id) {
+        ModeleMessageDTO modele = consulter(module, id);
+        if (!"ARCHIVE".equals(modele.getStatut())) {
+            throw new ErreurMetierException("Ce modèle n'est pas archivé.");
+        }
+        em.createNativeQuery("update crm_modele_message set statut = 'ACTIF', modifie_par = :modifiePar, updated_at = utc_timestamp() where id = :id")
+                .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
+                .setParameter("id", id)
+                .executeUpdate();
+        journalActionService.enregistrer("MODELE_REACTIVATION", "crm_modele_message", id, modele.getNom());
+        return consulter(module, id);
+    }
+
     private void verifier(String module, ModeleMessageDemandeDTO demande, Long id) {
         if (!"MARKETING".equals(module) && !GabaritMessage.TYPES_CAMPAGNE.contains(demande.getTypeCampagne())) {
             throw new ErreurMetierException("Type de relance inconnu : " + demande.getTypeCampagne() + ".");

@@ -268,7 +268,7 @@ export interface Produit {
 export interface FiltresCatalogue { categories: string[]; laboratoires: string[]; }
 export interface Promotion {
   id: number; code: string; nom: string; description: string | null; dateDebut: string; dateFin: string;
-  statut: 'BROUILLON' | 'ACTIVE' | 'TERMINEE' | 'ARCHIVEE'; nbProduits: number; creePar: string; creeLe: string; modifiePar: string | null;
+  statut: 'BROUILLON' | 'PROGRAMMEE' | 'ACTIVE' | 'SUSPENDUE' | 'TERMINEE' | 'ARCHIVEE'; nbProduits: number; creePar: string; creeLe: string; modifiePar: string | null;
   modifieLe: string | null;
 }
 export interface PromotionProduit {

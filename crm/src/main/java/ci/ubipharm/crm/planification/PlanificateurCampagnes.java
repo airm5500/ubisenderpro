@@ -26,9 +26,9 @@ public class PlanificateurCampagnes {
 
     @Scheduled(fixedDelayString = "${crm.campagnes.intervalle:60000}", initialDelay = 30000)
     public void demarrerCampagnesEchues() {
-        int terminees = promotionService.terminerPromotionsEchues();
-        if (terminees > 0) {
-            log.info("{} promotion(s) terminee(s)", terminees);
+        int promotions = promotionService.suivrePeriodes();
+        if (promotions > 0) {
+            log.info("{} promotion(s) ouverte(s) ou terminee(s)", promotions);
         }
         int demarrees = campagneService.demarrerCampagnesEchues() + campagneMarketingService.demarrerCampagnesEchues();
         if (demarrees > 0) {

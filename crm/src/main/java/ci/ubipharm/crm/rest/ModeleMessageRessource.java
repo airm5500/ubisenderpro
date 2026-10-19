@@ -15,6 +15,15 @@ import ci.ubipharm.crm.rest.service.ModeleMessageService;
 import ci.ubipharm.crm.rest.service.dto.ModeleMessageCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ModeleMessageDTO;
 import ci.ubipharm.crm.rest.service.dto.ModeleMessageDemandeDTO;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import ci.ubipharm.crm.rest.service.ModeleWordService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
+import ci.ubipharm.crm.rest.service.dto.LectureModeleWordDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +38,7 @@ public class ModeleMessageRessource {
     private static final String DIRECTION = "hasAuthority('DROIT_MODELES_GERER')";
 
     private final ModeleMessageService modeleMessageService;
+    private final ModeleWordService modeleWordService;
 
     @GetMapping
     public List<ModeleMessageDTO> rechercher(ModeleMessageCriteresDTO criteres) {
@@ -56,5 +66,27 @@ public class ModeleMessageRessource {
     @PreAuthorize(DIRECTION)
     public ModeleMessageDTO archiver(@PathVariable Long id) {
         return modeleMessageService.archiver(MODULE, id);
+    }
+
+    @PostMapping("/{id}/reactivation")
+    @PreAuthorize(DIRECTION)
+    public ModeleMessageDTO reactiver(@PathVariable Long id) {
+        return modeleMessageService.reactiver(MODULE, id);
+    }
+
+    @GetMapping("/{id}/word")
+    public ResponseEntity<byte[]> exporterWord(@PathVariable Long id) {
+        FichierDTO fichier = modeleWordService.exporter(MODULE, id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fichier.getNom()).build().toString())
+                .contentType(MediaType.parseMediaType(fichier.getTypeContenu()))
+                .body(fichier.getContenu());
+    }
+
+    /** Pre-remplit le formulaire d'un nouveau modele ; rien n'est enregistre. */
+    @PostMapping("/lecture-word")
+    @PreAuthorize(DIRECTION)
+    public LectureModeleWordDTO lireWord(@RequestParam("fichier") MultipartFile fichier) {
+        return modeleWordService.lire(MODULE, fichier);
     }
 }

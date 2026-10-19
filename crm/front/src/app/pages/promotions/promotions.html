@@ -18,8 +18,10 @@
       <label class="f large">Code ou nom<input class="sel" name="q" [(ngModel)]="criteres.q" placeholder="Ex. NOV26, novembre…"></label>
       <label class="f">Statut
         <select class="sel" name="statut" [(ngModel)]="criteres.statut">
-          <option value="EN_COURS">Brouillons et actives</option>
+          <option value="EN_COURS">En cours</option>
+          <option value="PROGRAMMEE">Programmées</option>
           <option value="ACTIVE">Actives</option>
+          <option value="SUSPENDUE">Désactivées</option>
           <option value="TERMINEE">Terminées</option>
           <option value="ARCHIVEE">Archivées</option>
           <option value="TOUS">Toutes</option>

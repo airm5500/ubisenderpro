@@ -95,13 +95,13 @@ class PromotionIT extends IntegrationBase {
         Long ligneAmox = ((Number) JsonPath.read(mvc.perform(get("/api/marketing/promotions/" + promo + "/produits").session(charge))
                 .andReturn().getResponse().getContentAsString(), "$[0].id")).longValue();
         envoyer(charge, post("/api/marketing/promotions/" + promo + "/produits/" + ligneAmox + "/retrait"), "")
-                .andExpect(jsonPath("$.message").value("Une promotion active garde au moins un produit : archivez-la plutôt."));
+                .andExpect(jsonPath("$.message").value("Une promotion publiée garde au moins un produit : désactivez-la ou archivez-la plutôt."));
         mvc.perform(get("/api/marketing/promotions/" + promo + "/produits").param("avecRetires", "true").session(charge))
                 .andExpect(jsonPath("$[*].actif", contains(true, false)));
 
         // Periode depassee : terminee d'office, la campagne ne peut plus partir ; prolongee, elle redevient active
         jdbc.update("update crm_promotion set date_debut = ?, date_fin = ? where id = ?", AUJOURDHUI.minusDays(10), AUJOURDHUI.minusDays(1), promo);
-        assertThat(promotionService.terminerPromotionsEchues()).isEqualTo(1);
+        assertThat(promotionService.suivrePeriodes()).isEqualTo(1);
         mvc.perform(get("/api/marketing/promotions/" + promo).session(charge)).andExpect(jsonPath("$.statut").value("TERMINEE"));
         envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "")
                 .andExpect(jsonPath("$.message").value("La promotion « Promo de novembre » n'est pas en cours : choisissez une promotion active."));
@@ -174,6 +174,35 @@ class PromotionIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/promotions/" + novembre + "/produits").session(admin)).andExpect(jsonPath("$.length()").value(2));
         envoyer(charge, post("/api/marketing/promotions"), promotion("nov26", "Doublon", AUJOURDHUI))
                 .andExpect(jsonPath("$.message", containsString("est déjà utilisé par la promotion « Novembre »")));
+    }
+
+    @Test
+    void unePromotionActiveeAvantSonDebutEstProgrammeeSeDesactiveEtReprend() throws Exception {
+        Long promo = idDe(envoyer(charge, post("/api/marketing/promotions"), "{\"code\":\"DEC26\",\"nom\":\"Décembre\",\"dateDebut\":\""
+                + AUJOURDHUI.plusDays(3) + "\",\"dateFin\":\"" + AUJOURDHUI.plusDays(20) + "\"}"));
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/produits"), "{\"produitId\":" + doliprane + ",\"avantage\":\"UG_QUANTITE\",\"ugQuantite\":1}")
+                .andExpect(status().isOk());
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/activation"), "").andExpect(jsonPath("$.statut").value("PROGRAMMEE"));
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/reactivation"), "")
+                .andExpect(jsonPath("$.message").value("Seule une promotion archivée ou désactivée se réactive."));
+        mvc.perform(get("/api/marketing/promotions").session(charge)).andExpect(jsonPath("$[0].statut").value("PROGRAMMEE"));
+
+        // Le jour venu, le planificateur l'ouvre
+        assertThat(promotionService.suivrePeriodes()).isZero();
+        jdbc.update("update crm_promotion set date_debut = ? where id = ?", AUJOURDHUI, promo);
+        assertThat(promotionService.suivrePeriodes()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select statut from crm_promotion where id = ?", String.class, promo)).isEqualTo("ACTIVE");
+
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/desactivation"), "").andExpect(jsonPath("$.statut").value("SUSPENDUE"));
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/desactivation"), "")
+                .andExpect(jsonPath("$.message").value("Seule une promotion active ou programmée se désactive."));
+        // Suspendue, elle n'est plus citable et reste suspendue meme si on change ses dates
+        envoyer(charge, put("/api/marketing/promotions/" + promo), promotion("DEC26", "Décembre", AUJOURDHUI.plusDays(25)))
+                .andExpect(jsonPath("$.statut").value("SUSPENDUE"));
+        assertThat(promotionService.suivrePeriodes()).isZero();
+        envoyer(charge, post("/api/marketing/promotions/" + promo + "/reactivation"), "").andExpect(jsonPath("$.statut").value("ACTIVE"));
+        assertThat(jdbc.queryForList("select action from crm_journal_action where entite_id = ? and entite = 'crm_promotion' order by id", String.class, promo))
+                .containsSubsequence("PROMOTION_PROGRAMMATION", "PROMOTION_DEBUT", "PROMOTION_DESACTIVATION", "PROMOTION_REACTIVATION");
     }
 
     private String promotion(String code, String nom, LocalDate fin) {

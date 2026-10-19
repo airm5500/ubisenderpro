@@ -83,7 +83,7 @@ public class PromotionServiceImpl implements PromotionService {
         Map<String, Object> parametres = new LinkedHashMap<>();
         switch (criteres.getStatut()) {
             case "TOUS" -> { }
-            case "EN_COURS" -> where.append(" and p.statut in ('BROUILLON', 'ACTIVE')");
+            case "EN_COURS" -> where.append(" and p.statut in ('BROUILLON', 'PROGRAMMEE', 'ACTIVE', 'SUSPENDUE')");
             default -> {
                 where.append(" and p.statut = :statut");
                 parametres.put("statut", criteres.getStatut());
@@ -94,7 +94,7 @@ public class PromotionServiceImpl implements PromotionService {
             parametres.put("q", "%" + criteres.getQ().trim() + "%");
         }
         Query requete = em.createNativeQuery(SELECT + where
-                + " order by field(p.statut, 'ACTIVE', 'BROUILLON', 'TERMINEE', 'ARCHIVEE'), p.date_debut desc, p.id desc", Tuple.class);
+                + " order by field(p.statut, 'ACTIVE', 'PROGRAMMEE', 'BROUILLON', 'SUSPENDUE', 'TERMINEE', 'ARCHIVEE'), p.date_debut desc, p.id desc", Tuple.class);
         parametres.forEach(requete::setParameter);
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = requete.getResultList();
@@ -141,8 +141,10 @@ public class PromotionServiceImpl implements PromotionService {
             throw new ErreurMetierException("Cette promotion est archivée : réactivez-la pour la modifier.");
         }
         verifier(id, demande);
-        // Une promotion publiee suit sa periode : prolongee, elle redevient active ; ecourtee, elle se termine
-        String statut = "BROUILLON".equals(avant.getStatut()) ? "BROUILLON" : demande.getDateFin().isBefore(aujourdhui()) ? "TERMINEE" : "ACTIVE";
+        // Une promotion publiee suit sa periode : prolongee, elle redevient active ; ecourtee, elle se termine.
+        // Brouillon et suspendue gardent leur statut : seule une action de l'utilisateur les publie.
+        String statut = "BROUILLON".equals(avant.getStatut()) || "SUSPENDUE".equals(avant.getStatut()) ? avant.getStatut()
+                : statutDePeriode(demande.getDateDebut(), demande.getDateFin());
         em.createNativeQuery("""
                 update crm_promotion set code = :code, nom = :nom, description = :description, date_debut = :debut, date_fin = :fin,
                        statut = :statut, modifie_par = :par, updated_at = utc_timestamp()
@@ -176,7 +178,19 @@ public class PromotionServiceImpl implements PromotionService {
         if (promotion.getDateFin().isBefore(aujourdhui())) {
             throw new ErreurMetierException("La période de cette promotion est déjà passée : prolongez sa date de fin.");
         }
-        return changerStatut(promotion, "ACTIVE", "PROMOTION_ACTIVATION");
+        // Activee avant son debut, elle est programmee et s'ouvrira d'elle-meme
+        return promotion.getDateDebut().isAfter(aujourdhui()) ? changerStatut(promotion, "PROGRAMMEE", "PROMOTION_PROGRAMMATION")
+                : changerStatut(promotion, "ACTIVE", "PROMOTION_ACTIVATION");
+    }
+
+    @Override
+    @Transactional
+    public PromotionDTO desactiver(Long id) {
+        PromotionDTO promotion = verrouiller(id);
+        if (!"ACTIVE".equals(promotion.getStatut()) && !"PROGRAMMEE".equals(promotion.getStatut())) {
+            throw new ErreurMetierException("Seule une promotion active ou programmée se désactive.");
+        }
+        return changerStatut(promotion, "SUSPENDUE", "PROMOTION_DESACTIVATION");
     }
 
     @Override
@@ -193,8 +207,12 @@ public class PromotionServiceImpl implements PromotionService {
     @Transactional
     public PromotionDTO reactiver(Long id) {
         PromotionDTO promotion = verrouiller(id);
+        if ("SUSPENDUE".equals(promotion.getStatut())) {
+            // Reprise : elle retrouve le statut de sa periode
+            return changerStatut(promotion, statutDePeriode(promotion.getDateDebut(), promotion.getDateFin()), "PROMOTION_REACTIVATION");
+        }
         if (!"ARCHIVEE".equals(promotion.getStatut())) {
-            throw new ErreurMetierException("Seule une promotion archivée se réactive.");
+            throw new ErreurMetierException("Seule une promotion archivée ou désactivée se réactive.");
         }
         // Elle repart en brouillon : on la relit avant de la proposer de nouveau aux campagnes
         return changerStatut(promotion, "BROUILLON", "PROMOTION_REACTIVATION");
@@ -272,8 +290,8 @@ public class PromotionServiceImpl implements PromotionService {
         if (!avant.isActif()) {
             throw new ErreurMetierException("Ce produit est déjà retiré de la promotion.");
         }
-        if ("ACTIVE".equals(promotion.getStatut()) && promotion.getNbProduits() == 1) {
-            throw new ErreurMetierException("Une promotion active garde au moins un produit : archivez-la plutôt.");
+        if (List.of("ACTIVE", "PROGRAMMEE").contains(promotion.getStatut()) && promotion.getNbProduits() == 1) {
+            throw new ErreurMetierException("Une promotion publiée garde au moins un produit : désactivez-la ou archivez-la plutôt.");
         }
         em.createNativeQuery("update crm_promotion_produit set actif = false, modifie_par = :par, updated_at = utc_timestamp() where id = :id")
                 .setParameter("par", utilisateur()).setParameter("id", ligneId).executeUpdate();
@@ -434,9 +452,19 @@ public class PromotionServiceImpl implements PromotionService {
 
     @Override
     @Transactional
-    public int terminerPromotionsEchues() {
+    public int suivrePeriodes() {
         @SuppressWarnings("unchecked")
-        List<Tuple> echues = em.createNativeQuery("select id as id, code as code from crm_promotion where statut = 'ACTIVE' and date_fin < :jour for update",
+        List<Tuple> ouvertes = em.createNativeQuery("""
+                select id as id, code as code from crm_promotion where statut = 'PROGRAMMEE' and date_debut <= :jour and date_fin >= :jour for update
+                """, Tuple.class).setParameter("jour", aujourdhui()).getResultList();
+        for (Tuple t : ouvertes) {
+            em.createNativeQuery("update crm_promotion set statut = 'ACTIVE', updated_at = utc_timestamp() where id = :id")
+                    .setParameter("id", t.get("id", Long.class)).executeUpdate();
+            journalActionService.enregistrerSysteme("PROMOTION_DEBUT", "crm_promotion", t.get("id", Long.class),
+                    t.get("code", String.class) + " : début de la période programmée");
+        }
+        @SuppressWarnings("unchecked")
+        List<Tuple> echues = em.createNativeQuery("select id as id, code as code from crm_promotion where statut in ('ACTIVE', 'PROGRAMMEE') and date_fin < :jour for update",
                 Tuple.class).setParameter("jour", aujourdhui()).getResultList();
         for (Tuple t : echues) {
             em.createNativeQuery("update crm_promotion set statut = 'TERMINEE', updated_at = utc_timestamp() where id = :id")
@@ -444,7 +472,11 @@ public class PromotionServiceImpl implements PromotionService {
             journalActionService.enregistrerSysteme("PROMOTION_FIN", "crm_promotion", t.get("id", Long.class),
                     t.get("code", String.class) + " : période terminée");
         }
-        return echues.size();
+        return ouvertes.size() + echues.size();
+    }
+
+    static String statutDePeriode(LocalDate debut, LocalDate fin) {
+        return fin.isBefore(aujourdhui()) ? "TERMINEE" : debut.isAfter(aujourdhui()) ? "PROGRAMMEE" : "ACTIVE";
     }
 
     private Avantage avantage(PromotionProduitDemandeDTO demande, Tuple produit) {

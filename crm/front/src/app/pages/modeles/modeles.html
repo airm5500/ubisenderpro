@@ -7,7 +7,10 @@
     </div>
     @if (peutGerer()) {
       <div class="actions">
-        @if (vue() === 'modeles') { <button class="ba" (click)="nouveau()">Nouveau modèle</button> }
+        @if (vue() === 'modeles') {
+          <label class="bs" style="cursor: pointer">Importer un modèle Word<input type="file" accept=".docx" hidden (change)="importerWord($event)"></label>
+          <button class="ba" (click)="nouveau()">Nouveau modèle</button>
+        }
         @else { <button class="ba" (click)="ouvrirVariable('nouvelle')">Nouvelle variable</button> }
       </div>
     }
@@ -39,6 +42,7 @@
       <div style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
         @if (enEdition()) {
           <h2 class="h2">{{ choisi() ? 'Modifier « ' + choisi()!.nom + ' »' : 'Nouveau modèle' }}</h2>
+          @for (a of avertissementsWord(); track a) { <div class="avert">{{ a }}</div> }
           <div class="grille">
             <label class="f large">Nom<input class="sel" [(ngModel)]="edition.nom" [placeholder]="marketing() ? 'Ex. Promotion du mois' : 'Ex. Après échéance · Normal'"></label>
             <label class="f">{{ marketing() ? 'Usage' : 'Type de relance' }}
@@ -95,9 +99,11 @@
         } @else if (choisi(); as m) {
           <div class="entete">
             <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }}{{ m.typeInformation ? ' · ' + L.typeInformation[m.typeInformation] : '' }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
-            @if (peutGerer() && m.statut === 'ACTIF') {
-              <div class="actions"><button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button></div>
-            }
+            <div class="actions">
+              <button class="bs petit" (click)="exporterWord(m)">Exporter en Word</button>
+              @if (peutGerer() && m.statut === 'ACTIF') { <button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button> }
+              @if (peutGerer() && m.statut === 'ARCHIVE') { <button class="bp petit" (click)="reactiver(m)">Réactiver</button> }
+            </div>
           </div>
           @if (m.variables.length) {
             <div class="chips">@for (v of m.variables; track v) { <span class="tag">{{ '{' + v + '}' }}</span> }</div>

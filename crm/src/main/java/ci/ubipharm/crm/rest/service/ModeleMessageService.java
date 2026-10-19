@@ -20,4 +20,6 @@ public interface ModeleMessageService {
     ModeleMessageDTO modifier(String module, Long id, ModeleMessageDemandeDTO demande);
 
     ModeleMessageDTO archiver(String module, Long id);
+
+    ModeleMessageDTO reactiver(String module, Long id);
 }

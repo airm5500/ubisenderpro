@@ -79,6 +79,12 @@ public class PromotionRessource {
         return promotionService.activer(id);
     }
 
+    @PostMapping("/{id:\\d+}/desactivation")
+    @PreAuthorize(GESTION)
+    public PromotionDTO desactiver(@PathVariable Long id) {
+        return promotionService.desactiver(id);
+    }
+
     @PostMapping("/{id:\\d+}/archivage")
     @PreAuthorize(GESTION)
     public PromotionDTO archiver(@PathVariable Long id) {

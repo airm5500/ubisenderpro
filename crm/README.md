@@ -658,6 +658,12 @@ Parametres > Referentiels (droit `REFERENTIELS`, donne aux roles qui gerent les 
 - **Mise a jour selective** (`POST /api/clients/mise-a-jour-selective`) : on coche des clients puis les champs a changer (segment, agence, sous-agence, region/ville/commune, tournee) ; les autres restent tels quels. Tout ou rien : un client hors perimetre, desactive, ou d'une autre agence que la tournee choisie bloque l'ensemble. Changer d'agence retire la tournee de l'ancienne. Chaque client modifie a sa ligne au journal avec les ecarts.
 - **Verificateur de numeros** (`POST /api/clients/verification-numeros`) : numeros colles ou numeros des clients coches. Le format est controle, puis WhatsApp est interroge par lots de 50 depuis le numero WhatsApp Web connecte de l'utilisateur (sinon un autre numero connecte). Sans numero connecte, seul le format est controle et l'ecran le dit. Le resultat est garde sur le contact (whatsapp_present, whatsapp_verifie_le) et s'exporte en CSV.
 
+## Modeles en Word et promotions programmees
+
+- **Modeles de messages en Word** (Recouvrement et Marketing) : « Exporter en Word » produit un .docx (nom, type, canal, objet, texte entre deux reperes) que l'on retouche puis reimporte. « Importer un modele Word » lit ce .docx, ou n'importe quel document Word : tout son texte devient le message, le nom du fichier le nom du modele, et les champs de publipostage «champ» ou {{champ}} deviennent des variables {champ}. Le formulaire est pre-rempli et rien n'est enregistre avant « Enregistrer » ; tableaux et images ne sont pas repris (l'ecran le signale). Le fichier importe est copie dans l'archivage (imports-modeles).
+- **Suppression des modeles** = archivage (rien n'est supprime) ; un modele archive se reactive.
+- **Promotions** (V1.3.8) : activee avant sa date de debut, une promotion est PROGRAMMEE et s'ouvre d'elle-meme le jour venu (planificateur, journal PROMOTION_DEBUT). « Desactiver » suspend une promotion active ou programmee : elle n'est plus proposee aux campagnes ; « Reactiver » la reprend selon sa periode. L'archivage existait deja.
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

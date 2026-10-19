@@ -69,7 +69,12 @@ export class PromotionDetail implements OnInit {
     }).subscribe(() => this.charger());
   }
 
-  action(chemin: 'activation' | 'archivage' | 'reactivation', titre: string): void {
+  /** Debut a venir : l'activation la programme. */
+  programmable(p: Promotion): boolean {
+    return p.dateDebut > new Date().toISOString().substring(0, 10);
+  }
+
+  action(chemin: 'activation' | 'desactivation' | 'archivage' | 'reactivation', titre: string): void {
     this.api.post<Promotion>(`/api/marketing/promotions/${this.id()}/${chemin}`).subscribe(p => {
       this.messages.add({ severity: 'success', summary: titre, detail: p.nom });
       this.charger();

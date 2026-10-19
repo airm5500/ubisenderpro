@@ -55,6 +55,9 @@ export class Modeles implements OnInit {
   /** Canal du modele affiche ou edite : l'apercu change de forme (bulle WhatsApp ou e-mail). */
   protected readonly canalApercu = signal('WHATSAPP');
 
+  /** Ce que l'import Word n'a pas pu reprendre tel quel. */
+  protected readonly avertissementsWord = signal<string[]>([]);
+
   protected readonly fenetreVariable = signal<Variable | 'nouvelle' | null>(null);
   variable = { code: '', libelle: '', source: '', exemple: '' };
 
@@ -115,7 +118,39 @@ export class Modeles implements OnInit {
     this.contenu.set('');
     this.objet.set('');
     this.canalApercu.set(canal);
+    this.avertissementsWord.set([]);
     this.enEdition.set(true);
+  }
+
+  /** Le document Word pre-remplit un nouveau modele : on le relit avant de l'enregistrer. */
+  importerWord(evenement: Event): void {
+    const champ = evenement.target as HTMLInputElement;
+    const fichier = champ.files?.[0];
+    champ.value = '';
+    if (!fichier) return;
+    this.api.envoyerFichier<{ modele: Partial<ModeleMessage>; avertissements: string[] }>(`${this.base()}/lecture-word`, fichier).subscribe(r => {
+      this.nouveau();
+      const m = r.modele;
+      this.edition = { ...this.edition, nom: m.nom ?? '', typeCampagne: m.typeCampagne ?? this.edition.typeCampagne,
+        canal: m.canal ?? this.edition.canal, objet: m.objet ?? '', contenu: m.contenu ?? '' };
+      this.contenu.set(this.edition.contenu);
+      this.objet.set(this.edition.objet);
+      this.canalApercu.set(this.edition.canal);
+      this.avertissementsWord.set(r.avertissements);
+      this.messages.add({ severity: 'info', summary: 'Document Word lu', detail: 'Relisez le modèle puis enregistrez-le.' });
+    });
+  }
+
+  exporterWord(m: ModeleMessage): void {
+    this.api.telecharger(`${this.base()}/${m.id}/word`, `${m.nom}.docx`);
+  }
+
+  reactiver(m: ModeleMessage): void {
+    this.api.post<ModeleMessage>(`${this.base()}/${m.id}/reactivation`).subscribe(r => {
+      this.messages.add({ severity: 'success', summary: 'Modèle réactivé', detail: `${m.nom} est de nouveau proposé aux campagnes.` });
+      this.archives.set(false);
+      this.chargerModeles(r.id);
+    });
   }
 
   modifier(m: ModeleMessage): void {
@@ -124,6 +159,7 @@ export class Modeles implements OnInit {
     this.contenu.set(m.contenu);
     this.objet.set(m.objet ?? '');
     this.canalApercu.set(m.canal);
+    this.avertissementsWord.set([]);
     this.enEdition.set(true);
   }
 

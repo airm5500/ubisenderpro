@@ -13,8 +13,13 @@
           @else {
             <button class="bs" type="button" (click)="saisie.set(true)">Modifier</button>
             <button class="bs" type="button" (click)="action('archivage', 'Promotion archivée')">Archiver</button>
+            @if (p.statut === 'ACTIVE' || p.statut === 'PROGRAMMEE') {
+              <button class="bs" type="button" (click)="action('desactivation', 'Promotion désactivée')">Désactiver</button>
+            }
+            @if (p.statut === 'SUSPENDUE') { <button class="bp" type="button" (click)="action('reactivation', 'Promotion réactivée')">Réactiver</button> }
             @if (p.statut === 'BROUILLON') {
-              <button class="bp" type="button" (click)="action('activation', 'Promotion activée')" [disabled]="!p.nbProduits">Activer</button>
+              <button class="bp" type="button" (click)="action('activation', programmable(p) ? 'Promotion programmée' : 'Promotion activée')" [disabled]="!p.nbProduits">
+                {{ programmable(p) ? 'Programmer' : 'Activer' }}</button>
             }
           }
         </div>
@@ -23,7 +28,9 @@
 
     @if (p.description) { <p>{{ p.description }}</p> }
     @switch (p.statut) {
-      @case ('BROUILLON') { <div class="info"><i class="pi pi-info-circle"></i><span>En préparation : activez-la pour la citer dans une campagne.</span></div> }
+      @case ('BROUILLON') { <div class="info"><i class="pi pi-info-circle"></i><span>@if (programmable(p)) { En préparation : programmez-la, elle s'ouvrira d'elle-même le {{ p.dateDebut | jour }}. } @else { En préparation : activez-la pour la citer dans une campagne. }</span></div> }
+      @case ('PROGRAMMEE') { <div class="info"><i class="pi pi-calendar"></i><span>Programmée : elle s'ouvrira d'elle-même le {{ p.dateDebut | jour }} et sera alors proposée aux campagnes jusqu'au {{ p.dateFin | jour }}.</span></div> }
+      @case ('SUSPENDUE') { <div class="avert"><i class="pi pi-pause"></i><span>Désactivée : elle n'est plus proposée aux campagnes. Réactivez-la pour la reprendre selon sa période.</span></div> }
       @case ('ACTIVE') { <div class="info"><i class="pi pi-check-circle"></i><span>Proposée aux campagnes jusqu'au {{ p.dateFin | jour }} ; elle se terminera d'elle-même le lendemain.</span></div> }
       @case ('TERMINEE') { <div class="info"><i class="pi pi-clock"></i><span>Période terminée : elle n'est plus proposée aux campagnes. Prolongez sa date de fin pour la relancer.</span></div> }
       @case ('ARCHIVEE') { <div class="info"><i class="pi pi-inbox"></i><span>Archivée : réactivez-la pour la modifier.</span></div> }

@@ -21,7 +21,11 @@ public interface PromotionService {
 
     PromotionDTO modifier(Long id, PromotionDemandeDTO demande);
 
+    /** Avant sa date de debut, la promotion est programmee et s'ouvrira d'elle-meme. */
     PromotionDTO activer(Long id);
+
+    /** Active ou programmee : plus proposee aux campagnes jusqu'a sa reprise. */
+    PromotionDTO desactiver(Long id);
 
     PromotionDTO archiver(Long id);
 
@@ -48,5 +52,5 @@ public interface PromotionService {
     FichierDTO classeurCampagne(List<Long> promotionIds, List<Long> produitIds);
 
     /** Passe en terminee les promotions actives dont la periode est depassee ; renvoie leur nombre. */
-    int terminerPromotionsEchues();
+    int suivrePeriodes();
 }
