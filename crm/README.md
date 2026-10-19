@@ -664,6 +664,18 @@ Parametres > Referentiels (droit `REFERENTIELS`, donne aux roles qui gerent les 
 - **Suppression des modeles** = archivage (rien n'est supprime) ; un modele archive se reactive.
 - **Promotions** (V1.3.8) : activee avant sa date de debut, une promotion est PROGRAMMEE et s'ouvre d'elle-meme le jour venu (planificateur, journal PROMOTION_DEBUT). « Desactiver » suspend une promotion active ou programmee : elle n'est plus proposee aux campagnes ; « Reactiver » la reprend selon sa periode. L'archivage existait deja.
 
+## Discussions, envoi WhatsApp en masse et historiques
+
+- **Discussions** (droit DISCUSSIONS, migration V1.3.9) : un fil par numero WhatsApp et par client, regroupant relances, promotions, envois en masse, reponses ecrites ici et messages recus. On repond depuis son propre numero, ou depuis celui d'un agent que l'on remplace (delegation en cours) ; la session WhatsApp Web doit etre connectee, et sur un numero Meta la fenetre de 24 h s'applique. Le parametre `discussions.reponse_active` (NON) coupe les reponses depuis l'ecran.
+- **Envoi WhatsApp en masse** (droit ENVOI_MASSE : ADMIN, administrateur sans SMS, charge marketing) : numeros colles (nom apres un point-virgule ou une tabulation) et/ou une liste de diffusion ; apercu avant envoi avec les numeros ecartes (format invalide, en double, desabonne STOP, client desactive) ; `{nom}` personnalise le message. Depart depuis le numero WhatsApp Web de l'auteur, au meme debit et dans la meme plage horaire que les relances (plafond journalier commun), apres les campagnes. Annulable tant qu'il reste des messages ; plafond `whatsapp.envoi_masse.destinataires_max` (1000).
+- **Historique des envois** (droit HISTORIQUE_ENVOIS) : tous les messages partis, tous canaux, filtrables (dates, origine, canal, statut, destinataire), selon le perimetre de l'utilisateur ; export CSV (50 000 lignes au plus, copie archivee dans exports-historique).
+- **Historique d'un compte** (ecran Utilisateurs, lien Historique) : connexions reussies ou refusees (IP, navigateur) et journal des actions de la personne, filtrables par date.
+
+## Centre de support
+
+- Menu Aide > Centre de support (migration V1.4.1). Tout utilisateur ouvre des tickets et suit la conversation ; le droit SUPPORT (donne a l'ADMIN) voit tous les tickets, les prend en charge et les clot, et dispose des onglets Diagnostic (erreurs serveur et navigateur avec leur reference, regroupees) et Sante (base, WhatsApp Web, SMTP, SMS, repertoire d'archivage, serveur). FAQ editable, les questions s'archivent.
+- Seule exception a la regle « rien n'est supprime » : les entrees de diagnostic plus anciennes que `support.retention_jours` sont purgees (ce sont des traces techniques, pas des donnees metier). `support.capture_max_minute` limite les erreurs navigateur enregistrees, `support.espace_disque_min_mo` declenche l'alerte d'espace disque.
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

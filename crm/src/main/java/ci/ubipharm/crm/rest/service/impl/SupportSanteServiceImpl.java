@@ -25,6 +25,10 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class SupportSanteServiceImpl implements SupportSanteService {
 
+    private static final java.util.Map<String, String> LIBELLES_SESSION = java.util.Map.of(
+            "DECONNECTE", "déconnecté(s)", "EN_ATTENTE_QR", "en attente du QR code", "CONNEXION", "en cours de connexion");
+
+
     static final String OK = "OK";
     static final String ALERTE = "ALERTE";
     static final String KO = "KO";
@@ -111,7 +115,7 @@ public class SupportSanteServiceImpl implements SupportSanteService {
         detail.append(" · ").append(connectees).append(" numéro(s) connecté(s) sur ").append(total);
         parStatut.forEach((statut, nb) -> {
             if (!"CONNECTE".equals(statut)) {
-                detail.append(", ").append(nb).append(' ').append(statut.toLowerCase());
+                detail.append(", ").append(nb).append(' ').append(LIBELLES_SESSION.getOrDefault(statut, statut.toLowerCase()));
             }
         });
         if (degradees > 0) {
