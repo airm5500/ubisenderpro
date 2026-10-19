@@ -21,4 +21,9 @@ public interface ClientService {
     ClientDTO modifier(Long id, ClientDemandeDTO demande);
 
     List<SegmentDTO> segments();
+
+    /** Le client sort des campagnes, des listes et du portefeuille actif, sans etre archive ; motif journalise. */
+    ClientDTO desactiver(Long id, String motif);
+
+    ClientDTO reactiver(Long id);
 }

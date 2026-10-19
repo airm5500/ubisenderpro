@@ -37,6 +37,7 @@ export interface Client {
   regionId: number | null; region: string | null; villeId: number | null; ville: string | null; communeId: number | null; commune: string | null;
   tourneeId: number | null; tournee: string | null; dateAnniversaire: string | null;
   adresse: string; email: string; commentaire: string; numeroPrincipal: string; numeroSecondaire: string; statut: string;
+  desactiveLe: string | null; desactivePar: string | null; desactiveMotif: string | null;
   /** Numeros actifs par role, renseignes sur la fiche client seulement. */
   numeros?: Record<string, string>;
 }
@@ -125,6 +126,12 @@ export interface PortefeuilleClient {
   clientId: number; code: string; raisonSociale: string; nomPharmacien: string; agenceId: number; agenceLibelle: string;
   segmentation: string; segmentationLibelle: string | null; segmentationBadge: string | null; numeroPrincipal: string; agentId: number | null; agentNom: string | null; affecteLe: string | null;
   nbFacturesOuvertes: number; totalSolde: number; retardMax: number;
+}
+export interface ResultatMiseAJour { nbModifies: number; nbInchanges: number; }
+export interface VerificationNumero { saisi: string; numero: string | null; clientId: number | null; client: string | null; fonction: string | null; resultat: string; }
+export interface VerificationNumeros {
+  sessionUtilisee: string | null; avertissement: string | null; surWhatsapp: number; absents: number; formatsInvalides: number; nonVerifies: number;
+  resultats: VerificationNumero[];
 }
 export interface ResultatAffectation { nbTraites: number; nbInchanges: number; refus: string[]; }
 export interface Affectation {

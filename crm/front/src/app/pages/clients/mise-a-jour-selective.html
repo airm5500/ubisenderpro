@@ -1,0 +1,68 @@
+<p-dialog header="Mise à jour sélective" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '640px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <p class="discret">Cochez les champs à changer sur les {{ clientIds().length }} client(s) sélectionné(s). Les champs non cochés restent tels quels.</p>
+    @for (c of CHAMPS; track c.code) {
+      <label class="case"><input type="checkbox" [name]="'champ-' + c.code" [ngModel]="champs.has(c.code)" (ngModelChange)="basculer(c.code, $event)">{{ c.libelle }}</label>
+      @if (champs.has(c.code)) {
+        <div class="grille" style="margin: 4px 0 12px 26px">
+          @switch (c.code) {
+            @case ('SEGMENT') {
+              <label class="f">Nouveau segment
+                <select class="sel" name="segmentation" [(ngModel)]="f.segmentation">
+                  <option value="">Aucun</option>
+                  @for (s of segments | async; track s.code) { <option [value]="s.code">{{ s.libelle }}</option> }
+                </select>
+              </label>
+            }
+            @case ('AGENCE') {
+              <label class="f">Nouvelle agence
+                <select class="sel" name="agenceId" [(ngModel)]="f.agenceId" required>
+                  <option [ngValue]="null" disabled>Choisir…</option>
+                  @for (a of ref.agences | async; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+                </select>
+              </label>
+              <p class="discret large">La tournée de l'ancienne agence est retirée si elle n'est pas remise ci-dessous.</p>
+            }
+            @case ('SOUS_AGENCE') {
+              <label class="f">Nouvelle sous-agence<input class="sel" name="sousAgence" [(ngModel)]="f.sousAgence" placeholder="Vide pour l'effacer"></label>
+            }
+            @case ('LOCALISATION') {
+              <label class="f">Région
+                <select class="sel" name="regionId" [(ngModel)]="f.regionId">
+                  <option [ngValue]="null">Non renseignée</option>
+                  @for (r of listes()['REGION']; track r.id) { <option [ngValue]="r.id">{{ r.libelle }}</option> }
+                </select>
+              </label>
+              <label class="f">Ville
+                <select class="sel" name="villeId" [(ngModel)]="f.villeId" (ngModelChange)="villeChoisie()">
+                  <option [ngValue]="null">Non renseignée</option>
+                  @for (v of villes(); track v.id) { <option [ngValue]="v.id">{{ v.libelle }}</option> }
+                </select>
+              </label>
+              <label class="f">Commune
+                <select class="sel" name="communeId" [(ngModel)]="f.communeId" (ngModelChange)="communeChoisie()">
+                  <option [ngValue]="null">Non renseignée</option>
+                  @for (m of communes(); track m.id) { <option [ngValue]="m.id">{{ m.libelle }}</option> }
+                </select>
+              </label>
+            }
+            @case ('TOURNEE') {
+              <label class="f">Nouvelle tournée
+                <select class="sel" name="tourneeId" [(ngModel)]="f.tourneeId">
+                  <option [ngValue]="null">Aucune</option>
+                  @for (t of tournees(); track t.id) { <option [ngValue]="t.id">{{ t.libelle }}{{ agenceCible() === null ? ' (' + t.agenceLibelle + ')' : '' }}</option> }
+                </select>
+              </label>
+            }
+          }
+        </div>
+      }
+    }
+    @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !champs.size">Appliquer à {{ clientIds().length }} client(s)</button>
+    </div>
+  </form>
+</p-dialog>

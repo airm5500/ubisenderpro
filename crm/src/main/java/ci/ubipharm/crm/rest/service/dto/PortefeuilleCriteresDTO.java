@@ -24,6 +24,11 @@ public class PortefeuilleCriteresDTO {
     /** Uniquement les clients qui ont un solde a recouvrer. */
     private boolean avecSolde;
 
+    /** ACTIF par defaut ; INACTIF pour la liste des clients desactives. */
+    @jakarta.validation.constraints.Pattern(regexp = "ACTIF|INACTIF", message = "Statut inconnu.")
+    @Builder.Default
+    private String statut = "ACTIF";
+
     @Min(value = 0, message = "La page doit être positive.")
     @Builder.Default
     private int page = 0;

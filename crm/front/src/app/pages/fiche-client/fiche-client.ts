@@ -1,5 +1,9 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { DialogModule } from 'primeng/dialog';
+import { MessageService } from 'primeng/api';
+import { VerificationNumerosDialogue } from '../clients/verification-numeros';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Affectation, Client, Facture, MessageRecu, Page } from '../../core/modeles';
@@ -14,7 +18,7 @@ const PALETTE = ['#05253D', '#51D78E', '#0B5C8E', '#F4B740', '#9DB0BF'];
 
 @Component({
   selector: 'app-fiche-client',
-  imports: [RouterLink, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire, BadgeSegment],
+  imports: [RouterLink, FormsModule, DialogModule, VerificationNumerosDialogue, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire, BadgeSegment],
   templateUrl: './fiche-client.html',
   styleUrl: './fiche-client.css'
 })
@@ -27,6 +31,11 @@ export class FicheClient implements OnInit {
   protected readonly client = signal<Client | null>(null);
   protected readonly modification = signal(false);
   protected readonly saisieFacture = signal(false);
+  private readonly messages = inject(MessageService);
+  protected readonly desactivation = signal(false);
+  protected readonly verification = signal(false);
+  protected readonly erreur = signal<string | null>(null);
+  motif = '';
   protected readonly factures = signal<Facture[]>([]);
   protected readonly voirSoldees = signal(false);
   protected readonly reponses = signal<MessageRecu[]>([]);
@@ -63,6 +72,32 @@ export class FicheClient implements OnInit {
     ];
     return ev.sort((a, b) => b.quand.localeCompare(a.quand));
   });
+
+  ouvrirDesactivation(): void {
+    this.motif = '';
+    this.erreur.set(null);
+    this.desactivation.set(true);
+  }
+
+  desactiver(): void {
+    this.api.postSilencieux<Client>(`/api/clients/${this.id()}/desactivation`, { motif: this.motif }).subscribe({
+      next: c => {
+        this.client.set(c);
+        this.desactivation.set(false);
+        this.messages.add({ severity: 'success', summary: 'Client désactivé', detail: 'Il ne recevra plus aucun message.' });
+      },
+      error: e => this.erreur.set(e?.error?.message ?? 'Désactivation impossible.')
+    });
+  }
+
+  reactiver(): void {
+    this.api.post<Client>(`/api/clients/${this.id()}/reactivation`).subscribe(c => {
+      this.client.set(c);
+      this.messages.add({ severity: 'success', summary: 'Client réactivé', detail: 'Il peut de nouveau être relancé.' });
+    });
+  }
+
+  ids(): number[] { return [Number(this.id())]; }
 
   chargerFactures(): void {
     this.api.toutes<Facture>('/api/recouvrement/factures', { clientId: Number(this.id()) }, 100).subscribe(f => this.factures.set(f));

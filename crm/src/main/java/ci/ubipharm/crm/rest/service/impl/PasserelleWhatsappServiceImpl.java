@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -70,6 +71,22 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
             corps.put("caption", legende);
         }
         return envoyer(numero, "/sessions/{id}/send-media", corps);
+    }
+
+    @Override
+    public Map<String, Boolean> verifierNumeros(String numero, List<String> numeros) {
+        Map<String, Object> reponse = appeler(() -> client.post().uri("/sessions/{id}/check-numbers", numero)
+                .body(Map.of("numbers", numeros)).retrieve().body(REPONSE));
+        Map<String, Boolean> presence = new HashMap<>();
+        Object resultats = reponse == null ? null : reponse.get("results");
+        if (resultats instanceof List<?> liste) {
+            for (Object o : liste) {
+                if (o instanceof Map<?, ?> r && r.get("number") != null) {
+                    presence.put(String.valueOf(r.get("number")), Boolean.TRUE.equals(r.get("exists")));
+                }
+            }
+        }
+        return presence;
     }
 
     private ResultatEnvoiDTO envoyer(String numero, String chemin, Map<String, Object> corps) {

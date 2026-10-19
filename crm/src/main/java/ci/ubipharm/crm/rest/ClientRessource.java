@@ -12,6 +12,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import ci.ubipharm.crm.rest.service.ClientService;
+import ci.ubipharm.crm.rest.service.MiseAJourSelectiveService;
+import ci.ubipharm.crm.rest.service.VerificationNumeroService;
+import ci.ubipharm.crm.rest.service.dto.DesactivationClientDTO;
+import ci.ubipharm.crm.rest.service.dto.MiseAJourSelectiveDTO;
+import ci.ubipharm.crm.rest.service.dto.ResultatMiseAJourDTO;
+import ci.ubipharm.crm.rest.service.dto.VerificationNumerosDTO;
+import ci.ubipharm.crm.rest.service.dto.VerificationNumerosDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientDemandeDTO;
@@ -26,6 +33,8 @@ import lombok.RequiredArgsConstructor;
 public class ClientRessource {
 
     private final ClientService clientService;
+    private final MiseAJourSelectiveService miseAJourSelectiveService;
+    private final VerificationNumeroService verificationNumeroService;
 
     @GetMapping
     public PageDTO<ClientDTO> rechercher(@Valid ClientCriteresDTO criteres) {
@@ -52,5 +61,29 @@ public class ClientRessource {
     @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
     public ClientDTO modifier(@PathVariable Long id, @Valid @RequestBody ClientDemandeDTO demande) {
         return clientService.modifier(id, demande);
+    }
+
+    @PostMapping("/{id}/desactivation")
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public ClientDTO desactiver(@PathVariable Long id, @Valid @RequestBody DesactivationClientDTO demande) {
+        return clientService.desactiver(id, demande.getMotif());
+    }
+
+    @PostMapping("/{id}/reactivation")
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public ClientDTO reactiver(@PathVariable Long id) {
+        return clientService.reactiver(id);
+    }
+
+    @PostMapping("/mise-a-jour-selective")
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public ResultatMiseAJourDTO miseAJourSelective(@Valid @RequestBody MiseAJourSelectiveDTO demande) {
+        return miseAJourSelectiveService.appliquer(demande);
+    }
+
+    @PostMapping("/verification-numeros")
+    @PreAuthorize("hasAuthority('DROIT_CLIENTS_GERER')")
+    public VerificationNumerosDTO verifierNumeros(@Valid @RequestBody VerificationNumerosDemandeDTO demande) {
+        return verificationNumeroService.verifier(demande);
     }
 }

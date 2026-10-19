@@ -652,6 +652,12 @@ Parametres > Referentiels (droit `REFERENTIELS`, donne aux roles qui gerent les 
 - Chaque segment porte un badge choisi parmi 12 (couronne, trophee, etoile...), affiche sur la fiche et la liste des clients.
 - Rien ne se supprime : une entree archivee reste sur les clients qui la portent mais ne se choisit plus.
 
+## Options des clients : desactivation, mise a jour selective, verificateur
+
+- **Desactivation** (droit CLIENTS_GERER, migration V1.3.7) : motif obligatoire, statut INACTIF, date et auteur gardes. Un client desactive ne recoit plus aucun message (relances, campagnes, listes : la selection ne prend que les ACTIF) et ne se modifie plus ; ses factures restent consultables. Liste « Clients desactives » par le filtre Statut de l'ecran Clients ; bouton Reactiver sur la fiche. Rien n'est supprime.
+- **Mise a jour selective** (`POST /api/clients/mise-a-jour-selective`) : on coche des clients puis les champs a changer (segment, agence, sous-agence, region/ville/commune, tournee) ; les autres restent tels quels. Tout ou rien : un client hors perimetre, desactive, ou d'une autre agence que la tournee choisie bloque l'ensemble. Changer d'agence retire la tournee de l'ancienne. Chaque client modifie a sa ligne au journal avec les ecarts.
+- **Verificateur de numeros** (`POST /api/clients/verification-numeros`) : numeros colles ou numeros des clients coches. Le format est controle, puis WhatsApp est interroge par lots de 50 depuis le numero WhatsApp Web connecte de l'utilisateur (sinon un autre numero connecte). Sans numero connecte, seul le format est controle et l'ecran le dit. Le resultat est garde sur le contact (whatsapp_present, whatsapp_verifie_le) et s'exporte en CSV.
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

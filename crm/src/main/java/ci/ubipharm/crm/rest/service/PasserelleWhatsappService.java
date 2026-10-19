@@ -1,5 +1,8 @@
 package ci.ubipharm.crm.rest.service;
 
+import java.util.List;
+import java.util.Map;
+
 import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
@@ -19,4 +22,7 @@ public interface PasserelleWhatsappService {
 
     /** Image (avec legende eventuelle) ou document ; ne leve jamais d'exception. */
     ResultatEnvoiDTO envoyerFichier(String numero, String destinataire, FichierDTO fichier, String legende);
+
+    /** Presence sur WhatsApp de chaque numero (format international), interrogee depuis la session du numero donne. */
+    Map<String, Boolean> verifierNumeros(String numero, List<String> numeros);
 }

@@ -8,14 +8,23 @@
         <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
       </div>
       <div class="actions">
-        @if (auth.peut('CLIENTS_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="modification.set(true)">Modifier</button> }
-        @if (auth.peut('FACTURES_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="saisieFacture.set(true)">Nouvelle facture</button> }
-        @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length) {
+        @if (auth.peut('CLIENTS_GERER') && c.statut === 'ACTIF') {
+          <button class="bs" type="button" (click)="modification.set(true)">Modifier</button>
+          <button class="bs" type="button" (click)="verification.set(true)">Vérifier les numéros</button>
+          <button class="bs" type="button" (click)="ouvrirDesactivation()">Désactiver</button>
+        }
+        @if (auth.peut('CLIENTS_GERER') && c.statut === 'INACTIF') { <button class="bp" type="button" (click)="reactiver()">Réactiver</button> }
+        @if (auth.peut('FACTURES_GERER') && c.statut === 'ACTIF') { <button class="bs" type="button" (click)="saisieFacture.set(true)">Nouvelle facture</button> }
+        @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length && c.statut === 'ACTIF') {
           <a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a>
         }
       </div>
     </div>
 
+    @if (c.statut === 'INACTIF') {
+      <div class="bandeau-inactif"><strong>Client désactivé</strong>{{ c.desactiveLe ? ' le ' + c.desactiveLe.substring(0, 10).split('-').reverse().join('/') : '' }}{{ c.desactivePar ? ' par ' + c.desactivePar : '' }}{{ c.desactiveMotif ? ' · ' + c.desactiveMotif : '' }}.
+        Il ne reçoit plus aucun message ; ses factures restent consultables.</div>
+    }
     <div class="kvs bandeau">
       <div class="kv"><span>Agence</span><strong>{{ c.agenceLibelle }}{{ c.sousAgence ? ' · ' + c.sousAgence : '' }}</strong></div>
       @if (auth.peut('PORTEFEUILLES_AFFECTER')) {
@@ -105,6 +114,18 @@
 
 @if (auth.peut('CLIENTS_GERER')) {
   <app-client-formulaire [(ouvert)]="modification" [client]="client()" (enregistre)="client.set($event)" />
+  <app-verification-numeros [(ouvert)]="verification" [clientIds]="ids()" />
+  <p-dialog header="Désactiver ce client" [visible]="desactivation()" (visibleChange)="!$event && desactivation.set(false)" [modal]="true" [style]="{ width: '520px' }">
+    <form class="formulaire" (ngSubmit)="desactiver()">
+      <p class="discret">Le client ne recevra plus aucun message (relances, campagnes). Rien n'est supprimé et vous pourrez le réactiver.</p>
+      <label class="f large">Motif<input class="sel" name="motif" [(ngModel)]="motif" placeholder="Ex. Pharmacie fermée" required></label>
+      @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
+      <div class="pied">
+        <button class="bs" type="button" (click)="desactivation.set(false)">Annuler</button>
+        <button class="bp" type="submit" [disabled]="!motif.trim()">Désactiver</button>
+      </div>
+    </form>
+  </p-dialog>
 }
 
 @if (auth.peut('FACTURES_GERER')) {

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ci.ubipharm.crm.rest.service.ClientService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.ReferentielService;
+import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.dto.LocalisationDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientDTO;
@@ -40,7 +41,8 @@ public class ClientServiceImpl implements ClientService {
                    sg.badge as segmentationBadge, c.nom_pharmacien as nomPharmacien, c.statut as statut,
                    c.region_id as regionId, rg.libelle as region, c.ville_id as villeId, vi.libelle as ville,
                    c.commune_id as communeId, co.libelle as commune, c.tournee_id as tourneeId, tr.libelle as tournee,
-                   c.date_anniversaire as dateAnniversaire,
+                   c.date_anniversaire as dateAnniversaire, c.desactive_le as desactiveLe, ud.nom_complet as desactivePar,
+                   c.desactive_motif as desactiveMotif,
                    a.id as agenceId, a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.adresse as adresse,
                    c.email as email, c.commentaire as commentaire,
                    (select ct.numero_whatsapp from crm_contact ct
@@ -56,6 +58,7 @@ public class ClientServiceImpl implements ClientService {
             left join crm_referentiel vi on vi.id = c.ville_id
             left join crm_referentiel co on co.id = c.commune_id
             left join crm_referentiel tr on tr.id = c.tournee_id
+            left join crm_utilisateur ud on ud.id = c.desactive_par
             """;
 
     private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
@@ -64,6 +67,7 @@ public class ClientServiceImpl implements ClientService {
     private final PerimetreService perimetreService;
     private final ParametreService parametreService;
     private final ReferentielService referentielService;
+    private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
 
     @Override
@@ -177,8 +181,8 @@ public class ClientServiceImpl implements ClientService {
     @Transactional
     public ClientDTO modifier(Long id, ClientDemandeDTO demande) {
         ClientDTO avant = consulter(id);
-        if ("ARCHIVE".equals(avant.getStatut())) {
-            throw new ErreurMetierException("Ce client est archivé.");
+        if (!"ACTIF".equals(avant.getStatut())) {
+            throw new ErreurMetierException("ARCHIVE".equals(avant.getStatut()) ? "Ce client est archivé." : "Ce client est désactivé : réactivez-le d'abord.");
         }
         Set<Long> dejaPortes = new java.util.HashSet<>();
         java.util.stream.Stream.of(avant.getRegionId(), avant.getVilleId(), avant.getCommuneId(), avant.getTourneeId())
@@ -245,6 +249,43 @@ public class ClientServiceImpl implements ClientService {
                 Tuple.class).getResultList();
         return lignes.stream().map(t -> SegmentDTO.builder().code(t.get("code", String.class)).libelle(t.get("libelle", String.class))
                 .badge(t.get("badge", String.class)).build()).toList();
+    }
+
+    @Override
+    @Transactional
+    public ClientDTO desactiver(Long id, String motif) {
+        ClientDTO client = consulter(id);
+        if (!"ACTIF".equals(client.getStatut())) {
+            throw new ErreurMetierException("Seul un client actif se désactive.");
+        }
+        em.createNativeQuery("""
+                update crm_client set statut = 'INACTIF', desactive_le = utc_timestamp(), desactive_par = :par, desactive_motif = :motif,
+                       updated_at = utc_timestamp()
+                where id = :id
+                """)
+                .setParameter("par", utilisateurCourantService.utilisateur().getId())
+                .setParameter("motif", motif.trim())
+                .setParameter("id", id)
+                .executeUpdate();
+        journalActionService.enregistrer("CLIENT_DESACTIVATION", "crm_client", id, client.getCode() + " : " + motif.trim());
+        return consulter(id);
+    }
+
+    @Override
+    @Transactional
+    public ClientDTO reactiver(Long id) {
+        ClientDTO client = consulter(id);
+        if (!"INACTIF".equals(client.getStatut())) {
+            throw new ErreurMetierException("Ce client n'est pas désactivé.");
+        }
+        em.createNativeQuery("""
+                update crm_client set statut = 'ACTIF', desactive_le = null, desactive_par = null, desactive_motif = null,
+                       updated_at = utc_timestamp()
+                where id = :id
+                """).setParameter("id", id).executeUpdate();
+        journalActionService.enregistrer("CLIENT_REACTIVATION", "crm_client", id, client.getCode() + " (désactivé le "
+                + client.getDesactiveLe().toLocalDate() + " : " + client.getDesactiveMotif() + ")");
+        return consulter(id);
     }
 
     private record Saisie(String raisonSociale, String nomPharmacien, String segmentation, String sousAgence, LocalisationDTO localisation,
@@ -357,6 +398,9 @@ public class ClientServiceImpl implements ClientService {
                 .tourneeId(tuple.get("tourneeId") == null ? null : ((Number) tuple.get("tourneeId")).longValue())
                 .tournee(tuple.get("tournee", String.class))
                 .dateAnniversaire(tuple.get("dateAnniversaire", java.time.LocalDate.class))
+                .desactiveLe(tuple.get("desactiveLe", java.time.LocalDateTime.class))
+                .desactivePar(tuple.get("desactivePar", String.class))
+                .desactiveMotif(tuple.get("desactiveMotif", String.class))
                 .statut(tuple.get("statut", String.class))
                 .agenceId(tuple.get("agenceId", Long.class))
                 .agenceLibelle(tuple.get("agenceLibelle", String.class))

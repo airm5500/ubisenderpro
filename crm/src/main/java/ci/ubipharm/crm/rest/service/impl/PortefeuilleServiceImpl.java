@@ -89,8 +89,9 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
     public PageDTO<PortefeuilleClientDTO> rechercher(PortefeuilleCriteresDTO criteres) {
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         List<Long> agentsGeres = agentsGeres();
-        StringBuilder where = new StringBuilder(" where c.statut = 'ACTIF'");
+        StringBuilder where = new StringBuilder(" where c.statut = :statut");
         Map<String, Object> parametres = new LinkedHashMap<>();
+        parametres.put("statut", criteres.getStatut() == null ? "ACTIF" : criteres.getStatut());
         if (agentsGeres != null) {
             // Un agent ne voit que son portefeuille et ceux qu'il remplace aujourd'hui
             where.append(" and af.agent_id in (:agentsGeres)");

@@ -45,6 +45,12 @@ public final class ResolutionReferentiels {
         return completer(r, v, c, t, agenceId, motifs);
     }
 
+    /** Libelle d'une entree, pour les journaux ; null si l'identifiant est vide. */
+    public String libelle(Long id) {
+        ReferentielDTO e = id == null ? null : parId.get(id);
+        return e == null ? (id == null ? null : String.valueOf(id)) : e.getLibelle();
+    }
+
     private ReferentielDTO choisi(String type, Long id, Set<Long> dejaPortes, List<String> motifs) {
         if (id == null) {
             return null;

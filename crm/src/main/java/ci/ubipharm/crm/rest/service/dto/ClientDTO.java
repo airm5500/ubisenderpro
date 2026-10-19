@@ -42,6 +42,9 @@ public class ClientDTO {
     private String numeroPrincipal;
     private String numeroSecondaire;
     private String statut;
+    private java.time.LocalDateTime desactiveLe;
+    private String desactivePar;
+    private String desactiveMotif;
     /** Numeros actifs par role (fiche client seulement), pour la modification. */
     private Map<String, String> numeros;
 }
