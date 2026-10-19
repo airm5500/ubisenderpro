@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
@@ -17,7 +18,7 @@ const ONGLETS: Onglet[] = [
 
 @Component({
   selector: 'app-liste-diffusion',
-  imports: [FormsModule, RouterLink, JourPipe, ListeFormulaire],
+  imports: [TooltipModule, FormsModule, RouterLink, JourPipe, ListeFormulaire],
   templateUrl: './liste-diffusion.html'
 })
 export class ListeDiffusionDetail implements OnInit {

@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -11,7 +12,7 @@ import { ProduitFormulaire } from './produit-formulaire';
 /** Catalogue des produits du Marketing : import Excel ou saisie a la main ; un produit s'archive, il ne se supprime pas. */
 @Component({
   selector: 'app-catalogue',
-  imports: [FormsModule, RouterLink, JourPipe, MontantPipe, ProduitFormulaire],
+  imports: [TooltipModule, FormsModule, RouterLink, JourPipe, MontantPipe, ProduitFormulaire],
   templateUrl: './catalogue.html'
 })
 export class Catalogue implements OnInit {

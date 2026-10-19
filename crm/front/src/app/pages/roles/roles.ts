@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -15,7 +16,7 @@ const VERROUS_ADMIN = ['UTILISATEURS', 'ROLES'];
 
 @Component({
   selector: 'app-roles',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
   templateUrl: './roles.html'
 })
 export class Roles implements OnInit {

@@ -1,4 +1,5 @@
 import { Component, OnChanges, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { AsyncPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
@@ -24,7 +25,7 @@ interface Edition { code: string; libelle: string; parentId: number | null; agen
 /** Listes de reference des fiches clients : regions, villes, communes, tournees et segments avec leur badge. Rien ne se supprime. */
 @Component({
   selector: 'app-referentiels',
-  imports: [FormsModule, DialogModule, JourPipe, BadgeSegment, AsyncPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe, BadgeSegment, AsyncPipe],
   templateUrl: './referentiels.html'
 })
 export class ReferentielsListe implements OnChanges {

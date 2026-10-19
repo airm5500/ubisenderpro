@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -22,7 +23,7 @@ interface EditionFaq { categorie: string; question: string; reponse: string; ord
  */
 @Component({
   selector: 'app-support',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
   templateUrl: './support.html'
 })
 export class Support implements OnInit {

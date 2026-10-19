@@ -79,7 +79,7 @@
 
         <h3 class="h" style="margin: 0">Accusés de réception</h3>
         @if (choisi()?.urlAccuse; as url) {
-          <div class="li"><span class="mono" style="word-break: break-all">{{ url }}</span><a (click)="copier(url)">Copier</a></div>
+          <div class="li"><span class="mono" style="word-break: break-all">{{ url }}</span><button type="button" class="bi" pTooltip="Copier l'adresse" tooltipPosition="top" aria-label="Copier l'adresse" (click)="copier(url)"><i class="pi pi-copy"></i></button></div>
           <p class="discret" style="margin: -8px 0 0">Adresse envoyée avec chaque SMS par {{ '{url_accuse}' }}, ou à déclarer chez le fournisseur.</p>
         } @else {
           <p class="discret" style="margin: 0">L'adresse publique du CRM (paramètre application.url_publique) n'est pas renseignée : le statut de chaque SMS est demandé au fournisseur.</p>

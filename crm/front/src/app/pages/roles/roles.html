@@ -23,10 +23,10 @@
               <td class="nw">
                 <span class="etat-compte"><span class="dot" [style.background]="r.actif ? '#51D78E' : '#D64545'"></span>{{ r.actif ? 'Actif' : 'Désactivé' }}</span>
               </td>
-              <td class="nw actions">
-                <a (click)="modifier(r)">Modifier</a>
-                @if (r.actif && r.code !== 'ADMIN') { <a (click)="desactiver(r)">Désactiver</a> }
-                @if (!r.actif) { <a (click)="reactiver(r)">Réactiver</a> }
+              <td class="nw"><span class="actions-ligne">
+                <button type="button" class="bi" pTooltip="Modifier le rôle" tooltipPosition="top" aria-label="Modifier le rôle" (click)="modifier(r)"><i class="pi pi-pencil"></i></button>
+                @if (r.actif && r.code !== 'ADMIN') { <button type="button" class="bi bi-danger" pTooltip="Désactiver le rôle" tooltipPosition="top" aria-label="Désactiver le rôle" (click)="desactiver(r)"><i class="pi pi-ban"></i></button> }
+                @if (!r.actif) { <button type="button" class="bi" pTooltip="Réactiver le rôle" tooltipPosition="top" aria-label="Réactiver le rôle" (click)="reactiver(r)"><i class="pi pi-replay"></i></button> }</span>
               </td>
             </tr>
           } @empty {

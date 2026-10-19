@@ -104,8 +104,8 @@
             </td>
             @if (auth.peut('FACTURES_GERER') || auth.peut('FACTURES_SUIVI')) {
               <td class="nw">
-                @if (auth.peut('FACTURES_SUIVI') && f.nature !== 'AVOIR' && (f.solde > 0 || f.suivi)) { <a (click)="suivre(f)">Suivi</a> }
-                @if (auth.peut('FACTURES_GERER')) { @if (auth.peut('FACTURES_SUIVI')) { · } <a (click)="modifier(f)">Modifier</a> }
+                <span class="actions-ligne">@if (auth.peut('FACTURES_SUIVI') && f.nature !== 'AVOIR' && (f.solde > 0 || f.suivi)) { <button type="button" class="bi" pTooltip="Suivi de la facture" tooltipPosition="top" aria-label="Suivi de la facture" (click)="suivre(f)"><i class="pi pi-flag"></i></button> }
+                @if (auth.peut('FACTURES_GERER')) { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(f)"><i class="pi pi-pencil"></i></button> }</span>
               </td>
             }
           </tr>

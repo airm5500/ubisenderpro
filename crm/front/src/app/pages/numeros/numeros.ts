@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -11,7 +12,7 @@ import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 
 @Component({
   selector: 'app-numeros',
-  imports: [FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe],
   templateUrl: './numeros.html'
 })
 export class Numeros implements OnInit, OnDestroy {

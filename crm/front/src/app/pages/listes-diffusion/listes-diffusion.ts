@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -12,7 +13,7 @@ import { FONCTIONS, ListeFormulaire } from './liste-formulaire';
 
 @Component({
   selector: 'app-listes-diffusion',
-  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, ListeFormulaire],
+  imports: [TooltipModule, FormsModule, AsyncPipe, RouterLink, JourPipe, ListeFormulaire],
   templateUrl: './listes-diffusion.html'
 })
 export class ListesDiffusion implements OnInit {

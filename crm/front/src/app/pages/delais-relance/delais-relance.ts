@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -16,7 +17,7 @@ interface Edition { agenceId: number | null; segment: string; avantJoursMax: num
 /** Delais de relance par agence et par segment client ; une case vide reprend le niveau au-dessus. */
 @Component({
   selector: 'app-delais-relance',
-  imports: [FormsModule, AsyncPipe, RouterLink, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, AsyncPipe, RouterLink, DialogModule, JourPipe],
   templateUrl: './delais-relance.html'
 })
 export class DelaisRelance implements OnInit {

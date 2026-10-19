@@ -144,7 +144,7 @@
         <tbody>
           @for (v of variables(); track v.id) {
             <tr><td><span class="tag">{{ '{' + v.code + '}' }}</span></td><td>{{ v.libelle }}</td><td>{{ libelleSource(v.source) }}</td><td>{{ v.exemple }}</td>
-              <td class="nw actions"><a (click)="ouvrirVariable(v)">Modifier</a><a (click)="archiverVariable(v)">Archiver</a></td></tr>
+              <td class="nw"><span class="actions-ligne"><button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="ouvrirVariable(v)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="archiverVariable(v)"><i class="pi pi-inbox"></i></button></span></td></tr>
           }
         </tbody>
       </table>

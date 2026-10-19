@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -14,7 +15,7 @@ const VARIABLE = /\{([a-z][a-z0-9_]*)\}/g;
 
 @Component({
   selector: 'app-modeles',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
   templateUrl: './modeles.html'
 })
 export class Modeles implements OnInit {

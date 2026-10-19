@@ -82,16 +82,16 @@
             <td class="nw">
               <span class="etat-compte"><span class="dot" [style.background]="p.statut === 'ACTIF' ? '#51D78E' : '#9AA5AE'"></span>{{ p.statut === 'ACTIF' ? 'Actif' : 'Archivé' }}</span>
             </td>
-            <td class="nw actions">
+            <td class="nw"><span class="actions-ligne">
               @if (auth.peut('PRODUITS_GERER')) {
                 @if (p.statut === 'ACTIF') {
-                  <a (click)="modifier(p)">Modifier</a>
-                  @if (p.disponibilite === 'DISPONIBLE') { <a (click)="changerDisponibilite(p, false)">Rupture</a> }
-                  @else { <a (click)="changerDisponibilite(p, true)">De retour</a> }
-                  <a (click)="archiver(p)">Archiver</a>
+                  <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(p)"><i class="pi pi-pencil"></i></button>
+                  @if (p.disponibilite === 'DISPONIBLE') { <button type="button" class="bi bi-danger" pTooltip="Marquer en rupture" tooltipPosition="top" aria-label="Marquer en rupture" (click)="changerDisponibilite(p, false)"><i class="pi pi-times-circle"></i></button> }
+                  @else { <button type="button" class="bi" pTooltip="Marquer de retour en stock" tooltipPosition="top" aria-label="Marquer de retour en stock" (click)="changerDisponibilite(p, true)"><i class="pi pi-check-circle"></i></button> }
+                  <button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="archiver(p)"><i class="pi pi-inbox"></i></button>
                 }
-                @else { <a (click)="reactiver(p)">Réactiver</a> }
-              }
+                @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="reactiver(p)"><i class="pi pi-replay"></i></button> }
+              }</span>
             </td>
           </tr>
         } @empty {

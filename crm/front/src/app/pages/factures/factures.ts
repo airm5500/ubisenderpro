@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -25,7 +26,7 @@ const ONGLETS: Onglet[] = [
 
 @Component({
   selector: 'app-factures',
-  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe, FactureFormulaire, FactureSuivi],
+  imports: [TooltipModule, FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe, FactureFormulaire, FactureSuivi],
   templateUrl: './factures.html'
 })
 export class Factures implements OnInit {

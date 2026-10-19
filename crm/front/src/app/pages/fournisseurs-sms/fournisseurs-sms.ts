@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -17,7 +18,7 @@ const VIDE: Edition = {
 /** Fournisseurs SMS : chacun est decrit par son API HTTP, un nouveau se parametre ici sans developpement. */
 @Component({
   selector: 'app-fournisseurs-sms',
-  imports: [FormsModule, JourPipe],
+  imports: [TooltipModule, FormsModule, JourPipe],
   templateUrl: './fournisseurs-sms.html'
 })
 export class FournisseursSms implements OnInit {

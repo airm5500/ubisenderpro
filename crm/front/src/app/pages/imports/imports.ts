@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
@@ -8,7 +9,7 @@ import { JourPipe } from '../../core/format';
 
 @Component({
   selector: 'app-imports',
-  imports: [FormsModule, RouterLink, JourPipe],
+  imports: [TooltipModule, FormsModule, RouterLink, JourPipe],
   templateUrl: './imports.html'
 })
 export class Imports implements OnInit {

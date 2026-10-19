@@ -29,16 +29,16 @@
             <td class="nw">
               @if (!s.numero) { <span class="discret">Numéro à renseigner</span> }
               @else if (s.fournisseur === 'META') {
-                @if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Mettre en pause</a> }
-                @else { <button class="ba petit" (click)="connecter(s)">Vérifier et reprendre</button> }
-                @if (auth.peut('WHATSAPP_META')) { <div><a (click)="passerWhatsappWeb(s)">Revenir à WhatsApp Web</a></div> }
+                <span class="actions-ligne">@if (s.statut === 'CONNECTE') { <button type="button" class="bi bi-danger" pTooltip="Mettre en pause" tooltipPosition="top" aria-label="Mettre en pause" (click)="deconnecter(s)"><i class="pi pi-pause"></i></button> }
+                @else { <button type="button" class="bi bi-plein" pTooltip="Vérifier et reprendre" tooltipPosition="top" aria-label="Vérifier et reprendre" (click)="connecter(s)"><i class="pi pi-play"></i></button> }
+                @if (auth.peut('WHATSAPP_META')) { <button type="button" class="bi" pTooltip="Revenir à WhatsApp Web" tooltipPosition="top" aria-label="Revenir à WhatsApp Web" (click)="passerWhatsappWeb(s)"><i class="pi pi-whatsapp"></i></button> }</span>
               }
               @else {
-                @if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Délier le téléphone</a> }
-                @else if (metaParDefaut(s)) { <button class="ba petit" (click)="ouvrirBascule(s)">Relier à l'API officielle</button> }
-                @else { <button class="ba petit" (click)="connecter(s)">Scanner le QR</button> }
-                @if (metaParDefaut(s)) { <div><a (click)="connecter(s)">ou scanner le QR (WhatsApp Web)</a></div> }
-                @else if (auth.peut('WHATSAPP_META')) { <div><a (click)="ouvrirBascule(s)">Passer à l'API officielle</a></div> }
+                <span class="actions-ligne">@if (s.statut === 'CONNECTE') { <button type="button" class="bi bi-danger" pTooltip="Délier le téléphone" tooltipPosition="top" aria-label="Délier le téléphone" (click)="deconnecter(s)"><i class="pi pi-sign-out"></i></button> }
+                @else if (metaParDefaut(s)) { <button type="button" class="bi bi-plein" pTooltip="Relier à l'API officielle" tooltipPosition="top" aria-label="Relier à l'API officielle" (click)="ouvrirBascule(s)"><i class="pi pi-link"></i></button> }
+                @else { <button type="button" class="bi bi-plein" pTooltip="Scanner le QR code" tooltipPosition="top" aria-label="Scanner le QR code" (click)="connecter(s)"><i class="pi pi-qrcode"></i></button> }
+                @if (metaParDefaut(s)) { <button type="button" class="bi" pTooltip="Ou scanner le QR code (WhatsApp Web)" tooltipPosition="top" aria-label="Ou scanner le QR code (WhatsApp Web)" (click)="connecter(s)"><i class="pi pi-qrcode"></i></button> }
+                @else if (auth.peut('WHATSAPP_META')) { <button type="button" class="bi" pTooltip="Passer à l'API officielle" tooltipPosition="top" aria-label="Passer à l'API officielle" (click)="ouvrirBascule(s)"><i class="pi pi-arrow-right-arrow-left"></i></button> }</span>
               }
             </td>
           </tr>

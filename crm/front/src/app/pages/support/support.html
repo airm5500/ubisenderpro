@@ -40,7 +40,7 @@
                 <td>{{ e.utilisateur ?? '—' }}</td>
                 <td class="nw">
                   @if (e.traite) { <span class="second">Traitée par {{ e.traitePar }}</span> }
-                  @else { <a (click)="$event.stopPropagation(); traiter(e)">Marquer traitée</a> }
+                  @else { <button type="button" class="bi" pTooltip="Marquer comme traitée" tooltipPosition="top" aria-label="Marquer comme traitée" (click)="$event.stopPropagation(); traiter(e)"><i class="pi pi-check"></i></button> }
                 </td>
               </tr>
             } @empty {
@@ -83,8 +83,8 @@
               @if (support()) {
                 <div class="second">
                   Modifiée le {{ f.modifieLe | jour }}{{ f.modifiePar ? ' par ' + f.modifiePar : '' }} ·
-                  @if (f.statut === 'ACTIF') { <a (click)="modifierQuestion(f)">Modifier</a> · <a (click)="changerStatutQuestion(f, 'archivage')">Archiver</a> }
-                  @else { <a (click)="changerStatutQuestion(f, 'reactivation')">Réactiver</a> }
+                  <span class="actions-ligne">@if (f.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier la question" tooltipPosition="top" aria-label="Modifier la question" (click)="modifierQuestion(f)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver la question" tooltipPosition="top" aria-label="Archiver la question" (click)="changerStatutQuestion(f, 'archivage')"><i class="pi pi-inbox"></i></button> }
+                  @else { <button type="button" class="bi" pTooltip="Réactiver la question" tooltipPosition="top" aria-label="Réactiver la question" (click)="changerStatutQuestion(f, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
                 </div>
               }
             </details>

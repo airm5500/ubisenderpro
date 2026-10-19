@@ -34,10 +34,10 @@
               @else { <span class="discret">pas encore annoncée</span> }</td>
             <td><div>{{ i.modifieLe | jour }}</div><div class="second">{{ i.modifiePar }}</div></td>
             <td class="nw">
-              @if (i.statut === 'ACTIF') {
-                @if (!i.expiree) { <a (click)="annoncer(i)">Annoncer</a> · }
-                <a (click)="modifier(i)">Modifier</a> · <a (click)="action(i, 'duplication')">Dupliquer</a> · <a (click)="action(i, 'archivage')">Archiver</a>
-              } @else { <a (click)="action(i, 'reactivation')">Réactiver</a> }
+              <span class="actions-ligne">@if (i.statut === 'ACTIF') {
+                @if (!i.expiree) { <button type="button" class="bi" pTooltip="Annoncer" tooltipPosition="top" aria-label="Annoncer" (click)="annoncer(i)"><i class="pi pi-megaphone"></i></button> }
+                <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(i)"><i class="pi pi-pencil"></i></button><button type="button" class="bi" pTooltip="Dupliquer" tooltipPosition="top" aria-label="Dupliquer" (click)="action(i, 'duplication')"><i class="pi pi-copy"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="action(i, 'archivage')"><i class="pi pi-inbox"></i></button>
+              } @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="action(i, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
             </td>
           </tr>
         } @empty {
