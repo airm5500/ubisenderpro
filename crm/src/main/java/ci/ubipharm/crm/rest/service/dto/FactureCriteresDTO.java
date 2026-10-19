@@ -22,6 +22,8 @@ public class FactureCriteresDTO {
 
     /** Reference de facture, code ou raison sociale du client. */
     private String q;
+    /** Une seule facture (consultation), dans le meme perimetre que la recherche. */
+    private Long factureId;
     private Long clientId;
     private Long agenceId;
     private Long sousTypeId;

@@ -8,6 +8,7 @@
       </div>
       <div class="actions">
         @if (auth.peut('CLIENTS_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="modification.set(true)">Modifier</button> }
+        @if (auth.peut('FACTURES_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="saisieFacture.set(true)">Nouvelle facture</button> }
         @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length) {
           <a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a>
         }
@@ -96,4 +97,8 @@
 
 @if (auth.peut('CLIENTS_GERER')) {
   <app-client-formulaire [(ouvert)]="modification" [client]="client()" (enregistre)="client.set($event)" />
+}
+
+@if (auth.peut('FACTURES_GERER')) {
+  <app-facture-formulaire [(ouvert)]="saisieFacture" [client]="client()" (enregistre)="chargerFactures()" />
 }

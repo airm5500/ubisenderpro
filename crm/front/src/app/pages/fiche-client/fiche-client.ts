@@ -5,6 +5,7 @@ import { Auth } from '../../core/auth';
 import { Affectation, Client, Facture, MessageRecu, Page } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, TelephonePipe } from '../../core/format';
 import { ClientFormulaire } from '../clients/client-formulaire';
+import { FactureFormulaire } from '../factures/facture-formulaire';
 
 interface Evenement { quand: string; qui: string; titre: string; detail: string; couleur: string; }
 
@@ -12,7 +13,7 @@ const PALETTE = ['#05253D', '#51D78E', '#0B5C8E', '#F4B740', '#9DB0BF'];
 
 @Component({
   selector: 'app-fiche-client',
-  imports: [RouterLink, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire],
+  imports: [RouterLink, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire],
   templateUrl: './fiche-client.html',
   styleUrl: './fiche-client.css'
 })
@@ -24,6 +25,7 @@ export class FicheClient implements OnInit {
   readonly id = input.required<string>();
   protected readonly client = signal<Client | null>(null);
   protected readonly modification = signal(false);
+  protected readonly saisieFacture = signal(false);
   protected readonly factures = signal<Facture[]>([]);
   protected readonly voirSoldees = signal(false);
   protected readonly reponses = signal<MessageRecu[]>([]);
@@ -61,10 +63,14 @@ export class FicheClient implements OnInit {
     return ev.sort((a, b) => b.quand.localeCompare(a.quand));
   });
 
+  chargerFactures(): void {
+    this.api.toutes<Facture>('/api/recouvrement/factures', { clientId: Number(this.id()) }, 100).subscribe(f => this.factures.set(f));
+  }
+
   ngOnInit(): void {
     const id = Number(this.id());
     this.api.get<Client>(`/api/clients/${id}`).subscribe(c => this.client.set(c));
-    this.api.toutes<Facture>('/api/recouvrement/factures', { clientId: id }, 100).subscribe(f => this.factures.set(f));
+    this.chargerFactures();
     this.api.get<Page<MessageRecu>>('/api/recouvrement/reponses', { clientId: id, page: 0, taille: 50 }).subscribe(p => this.reponses.set(p.elements));
     if (this.auth.peut('PORTEFEUILLES_AFFECTER')) {
       this.api.get<Affectation[]>(`/api/recouvrement/clients/${id}/affectations`).subscribe(a => this.affectations.set(a));

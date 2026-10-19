@@ -1,0 +1,57 @@
+<p-dialog [header]="facture() ? 'Modifier la facture' : 'Nouvelle facture'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '680px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="f large">Client
+      @if (clientChoisi(); as c) {
+        <div class="actions" style="justify-content: space-between">
+          <strong>{{ c.libelle }}</strong>
+          @if (!facture() && !client()) { <a (click)="changerClient()">Changer</a> }
+        </div>
+      } @else {
+        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher($event)"
+               placeholder="Pharmacie, pharmacien ou numéro de compte" aria-label="Rechercher le client" autocomplete="off">
+        @if (clients().length) {
+          <div class="choix-client">
+            @for (c of clients(); track c.id) {
+              <button type="button" class="ligne-choix" (click)="choisir(c)">{{ c.raisonSociale }}<span class="discret"> · {{ c.code }} · {{ c.agenceLibelle }}</span></button>
+            }
+          </div>
+        } @else if (recherche.trim().length >= 2) { <span class="discret">Aucun client trouvé.</span> }
+      }
+    </div>
+    <div class="grille">
+      <label class="f">Référence
+        <input class="sel" name="reference" [(ngModel)]="formulaire.reference" [disabled]="!!facture()" placeholder="Ex. FA-2026-10-0412" required>
+      </label>
+      <label class="f">Nature
+        <select class="sel" name="nature" [(ngModel)]="formulaire.nature">
+          <option value="FACTURE">Facture</option>
+          <option value="AVOIR">Avoir</option>
+        </select>
+      </label>
+      <label class="f">Sous-type de compte
+        <select class="sel" name="sousTypeId" [(ngModel)]="formulaire.sousTypeId" required>
+          <option [ngValue]="null" disabled>Choisir…</option>
+          @for (s of ref.sousTypes | async; track s.id) { <option [ngValue]="s.id">{{ s.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Date de facture<input class="sel" type="date" name="dateFacture" [(ngModel)]="formulaire.dateFacture" required></label>
+      <label class="f">Échéance<input class="sel" type="date" name="dateEcheance" [(ngModel)]="formulaire.dateEcheance" required></label>
+      <span></span>
+      <label class="f">Montant (FCFA)
+        <input class="sel" type="number" min="0" step="1" name="montant" [(ngModel)]="formulaire.montant" (ngModelChange)="montantSaisi($event)" required>
+      </label>
+      <label class="f">Solde dû (FCFA)
+        <input class="sel" type="number" min="0" step="1" name="solde" [(ngModel)]="formulaire.solde" required>
+      </label>
+    </div>
+    <p class="discret" style="margin: 0">Un solde à 0 solde la facture : elle sort des relances.
+      @if (formulaire.nature === 'AVOIR') { Un avoir s'enregistre en négatif, comme à l'import. }</p>
+
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !pret()">{{ facture() ? 'Enregistrer' : 'Créer' }}</button>
+    </div>
+  </form>
+</p-dialog>

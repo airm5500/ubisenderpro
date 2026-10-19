@@ -245,3 +245,9 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .droit .discret { display: block; margin-top: 1px; }
 .droit.verrou { cursor: default; opacity: .75; }
 @media (max-width: 800px) { .droits-liste { grid-template-columns: 1fr; } }
+
+/* Choix d'un client dans un formulaire (saisie d'une facture) */
+.choix-client { display: flex; flex-direction: column; border: 1px solid var(--bordure); border-radius: 8px; margin-top: 4px; overflow: hidden; }
+.ligne-choix { text-align: left; background: #fff; border: 0; border-bottom: 1px solid var(--filet-2); padding: 9px 12px; font: inherit; color: var(--texte); cursor: pointer; }
+.ligne-choix:last-child { border-bottom: 0; }
+.ligne-choix:hover, .ligne-choix:focus-visible { background: var(--fond-2); }

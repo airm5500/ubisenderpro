@@ -382,3 +382,15 @@ Les clients arrives un par un se saisissent sans import : bouton **Nouveau clien
   (`statut = 'ARCHIVE'`), jamais supprime.
 - **Agent** : a la creation, un profil qui affecte les portefeuilles peut choisir l'agent tout de suite.
 - **Journal** : `CLIENT_CREATION`, et `CLIENT_MODIFICATION` avec chaque champ change (avant -> apres).
+
+## Creation des factures a la main (lot 14)
+
+Regle : tout ce qui s'importe peut aussi se saisir. **Nouvelle facture** dans Factures (et sur la fiche client),
+**Modifier** sur chaque ligne pour corriger une facture ou enregistrer un reglement.
+
+- **Droit** `FACTURES_GERER` (Creances, Recouvrement), donne par `V1.0.19` aux roles qui importent deja.
+- **API** : `GET /api/recouvrement/factures/{id}`, `POST /api/recouvrement/factures`, `PUT /api/recouvrement/factures/{id}`.
+- **Controles de l'import** : reference unique (figee ensuite, comme le client), client du perimetre (et du portefeuille
+  pour un agent), sous-type connu, echeance apres la date de facture, solde au plus egal au montant. Un avoir est
+  enregistre en negatif. Un solde a 0 solde la facture ; une facture soldee dont le solde reapparait repasse a relancer.
+- **Journal** : `FACTURE_CREATION`, `FACTURE_MODIFICATION` (avant -> apres).

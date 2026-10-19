@@ -1,10 +1,14 @@
 package ci.ubipharm.crm.rest.service.impl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,11 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 import ci.ubipharm.crm.rest.service.FactureService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.dto.FactureCriteresDTO;
+import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.dto.FactureDTO;
+import ci.ubipharm.crm.rest.service.dto.FactureDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.SousTypeDTO;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
+import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
+import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
@@ -46,6 +54,9 @@ public class FactureServiceImpl implements FactureService {
     private final EntityManager em;
     private final PerimetreService perimetreService;
     private final PortefeuilleService portefeuilleService;
+    private final JournalActionService journalActionService;
+
+    private static final DateTimeFormatter DATE_LISIBLE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     @Override
     @Transactional(readOnly = true)
@@ -68,6 +79,10 @@ public class FactureServiceImpl implements FactureService {
             where.append(" and exists (select 1 from crm_affectation af where af.client_id = c.id and af.date_fin is null"
                     + " and af.agent_id in (:agentsGeres))");
             parametres.put("agentsGeres", agentsGeres);
+        }
+        if (criteres.getFactureId() != null) {
+            where.append(" and f.id = :factureId");
+            parametres.put("factureId", criteres.getFactureId());
         }
         if (criteres.getClientId() != null) {
             where.append(" and f.client_id = :clientId");
@@ -131,6 +146,151 @@ public class FactureServiceImpl implements FactureService {
                 "select id as id, code as code, libelle as libelle from crm_sous_type_compte where statut = 'ACTIF' order by libelle",
                 Tuple.class).getResultList();
         return lignes.stream().map(this::mapTupleToSousTypeDto).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FactureDTO consulter(Long id) {
+        return rechercher(FactureCriteresDTO.builder().factureId(id).taille(1).build()).getElements().stream().findFirst()
+                .orElseThrow(() -> new RessourceIntrouvableException("Facture introuvable"));
+    }
+
+    @Override
+    @Transactional
+    public FactureDTO creer(FactureDemandeDTO demande) {
+        List<String> motifs = new ArrayList<>();
+        String reference = vide(demande.getReference());
+        if (reference == null) {
+            motifs.add("Saisissez la référence de la facture.");
+        } else {
+            Number homonymes = (Number) em.createNativeQuery("select count(*) from crm_facture where upper(reference) = upper(:reference)")
+                    .setParameter("reference", reference).getSingleResult();
+            if (homonymes.longValue() > 0) {
+                motifs.add("La facture " + reference + " existe déjà.");
+            }
+        }
+        if (demande.getClientId() == null) {
+            motifs.add("Choisissez le client.");
+        } else {
+            verifierClient(demande.getClientId(), motifs);
+        }
+        Saisie saisie = verifier(demande, motifs);
+        em.createNativeQuery("""
+                insert into crm_facture (reference, client_id, sous_type_id, nature, date_facture, date_echeance, montant, solde, statut, created_at)
+                values (:reference, :clientId, :sousTypeId, :nature, :dateFacture, :dateEcheance, :montant, :solde,
+                        case when :solde = 0 then 'SOLDEE' else 'A_RELANCER' end, utc_timestamp())
+                """)
+                .setParameter("reference", reference)
+                .setParameter("clientId", demande.getClientId())
+                .setParameter("sousTypeId", demande.getSousTypeId())
+                .setParameter("nature", saisie.nature())
+                .setParameter("dateFacture", demande.getDateFacture())
+                .setParameter("dateEcheance", demande.getDateEcheance())
+                .setParameter("montant", saisie.montant())
+                .setParameter("solde", saisie.solde())
+                .executeUpdate();
+        Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
+        journalActionService.enregistrer("FACTURE_CREATION", "crm_facture", id,
+                reference + " : " + saisie.montant().toPlainString() + " (solde " + saisie.solde().toPlainString() + ")");
+        return consulter(id);
+    }
+
+    @Override
+    @Transactional
+    public FactureDTO modifier(Long id, FactureDemandeDTO demande) {
+        FactureDTO avant = consulter(id);
+        List<String> motifs = new ArrayList<>();
+        Saisie saisie = verifier(demande, motifs);
+        // Meme regle que l'import : solde a zero = soldee ; une facture soldee dont le solde reapparait repasse a relancer
+        em.createNativeQuery("""
+                update crm_facture set statut = case when :solde = 0 then 'SOLDEE' when statut = 'SOLDEE' then 'A_RELANCER' else statut end,
+                       sous_type_id = :sousTypeId, nature = :nature, date_facture = :dateFacture, date_echeance = :dateEcheance,
+                       montant = :montant, solde = :solde, updated_at = utc_timestamp()
+                where id = :id
+                """)
+                .setParameter("sousTypeId", demande.getSousTypeId())
+                .setParameter("nature", saisie.nature())
+                .setParameter("dateFacture", demande.getDateFacture())
+                .setParameter("dateEcheance", demande.getDateEcheance())
+                .setParameter("montant", saisie.montant())
+                .setParameter("solde", saisie.solde())
+                .setParameter("id", id)
+                .executeUpdate();
+        FactureDTO apres = consulter(id);
+        List<String> ecarts = new ArrayList<>();
+        ecart(ecarts, "Nature", avant.getNature(), apres.getNature());
+        ecart(ecarts, "Sous-type", avant.getSousTypeLibelle(), apres.getSousTypeLibelle());
+        ecart(ecarts, "Date de facture", avant.getDateFacture().format(DATE_LISIBLE), apres.getDateFacture().format(DATE_LISIBLE));
+        ecart(ecarts, "Échéance", avant.getDateEcheance().format(DATE_LISIBLE), apres.getDateEcheance().format(DATE_LISIBLE));
+        ecart(ecarts, "Montant", avant.getMontant().toPlainString(), apres.getMontant().toPlainString());
+        ecart(ecarts, "Solde", avant.getSolde().toPlainString(), apres.getSolde().toPlainString());
+        if (!ecarts.isEmpty()) {
+            journalActionService.enregistrer("FACTURE_MODIFICATION", "crm_facture", id, avant.getReference() + " : " + String.join(" ; ", ecarts));
+        }
+        return apres;
+    }
+
+    private record Saisie(String nature, BigDecimal montant, BigDecimal solde) {
+    }
+
+    /** Memes controles que l'import des factures. */
+    private Saisie verifier(FactureDemandeDTO demande, List<String> motifs) {
+        Number sousType = (Number) em.createNativeQuery("select count(*) from crm_sous_type_compte where id = :id and statut = 'ACTIF'")
+                .setParameter("id", demande.getSousTypeId()).getSingleResult();
+        if (sousType.longValue() == 0) {
+            motifs.add("Sous-type inconnu.");
+        }
+        if (demande.getDateEcheance().isBefore(demande.getDateFacture())) {
+            motifs.add("L'échéance (" + demande.getDateEcheance().format(DATE_LISIBLE) + ") précède la date de facture ("
+                    + demande.getDateFacture().format(DATE_LISIBLE) + ").");
+        }
+        String nature = demande.getNature() == null || demande.getNature().isBlank() ? "FACTURE" : demande.getNature();
+        if (!"FACTURE".equals(nature) && !"AVOIR".equals(nature)) {
+            motifs.add("Nature inconnue : " + nature + ".");
+        }
+        BigDecimal montant = demande.getMontant().abs().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal solde = demande.getSolde().abs().setScale(2, RoundingMode.HALF_UP);
+        if (montant.signum() == 0) {
+            motifs.add("Le montant ne peut pas être nul.");
+        }
+        if (solde.compareTo(montant) > 0) {
+            motifs.add("Le solde (" + solde.toPlainString() + ") dépasse le montant (" + montant.toPlainString() + ").");
+        }
+        if (!motifs.isEmpty()) {
+            throw new ErreurMetierException(String.join(" ", motifs));
+        }
+        return "AVOIR".equals(nature) ? new Saisie(nature, montant.negate(), solde.negate()) : new Saisie(nature, montant, solde);
+    }
+
+    private void verifierClient(Long clientId, List<String> motifs) {
+        @SuppressWarnings("unchecked")
+        List<Tuple> clients = em.createNativeQuery("select agence_id as agenceId, statut as statut from crm_client where id = :id", Tuple.class)
+                .setParameter("id", clientId).getResultList();
+        PerimetreDTO perimetre = perimetreService.perimetreCourant();
+        if (clients.isEmpty()) {
+            motifs.add("Client inconnu.");
+        } else if (!perimetre.isVisionGlobale() && !perimetre.getAgenceIds().contains(clients.getFirst().get("agenceId", Long.class))) {
+            motifs.add("Ce client est hors de votre périmètre.");
+        } else if ("ARCHIVE".equals(clients.getFirst().get("statut", String.class))) {
+            motifs.add("Ce client est archivé.");
+        } else if (portefeuilleService.agentsGeres() != null) {
+            Number affecte = (Number) em.createNativeQuery(
+                    "select count(*) from crm_affectation where client_id = :id and date_fin is null and agent_id in (:agents)")
+                    .setParameter("id", clientId).setParameter("agents", portefeuilleService.agentsGeres()).getSingleResult();
+            if (affecte.longValue() == 0) {
+                motifs.add("Ce client n'est pas dans votre portefeuille.");
+            }
+        }
+    }
+
+    private static void ecart(List<String> ecarts, String champ, String avant, String apres) {
+        if (!Objects.equals(avant, apres)) {
+            ecarts.add(champ + " : " + avant + " -> " + apres);
+        }
+    }
+
+    private static String vide(String valeur) {
+        return valeur == null || valeur.isBlank() ? null : valeur.trim();
     }
 
     FactureDTO mapTupleToDto(Tuple tuple) {

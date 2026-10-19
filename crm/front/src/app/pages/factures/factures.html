@@ -4,8 +4,11 @@
       <h1>Factures et créances</h1>
       <p class="sous-titre">Chaque facture se suit à part, avec sa propre échéance et son sous-type de compte.</p>
     </div>
-    @if (auth.peut('IMPORTS')) {
-      <div class="actions"><a class="bs" routerLink="/imports/nouveau" [queryParams]="{ type: 'factures' }">Importer</a></div>
+    @if (auth.peut('IMPORTS') || auth.peut('FACTURES_GERER')) {
+      <div class="actions">
+        @if (auth.peut('IMPORTS')) { <a class="bs" routerLink="/imports/nouveau" [queryParams]="{ type: 'factures' }">Importer</a> }
+        @if (auth.peut('FACTURES_GERER')) { <button class="bp" type="button" (click)="nouvelle()">Nouvelle facture</button> }
+      </div>
     }
   </div>
 
@@ -66,7 +69,7 @@
       <thead><tr>
         <th><input type="checkbox" aria-label="Tout sélectionner" [checked]="toutCoche()" (change)="toutBasculer($any($event.target).checked)"></th>
         <th>Référence</th><th>Client</th><th>Agence</th><th>Sous-type</th><th>Date facture</th><th>Échéance</th>
-        <th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th>
+        <th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th>@if (auth.peut('FACTURES_GERER')) { <th></th> }
       </tr></thead>
       <tbody>
         @for (f of page()?.elements; track f.id) {
@@ -87,9 +90,10 @@
             <td class="n">{{ f.montant | montant }}</td>
             <td class="n" style="font-weight: 700">{{ f.solde | montant }}</td>
             <td class="nw"><span class="dot" [style.background]="L.couleurFacture[f.statut]"></span>{{ L.statutFacture[f.statut] ?? f.statut }}</td>
+            @if (auth.peut('FACTURES_GERER')) { <td class="nw"><a (click)="modifier(f)">Modifier</a></td> }
           </tr>
         } @empty {
-          <tr><td colspan="10" class="vide">{{ page() ? 'Aucune facture ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          <tr><td [attr.colspan]="auth.peut('FACTURES_GERER') ? 11 : 10" class="vide">{{ page() ? 'Aucune facture ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>
@@ -102,3 +106,7 @@
     </div>
   }
 </div>
+
+@if (auth.peut('FACTURES_GERER')) {
+  <app-facture-formulaire [(ouvert)]="saisie" [facture]="cible()" (enregistre)="enregistree()" />
+}

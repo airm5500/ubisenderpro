@@ -8,6 +8,7 @@ import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
 import { Facture, Page } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, aujourdhui } from '../../core/format';
+import { FactureFormulaire } from './facture-formulaire';
 
 interface Onglet { code: string; libelle: string; statut?: string; enRetard?: boolean; }
 
@@ -23,7 +24,7 @@ const ONGLETS: Onglet[] = [
 
 @Component({
   selector: 'app-factures',
-  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe],
+  imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, MontantPipe, FactureFormulaire],
   templateUrl: './factures.html'
 })
 export class Factures implements OnInit {
@@ -39,6 +40,8 @@ export class Factures implements OnInit {
   protected readonly page = signal<Page<Facture> | null>(null);
   protected readonly compteurs = signal<Record<string, number>>({});
   protected readonly selection = signal<Map<number, Facture>>(new Map());
+  protected readonly saisie = signal(false);
+  protected readonly cible = signal<Facture | null>(null);
   private numeroPage = 0;
   private readonly taille = 25;
 
@@ -77,6 +80,21 @@ export class Factures implements OnInit {
   allerA(decalage: number): void {
     this.numeroPage = Math.min(Math.max(0, this.numeroPage + decalage), this.nbPages() - 1);
     this.charger();
+  }
+
+  nouvelle(): void {
+    this.cible.set(null);
+    this.saisie.set(true);
+  }
+
+  modifier(f: Facture): void {
+    this.cible.set(f);
+    this.saisie.set(true);
+  }
+
+  enregistree(): void {
+    this.charger();
+    this.compter();
   }
 
   basculer(f: Facture): void {
