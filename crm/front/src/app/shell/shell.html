@@ -43,7 +43,8 @@
     }
     } @else {
       <div class="gl">Marketing</div>
-      <a class="nv" routerLink="/marketing" routerLinkActive="on">Accueil</a>
+      <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
+      @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
     }
     <!-- Administration : la meme dans les deux modules -->
     @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'FOURNISSEURS_SMS')) {

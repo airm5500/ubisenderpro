@@ -13,6 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.DesabonnementService;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.EvenementAccuseDTO;
 import ci.ubipharm.crm.rest.service.dto.EvenementMessageDTO;
@@ -29,10 +30,13 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
     private static final String AVANT_REPONSE = "('A_RELANCER', 'RELANCE_PROGRAMMEE', 'RELANCE_ENVOYEE', 'MESSAGE_DISTRIBUE', 'MESSAGE_LU')";
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final DesabonnementService desabonnementService;
     private final byte[] jeton;
 
-    public EvenementWhatsappServiceImpl(NamedParameterJdbcTemplate jdbc, @Value("${crm.whatsapp.jeton:}") String jeton) {
+    public EvenementWhatsappServiceImpl(NamedParameterJdbcTemplate jdbc, DesabonnementService desabonnementService,
+                                        @Value("${crm.whatsapp.jeton:}") String jeton) {
         this.jdbc = jdbc;
+        this.desabonnementService = desabonnementService;
         this.jeton = jeton.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -106,6 +110,9 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                 .addValue("type", e.getType() == null ? "TEXTE" : e.getType())
                 .addValue("contenu", e.getText())
                 .addValue("identifiant", e.getId()));
+        if (nouveaux > 0 && !clients.isEmpty()) {
+            desabonnementService.traiterReponse(clients.getFirst(), e.getText());
+        }
         if (nouveaux == 0 || relance == null) {
             return;
         }

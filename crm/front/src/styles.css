@@ -251,3 +251,5 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .ligne-choix { text-align: left; background: #fff; border: 0; border-bottom: 1px solid var(--filet-2); padding: 9px 12px; font: inherit; color: var(--texte); cursor: pointer; }
 .ligne-choix:last-child { border-bottom: 0; }
 .ligne-choix:hover, .ligne-choix:focus-visible { background: var(--fond-2); }
+.tuile { padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.tuile b { font-size: 24px; color: var(--bleu); }

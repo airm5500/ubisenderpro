@@ -394,3 +394,24 @@ Regle : tout ce qui s'importe peut aussi se saisir. **Nouvelle facture** dans Fa
   pour un agent), sous-type connu, echeance apres la date de facture, solde au plus egal au montant. Un avoir est
   enregistre en negatif. Un solde a 0 solde la facture ; une facture soldee dont le solde reapparait repasse a relancer.
 - **Journal** : `FACTURE_CREATION`, `FACTURE_MODIFICATION` (avant -> apres).
+
+## Marketing : listes de diffusion (Marketing lot 1)
+
+Ecran **Marketing > Listes de diffusion**. Une liste vise des clients par criteres (agences, sous-agences, villes,
+segments ; un critere vide ne filtre pas), completee ou corrigee client par client (ajout, exclusion). Le nombre de
+clients vises se recalcule pendant la saisie. Une liste n'est jamais supprimee : elle est archivee puis reactivable.
+Le critere "tournee" n'existe pas : les tournees sont decidees par les agences.
+
+- **Perimetre** : un compte ne voit et n'ajoute que les clients de ses agences (sauf vision globale). Clients archives exclus.
+- **Joignable** : client non desabonne qui a au moins un numero WhatsApp des fonctions choisies (principal par defaut) ou un e-mail.
+- **Desabonnement STOP** : un message WhatsApp recu dont le texte, sans accents ni ponctuation, est l'un des mots du
+  parametre `marketing.mots_desabonnement` (STOP, ARRET, DESABONNER par defaut) desabonne le client de tout le Marketing.
+  Les relances du Recouvrement continuent. Desabonner et reabonner a la main depuis la liste.
+- **Droits** `LISTES` (consulter) et `LISTES_GERER` (creer, modifier, archiver, desabonner), groupe Diffusion du module
+  Marketing ; nouveau role systeme `CHARGE_MARKETING` (Charge marketing). Migration `V1.0.20`.
+- **API** (`/api/marketing`) : `GET /listes`, `GET /listes/{id}`, `GET /listes/{id}/membres?filtre=TOUS|JOIGNABLES|NON_JOIGNABLES|EXCLUS`,
+  `GET /listes/criteres`, `POST /listes/simulation`, `POST /listes`, `PUT /listes/{id}`, `POST /listes/{id}/clients`
+  (`sens` AJOUT, EXCLUSION ou RETRAIT), `POST /listes/{id}/archivage`, `POST /listes/{id}/reactivation`,
+  `POST /clients/{id}/desabonnement`, `POST /clients/{id}/reabonnement`.
+- **Journal** : `LISTE_CREATION`, `LISTE_MODIFICATION`, `LISTE_CLIENTS`, `LISTE_ARCHIVAGE`, `LISTE_REACTIVATION`,
+  `CLIENT_DESABONNEMENT`, `CLIENT_REABONNEMENT`.

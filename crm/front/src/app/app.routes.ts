@@ -9,6 +9,8 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', canActivate: [accueil], children: [] },
       { path: 'marketing', loadComponent: () => import('./pages/marketing/marketing').then(m => m.Marketing), title: 'Marketing' },
+      { path: 'marketing/listes', canActivate: [droit('LISTES')], loadComponent: () => import('./pages/listes-diffusion/listes-diffusion').then(m => m.ListesDiffusion), title: 'Listes de diffusion' },
+      { path: 'marketing/listes/:id', canActivate: [droit('LISTES')], loadComponent: () => import('./pages/liste-diffusion/liste-diffusion').then(m => m.ListeDiffusionDetail), title: 'Liste de diffusion' },
       { path: 'ma-journee', canActivate: [droit('MA_JOURNEE')], loadComponent: () => import('./pages/ma-journee/ma-journee').then(m => m.MaJournee), title: 'Ma journée' },
       { path: 'factures', canActivate: [droit('FACTURES')], loadComponent: () => import('./pages/factures/factures').then(m => m.Factures), title: 'Factures' },
       { path: 'clients', canActivate: [droit('CLIENTS')], loadComponent: () => import('./pages/clients/clients').then(m => m.Clients), title: 'Clients' },

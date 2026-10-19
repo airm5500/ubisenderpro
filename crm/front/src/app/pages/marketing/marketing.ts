@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../core/auth';
 
-/** Le module Marketing arrive apres le pilote : page d'attente pour les comptes qui y sont habilites. */
+/** Accueil du module Marketing : les ecrans en service et ceux qui arrivent. */
 @Component({
   selector: 'app-marketing',
   imports: [RouterLink],
@@ -10,9 +10,15 @@ import { Auth } from '../../core/auth';
     <div class="page">
       <div class="entete"><div>
         <h1>Marketing</h1>
-        <p class="sous-titre">Le module Marketing (campagnes promotionnelles, listes de diffusion) arrive après le pilote du Recouvrement.</p>
+        <p class="sous-titre">Listes de diffusion, puis campagnes promotionnelles WhatsApp, e-mail et SMS.</p>
       </div></div>
-      <div class="info"><i class="pi pi-info-circle"></i><span>Votre compte y est déjà habilité : les écrans apparaîtront ici dès leur mise en service.</span></div>
+      @if (auth.peut('LISTES')) {
+        <a class="bloc tuile" routerLink="/marketing/listes" style="text-decoration: none; max-width: 420px">
+          <b style="font-size: 16px">Listes de diffusion</b>
+          <span class="discret">Les clients visés par vos campagnes, par critères ou choisis un par un. Les clients qui répondent STOP sont écartés.</span>
+        </a>
+      }
+      <div class="info"><i class="pi pi-info-circle"></i><span>Les campagnes marketing, le catalogue et les promotions arrivent dans les prochaines livraisons.</span></div>
       @if (auth.recouvrement()) { <a routerLink="/">Revenir au Recouvrement</a> }
     </div>`
 })

@@ -148,3 +148,17 @@ export interface MessageRecu {
   clientCode: string | null; clientRaisonSociale: string | null; factureReference: string | null; campagneNom: string | null;
   type: string; contenu: string; recuLe: string;
 }
+
+/** Marketing : liste de diffusion, par criteres et/ou clients choisis un par un. */
+export interface ListeDiffusion {
+  id: number; nom: string; description: string | null; parCriteres: boolean; agenceIds: number[]; sousAgences: string[]; villes: string[];
+  segments: string[]; fonctions: string[]; statut: 'ACTIF' | 'ARCHIVE'; nbAjouts: number; nbExclusions: number; nbClients: number;
+  nbJoignables: number; creePar: string | null; creeLe: string; modifieLe: string | null;
+}
+export interface MembreListe {
+  clientId: number; code: string; raisonSociale: string; nomPharmacien: string | null; agenceLibelle: string | null; segmentation: string | null;
+  ville: string | null; origine: 'CRITERES' | 'AJOUT' | 'EXCLUSION'; numeros: string[]; email: string | null;
+  motifExclusion: 'DESABONNE' | 'SANS_COORDONNEES' | null; desabonneLe: string | null;
+}
+export interface ApercuListe { nbClients: number; nbJoignables: number; nbDesabonnes: number; nbSansCoordonnees: number; membres: Page<MembreListe>; }
+export interface ValeursCriteres { sousAgences: string[]; villes: string[]; }

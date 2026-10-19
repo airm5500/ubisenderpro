@@ -1,0 +1,100 @@
+<div class="page">
+  <a class="discret" routerLink="/marketing/listes"><i class="pi pi-arrow-left"></i> Listes de diffusion</a>
+  @if (liste(); as l) {
+    <div class="entete">
+      <div>
+        <h1>{{ l.nom }}@if (l.statut === 'ARCHIVE') { <span class="discret"> · archivée</span> }</h1>
+        <p class="sous-titre">{{ l.description || (l.parCriteres ? 'Liste par critères, corrigée client par client.' : 'Liste de clients choisis à la main.') }}</p>
+      </div>
+      @if (modifiable()) { <button class="bs" type="button" (click)="saisie.set(true)"><i class="pi pi-pencil"></i> Modifier les critères</button> }
+    </div>
+  }
+
+  @if (apercu(); as a) {
+    <div class="grille">
+      <div class="bloc tuile"><div class="discret">Clients dans la liste</div><b>{{ a.nbClients }}</b></div>
+      <div class="bloc tuile"><div class="discret">Joignables</div><b>{{ a.nbJoignables }}</b></div>
+      <div class="bloc tuile"><div class="discret">Désabonnés (STOP)</div><b>{{ a.nbDesabonnes }}</b></div>
+      <div class="bloc tuile"><div class="discret">Sans numéro ni e-mail</div><b>{{ a.nbSansCoordonnees }}</b></div>
+    </div>
+  }
+
+  @if (modifiable()) {
+    <section class="bloc" style="padding: 16px">
+      <label class="f">Ajouter un client à la main
+        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercherClient($event)" placeholder="Nom de la pharmacie ou numéro de compte" autocomplete="off">
+      </label>
+      @if (trouves(); as liste) {
+        @if (liste.length) {
+          <div class="choix-client">
+            @for (c of liste; track c.id) {
+              <button type="button" class="ligne-choix" (click)="ajouter(c)">{{ c.raisonSociale }}<span class="discret"> · {{ c.code }} · {{ c.agenceLibelle }}</span></button>
+            }
+          </div>
+        } @else { <span class="discret">Aucun client trouvé.</span> }
+      }
+    </section>
+  }
+
+  <div class="filtres-ligne" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+    <div role="tablist" aria-label="Filtre" class="onglets">
+      @for (o of onglets; track o.code) {
+        <button class="tab" [class.tabon]="onglet().code === o.code" role="tab" [attr.aria-selected]="onglet().code === o.code" (click)="choisirOnglet(o)">{{ o.libelle }}</button>
+      }
+    </div>
+    <form (ngSubmit)="rechercherMembres()" style="display: flex; gap: 8px">
+      <input class="sel" name="q" [(ngModel)]="q" placeholder="Rechercher dans la liste" aria-label="Rechercher dans la liste">
+      <button class="bs" type="submit">Rechercher</button>
+    </form>
+  </div>
+
+  <section class="bloc">
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Client</th><th>Agence</th><th>Segment</th><th>Numéros</th><th>Origine</th><th>Envoi</th><th></th></tr></thead>
+        <tbody>
+          @for (m of apercu()?.membres?.elements; track m.clientId) {
+            <tr>
+              <td><span class="ref">{{ m.raisonSociale }}</span><div class="second">{{ m.code }}@if (m.nomPharmacien) { · {{ m.nomPharmacien }} }</div></td>
+              <td>{{ m.agenceLibelle ?? '—' }}@if (m.ville) { <div class="second">{{ m.ville }}</div> }</td>
+              <td class="nw">{{ m.segmentation ?? '—' }}</td>
+              <td>@for (n of m.numeros; track n) { <div class="nw">{{ n }}</div> } @empty { @if (m.email) { {{ m.email }} } @else { — } }</td>
+              <td class="nw">{{ m.origine === 'CRITERES' ? 'Critères' : m.origine === 'AJOUT' ? 'Ajouté à la main' : 'Exclu à la main' }}</td>
+              <td class="nw">
+                @switch (m.motifExclusion) {
+                  @case ('DESABONNE') { <span class="etat-compte"><span class="dot" style="background: #D64545"></span>Désabonné</span><div class="second">{{ m.desabonneLe | jour }}</div> }
+                  @case ('SANS_COORDONNEES') { <span class="etat-compte"><span class="dot" style="background: #F0A23B"></span>Sans coordonnées</span> }
+                  @default { @if (m.origine === 'EXCLUSION') { — } @else { <span class="etat-compte"><span class="dot" style="background: #51D78E"></span>Joignable</span> } }
+                }
+              </td>
+              <td class="nw actions">
+                @if (modifiable()) {
+                  @if (m.origine === 'CRITERES') { <a (click)="exclure(m)">Exclure</a> }
+                  @if (m.origine === 'AJOUT') { <a (click)="retirer(m)">Retirer</a> }
+                  @if (m.origine === 'EXCLUSION') { <a (click)="retirer(m)">Réintégrer</a> }
+                }
+                @if (auth.peut('LISTES_GERER')) {
+                  @if (m.motifExclusion === 'DESABONNE') { <a (click)="reabonner(m)">Réabonner</a> }
+                  @else { <a (click)="desabonner(m)">Désabonner</a> }
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="vide">{{ apercu() ? 'Aucun client.' : 'Chargement…' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+  @if (apercu()?.membres; as p) {
+    <div class="pagination">
+      <span>{{ p.total }} client{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+      <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+        <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+    </div>
+  }
+</div>
+
+@if (modifiable()) {
+  <app-liste-formulaire [(ouvert)]="saisie" [liste]="liste()" (enregistre)="enregistree($event)" />
+}

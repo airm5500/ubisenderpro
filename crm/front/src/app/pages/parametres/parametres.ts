@@ -12,7 +12,8 @@ const CATEGORIES: [string, string, string][] = [
   ['EMAIL', 'E-mail', "Expéditeur et rythme des e-mails. Le serveur d'envoi (SMTP) se règle dans le fichier de configuration du serveur."],
   ['SMS', 'SMS', 'Rythme des envois ; le fournisseur se règle dans Fournisseurs SMS.'],
   ['SECURITE', 'Sécurité', 'Mots de passe et verrouillage des comptes.'],
-  ['IMPORT', 'Imports', 'Taille des fichiers importés.']
+  ['IMPORT', 'Imports', 'Taille des fichiers importés.'],
+  ['MARKETING', 'Marketing', 'Désabonnement des clients par une réponse WhatsApp.']
 ];
 
 /** Parametres de l'application, par categorie ; seuls ceux qui ont change sont envoyes. */
