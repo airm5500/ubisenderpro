@@ -138,6 +138,23 @@ A sauvegarder chaque jour, hors du poste :
 
 ## 9. Mise a jour
 
+### Sur un poste qui a la copie du depot (tests, corrections frequentes)
+
+Une seule commande suffit, sans supprimer ni recopier de dossier. Clic droit sur
+`crm\distribution\mettre-a-jour.bat` > Executer en tant qu'administrateur. Le script :
+
+- recupere les modifications (`git pull`) ;
+- reconstruit l'interface et le jar avec le JDK et le Node gardes en cache par
+  `construire-paquet-windows.ps1` (a lancer une fois avant) ;
+- arrete le service, remplace `crm.jar` (l'ancien est garde en
+  `crm.jar.precedent`) et met a jour le compagnon WhatsApp s'il a change ;
+- redemarre et attend que le CRM reponde.
+
+Le dossier `donnees` et la base ne sont pas touches ; la base se met a jour seule
+au demarrage. Dans le navigateur, recharger la page avec Ctrl+F5.
+
+### Avec un nouveau paquet (poste d'UBIPHARM)
+
 1. Sauvegarder la base (etape 8).
 2. Dans l'ancien dossier `application`, lancer `desinstaller.bat` en
    administrateur : les services s'arretent, `donnees` et la base restent.
