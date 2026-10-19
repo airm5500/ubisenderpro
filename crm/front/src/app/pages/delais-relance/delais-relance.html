@@ -22,7 +22,7 @@
               <td class="n">J-{{ d.avantJoursMax }}</td><td class="n">J-{{ d.avantJoursMin }}</td><td class="n">J+{{ d.retardJoursMin }}</td>
               <td class="n">{{ d.intervalleJours ? d.intervalleJours + ' j' : 'sans minimum' }}</td>
               <td class="second">Paramètres</td>
-              <td class="nw">@if (auth.peut('PARAMETRES')) { <a routerLink="/parametres">Modifier</a> }</td>
+              <td class="nw">@if (auth.peut('PARAMETRES')) { <a class="bi" routerLink="/parametres" pTooltip="Modifier dans les paramètres" tooltipPosition="top" aria-label="Modifier dans les paramètres"><i class="pi pi-pencil"></i></a> }</td>
             </tr>
           }
         }
@@ -36,8 +36,8 @@
             <td><div>{{ r.modifieLe | jour }}</div><div class="second">{{ r.modifiePar }}</div></td>
             <td class="nw">
               @if (r.modifiable) {
-                @if (r.statut === 'ACTIF') { <a (click)="modifier(r)">Modifier</a> · <a (click)="changerStatut(r, 'archivage')">Archiver</a> }
-                @else { <a (click)="changerStatut(r, 'reactivation')">Réactiver</a> }
+                <span class="actions-ligne">@if (r.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(r)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(r, 'archivage')"><i class="pi pi-inbox"></i></button> }
+                @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(r, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
               }
             </td>
           </tr>

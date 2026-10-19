@@ -128,7 +128,7 @@
                 <tbody>
                   @for (l of rejets(); track l.id) {
                     <tr><td>{{ l.numeroLigne }}</td><td>{{ l.cle || '—' }}</td><td>{{ l.message }}</td>
-                      <td><a (click)="ouvrirCorrection(l)">Corriger</a></td></tr>
+                      <td class="nw"><button type="button" class="bi" pTooltip="Corriger la ligne" tooltipPosition="top" aria-label="Corriger la ligne" (click)="ouvrirCorrection(l)"><i class="pi pi-pencil"></i></button></td></tr>
                   }
                 </tbody>
               </table>

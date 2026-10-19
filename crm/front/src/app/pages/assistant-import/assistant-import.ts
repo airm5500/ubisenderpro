@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -36,7 +37,7 @@ const TYPES: Record<string, TypeImport> = {
 
 @Component({
   selector: 'app-assistant-import',
-  imports: [FormsModule, RouterLink, DialogModule],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule],
   templateUrl: './assistant-import.html',
   styleUrl: './assistant-import.css'
 })

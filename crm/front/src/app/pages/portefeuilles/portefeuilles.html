@@ -20,10 +20,10 @@
               <td class="n">{{ a.nbClients }}</td>
               <td class="n">{{ a.totalSolde | montant }}</td>
               <td>{{ a.remplacant ? 'Remplacé par ' + a.remplacant : '—' }}</td>
-              <td class="nw actions">
-                @if (auth.peut('NUMEROS_TOUS')) { <a (click)="ouvrir('numero', a)">Numéro</a> }
-                @if (auth.peut('INTERIMS')) { <a (click)="ouvrir('interim', a)">Intérim</a> }
-                @if (auth.peut('PORTEFEUILLES_AFFECTER') && a.nbClients > 0) { <a (click)="ouvrir('transfert', a)">Transférer</a> }
+              <td class="nw"><span class="actions-ligne">
+                @if (auth.peut('NUMEROS_TOUS')) { <button type="button" class="bi" pTooltip="Numéro d'envoi" tooltipPosition="top" aria-label="Numéro d'envoi" (click)="ouvrir('numero', a)"><i class="pi pi-phone"></i></button> }
+                @if (auth.peut('INTERIMS')) { <button type="button" class="bi" pTooltip="Organiser un intérim" tooltipPosition="top" aria-label="Organiser un intérim" (click)="ouvrir('interim', a)"><i class="pi pi-user-edit"></i></button> }
+                @if (auth.peut('PORTEFEUILLES_AFFECTER') && a.nbClients > 0) { <button type="button" class="bi" pTooltip="Transférer le portefeuille" tooltipPosition="top" aria-label="Transférer le portefeuille" (click)="ouvrir('transfert', a)"><i class="pi pi-arrow-right-arrow-left"></i></button> }</span>
               </td>
             </tr>
           } @empty {
@@ -40,7 +40,7 @@
       @for (d of delegations(); track d.id) {
         <div class="li">
           <span><strong>{{ d.remplacantNom }}</strong> remplace <strong>{{ d.titulaireNom }}</strong> du {{ d.dateDebut | jour }} au {{ d.dateFin | jour }}{{ d.motif ? ' · ' + d.motif : '' }}</span>
-          @if (auth.peut('INTERIMS')) { <a (click)="annulerInterim(d)">Annuler</a> }
+          @if (auth.peut('INTERIMS')) { <button type="button" class="bi bi-danger" pTooltip="Annuler l'intérim" tooltipPosition="top" aria-label="Annuler l'intérim" (click)="annulerInterim(d)"><i class="pi pi-times"></i></button> }
         </div>
       }
       <p class="discret">Pendant un intérim, le remplaçant voit et relance les clients du titulaire ; les messages partent du numéro du titulaire.</p>

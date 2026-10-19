@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -12,7 +13,7 @@ type Action = 'rejet' | 'annulation' | null;
 
 @Component({
   selector: 'app-campagne-suivi',
-  imports: [FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe],
   templateUrl: './campagne-suivi.html'
 })
 export class CampagneSuivi implements OnInit, OnDestroy {

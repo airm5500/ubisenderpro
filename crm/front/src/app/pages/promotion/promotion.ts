@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -12,7 +13,7 @@ import { LignePromotion } from './ligne-promotion';
 /** Une promotion : sa periode, ses produits et leur avantage, son activation et son archivage. */
 @Component({
   selector: 'app-promotion',
-  imports: [RouterLink, JourPipe, MontantPipe, PromotionFormulaire, LignePromotion],
+  imports: [TooltipModule, RouterLink, JourPipe, MontantPipe, PromotionFormulaire, LignePromotion],
   templateUrl: './promotion.html'
 })
 export class PromotionDetail implements OnInit {

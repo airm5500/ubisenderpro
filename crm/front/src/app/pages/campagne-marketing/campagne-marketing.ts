@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -14,7 +15,7 @@ type Action = 'rejet' | 'annulation' | null;
 /** Controle avant validation, puis suivi des envois d'une campagne promotionnelle. */
 @Component({
   selector: 'app-campagne-marketing',
-  imports: [FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire],
   templateUrl: './campagne-marketing.html'
 })
 export class CampagneMarketingSuivi implements OnInit, OnDestroy {

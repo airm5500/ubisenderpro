@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -21,7 +22,7 @@ const GARDE = ['INFORMATION_GARDE', 'INFORMATION_JOUR_FERIE'];
  */
 @Component({
   selector: 'app-informations',
-  imports: [FormsModule, DialogModule, JourPipe, CampagneMarketingFormulaire],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe, CampagneMarketingFormulaire],
   templateUrl: './informations.html'
 })
 export class Informations implements OnInit {

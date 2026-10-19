@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -11,7 +12,7 @@ interface Edition { code: string; codeImport: string; libelle: string; }
 /** Referentiel des agences : cree, renomme ou archive par la Direction Generale ; jamais supprime. */
 @Component({
   selector: 'app-agences',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
   templateUrl: './agences.html'
 })
 export class Agences implements OnInit {

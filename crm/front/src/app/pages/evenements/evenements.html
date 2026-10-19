@@ -24,8 +24,8 @@
             <td>@if (e.envoiPropose) { {{ e.envoiPropose | jour: true }} } @else { <span class="discret">—</span> }</td>
             <td><div>{{ e.modifieLe | jour }}</div><div class="second">{{ e.modifiePar ?? 'Livré avec la plateforme' }}</div></td>
             <td class="nw">
-              @if (e.statut === 'ACTIF') { <a (click)="modifier(e)">Modifier</a> · <a (click)="changerStatut(e, 'archivage')">Archiver</a> }
-              @else { <a (click)="changerStatut(e, 'reactivation')">Réactiver</a> }
+              <span class="actions-ligne">@if (e.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(e)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(e, 'archivage')"><i class="pi pi-inbox"></i></button> }
+              @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(e, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
             </td>
           </tr>
         } @empty {

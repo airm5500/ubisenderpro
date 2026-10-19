@@ -26,12 +26,12 @@
               <td class="nw">
                 <span class="etat-compte"><span class="dot" [style.background]="l.statut === 'ACTIF' ? '#51D78E' : '#9AA5AE'"></span>{{ l.statut === 'ACTIF' ? 'Active' : 'Archivée' }}</span>
               </td>
-              <td class="nw actions">
-                <a [routerLink]="['/marketing/listes', l.id]">Voir</a>
+              <td class="nw"><span class="actions-ligne">
+                <a class="bi" [routerLink]="['/marketing/listes', l.id]" pTooltip="Voir la liste" tooltipPosition="top" aria-label="Voir la liste"><i class="pi pi-eye"></i></a>
                 @if (auth.peut('LISTES_GERER')) {
-                  @if (l.statut === 'ACTIF') { <a (click)="modifier(l)">Modifier</a> <a (click)="archiver(l)">Archiver</a> }
-                  @else { <a (click)="reactiver(l)">Réactiver</a> }
-                }
+                  @if (l.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(l)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="archiver(l)"><i class="pi pi-inbox"></i></button> }
+                  @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="reactiver(l)"><i class="pi pi-replay"></i></button> }
+                }</span>
               </td>
             </tr>
           } @empty {

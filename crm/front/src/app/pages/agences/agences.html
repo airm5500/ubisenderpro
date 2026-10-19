@@ -21,8 +21,8 @@
             <td class="n">{{ a.nbUtilisateurs }}</td>
             <td><div>{{ a.modifieLe | jour }}</div><div class="second">{{ a.modifiePar ?? 'Livrée avec la plateforme' }}</div></td>
             <td class="nw">
-              @if (a.statut === 'ACTIF') { <a (click)="modifier(a)">Modifier</a> · <a (click)="changerStatut(a, 'archivage')">Archiver</a> }
-              @else { <a (click)="changerStatut(a, 'reactivation')">Réactiver</a> }
+              <span class="actions-ligne">@if (a.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(a)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(a, 'archivage')"><i class="pi pi-inbox"></i></button> }
+              @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(a, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
             </td>
           </tr>
         } @empty {

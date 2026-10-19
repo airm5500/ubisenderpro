@@ -67,16 +67,16 @@
                   @default { @if (m.origine === 'EXCLUSION') { — } @else { <span class="etat-compte"><span class="dot" style="background: #51D78E"></span>Joignable</span> } }
                 }
               </td>
-              <td class="nw actions">
+              <td class="nw"><span class="actions-ligne">
                 @if (modifiable()) {
-                  @if (m.origine === 'CRITERES') { <a (click)="exclure(m)">Exclure</a> }
-                  @if (m.origine === 'AJOUT') { <a (click)="retirer(m)">Retirer</a> }
-                  @if (m.origine === 'EXCLUSION') { <a (click)="retirer(m)">Réintégrer</a> }
+                  @if (m.origine === 'CRITERES') { <button type="button" class="bi bi-danger" pTooltip="Exclure de la liste" tooltipPosition="top" aria-label="Exclure de la liste" (click)="exclure(m)"><i class="pi pi-minus-circle"></i></button> }
+                  @if (m.origine === 'AJOUT') { <button type="button" class="bi bi-danger" pTooltip="Retirer de la liste" tooltipPosition="top" aria-label="Retirer de la liste" (click)="retirer(m)"><i class="pi pi-times"></i></button> }
+                  @if (m.origine === 'EXCLUSION') { <button type="button" class="bi" pTooltip="Réintégrer dans la liste" tooltipPosition="top" aria-label="Réintégrer dans la liste" (click)="retirer(m)"><i class="pi pi-replay"></i></button> }
                 }
                 @if (auth.peut('LISTES_GERER')) {
-                  @if (m.motifExclusion === 'DESABONNE') { <a (click)="reabonner(m)">Réabonner</a> }
-                  @else { <a (click)="desabonner(m)">Désabonner</a> }
-                }
+                  @if (m.motifExclusion === 'DESABONNE') { <button type="button" class="bi" pTooltip="Réabonner" tooltipPosition="top" aria-label="Réabonner" (click)="reabonner(m)"><i class="pi pi-bell"></i></button> }
+                  @else { <button type="button" class="bi bi-danger" pTooltip="Désabonner" tooltipPosition="top" aria-label="Désabonner" (click)="desabonner(m)"><i class="pi pi-bell-slash"></i></button> }
+                }</span>
               </td>
             </tr>
           } @empty {

@@ -54,15 +54,15 @@
                 @if (u.motDePasseProvisoire) { <div class="second">Mot de passe provisoire</div> }
                 @if (u.statut === 'DESACTIVE' && u.echecsConnexion > 0) { <div class="second">{{ u.echecsConnexion }} échecs de connexion</div> }
               </td>
-              <td class="nw actions" style="flex-wrap: nowrap">
-                <a (click)="modifier(u)">Modifier</a>
-                <a (click)="reinitialiser(u)">Nouveau mot de passe</a>
-                <a (click)="voirHistorique(u)">Historique</a>
+              <td class="nw"><span class="actions-ligne">
+                <button type="button" class="bi" pTooltip="Modifier l'utilisateur" tooltipPosition="top" aria-label="Modifier l'utilisateur" (click)="modifier(u)"><i class="pi pi-pencil"></i></button>
+                <button type="button" class="bi" pTooltip="Nouveau mot de passe" tooltipPosition="top" aria-label="Nouveau mot de passe" (click)="reinitialiser(u)"><i class="pi pi-key"></i></button>
+                <button type="button" class="bi" pTooltip="Historique des actions" tooltipPosition="top" aria-label="Historique des actions" (click)="voirHistorique(u)"><i class="pi pi-history"></i></button>
                 @if (u.statut === 'ACTIF') {
-                  @if (u.id !== auth.utilisateur()?.id) { <a (click)="demanderDesactivation(u)">Désactiver</a> }
+                  @if (u.id !== auth.utilisateur()?.id) { <button type="button" class="bi bi-danger" pTooltip="Désactiver l'utilisateur" tooltipPosition="top" aria-label="Désactiver l'utilisateur" (click)="demanderDesactivation(u)"><i class="pi pi-ban"></i></button> }
                 } @else {
-                  <a (click)="reactiver(u)">Réactiver</a>
-                }
+                  <button type="button" class="bi" pTooltip="Réactiver l'utilisateur" tooltipPosition="top" aria-label="Réactiver l'utilisateur" (click)="reactiver(u)"><i class="pi pi-replay"></i></button>
+                }</span>
               </td>
             </tr>
           } @empty {

@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -11,7 +12,7 @@ interface Edition { nom: string; nature: string; dateDebut: string; dateFin: str
 /** Calendrier des evenements annonces aux clients : fetes, jours feries, fermetures d'agence. */
 @Component({
   selector: 'app-evenements',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
   templateUrl: './evenements.html'
 })
 export class Evenements implements OnInit {

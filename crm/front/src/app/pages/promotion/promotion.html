@@ -59,11 +59,11 @@
                 <td class="n nw">@if (l.prixPublic !== null) { {{ l.prixPublic | montant }} F } @else { — }</td>
                 <td>{{ l.resume }}@if (!l.actif) { <div class="second">Retiré</div> }</td>
                 <td class="n">{{ l.quantiteMin }}</td>
-                <td class="nw actions">
+                <td class="nw"><span class="actions-ligne">
                   @if (modifiable()) {
-                    @if (l.actif) { <a (click)="modifier(l)">Modifier</a> <a (click)="retirer(l)">Retirer</a> }
-                    @else { <a (click)="remettre(l)">Remettre</a> }
-                  }
+                    @if (l.actif) { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(l)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Retirer de la promotion" tooltipPosition="top" aria-label="Retirer de la promotion" (click)="retirer(l)"><i class="pi pi-times"></i></button> }
+                    @else { <button type="button" class="bi" pTooltip="Remettre dans la promotion" tooltipPosition="top" aria-label="Remettre dans la promotion" (click)="remettre(l)"><i class="pi pi-replay"></i></button> }
+                  }</span>
                 </td>
               </tr>
             } @empty {

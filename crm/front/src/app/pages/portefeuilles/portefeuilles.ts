@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -14,7 +15,7 @@ type Fenetre = 'affecter' | 'retirer' | 'transfert' | 'numero' | 'interim' | nul
 
 @Component({
   selector: 'app-portefeuilles',
-  imports: [FormsModule, AsyncPipe, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe],
+  imports: [TooltipModule, FormsModule, AsyncPipe, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe],
   templateUrl: './portefeuilles.html'
 })
 export class Portefeuilles implements OnInit {
