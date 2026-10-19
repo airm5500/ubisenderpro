@@ -461,3 +461,33 @@ la main ; un produit n'est jamais supprime, il est archive puis reactive au beso
   `PUT /{id}`, `POST /{id}/archivage|reactivation`), `/api/marketing/imports/produits` (simulation et validation) et
   `/api/imports/produits/...` (etapes communes de l'assistant).
 - **Journal** : `PRODUIT_CREATION`, `PRODUIT_MODIFICATION`, `PRODUIT_ARCHIVAGE`, `PRODUIT_REACTIVATION`.
+
+## Marketing : promotions (Marketing lot 4)
+
+Ecran **Marketing > Promotions**. Une promotion = un code, un nom, une periode (debut, fin) et des produits du
+catalogue avec leur avantage. La personne qui la cree en est la responsable.
+
+- **Avantages** : unites gratuites en nombre (« 2 offerts pour 10 achetes »), unites gratuites en pourcentage avec
+  plafond facultatif (« 10 % d'unites gratuites des 20 achetes, 5 au plus »), ou prix promotionnel (« 2 200 F au lieu
+  de 2 500 F », toujours inferieur au prix public du catalogue). Une quantite minimale s'applique a chacun.
+- **Cycle** : brouillon, puis active (au moins un produit) ; le lendemain de sa date de fin, elle passe d'office en
+  terminee (planificateur chaque minute) et n'est plus proposee aux campagnes ; prolongee, elle redevient active.
+  Archivage et reactivation (retour en brouillon) a la main. Un produit se retire de la promotion, il n'est pas
+  supprime ; une promotion active garde au moins un produit.
+- **Produits a la main ou par import** : bouton Ajouter un produit (recherche dans le catalogue), ou assistant d'import
+  (type `PROMOTIONS`) : une ligne = code promotion, code produit, quantite minimale, unites offertes, % d'unites
+  gratuites, plafond, prix promotionnel ; un meme fichier peut remplir plusieurs promotions. Exporter donne la liste
+  des produits d'une promotion au meme format, reimportable.
+- **Campagnes** : une campagne Marketing coche une ou plusieurs promotions actives. Les variables `{promotion_nom}`,
+  `{promotion_code}`, `{promotion_debut}`, `{promotion_fin}` et `{produits_promotion}` (un produit par ligne avec son
+  avantage) se remplissent d'office ; un modele qui les cite exige une promotion, et une promotion terminee entre-temps
+  bloque la soumission et la validation. Ces variables sont refusees dans les modeles de relance.
+- **Tables** : `crm_promotion`, `crm_promotion_produit` (ligne retiree = `actif` faux), `crm_campagne.promotion_ids`.
+  Migration `V1.0.23`.
+- **Droits** (groupe Catalogue, module Marketing) : `PROMOTIONS`, `PROMOTIONS_GERER`, memes roles que le catalogue.
+- **API** : `/api/marketing/promotions` (`GET` avec `q` et `statut`, `POST`, `PUT /{id}`,
+  `POST /{id}/activation|archivage|reactivation`, `GET /{id}/produits`, `GET /{id}/produits/export`,
+  `POST /{id}/produits`, `PUT /{id}/produits/{ligne}`, `POST /{id}/produits/{ligne}/retrait`),
+  `/api/marketing/imports/promotions` (simulation et validation).
+- **Journal** : `PROMOTION_CREATION`, `_MODIFICATION`, `_ACTIVATION`, `_ARCHIVAGE`, `_REACTIVATION`, `_FIN` (systeme),
+  `PROMOTION_PRODUIT_AJOUT`, `_MODIFICATION`, `_RETRAIT`.

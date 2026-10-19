@@ -29,6 +29,9 @@ public class CampagneMarketingDemandeDTO {
     @NotNull(message = "Choisissez le modèle de message.")
     private Long modeleId;
 
+    /** Promotions actives citees ; leurs variables se remplissent d'office. */
+    private java.util.List<Long> promotionIds;
+
     /** Vide : execution des la validation. */
     private LocalDateTime dateExecution;
 }

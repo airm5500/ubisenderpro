@@ -23,6 +23,9 @@ public class CampagneMarketingDTO {
     private String listeNom;
     private Long modeleId;
     private String modeleNom;
+    private List<Long> promotionIds;
+    /** « CODE · Nom » de chaque promotion citee. */
+    private List<String> promotions;
     private String canal;
     private LocalDateTime dateExecution;
     private String statut;

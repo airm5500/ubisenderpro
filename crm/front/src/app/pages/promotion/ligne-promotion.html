@@ -1,0 +1,50 @@
+<p-dialog [header]="ligne() ? 'Modifier l\'avantage' : 'Ajouter un produit'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '600px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    @if (formulaire.produit; as p) {
+      <div class="info"><i class="pi pi-box"></i><span><b>{{ p.libelle }}</b> · {{ p.code }}@if (p.prix !== null && p.prix !== undefined) { · prix public {{ p.prix | montant }} F }</span>
+        @if (!ligne()) { <a (click)="formulaire.produit = null">Changer</a> }</div>
+    } @else {
+      <label class="f">Produit du catalogue
+        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher()" placeholder="Code, libellé ou laboratoire" autocomplete="off">
+      </label>
+      @if (resultats().length) {
+        <div class="bloc" style="padding: 0">
+          @for (r of resultats(); track r.id) {
+            <a class="ligne-choix" (click)="choisir(r)" style="display: block; padding: 10px 14px; border-bottom: 1px solid var(--filet)">
+              <b>{{ r.libelle }}</b> <span class="discret">{{ r.code }}@if (r.prix !== null) { · {{ r.prix | montant }} F }</span></a>
+          }
+        </div>
+      }
+    }
+
+    <div class="grille">
+      <label class="f">Avantage
+        <select class="sel" name="avantage" [(ngModel)]="formulaire.avantage">
+          <option value="UG_QUANTITE">Unités gratuites (nombre)</option>
+          <option value="UG_POURCENTAGE">Unités gratuites (%)</option>
+          <option value="PRIX">Prix promotionnel</option>
+        </select>
+      </label>
+      <label class="f">Quantité minimale achetée<input class="sel" type="number" min="1" step="1" name="quantiteMin" [(ngModel)]="formulaire.quantiteMin"></label>
+      @switch (formulaire.avantage) {
+        @case ('UG_QUANTITE') {
+          <label class="f">Unités offertes<input class="sel" type="number" min="1" step="1" name="ugQuantite" [(ngModel)]="formulaire.ugQuantite" required></label>
+        }
+        @case ('UG_POURCENTAGE') {
+          <label class="f">% d'unités gratuites<input class="sel" type="number" min="0" max="100" step="0.5" name="ugPourcentage" [(ngModel)]="formulaire.ugPourcentage" required></label>
+          <label class="f">Plafond (unités)<input class="sel" type="number" min="1" step="1" name="ugPlafond" [(ngModel)]="formulaire.ugPlafond" placeholder="Facultatif"></label>
+        }
+        @case ('PRIX') {
+          <label class="f">Prix promotionnel (FCFA)<input class="sel" type="number" min="0" step="1" name="prixPromo" [(ngModel)]="formulaire.prixPromo" required></label>
+        }
+      }
+    </div>
+
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.produit">{{ ligne() ? 'Enregistrer' : 'Ajouter à la promotion' }}</button>
+    </div>
+  </form>
+</p-dialog>

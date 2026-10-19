@@ -39,6 +39,7 @@
     <div class="kvs" style="padding: 18px 0; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet)">
       <div class="kv"><span>Liste</span><strong><a [routerLink]="['/marketing/listes', c.listeId]">{{ c.listeNom }}</a></strong></div>
       <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }} · {{ L.canal[c.canal] }}</strong></div>
+      @if (c.promotions.length) { <div class="kv"><span>Promotions</span><strong>{{ c.promotions.join(', ') }}</strong></div> }
       <div class="kv"><span>Envoi</span><strong>{{ c.dateExecution ? (c.dateExecution | jour: true) : 'Dès la validation' }}</strong></div>
       <div class="kv"><span>Préparée le</span><strong>{{ c.createdAt | jour }} par {{ c.creePar }}</strong></div>
       @if (c.validePar) { <div class="kv"><span>Validée par</span><strong>{{ c.validePar }}, {{ c.valideLe | jour }}</strong></div> }

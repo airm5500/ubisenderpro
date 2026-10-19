@@ -15,6 +15,13 @@
       </select>
     </label>
     @if (!modeles().length) { <p class="discret" style="margin: 0">Aucun modèle promotionnel : créez-en un dans Modèles promotionnels.</p> }
+    <div class="f">Promotions citées
+      @for (p of promotions(); track p.id) {
+        <label class="droit"><input type="checkbox" [checked]="formulaire.promotionIds.has(p.id)" (change)="basculer(p.id, $any($event.target).checked)">
+          {{ p.code }} · {{ p.nom }} <span class="discret">jusqu'au {{ p.dateFin | jour }} · {{ p.nbProduits }} produit{{ p.nbProduits > 1 ? 's' : '' }}</span></label>
+      } @empty { <span class="discret">Aucune promotion active.</span> }
+    </div>
+    <p class="discret" style="margin: 0">Les variables {{ '{' }}promotion_nom{{ '}' }}, {{ '{' }}promotion_fin{{ '}' }} et {{ '{' }}produits_promotion{{ '}' }} du modèle se remplissent avec les promotions cochées.</p>
     <label class="f">Date et heure d'envoi (heure d'Abidjan)
       <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">
     </label>

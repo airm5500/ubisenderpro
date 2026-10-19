@@ -165,7 +165,8 @@ export interface ValeursCriteres { sousAgences: string[]; villes: string[]; }
 
 /** Marketing : campagne promotionnelle sur une liste de diffusion. */
 export interface CampagneMarketing {
-  id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; canal: string; dateExecution: string | null;
+  id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
+  canal: string; dateExecution: string | null;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
   numeroExpediteur: string | null; agencesCibles: number[] | null; createdAt: string; soumiseLe: string | null; validePar: string | null;
   valideLe: string | null; motifRejet: string | null; rejetePar: string | null; lanceLe: string | null; termineLe: string | null;
@@ -181,3 +182,14 @@ export interface Produit {
   modifiePar: string | null; modifieLe: string | null;
 }
 export interface FiltresCatalogue { categories: string[]; laboratoires: string[]; }
+export interface Promotion {
+  id: number; code: string; nom: string; description: string | null; dateDebut: string; dateFin: string;
+  statut: 'BROUILLON' | 'ACTIVE' | 'TERMINEE' | 'ARCHIVEE'; nbProduits: number; creePar: string; creeLe: string; modifiePar: string | null;
+  modifieLe: string | null;
+}
+export interface PromotionProduit {
+  id: number; produitId: number; produitCode: string; produitLibelle: string; produitStatut: string; conditionnement: string | null;
+  prixPublic: number | null; quantiteMin: number; avantage: 'UG_QUANTITE' | 'UG_POURCENTAGE' | 'PRIX'; ugQuantite: number | null;
+  ugPourcentage: number | null; ugPlafond: number | null; prixPromo: number | null; resume: string; actif: boolean; importe: boolean;
+  modifieLe: string | null;
+}

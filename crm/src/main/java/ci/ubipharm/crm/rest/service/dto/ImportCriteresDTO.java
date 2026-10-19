@@ -16,7 +16,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ImportCriteresDTO {
 
-    @Pattern(regexp = "CLIENTS|FACTURES|PRODUITS", message = "Type d'import inconnu.")
+    @Pattern(regexp = "CLIENTS|FACTURES|PRODUITS|PROMOTIONS", message = "Type d'import inconnu.")
     private String type;
 
     @Min(value = 0, message = "La page doit être positive.")

@@ -24,7 +24,7 @@
         @for (i of page()?.elements; track i.id) {
           <tr>
             <td><strong>{{ i.nomFichier }}</strong><div class="second">{{ i.creeLe | jour: true }}</div></td>
-            <td>{{ i.type === 'CLIENTS' ? 'Clients' : i.type === 'FACTURES' ? 'Factures' : i.type === 'PRODUITS' ? 'Produits du catalogue' : i.type }}</td>
+            <td>{{ i.type === 'CLIENTS' ? 'Clients' : i.type === 'FACTURES' ? 'Factures' : i.type === 'PRODUITS' ? 'Produits du catalogue' : i.type === 'PROMOTIONS' ? 'Produits en promotion' : i.type }}</td>
             <td>{{ i.auteur }}@if (i.validePar) {<div class="second">validé par {{ i.validePar }} le {{ i.valideLe | jour: true }}</div>}</td>
             <td class="nw"><span class="dot" [style.background]="couleurs[i.statut]"></span>{{ statuts[i.statut] ?? i.statut }}</td>
             <td class="n">{{ i.nbLignes }}</td>
@@ -32,7 +32,7 @@
             <td class="n">{{ i.statut === 'VALIDE' ? i.nbMisAJour : i.nbMisesAJour }}</td>
             <td class="n">{{ i.nbRejets }}</td>
             <td class="nw">
-              @if (i.statut === 'SIMULE') { <a [routerLink]="i.type === 'PRODUITS' ? '/marketing/catalogue/import' : '/imports/nouveau'" [queryParams]="i.type === 'PRODUITS' ? { import: i.id } : { type: i.type.toLowerCase(), import: i.id }">Reprendre</a> }
+              @if (i.statut === 'SIMULE') { <a [routerLink]="i.type === 'PRODUITS' ? '/marketing/catalogue/import' : i.type === 'PROMOTIONS' ? '/marketing/promotions/import' : '/imports/nouveau'" [queryParams]="i.type === 'PRODUITS' || i.type === 'PROMOTIONS' ? { import: i.id } : { type: i.type.toLowerCase(), import: i.id }">Reprendre</a> }
               @else if (i.nbRejets > 0) { <a (click)="rejets(i)">Rejets CSV</a> }
             </td>
           </tr>

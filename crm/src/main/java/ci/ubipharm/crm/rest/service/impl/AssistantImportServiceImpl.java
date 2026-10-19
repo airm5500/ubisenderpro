@@ -1,6 +1,5 @@
 package ci.ubipharm.crm.rest.service.impl;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -36,8 +35,6 @@ import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 public class AssistantImportServiceImpl implements AssistantImportService {
 
     private static final int NB_EXEMPLES = 3;
-    private static final String TYPE_CSV = "text/csv;charset=UTF-8";
-    private static final char SEPARATEUR = ';';
 
     private final Map<String, ImportMetierService> metiers;
     private final LecteurTableurService lecteurTableurService;
@@ -158,22 +155,8 @@ public class AssistantImportServiceImpl implements AssistantImportService {
     }
 
     /** CSV lisible par Excel en francais : point-virgule et UTF-8 avec BOM. */
-    private FichierDTO csv(String nom, List<List<String>> lignes) {
-        StringBuilder texte = new StringBuilder("﻿");
-        for (List<String> ligne : lignes) {
-            texte.append(ligne.stream().map(this::cellule).collect(Collectors.joining(String.valueOf(SEPARATEUR)))).append("\r\n");
-        }
-        return FichierDTO.builder().nom(nom).typeContenu(TYPE_CSV).contenu(texte.toString().getBytes(StandardCharsets.UTF_8)).build();
-    }
 
-    private String cellule(String valeur) {
-        if (valeur == null) {
-            return "";
-        }
-        // Une valeur commencant par = + - @ serait executee comme formule par Excel
-        String sure = valeur.matches("^[=+\\-@].*") && !valeur.matches("^-?[0-9][0-9 .,]*$") ? "'" + valeur : valeur;
-        return sure.contains(String.valueOf(SEPARATEUR)) || sure.contains("\"") || sure.contains("\n")
-                ? "\"" + sure.replace("\"", "\"\"") + "\""
-                : sure;
+    private FichierDTO csv(String nom, List<List<String>> lignes) {
+        return FichierCsv.csv(nom, lignes);
     }
 }

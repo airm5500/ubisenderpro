@@ -45,6 +45,9 @@ public class ImportServiceImpl implements ImportService {
             left join crm_utilisateur v on v.id = i.valide_par
             """;
 
+    /** Imports du Marketing, ouverts sans le droit Imports. */
+    private static final java.util.Set<String> IMPORTS_MARKETING = java.util.Set.of("PRODUITS", "PROMOTIONS");
+
     private static final TypeReference<Map<String, String>> TYPE_DONNEES = new TypeReference<>() {
     };
 
@@ -105,8 +108,8 @@ public class ImportServiceImpl implements ImportService {
             parametres.put("utilisateurId", perimetre.getUtilisateurId());
         }
         if (!importsGeneraux()) {
-            // Sans le droit Imports, seul le catalogue du Marketing s'importe
-            where.append(" and i.type = 'PRODUITS'");
+            // Sans le droit Imports, seuls le catalogue et les promotions du Marketing s'importent
+            where.append(" and i.type in ('PRODUITS', 'PROMOTIONS')");
         }
         if (criteres.getType() != null) {
             where.append(" and i.type = :type");
@@ -278,7 +281,7 @@ public class ImportServiceImpl implements ImportService {
                 .getResultList();
         if (imports.isEmpty()
                 || (!perimetre.isVisionGlobale() && imports.getFirst().get("auteur", Number.class).longValue() != perimetre.getUtilisateurId())
-                || (!importsGeneraux() && !"PRODUITS".equals(imports.getFirst().get("type", String.class)))) {
+                || (!importsGeneraux() && !IMPORTS_MARKETING.contains(imports.getFirst().get("type", String.class)))) {
             throw new RessourceIntrouvableException("Import introuvable");
         }
     }

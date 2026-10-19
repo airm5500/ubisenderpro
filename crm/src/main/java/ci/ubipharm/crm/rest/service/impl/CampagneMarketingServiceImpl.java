@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -26,6 +27,7 @@ import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
+import ci.ubipharm.crm.rest.service.PromotionService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.VariableMessageService;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
@@ -65,6 +67,9 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private static final String SELECT = """
             select cp.id as id, cp.nom as nom, cp.liste_id as listeId, l.nom as listeNom, cp.modele_id as modeleId, mo.nom as modeleNom,
                    mo.canal as canal, mo.objet as modeleObjet, mo.contenu as modeleContenu, mo.statut as modeleStatut,
+                   cp.promotion_ids as promotionIds,
+                   (select group_concat(concat(p.code, ' · ', p.nom) order by p.code separator '|') from crm_promotion p
+                    where find_in_set(p.id, cp.promotion_ids) > 0) as promotionsLibelles,
                    cp.date_execution as dateExecution, cp.statut as statut, cp.perimetre_agences as perimetreAgences,
                    cp.agences_cibles as agencesCibles, cp.nb_clients as nbClients, cp.nb_messages as nbMessages, cp.nb_exclus as nbExclus,
                    cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs, cp.cree_par as creeParId, uc.nom_complet as creePar,
@@ -96,6 +101,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ListeDiffusionService listeDiffusionService;
     private final VariableMessageService variableMessageService;
+    private final PromotionService promotionService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
@@ -157,10 +163,12 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         em.createNativeQuery("""
-                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, criteres, date_execution, perimetre_agences,
-                                          cree_par, created_at)
-                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, '{}', :dateExecution, :perimetreAgences, :creePar, utc_timestamp())
+                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, criteres, date_execution,
+                                          perimetre_agences, cree_par, created_at)
+                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, '{}', :dateExecution, :perimetreAgences, :creePar,
+                        utc_timestamp())
                 """)
+                .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
                 .setParameter("listeId", demande.getListeId())
@@ -183,10 +191,11 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         }
         verifierDemande(demande);
         em.createNativeQuery("""
-                update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, date_execution = :dateExecution,
-                       statut = 'BROUILLON', soumise_le = null, updated_at = utc_timestamp()
+                update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, promotion_ids = :promotionIds,
+                       date_execution = :dateExecution, statut = 'BROUILLON', soumise_le = null, updated_at = utc_timestamp()
                 where id = :id
                 """)
+                .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
                 .setParameter("listeId", demande.getListeId())
@@ -251,6 +260,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             throw new ErreurMetierException("Seul un brouillon peut être soumis à validation.");
         }
         verifierExpediteur(campagne);
+        verifierPromotions(campagne);
         List<Ligne> lignes = generer(campagne);
         long envoyables = lignes.stream().filter(Ligne::envoyable).count();
         if (envoyables == 0) {
@@ -274,6 +284,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             throw new ErreurMetierException("Le modèle « " + campagne.dto().getModeleNom() + " » a été archivé ; choisissez-en un autre.");
         }
         verifierExpediteur(campagne);
+        verifierPromotions(campagne);
         List<Ligne> lignes = generer(campagne);
         if (lignes.stream().noneMatch(Ligne::envoyable)) {
             throw new ErreurMetierException("La campagne ne contient plus aucun message à envoyer.");
@@ -470,11 +481,14 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             lignes.forEach(l -> contacts.computeIfAbsent(((Number) l[0]).longValue(), k -> new ArrayList<>()).add(l));
         }
 
+        Map<String, String> valeursPromotions = dto.getPromotionIds().isEmpty() ? Map.of() : promotionService.valeursCampagne(dto.getPromotionIds());
+
         List<Ligne> resultat = new ArrayList<>();
         Set<String> servis = new HashSet<>();
         for (Tuple t : fiches) {
             Map<String, String> valeurs = new HashMap<>();
-            sourcesParCode.forEach((code, source) -> valeurs.put(code, valeur(t, source, aliasParSource, dto)));
+            sourcesParCode.forEach((code, source) -> valeurs.put(code, ModeleMessageServiceImpl.sourcePromotion(source)
+                    ? valeursPromotions.getOrDefault(source, "") : valeur(t, source, aliasParSource, dto)));
             Long clientId = t.get("clientId", Long.class);
             if (t.get("desabonneLe") != null) {
                 resultat.add(ligne(t, dto, null, null, null, "Client désabonné (STOP)", campagne, valeurs));
@@ -567,6 +581,34 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         if (demande.getDateExecution() != null && demande.getDateExecution().isBefore(maintenant().minusMinutes(1))) {
             throw new ErreurMetierException("La date d'exécution est déjà passée.");
         }
+        promotionService.verifierCitables(promotions(demande));
+        @SuppressWarnings("unchecked")
+        List<String> contenus = em.createNativeQuery("select concat(coalesce(objet, ''), ' ', contenu) from crm_modele_message where id = :id")
+                .setParameter("id", demande.getModeleId()).getResultList();
+        verifierPromotionsDuModele(contenus.getFirst(), promotions(demande));
+    }
+
+    private static List<Long> promotions(CampagneMarketingDemandeDTO demande) {
+        return demande.getPromotionIds() == null ? List.of() : demande.getPromotionIds().stream().filter(Objects::nonNull).distinct().toList();
+    }
+
+    /** Un modele qui cite {produits_promotion} ou {promotion_nom} demande au moins une promotion. */
+    private void verifierPromotionsDuModele(String texte, List<Long> promotions) {
+        if (!promotions.isEmpty()) {
+            return;
+        }
+        Map<String, String> sources = variableMessageService.sourcesParCode();
+        List<String> citees = GabaritMessage.variables(texte).stream().filter(v -> ModeleMessageServiceImpl.sourcePromotion(sources.get(v)))
+                .map(v -> "{" + v + "}").toList();
+        if (!citees.isEmpty()) {
+            throw new ErreurMetierException("Le modèle cite " + String.join(", ", citees) + " : choisissez au moins une promotion.");
+        }
+    }
+
+    /** Les promotions citees doivent etre encore en cours a la soumission et a la validation. */
+    private void verifierPromotions(Campagne campagne) {
+        promotionService.verifierCitables(campagne.dto().getPromotionIds());
+        verifierPromotionsDuModele(Objects.requireNonNullElse(campagne.objet(), "") + " " + campagne.contenu(), campagne.dto().getPromotionIds());
     }
 
     /** Le WhatsApp part du numero de l'auteur : sans numero, ou auteur desactive, rien ne peut partir. */
@@ -669,6 +711,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .modeleId(tuple.get("modeleId", Long.class))
                 .modeleNom(tuple.get("modeleNom", String.class))
                 .canal(tuple.get("canal", String.class))
+                .promotionIds(Objects.requireNonNullElse(separer(tuple.get("promotionIds", String.class)), List.of()))
+                .promotions(tuple.get("promotionsLibelles") == null ? List.of() : List.of(tuple.get("promotionsLibelles", String.class).split("\\|")))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
                 .statut(tuple.get("statut", String.class))
                 .nbClients(((Number) tuple.get("nbClients")).intValue())

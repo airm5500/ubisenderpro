@@ -41,6 +41,11 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.agent_numero", "Numéro WhatsApp de l'agent du client");
         SOURCES_CALCULEES.put("calcul.expediteur_nom", "Nom de l'expéditeur (l'agent en relance, le préparateur en Marketing)");
         SOURCES_CALCULEES.put("calcul.expediteur_numero", "Numéro WhatsApp de l'expéditeur");
+        SOURCES_CALCULEES.put("calcul.promotion_nom", "Nom des promotions citées par la campagne (Marketing)");
+        SOURCES_CALCULEES.put("calcul.promotion_code", "Code des promotions citées (Marketing)");
+        SOURCES_CALCULEES.put("calcul.promotion_debut", "Début des promotions citées (Marketing)");
+        SOURCES_CALCULEES.put("calcul.promotion_fin", "Fin des promotions citées (Marketing)");
+        SOURCES_CALCULEES.put("calcul.produits_promotion", "Produits des promotions citées et leur avantage, un par ligne (Marketing)");
     }
 
     /** Colonnes techniques jamais proposees. */

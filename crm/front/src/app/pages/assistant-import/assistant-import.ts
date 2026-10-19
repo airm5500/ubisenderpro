@@ -27,6 +27,10 @@ const TYPES: Record<string, TypeImport> = {
   produits: {
     simulation: '/api/marketing/imports/produits', pluriel: 'produits', feminin: false, cle: 'Code produit',
     retour: '/marketing/catalogue', libelleRetour: 'Catalogue', fin: '/marketing/catalogue', libelleFin: 'Voir le catalogue'
+  },
+  promotions: {
+    simulation: '/api/marketing/imports/promotions', pluriel: 'produits en promotion', feminin: false, cle: 'Promotion / produit',
+    retour: '/marketing/promotions', libelleRetour: 'Promotions', fin: '/marketing/promotions', libelleFin: 'Voir les promotions'
   }
 };
 
@@ -203,6 +207,7 @@ export class AssistantImport implements OnInit {
 
   recommencer(): void {
     const cible = this.type() === 'produits' ? this.router.navigate(['/marketing/catalogue/import'])
+      : this.type() === 'promotions' ? this.router.navigate(['/marketing/promotions/import'])
       : this.router.navigate(['/imports/nouveau'], { queryParams: { type: this.type() } });
     cible.then(() => {
       this.etape.set(0); this.fichier = null; this.apercu.set(null); this.simulation.set(null); this.rapport.set(null);

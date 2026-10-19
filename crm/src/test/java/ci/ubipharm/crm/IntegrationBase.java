@@ -57,11 +57,14 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_modele_message");
         jdbc.update("delete from crm_variable_message where code not in ('code_client', 'numero_compte', 'nom_client', 'nom_pharmacie', "
                 + "'agence', 'sous_type', 'reference_facture', 'date_facture', 'date_echeance', 'montant', 'solde', 'jours_retard', "
-                + "'jours_avant_echeance', 'agent_nom', 'agent_numero', 'expediteur_nom', 'expediteur_numero', 'segment')");
+                + "'jours_avant_echeance', 'agent_nom', 'agent_numero', 'expediteur_nom', 'expediteur_numero', 'segment', "
+                + "'promotion_nom', 'promotion_code', 'promotion_debut', 'promotion_fin', 'produits_promotion')");
         jdbc.update("update crm_variable_message set statut = 'ACTIF'");
         jdbc.update("delete from crm_delegation");
         jdbc.update("delete from crm_affectation");
         jdbc.update("delete from crm_facture");
+        jdbc.update("delete from crm_promotion_produit");
+        jdbc.update("delete from crm_promotion");
         jdbc.update("delete from crm_produit");
         jdbc.update("delete from crm_import_ligne");
         jdbc.update("delete from crm_import");

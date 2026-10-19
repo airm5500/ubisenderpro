@@ -1,0 +1,78 @@
+<div class="page">
+  <a class="retour" routerLink="/marketing/promotions">← Promotions</a>
+  @if (promotion(); as p) {
+    <div class="entete">
+      <div>
+        <h1>{{ p.nom }}</h1>
+        <p class="sous-titre">{{ p.code }} · du {{ p.dateDebut | jour }} au {{ p.dateFin | jour }} ·
+          <span class="etat-compte"><span class="dot" [style.background]="S[p.statut].couleur"></span>{{ S[p.statut].libelle }}</span></p>
+      </div>
+      @if (auth.peut('PROMOTIONS_GERER')) {
+        <div class="actions">
+          @if (p.statut === 'ARCHIVEE') { <button class="bs" type="button" (click)="action('reactivation', 'Promotion réactivée')">Réactiver</button> }
+          @else {
+            <button class="bs" type="button" (click)="saisie.set(true)">Modifier</button>
+            <button class="bs" type="button" (click)="action('archivage', 'Promotion archivée')">Archiver</button>
+            @if (p.statut === 'BROUILLON') {
+              <button class="bp" type="button" (click)="action('activation', 'Promotion activée')" [disabled]="!p.nbProduits">Activer</button>
+            }
+          }
+        </div>
+      }
+    </div>
+
+    @if (p.description) { <p>{{ p.description }}</p> }
+    @switch (p.statut) {
+      @case ('BROUILLON') { <div class="info"><i class="pi pi-info-circle"></i><span>En préparation : activez-la pour la citer dans une campagne.</span></div> }
+      @case ('ACTIVE') { <div class="info"><i class="pi pi-check-circle"></i><span>Proposée aux campagnes jusqu'au {{ p.dateFin | jour }} ; elle se terminera d'elle-même le lendemain.</span></div> }
+      @case ('TERMINEE') { <div class="info"><i class="pi pi-clock"></i><span>Période terminée : elle n'est plus proposée aux campagnes. Prolongez sa date de fin pour la relancer.</span></div> }
+      @case ('ARCHIVEE') { <div class="info"><i class="pi pi-inbox"></i><span>Archivée : réactivez-la pour la modifier.</span></div> }
+    }
+
+    <section class="bloc">
+      <div class="titre" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h2 class="h2">Produits en promotion · {{ p.nbProduits }}</h2>
+        <div class="actions">
+          <label class="case"><input type="checkbox" [checked]="avecRetires" (change)="basculerRetires()">Afficher les produits retirés</label>
+          <button class="bs petit" type="button" (click)="exporter()" [disabled]="!p.nbProduits"><i class="pi pi-download"></i> Exporter</button>
+          @if (modifiable()) {
+            <a class="bs petit" routerLink="/marketing/promotions/import">Importer</a>
+            <button class="bp petit" type="button" (click)="ajouter()"><i class="pi pi-plus"></i> Ajouter un produit</button>
+          }
+        </div>
+      </div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Produit</th><th class="n">Prix public</th><th>Avantage</th><th class="n">Dès</th><th></th></tr></thead>
+          <tbody>
+            @for (l of lignes(); track l.id) {
+              <tr [style.opacity]="l.actif ? 1 : 0.55">
+                <td><b>{{ l.produitLibelle }}</b><div class="second">{{ l.produitCode }}@if (l.conditionnement) { · {{ l.conditionnement }} }@if (l.importe) { · importé }
+                  @if (l.produitStatut !== 'ACTIF') { · archivé au catalogue }</div></td>
+                <td class="n nw">@if (l.prixPublic !== null) { {{ l.prixPublic | montant }} F } @else { — }</td>
+                <td>{{ l.resume }}@if (!l.actif) { <div class="second">Retiré</div> }</td>
+                <td class="n">{{ l.quantiteMin }}</td>
+                <td class="nw actions">
+                  @if (modifiable()) {
+                    @if (l.actif) { <a (click)="modifier(l)">Modifier</a> <a (click)="retirer(l)">Retirer</a> }
+                    @else { <a (click)="remettre(l)">Remettre</a> }
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="vide">Aucun produit : ajoutez-en un, ou importez votre fichier.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <p class="discret">Responsable : {{ p.creePar }}, créée le {{ p.creeLe | jour }}@if (p.modifiePar) { · modifiée par {{ p.modifiePar }} le {{ p.modifieLe | jour }} }.</p>
+
+    @if (auth.peut('PROMOTIONS_GERER')) {
+      <app-promotion-formulaire [(ouvert)]="saisie" [promotion]="p" (enregistre)="charger()" />
+      <app-ligne-promotion [(ouvert)]="saisieLigne" [promotionId]="p.id" [ligne]="cible()" (enregistre)="charger()" />
+    }
+  } @else {
+    <p class="discret">Chargement…</p>
+  }
+</div>

@@ -1,0 +1,20 @@
+<p-dialog [header]="promotion() ? 'Modifier la promotion' : 'Nouvelle promotion'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '600px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Code<input class="sel" name="code" [(ngModel)]="formulaire.code" placeholder="Ex. NOV26" required maxlength="30"></label>
+      <label class="f large">Nom<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Promo santé de novembre" required maxlength="150"></label>
+      <label class="f">Début<input class="sel" type="date" name="dateDebut" [(ngModel)]="formulaire.dateDebut" required></label>
+      <label class="f">Fin<input class="sel" type="date" name="dateFin" [(ngModel)]="formulaire.dateFin" required></label>
+      <label class="f large">Description<textarea class="sel" rows="3" name="description" [(ngModel)]="formulaire.description" maxlength="1000"
+        placeholder="Facultatif : conditions, public visé…"></textarea></label>
+    </div>
+    <p class="discret" style="margin: 0">Le lendemain de la date de fin, la promotion se termine d'elle-même et n'est plus proposée aux campagnes.</p>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.code.trim() || !formulaire.nom.trim() || !formulaire.dateDebut || !formulaire.dateFin">
+        {{ promotion() ? 'Enregistrer' : 'Créer la promotion' }}</button>
+    </div>
+  </form>
+</p-dialog>

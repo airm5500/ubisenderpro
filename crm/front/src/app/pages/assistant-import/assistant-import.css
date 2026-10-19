@@ -5,4 +5,5 @@
 .pied-etape .sous-titre { max-width: 620px; }
 .motifs { max-width: 560px; }
 @media (max-width: 900px) { .grille-etape { grid-template-columns: minmax(0, 1fr); } }
-.maj { text-transform: capitalize; }
+.maj { display: inline-block; }
+.maj::first-letter { text-transform: uppercase; }

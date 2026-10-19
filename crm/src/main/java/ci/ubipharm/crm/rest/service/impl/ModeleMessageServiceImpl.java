@@ -43,7 +43,8 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             """;
 
     /** Sources utilisables sans facture ni agent de recouvrement. */
-    private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero");
+    private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero",
+            "calcul.promotion_nom", "calcul.promotion_code", "calcul.promotion_debut", "calcul.promotion_fin", "calcul.produits_promotion");
 
     /** 4 SMS de 153 caracteres. */
     private static final int SMS_LONGUEUR_MAX = 612;
@@ -184,6 +185,11 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 throw new ErreurMetierException("Une promotion ne porte sur aucune facture ni agent de recouvrement : retirez "
                         + String.join(", ", horsMarketing) + ".");
             }
+        } else {
+            List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v))).map(v -> "{" + v + "}").toList();
+            if (!promotions.isEmpty()) {
+                throw new ErreurMetierException("Une relance ne cite aucune promotion : retirez " + String.join(", ", promotions) + ".");
+            }
         }
         // Le nom reste unique tous modules confondus : les journaux et les campagnes le citent
         long homonymes = ((Number) em.createNativeQuery("select count(*) from crm_modele_message where nom = :nom and id <> :id")
@@ -198,6 +204,11 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     /** Variables d'une promotion : celles du client et de l'expediteur. */
     static boolean sourceMarketing(String source) {
         return source != null && (source.startsWith("client.") || SOURCES_MARKETING.contains(source));
+    }
+
+    /** Variables remplies par les promotions qu'une campagne Marketing cite. */
+    static boolean sourcePromotion(String source) {
+        return source != null && (source.startsWith("calcul.promotion_") || "calcul.produits_promotion".equals(source));
     }
 
     private static String type(String module, ModeleMessageDemandeDTO demande) {
