@@ -9,7 +9,7 @@
   <name>UBIPHARM CRM</name>
   <description>CRM UBIPHARM CI : relances de recouvrement par WhatsApp, e-mail et SMS (interface web sur le port 8080).</description>
   <executable>%BASE%\runtime\bin\java.exe</executable>
-  <arguments>-Xms256m -Xmx1024m -Dfile.encoding=UTF-8 -jar "%BASE%\crm.jar" --spring.profiles.active=prod --spring.config.additional-location=optional:file:./application-prod.yml</arguments>
+  <arguments>-Xms256m -Xmx1024m -Dfile.encoding=UTF-8 -Duser.timezone=UTC -jar "%BASE%\crm.jar" --spring.profiles.active=prod --spring.config.additional-location=optional:file:./application-prod.yml</arguments>
   <workingdirectory>%BASE%\..\donnees</workingdirectory>
   <env name="CRM_LOG_DIR" value="%BASE%\..\donnees\logs"/>
   <startmode>Automatic</startmode>

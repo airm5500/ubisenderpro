@@ -34,7 +34,8 @@ export class Connexion {
     this.auth.connecter(this.login.trim(), this.motDePasse).subscribe({
       next: () => {
         ecrire(CLE_IDENTIFIANT, this.seSouvenir ? this.login.trim() : '');
-        this.router.navigateByUrl(this.auth.accueil());
+        // Si la session est refusee aussitot (page d'accueil en 401), on reste ici : le bouton redevient utilisable
+        this.router.navigateByUrl(this.auth.accueil()).finally(() => this.enCours.set(false));
       },
       error: (e: HttpErrorResponse) => {
         this.enCours.set(false);
