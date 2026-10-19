@@ -6,6 +6,7 @@ import { MessageService } from 'primeng/api';
 import { VerificationNumerosDialogue } from '../clients/verification-numeros';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
+import { JournalFiche } from '../journal/journal-fiche';
 import { Affectation, Client, Facture, MessageRecu, Page } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, TelephonePipe } from '../../core/format';
 import { ClientFormulaire } from '../clients/client-formulaire';
@@ -18,7 +19,7 @@ const PALETTE = ['#05253D', '#51D78E', '#0B5C8E', '#F4B740', '#9DB0BF'];
 
 @Component({
   selector: 'app-fiche-client',
-  imports: [RouterLink, FormsModule, DialogModule, VerificationNumerosDialogue, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire, BadgeSegment],
+  imports: [RouterLink, FormsModule, DialogModule, VerificationNumerosDialogue, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire, BadgeSegment, JournalFiche],
   templateUrl: './fiche-client.html',
   styleUrl: './fiche-client.css'
 })

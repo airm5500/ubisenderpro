@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import ci.ubipharm.crm.rest.service.ArchivageService;
+import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
@@ -32,6 +33,7 @@ public class PieceJointeServiceImpl implements PieceJointeService {
     private final ParametreService parametreService;
     private final ArchivageService archivageService;
     private final UtilisateurCourantService utilisateurCourantService;
+    private final JournalActionService journalActionService;
 
     @Override
     @Transactional
@@ -54,6 +56,7 @@ public class PieceJointeServiceImpl implements PieceJointeService {
         }
         try {
             Long id = inserer("AFFICHE", nom, type, fichier.getBytes(), utilisateurCourantService.utilisateur().getId());
+            journalActionService.enregistrer("PIECE_JOINTE_DEPOT", "crm_piece_jointe", id, "Affiche " + nom + " (" + fichier.getSize() / 1024 + " Ko)");
             return decrire(id);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

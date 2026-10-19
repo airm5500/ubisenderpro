@@ -160,10 +160,17 @@ public class ProduitServiceImpl implements ProduitService {
                 .setParameter("par", perimetreService.perimetreCourant().getUtilisateurId())
                 .setParameter("id", id)
                 .executeUpdate();
-        journalActionService.enregistrer("PRODUIT_MODIFICATION", "crm_produit", id,
-                avant.getCode() + (avant.getCode().equals(demande.getCode().trim()) ? "" : " -> " + demande.getCode().trim())
-                        + " " + demande.getLibelle().trim());
-        return consulter(id);
+        ProduitDTO apres = consulter(id);
+        journalActionService.enregistrer("PRODUIT_MODIFICATION", "crm_produit", id, new EcartsJournal()
+                .champ("Code", avant.getCode(), apres.getCode())
+                .champ("Libellé", avant.getLibelle(), apres.getLibelle())
+                .champ("Catégorie", avant.getCategorie(), apres.getCategorie())
+                .champ("Laboratoire", avant.getLaboratoire(), apres.getLaboratoire())
+                .champ("Conditionnement", avant.getConditionnement(), apres.getConditionnement())
+                .champ("Prix", avant.getPrix(), apres.getPrix())
+                .masque("Description", avant.getDescription(), apres.getDescription())
+                .detail(avant.getCode() + " " + avant.getLibelle()));
+        return apres;
     }
 
     @Override

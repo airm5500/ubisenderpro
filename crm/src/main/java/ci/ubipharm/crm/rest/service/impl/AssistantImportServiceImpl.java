@@ -17,6 +17,7 @@ import ci.ubipharm.crm.rest.service.AssistantImportService;
 import ci.ubipharm.crm.rest.service.CorrespondanceImportService;
 import ci.ubipharm.crm.rest.service.ImportMetierService;
 import ci.ubipharm.crm.rest.service.ImportService;
+import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.LecteurTableurService;
 import ci.ubipharm.crm.rest.service.dto.ApercuImportDTO;
 import ci.ubipharm.crm.rest.service.dto.ChampImportDTO;
@@ -43,16 +44,19 @@ public class AssistantImportServiceImpl implements AssistantImportService {
     private final ImportService importService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final ArchivageService archivageService;
+    private final JournalActionService journalActionService;
 
     public AssistantImportServiceImpl(List<ImportMetierService> metiers, LecteurTableurService lecteurTableurService,
             CorrespondanceImportService correspondanceImportService, ImportService importService,
-            UtilisateurCourantService utilisateurCourantService, ArchivageService archivageService) {
+            UtilisateurCourantService utilisateurCourantService, ArchivageService archivageService,
+            JournalActionService journalActionService) {
         this.metiers = metiers.stream().collect(Collectors.toMap(ImportMetierService::type, Function.identity()));
         this.lecteurTableurService = lecteurTableurService;
         this.correspondanceImportService = correspondanceImportService;
         this.importService = importService;
         this.utilisateurCourantService = utilisateurCourantService;
         this.archivageService = archivageService;
+        this.journalActionService = journalActionService;
     }
 
     @Override
@@ -111,7 +115,10 @@ public class AssistantImportServiceImpl implements AssistantImportService {
 
     @Override
     public ImportDTO corriger(Long importId, Long ligneId, CorrectionLigneDTO correction) {
-        return metier(importService.type(importId)).corriger(importId, ligneId, correction);
+        ImportDTO resultat = metier(importService.type(importId)).corriger(importId, ligneId, correction);
+        journalActionService.enregistrer("IMPORT_CORRECTION", "crm_import", importId, "Ligne corrigée avant validation : "
+                + (correction.getValeurs() == null ? "" : String.join(", ", correction.getValeurs().keySet())));
+        return resultat;
     }
 
     @Override

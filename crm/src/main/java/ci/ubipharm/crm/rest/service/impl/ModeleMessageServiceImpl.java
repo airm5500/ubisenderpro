@@ -160,7 +160,14 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
                 .setParameter("id", id)
                 .executeUpdate();
-        journalActionService.enregistrer("MODELE_MODIFICATION", "crm_modele_message", id, demande.getNom().trim());
+        journalActionService.enregistrer("MODELE_MODIFICATION", "crm_modele_message", id, new EcartsJournal()
+                .champ("Nom", existant.getNom(), demande.getNom())
+                .champ("Type", existant.getTypeCampagne(), type(module, demande))
+                .champ("Canal", existant.getCanal(), canal(demande))
+                .champ("Objet", existant.getObjet(), objet(demande))
+                .masque("Texte du message", existant.getContenu(), demande.getContenu())
+                .champ("Modèle Meta", existant.getMetaModele(), metaModele(demande))
+                .detail(existant.getNom()));
         return consulter(module, id);
     }
 
