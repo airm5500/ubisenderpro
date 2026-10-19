@@ -30,8 +30,21 @@ class CadenceWhatsapp {
     private final Map<String, Instant> prochainEnvoi = new ConcurrentHashMap<>();
 
     boolean dansLaPlage() {
+        return dansLaPlage("whatsapp.envoi", 8, 18);
+    }
+
+    /** Plage propre aux envois en masse (ouverte en permanence par defaut), distincte de celle des relances. */
+    boolean dansLaPlageEnvoiMasse() {
+        return dansLaPlage("whatsapp.envoi_masse", 0, 24);
+    }
+
+    String plageEnvoiMasse() {
+        return parametreService.entier("whatsapp.envoi_masse.heure_debut", 0) + " h et " + parametreService.entier("whatsapp.envoi_masse.heure_fin", 24) + " h";
+    }
+
+    private boolean dansLaPlage(String prefixe, int debut, int fin) {
         int heure = ZonedDateTime.now(ABIDJAN).getHour();
-        return heure >= parametreService.entier("whatsapp.envoi.heure_debut", 8) && heure < parametreService.entier("whatsapp.envoi.heure_fin", 18);
+        return heure >= parametreService.entier(prefixe + ".heure_debut", debut) && heure < parametreService.entier(prefixe + ".heure_fin", fin);
     }
 
     /** Plage d'envoi lisible, par ex. « 8 h et 18 h ». */

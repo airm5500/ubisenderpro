@@ -52,7 +52,7 @@ class EchangesIT extends IntegrationBase {
         reinitialiser();
         for (String[] p : new String[][] {{"whatsapp.envoi.heure_debut", "0"}, {"whatsapp.envoi.heure_fin", "24"},
                 {"whatsapp.envoi.delai_min_secondes", "0"}, {"whatsapp.envoi.delai_max_secondes", "0"}, {"whatsapp.envoi.plafond_jour", "200"},
-                {"discussions.reponse_active", "OUI"}}) {
+                {"discussions.reponse_active", "OUI"}, {"whatsapp.envoi_masse.heure_debut", "0"}, {"whatsapp.envoi_masse.heure_fin", "24"}}) {
             jdbc.update("update crm_parametre set valeur = ? where cle = ?", p[1], p[0]);
         }
         admin = connecter("admin", MOT_DE_PASSE_ADMIN);
@@ -149,6 +149,21 @@ class EchangesIT extends IntegrationBase {
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.elements[0].action", containsString("LISTE")));
         mvc.perform(get("/api/utilisateurs/" + id + "/actions").session(charge)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void lEnvoiEnMasseASaProprePlageEtNeDependPasDeCelleDesRelances() throws Exception {
+        // Plage des relances fermee : l'envoi en masse part quand meme (sa plage est ouverte par defaut)
+        jdbc.update("update crm_parametre set valeur = '0' where cle in ('whatsapp.envoi.heure_debut', 'whatsapp.envoi.heure_fin')");
+        when(passerelle.envoyerTexte(eq(NUMERO), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("P-1").build());
+        envoyer(charge, post("/api/envois-masse"), "{\"nom\":\"Nuit\",\"contenu\":\"Promo\",\"numeros\":\"0700000001\"}")
+                .andExpect(jsonPath("$.horsPlage").value(false));
+        assertThat(envoiMasseService.envoyerLot()).isEqualTo(1);
+        // Sa propre plage fermee : il attend et l'ecran le dit
+        jdbc.update("update crm_parametre set valeur = '0' where cle in ('whatsapp.envoi_masse.heure_debut', 'whatsapp.envoi_masse.heure_fin')");
+        envoyer(charge, post("/api/envois-masse"), "{\"nom\":\"Nuit 2\",\"contenu\":\"Promo\",\"numeros\":\"0700000001\"}")
+                .andExpect(jsonPath("$.horsPlage").value(true)).andExpect(jsonPath("$.plageHoraire").value("0 h et 0 h"));
+        assertThat(envoiMasseService.envoyerLot()).isZero();
     }
 
     @Test

@@ -96,7 +96,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
         String exemple = retenus.isEmpty() ? null : personnaliser(demande.getContenu(), retenus.getFirst().nom());
         if (demande.isApercu()) {
             return EnvoiMasseApercuDTO.builder().nbRetenus(retenus.size()).exclus(exclus).exemple(exemple)
-                    .horsPlage(!cadence.dansLaPlage()).plageHoraire(cadence.plage()).build();
+                    .horsPlage(!cadence.dansLaPlageEnvoiMasse()).plageHoraire(cadence.plageEnvoiMasse()).build();
         }
         if (retenus.isEmpty()) {
             throw new ErreurMetierException("Aucun destinataire à qui envoyer : tous sont exclus.");
@@ -123,7 +123,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
         journalActionService.enregistrer("ENVOI_MASSE_CREATION", "crm_envoi_masse", id,
                 demande.getNom().trim() + " : " + retenus.size() + " destinataire(s), " + exclus.size() + " exclu(s), depuis " + expediteur);
         return EnvoiMasseApercuDTO.builder().envoi(consulter(id)).nbRetenus(retenus.size()).exclus(exclus).exemple(exemple)
-                .horsPlage(!cadence.dansLaPlage()).plageHoraire(cadence.plage()).build();
+                .horsPlage(!cadence.dansLaPlageEnvoiMasse()).plageHoraire(cadence.plageEnvoiMasse()).build();
     }
 
     @Override
@@ -157,8 +157,8 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
             throw new RessourceIntrouvableException("Envoi introuvable.");
         }
         EnvoiMasseDTO envoi = mapTupleToDto(lignes.getFirst());
-        envoi.setHorsPlage(!cadence.dansLaPlage());
-        envoi.setPlageHoraire(cadence.plage());
+        envoi.setHorsPlage(!cadence.dansLaPlageEnvoiMasse());
+        envoi.setPlageHoraire(cadence.plageEnvoiMasse());
         return envoi;
     }
 
@@ -207,18 +207,20 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
 
     @Override
     public int envoyerLot() {
-        if (!cadence.dansLaPlage()) {
+        if (!cadence.dansLaPlageEnvoiMasse()) {
             return 0;
         }
-        // Les relances et promotions d'un numero passent avant ses envois en masse
+        // Pendant la plage des relances, les relances et promotions d'un numero passent avant ses envois en masse ;
+        // en dehors, elles attendent et ne retiennent pas les envois en masse
+        String prioriteCampagnes = !cadence.dansLaPlage() ? "" : """
+                 and not exists (
+                    select 1 from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
+                    where m.numero_expediteur = s.numero_expediteur and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS')""";
         List<String> numeros = jdbc.queryForList("""
                 select distinct s.numero_expediteur from crm_message_sortant s
                 join crm_envoi_masse e on e.id = s.envoi_masse_id and e.statut = 'EN_COURS'
                 join crm_session_whatsapp w on w.numero = s.numero_expediteur and w.statut = 'CONNECTE' and w.fournisseur = 'WA_WEB'
-                where s.statut = 'A_ENVOYER' and not exists (
-                    select 1 from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
-                    where m.numero_expediteur = s.numero_expediteur and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS')
-                """, Map.of(), String.class);
+                where s.statut = 'A_ENVOYER'""" + prioriteCampagnes, Map.of(), String.class);
         int envoyes = 0;
         for (String numero : numeros) {
             if (!cadence.peutEnvoyer(numero)) {

@@ -36,7 +36,7 @@
           <div class="kv"><span>Destinataires retenus</span><strong>{{ a.nbRetenus }}</strong></div>
           <div class="kv"><span>Écartés</span><strong>{{ a.exclus.length }}</strong></div>
         </div>
-        @if (a.horsPlage) { <div class="info"><i class="pi pi-clock"></i><span>Il est hors de la plage d'envoi WhatsApp (entre {{ a.plageHoraire }}, heure d'Abidjan) : les messages partiront à son ouverture. La plage se règle dans Paramètres > WhatsApp.</span></div> }
+        @if (a.horsPlage) { <div class="info"><i class="pi pi-clock"></i><span>Il est hors de la plage des envois en masse (entre {{ a.plageHoraire }}, heure d'Abidjan) : les messages partiront à son ouverture. Cette plage se règle dans Paramètres > WhatsApp.</span></div> }
         @if (a.exemple) { <div class="info"><i class="pi pi-whatsapp"></i><span style="white-space: pre-wrap">{{ a.exemple }}</span></div> }
         @if (a.exclus.length) {
           <div class="defile" style="max-height: 220px">
@@ -68,7 +68,7 @@
         </div>
       </div>
       @if (e.statut === 'EN_COURS' && e.horsPlage && e.nbEnAttente) {
-        <div class="info"><i class="pi pi-clock"></i><span>En attente de la plage d'envoi WhatsApp (entre {{ e.plageHoraire }}, heure d'Abidjan) : les {{ e.nbEnAttente }} message(s) partiront à son ouverture, après les campagnes.</span></div>
+        <div class="info"><i class="pi pi-clock"></i><span>En attente de la plage des envois en masse (entre {{ e.plageHoraire }}, heure d'Abidjan) : les {{ e.nbEnAttente }} message(s) partiront à son ouverture, après les campagnes.</span></div>
       }
       <div class="kvs bandeau">
         <div class="kv"><span>À envoyer</span><strong>{{ e.nbEnAttente }}</strong></div>
@@ -91,7 +91,7 @@
           <tbody>
             @for (d of destinataires()?.elements; track d.id) {
               <tr><td class="nw">{{ d.numero | telephone }}</td><td>{{ d.nom || '—' }}</td>
-                <td><span [pTooltip]="d.statut === 'A_ENVOYER' ? 'En attente : les messages WhatsApp partent entre ' + e.plageHoraire + ' (heure d\'Abidjan), au rythme des relances, après les campagnes.' : ''" tooltipPosition="top" [class.attente]="d.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[d.statut]"></span>{{ L.statutMessage[d.statut] ?? d.statut }}@if (d.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>@if (d.motif) { <div class="second">{{ d.motif }}</div> }</td>
+                <td><span [pTooltip]="d.statut === 'A_ENVOYER' ? 'En attente : les envois en masse partent entre ' + e.plageHoraire + ' (heure d\'Abidjan), au rythme des relances, après les campagnes.' : ''" tooltipPosition="top" [class.attente]="d.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[d.statut]"></span>{{ L.statutMessage[d.statut] ?? d.statut }}@if (d.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>@if (d.motif) { <div class="second">{{ d.motif }}</div> }</td>
                 <td class="nw">{{ d.envoyeLe | jour: true }}</td></tr>
             } @empty { <tr><td colspan="4" class="vide">Aucun destinataire.</td></tr> }
           </tbody>

@@ -97,7 +97,7 @@ export class EnvoiMassePage implements OnInit {
         }
         this.messages.add(r.horsPlage
           ? { severity: 'info', summary: 'Envoi programmé', life: 10000,
-              detail: `Il est hors de la plage d'envoi WhatsApp : les ${r.nbRetenus} message(s) partiront depuis votre numéro à son ouverture (entre ${r.plageHoraire}, heure d'Abidjan), après les campagnes.` }
+              detail: `Il est hors de la plage des envois en masse : les ${r.nbRetenus} message(s) partiront depuis votre numéro à son ouverture (entre ${r.plageHoraire}, heure d'Abidjan), après les campagnes.` }
           : { severity: 'success', summary: 'Envoi lancé', detail: `${r.nbRetenus} message(s) partiront depuis votre numéro, au rythme des relances.` });
         this.saisie.set(false);
         this.charger();
