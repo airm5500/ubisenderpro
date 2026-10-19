@@ -25,4 +25,7 @@ public interface PasserelleWhatsappService {
 
     /** Presence sur WhatsApp de chaque numero (format international), interrogee depuis la session du numero donne. */
     Map<String, Boolean> verifierNumeros(String numero, List<String> numeros);
+
+    /** Vrai si le service wa-web repond (route /health) ; ne leve jamais d'exception. */
+    boolean joignable();
 }

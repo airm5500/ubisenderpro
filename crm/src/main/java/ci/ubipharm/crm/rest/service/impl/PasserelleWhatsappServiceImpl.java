@@ -89,6 +89,17 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
         return presence;
     }
 
+    @Override
+    public boolean joignable() {
+        try {
+            client.get().uri("/health").retrieve().toBodilessEntity();
+            return true;
+        } catch (RuntimeException e) {
+            log.debug("Service WhatsApp injoignable : {}", e.getMessage());
+            return false;
+        }
+    }
+
     private ResultatEnvoiDTO envoyer(String numero, String chemin, Map<String, Object> corps) {
         try {
             Map<String, Object> reponse = client.post().uri(chemin, numero)

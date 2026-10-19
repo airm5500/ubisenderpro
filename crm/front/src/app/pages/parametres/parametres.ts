@@ -20,7 +20,8 @@ const CATEGORIES: [string, string, string][] = [
   ['SMS', 'SMS', 'Rythme des envois ; le fournisseur se règle dans Fournisseurs SMS.'],
   ['SECURITE', 'Sécurité', 'Mots de passe et verrouillage des comptes.'],
   ['IMPORT', 'Imports', 'Taille des fichiers importés.'],
-  ['MARKETING', 'Marketing', 'Désabonnement des clients par une réponse WhatsApp.']
+  ['MARKETING', 'Marketing', 'Désabonnement des clients par une réponse WhatsApp.'],
+  ['SUPPORT', 'Centre de support', "Conservation et rythme de capture des erreurs du diagnostic, seuil d'alerte du disque d'archivage."]
 ];
 
 /** Listes de reference tenues dans les Parametres (droit Referentiels). */
