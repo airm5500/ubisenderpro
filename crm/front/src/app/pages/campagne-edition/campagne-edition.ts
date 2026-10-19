@@ -38,6 +38,8 @@ export class CampagneEdition implements OnInit {
   quand: 'validation' | 'date' = 'validation';
   dateEnvoi = aujourdhui();
   heureEnvoi = '09:00';
+  recurrence = '';
+  finRecurrence = '';
 
   protected readonly agences = signal<Agence[]>([]);
   protected readonly agents = signal<Agent[]>([]);
@@ -167,7 +169,8 @@ export class CampagneEdition implements OnInit {
   private enregistrer(): Observable<Campagne> {
     const demande: CampagneDemande = {
       nom: this.nom.trim(), typeCampagne: this.typeCampagne, modeleId: this.modeleId, criteres: this.nettoyes(),
-      dateExecution: this.quand === 'date' ? `${this.dateEnvoi}T${this.heureEnvoi}:00` : null
+      dateExecution: this.quand === 'date' ? `${this.dateEnvoi}T${this.heureEnvoi}:00` : null,
+      recurrence: this.recurrence || null, finRecurrence: this.recurrence && this.finRecurrence ? this.finRecurrence : null
     };
     const requete = this.campagneId
       ? this.api.put<Campagne>(`/api/recouvrement/campagnes/${this.campagneId}`, demande)
@@ -193,6 +196,8 @@ export class CampagneEdition implements OnInit {
       this.dateEnvoi = c.dateExecution.substring(0, 10);
       this.heureEnvoi = c.dateExecution.substring(11, 16);
     }
+    this.recurrence = c.recurrence ?? '';
+    this.finRecurrence = c.finRecurrence ?? '';
     this.modifie();
   }
 

@@ -91,10 +91,14 @@ export interface CriteresCampagne {
   soldeMin?: number | null; soldeMax?: number | null; echeanceDu?: string | null; echeanceAu?: string | null;
   joursAvantMin?: number | null; joursAvantMax?: number | null; joursRetardMin?: number | null; joursRetardMax?: number | null;
 }
-export interface CampagneDemande { nom: string; typeCampagne: string; modeleId: number | null; criteres: CriteresCampagne; dateExecution: string | null; }
+export interface CampagneDemande {
+  nom: string; typeCampagne: string; modeleId: number | null; criteres: CriteresCampagne; dateExecution: string | null;
+  recurrence: string | null; finRecurrence: string | null;
+}
 export interface Campagne {
   id: number; nom: string; typeCampagne: string; modeleId: number; modeleNom: string; canal: string; criteres: CriteresCampagne;
-  dateExecution: string | null; statut: string; nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number;
+  dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
+  statut: string; nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number;
   nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string; createdAt: string; soumiseLe: string | null;
   validePar: string | null; valideLe: string | null; motifRejet: string | null; rejetePar: string | null;
   lanceLe: string | null; termineLe: string | null; annulePar: string | null; annuleLe: string | null; motifAnnulation: string | null;
@@ -166,7 +170,7 @@ export interface ValeursCriteres { sousAgences: string[]; villes: string[]; }
 /** Marketing : campagne promotionnelle sur une liste de diffusion. */
 export interface CampagneMarketing {
   id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
-  canal: string; dateExecution: string | null;
+  canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
   numeroExpediteur: string | null; agencesCibles: number[] | null; createdAt: string; soumiseLe: string | null; validePar: string | null;
   valideLe: string | null; motifRejet: string | null; rejetePar: string | null; lanceLe: string | null; termineLe: string | null;

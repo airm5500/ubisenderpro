@@ -174,6 +174,12 @@ class SelectionCampagne {
         filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= -:avantMax", "avantMax", avantMax);
         filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= :retardMin", "retardMin", retardMin);
         filtre(sql, parametres, "datediff(:reference, f.date_echeance) <= :retardMax", "retardMax", c.getJoursRetardMax());
+        // Campagne automatique : une facture deja relancee avant ou le jour de l'echeance ne l'est plus ; apres l'echeance,
+        // elle l'est a chaque envoi, sauf si le message de l'envoi precedent n'est pas encore parti.
+        sql.append(" and not exists (select 1 from crm_campagne_message dm where dm.campagne_id = :campagneId and dm.facture_id = f.id"
+                + " and dm.statut in (:dejaTraites))");
+        parametres.put("dejaTraites", "AVANT_ECHEANCE".equals(typeCampagne) || "JOUR_ECHEANCE".equals(typeCampagne)
+                ? List.of(A_ENVOYER, "ENVOI", "ENVOYE", "DISTRIBUE", "LU") : List.of(A_ENVOYER, "ENVOI"));
         sql.append(" order by u.nom_complet, c.code, f.date_echeance, f.reference");
 
         Query requete = em.createNativeQuery(sql.toString(), Tuple.class);

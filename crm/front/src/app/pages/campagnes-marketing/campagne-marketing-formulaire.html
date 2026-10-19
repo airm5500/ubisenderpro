@@ -26,6 +26,22 @@
       <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">
     </label>
     <p class="discret" style="margin: 0">Laissez vide pour envoyer dès la validation. Rien ne part avant qu'une personne habilitée ait validé la campagne.</p>
+    <div class="grille">
+      <label class="f">Répétition
+        <select class="sel" name="recurrence" [(ngModel)]="formulaire.recurrence">
+          <option value="">Une seule fois</option>
+          <option value="QUOTIDIENNE">Chaque jour</option>
+          <option value="HEBDOMADAIRE">Chaque semaine</option>
+          <option value="MENSUELLE">Chaque mois</option>
+        </select>
+      </label>
+      @if (formulaire.recurrence) {
+        <label class="f">Jusqu'au<input class="sel" type="date" name="finRecurrence" [(ngModel)]="formulaire.finRecurrence" required></label>
+      }
+    </div>
+    @if (formulaire.recurrence) {
+      <p class="discret" style="margin: 0">Validée une fois, la campagne repart seule avec la liste et les promotions du moment. Elle s'arrête d'elle-même si une promotion citée est terminée.</p>
+    }
     @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
     <div class="pied">
       <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>

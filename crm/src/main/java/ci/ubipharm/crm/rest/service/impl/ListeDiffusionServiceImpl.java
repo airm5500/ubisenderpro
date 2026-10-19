@@ -149,9 +149,20 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
 
     @Override
     @Transactional(readOnly = true)
+    public ListeDiffusionDTO consulterDefinition(Long id) {
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.id = :id", Tuple.class).setParameter("id", id).getResultList();
+        if (lignes.isEmpty()) {
+            throw new RessourceIntrouvableException("Liste introuvable");
+        }
+        return mapTupleToDto(lignes.getFirst());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Long> clients(Long id, List<Long> agences) {
         Map<String, Object> parametres = new LinkedHashMap<>();
-        Query requete = em.createNativeQuery("select c.id " + requeteMembres(definition(consulter(id)), parametres, agences)
+        Query requete = em.createNativeQuery("select c.id " + requeteMembres(definition(consulterDefinition(id)), parametres, agences)
                 + " order by c.raison_sociale, c.code");
         parametres.forEach(requete::setParameter);
         @SuppressWarnings("unchecked")

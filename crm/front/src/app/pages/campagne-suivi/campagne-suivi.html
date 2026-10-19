@@ -7,7 +7,7 @@
         <p class="sous-titre"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}
           @if (c.statut === 'TERMINEE') { · exécutée du {{ c.lanceLe | jour: true }} au {{ c.termineLe | jour: true }} }
           @if (c.statut === 'EN_COURS') { · démarrée le {{ c.lanceLe | jour: true }} }
-          @if (c.statut === 'VALIDEE') { · envoi prévu le {{ c.dateExecution | jour: true }} }
+          @if (c.statut === 'VALIDEE') { · {{ c.nbExecutions ? 'prochain envoi' : 'envoi prévu' }} le {{ c.dateExecution | jour: true }} }
           @if (c.statut === 'ANNULEE') { · par {{ c.annulePar }} le {{ c.annuleLe | jour: true }} : {{ c.motifAnnulation }} }
         </p>
       </div>
@@ -34,6 +34,9 @@
     <div class="kvs" style="padding: 18px 0; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet)">
       <div class="kv"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }}</strong></div>
       <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }} · {{ L.canal[c.canal] }}</strong></div>
+      @if (c.recurrence) {
+        <div class="kv"><span>Répétition</span><strong>{{ L.recurrence[c.recurrence] }} jusqu'au {{ c.finRecurrence | jour }} · {{ c.nbExecutions }} envoi{{ c.nbExecutions > 1 ? 's' : '' }} fait{{ c.nbExecutions > 1 ? 's' : '' }}</strong></div>
+      }
       <div class="kv"><span>Créée le</span><strong>{{ c.createdAt | jour }} par {{ c.creePar }}</strong></div>
       @if (c.validePar) { <div class="kv"><span>Validée par</span><strong>{{ c.validePar }}, {{ c.valideLe | jour }}</strong></div> }
       <div class="kv"><span>Critères</span><strong>{{ resume(c.criteres).join(' · ') || 'Toutes les factures du type' }}</strong></div>

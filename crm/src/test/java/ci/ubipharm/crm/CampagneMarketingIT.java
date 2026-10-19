@@ -21,8 +21,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import com.jayway.jsonpath.JsonPath;
 
+import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
+import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 
 /** Campagnes promotionnelles : liste de diffusion, modele du Marketing, numero de l'auteur, validation par agence. */
@@ -35,6 +37,12 @@ class CampagneMarketingIT extends IntegrationBase {
 
     @Autowired
     EnvoiWhatsappService envoiWhatsappService;
+
+    @Autowired
+    CampagneMarketingService campagneMarketingService;
+
+    @Autowired
+    SuiviEnvoiService suiviEnvoiService;
 
     private MockHttpSession admin;
     private MockHttpSession charge;
@@ -138,6 +146,36 @@ class CampagneMarketingIT extends IntegrationBase {
 
         creerUtilisateur("it-agent", "AGENT", "RECOUVREMENT", 1L);
         mvc.perform(get("/api/marketing/campagnes").session(connecter("it-agent", MOT_DE_PASSE_ADMIN))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void uneCampagneRecurrenteRepartChaqueSemaineEtSArreteSiSonAuteurNePeutPlusEnvoyer() throws Exception {
+        String fin = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusMonths(1).toString();
+        Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Chaque lundi","listeId":%d,"modeleId":%d,"recurrence":"HEBDOMADAIRE","finRecurrence":"%s"}""".formatted(liste, modele, fin)));
+        envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "");
+        envoyer(admin, post("/api/marketing/campagnes/" + campagne + "/validation"), "")
+                .andExpect(jsonPath("$.statut").value("EN_COURS"))
+                .andExpect(jsonPath("$.nbExecutions").value(1));
+        jdbc.update("update crm_campagne_message set statut = 'ENVOYE' where campagne_id = ? and statut = 'A_ENVOYER'", campagne);
+        suiviEnvoiService.recompter(campagne);
+        mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge)).andExpect(jsonPath("$.statut").value("VALIDEE"));
+
+        jdbc.update("update crm_campagne set date_execution = utc_timestamp() - interval 1 minute where id = ?", campagne);
+        assertThat(campagneMarketingService.demarrerCampagnesEchues()).isEqualTo(1);
+        mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))
+                .andExpect(jsonPath("$.statut").value("EN_COURS"))
+                .andExpect(jsonPath("$.nbExecutions").value(2))
+                .andExpect(jsonPath("$.nbMessages").value(4));
+
+        jdbc.update("update crm_campagne_message set statut = 'ENVOYE' where campagne_id = ? and statut = 'A_ENVOYER'", campagne);
+        suiviEnvoiService.recompter(campagne);
+        jdbc.update("update crm_utilisateur set numero_whatsapp = null where login = 'it-marketing'");
+        jdbc.update("update crm_campagne set date_execution = utc_timestamp() - interval 1 minute where id = ?", campagne);
+        campagneMarketingService.demarrerCampagnesEchues();
+        mvc.perform(get("/api/marketing/campagnes/" + campagne).session(admin))
+                .andExpect(jsonPath("$.statut").value("ANNULEE"))
+                .andExpect(jsonPath("$.motifAnnulation", org.hamcrest.Matchers.endsWith("Répétition arrêtée.")));
     }
 
     private String campagne(String nom, Long modeleId) {

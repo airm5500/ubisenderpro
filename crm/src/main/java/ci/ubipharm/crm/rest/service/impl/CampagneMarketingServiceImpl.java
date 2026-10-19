@@ -70,7 +70,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                    cp.promotion_ids as promotionIds,
                    (select group_concat(concat(p.code, ' · ', p.nom) order by p.code separator '|') from crm_promotion p
                     where find_in_set(p.id, cp.promotion_ids) > 0) as promotionsLibelles,
-                   cp.date_execution as dateExecution, cp.statut as statut, cp.perimetre_agences as perimetreAgences,
+                   cp.date_execution as dateExecution, cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence,
+                   cp.debut_recurrence as debutRecurrence, cp.nb_executions as nbExecutions, cp.statut as statut, cp.perimetre_agences as perimetreAgences,
                    cp.agences_cibles as agencesCibles, cp.nb_clients as nbClients, cp.nb_messages as nbMessages, cp.nb_exclus as nbExclus,
                    cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs, cp.cree_par as creeParId, uc.nom_complet as creePar,
                    uc.numero_whatsapp as numeroExpediteur, uc.email as emailAuteur, uc.statut as statutAuteur,
@@ -108,7 +109,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
 
     /** Campagne lue en base, avec son modele, son auteur et le perimetre fige a la creation (null = toutes les agences). */
     private record Campagne(CampagneMarketingDTO dto, String objet, String contenu, String modeleStatut, String emailAuteur,
-                            boolean auteurActif, List<Long> perimetre) {
+                            boolean auteurActif, List<Long> perimetre, LocalDateTime debutRecurrence) {
     }
 
     /** Message genere et son contact destinataire. */
@@ -164,10 +165,12 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         em.createNativeQuery("""
                 insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, criteres, date_execution,
-                                          perimetre_agences, cree_par, created_at)
-                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, '{}', :dateExecution, :perimetreAgences, :creePar,
-                        utc_timestamp())
+                                          recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
+                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, '{}', :dateExecution, :recurrence, :finRecurrence,
+                        :perimetreAgences, :creePar, utc_timestamp())
                 """)
+                .setParameter("recurrence", demande.getRecurrence())
+                .setParameter("finRecurrence", demande.getFinRecurrence())
                 .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
@@ -192,9 +195,12 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         em.createNativeQuery("""
                 update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, promotion_ids = :promotionIds,
-                       date_execution = :dateExecution, statut = 'BROUILLON', soumise_le = null, updated_at = utc_timestamp()
+                       date_execution = :dateExecution, recurrence = :recurrence, fin_recurrence = :finRecurrence, statut = 'BROUILLON',
+                       soumise_le = null, updated_at = utc_timestamp()
                 where id = :id
                 """)
+                .setParameter("recurrence", demande.getRecurrence())
+                .setParameter("finRecurrence", demande.getFinRecurrence())
                 .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
@@ -290,25 +296,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             throw new ErreurMetierException("La campagne ne contient plus aucun message à envoyer.");
         }
         verifierAgencesDuValideur(lignes);
-        SqlParameterSource[] lots = lignes.stream().map(l -> new MapSqlParameterSource()
-                .addValue("campagneId", id)
-                .addValue("clientId", l.message().getClientId())
-                .addValue("canal", l.message().getCanal())
-                .addValue("contactId", l.contactId())
-                .addValue("numeroDestinataire", l.message().getNumeroDestinataire())
-                .addValue("emailDestinataire", l.message().getEmailDestinataire())
-                .addValue("numeroExpediteur", l.message().getNumeroExpediteur())
-                .addValue("emailReponse", l.message().getEmailReponse())
-                .addValue("objet", l.message().getObjet())
-                .addValue("contenu", l.message().getContenu())
-                .addValue("statut", l.message().getStatut())
-                .addValue("motif", l.message().getMotif())).toArray(SqlParameterSource[]::new);
-        jdbc.batchUpdate("""
-                insert into crm_campagne_message (campagne_id, facture_id, client_id, canal, contact_id, numero_destinataire, email_destinataire,
-                                                  numero_expediteur, email_reponse, objet, contenu, statut, motif, created_at)
-                values (:campagneId, null, :clientId, :canal, :contactId, :numeroDestinataire, :emailDestinataire,
-                        :numeroExpediteur, :emailReponse, :objet, :contenu, :statut, :motif, utc_timestamp())
-                """, lots);
+        enregistrerMessages(id, lignes, 1);
         em.createNativeQuery("update crm_campagne set statut = 'VALIDEE', valide_par = :validePar, valide_le = utc_timestamp(), "
                 + "updated_at = utc_timestamp() where id = :id")
                 .setParameter("validePar", utilisateurCourantService.utilisateur().getId())
@@ -391,8 +379,29 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         return ids.size();
     }
 
-    /** Passe la campagne en cours ; un client desabonne depuis la validation ne recoit rien. */
+    /**
+     * Passe la campagne en cours ; un client desabonne depuis la validation ne recoit rien. Une campagne recurrente
+     * regenere ses messages a chaque envoi apres le premier (liste et promotions du moment), puis attend le suivant ;
+     * elle s'arrete d'elle-meme si une promotion citee est finie ou si son auteur ne peut plus envoyer.
+     */
     private void demarrer(Long id, boolean systeme) {
+        Campagne campagne = lireSansRestriction(id);
+        CampagneMarketingDTO dto = campagne.dto();
+        int execution = dto.getNbExecutions() + 1;
+        if (execution > 1) {
+            try {
+                if (!"ACTIF".equals(campagne.modeleStatut())) {
+                    throw new ErreurMetierException("Le modèle « " + dto.getModeleNom() + " » a été archivé.");
+                }
+                verifierExpediteur(campagne);
+                verifierPromotions(campagne);
+            } catch (ErreurMetierException e) {
+                arreter(id, e.getMessage() + " Répétition arrêtée.");
+                return;
+            }
+            enregistrerMessages(id, generer(campagne), execution);
+            recompterCumul(id);
+        }
         int annules = em.createNativeQuery("""
                 update crm_campagne_message m join crm_client c on c.id = m.client_id
                 set m.statut = 'ANNULE', m.motif = 'Client desabonne avant l''envoi', m.updated_at = utc_timestamp()
@@ -400,20 +409,75 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 """).setParameter("id", id).executeUpdate();
         long restants = ((Number) em.createNativeQuery("select count(*) from crm_campagne_message where campagne_id = :id and statut = 'A_ENVOYER'")
                 .setParameter("id", id).getSingleResult()).longValue();
+        LocalDateTime debut = campagne.debutRecurrence() != null ? campagne.debutRecurrence()
+                : dto.getDateExecution() != null ? dto.getDateExecution() : maintenant();
+        LocalDateTime prochaine = dto.getRecurrence() == null ? null
+                : Recurrence.prochaine(debut, dto.getRecurrence(), dto.getFinRecurrence(), maintenant());
+        String statut = restants > 0 ? "EN_COURS" : prochaine != null ? "VALIDEE" : "TERMINEE";
         em.createNativeQuery("""
                 update crm_campagne set statut = :statut, lance_le = utc_timestamp(),
-                       termine_le = case when :statut = 'TERMINEE' then utc_timestamp() end, updated_at = utc_timestamp()
+                       termine_le = case when :statut = 'TERMINEE' then utc_timestamp() end,
+                       date_execution = coalesce(:prochaine, date_execution),
+                       debut_recurrence = case when recurrence is not null then coalesce(debut_recurrence, :debut) end,
+                       nb_executions = nb_executions + 1, updated_at = utc_timestamp()
                 where id = :id
                 """)
-                .setParameter("statut", restants == 0 ? "TERMINEE" : "EN_COURS")
+                .setParameter("statut", statut)
+                .setParameter("prochaine", prochaine)
+                .setParameter("debut", debut)
                 .setParameter("id", id)
                 .executeUpdate();
-        String details = restants + " message(s) a envoyer" + (annules > 0 ? ", " + annules + " client(s) desabonne(s) retire(s)" : "");
+        String details = (execution > 1 ? "Envoi n° " + execution + " : " : "") + restants + " message(s) a envoyer"
+                + (annules > 0 ? ", " + annules + " client(s) desabonne(s) retire(s)" : "");
         if (systeme) {
             journalActionService.enregistrerSysteme("CAMPAGNE_MARKETING_LANCEMENT", "crm_campagne", id, details);
         } else {
             journalActionService.enregistrer("CAMPAGNE_MARKETING_LANCEMENT", "crm_campagne", id, details);
         }
+    }
+
+    /** Arret d'une campagne recurrente qui ne peut plus repartir. */
+    private void arreter(Long id, String motif) {
+        em.createNativeQuery("""
+                update crm_campagne set statut = 'ANNULEE', annule_le = utc_timestamp(), motif_annulation = :motif, updated_at = utc_timestamp()
+                where id = :id
+                """).setParameter("motif", motif).setParameter("id", id).executeUpdate();
+        journalActionService.enregistrerSysteme("CAMPAGNE_MARKETING_ANNULATION", "crm_campagne", id, motif);
+    }
+
+    /** Compteurs d'une campagne recurrente : tous ses envois confondus. */
+    private void recompterCumul(Long id) {
+        em.createNativeQuery("""
+                update crm_campagne c set
+                    nb_messages = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut <> 'EXCLU'),
+                    nb_clients = (select count(distinct m.client_id) from crm_campagne_message m where m.campagne_id = c.id and m.statut <> 'EXCLU'),
+                    nb_exclus = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut = 'EXCLU')
+                where c.id = :id
+                """).setParameter("id", id).executeUpdate();
+    }
+
+    /** Fige les messages d'un envoi. */
+    private void enregistrerMessages(Long id, List<Ligne> lignes, int execution) {
+        SqlParameterSource[] lots = lignes.stream().map(l -> new MapSqlParameterSource()
+                .addValue("campagneId", id)
+                .addValue("execution", execution)
+                .addValue("clientId", l.message().getClientId())
+                .addValue("canal", l.message().getCanal())
+                .addValue("contactId", l.contactId())
+                .addValue("numeroDestinataire", l.message().getNumeroDestinataire())
+                .addValue("emailDestinataire", l.message().getEmailDestinataire())
+                .addValue("numeroExpediteur", l.message().getNumeroExpediteur())
+                .addValue("emailReponse", l.message().getEmailReponse())
+                .addValue("objet", l.message().getObjet())
+                .addValue("contenu", l.message().getContenu())
+                .addValue("statut", l.message().getStatut())
+                .addValue("motif", l.message().getMotif())).toArray(SqlParameterSource[]::new);
+        jdbc.batchUpdate("""
+                insert into crm_campagne_message (campagne_id, execution, facture_id, client_id, canal, contact_id, numero_destinataire, email_destinataire,
+                                                  numero_expediteur, email_reponse, objet, contenu, statut, motif, created_at)
+                values (:campagneId, :execution, null, :clientId, :canal, :contactId, :numeroDestinataire, :emailDestinataire,
+                        :numeroExpediteur, :emailReponse, :objet, :contenu, :statut, :motif, utc_timestamp())
+                """, lots);
     }
 
     // --- Generation des messages ---------------------------------------------------------------
@@ -437,7 +501,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         if (clients.isEmpty()) {
             return List.of();
         }
-        ListeDiffusionDTO liste = listeDiffusionService.consulter(dto.getListeId());
+        ListeDiffusionDTO liste = listeDiffusionService.consulterDefinition(dto.getListeId());
         String canal = dto.getCanal();
         Map<String, String> sourcesParCode = variableMessageService.sourcesParCode();
         Set<String> utilisees = new LinkedHashSet<>(GabaritMessage.variables(campagne.contenu()));
@@ -586,6 +650,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         List<String> contenus = em.createNativeQuery("select concat(coalesce(objet, ''), ' ', contenu) from crm_modele_message where id = :id")
                 .setParameter("id", demande.getModeleId()).getResultList();
         verifierPromotionsDuModele(contenus.getFirst(), promotions(demande));
+        Recurrence.verifier(demande.getRecurrence(), demande.getFinRecurrence(), demande.getDateExecution(), maintenant().toLocalDate());
     }
 
     private static List<Long> promotions(CampagneMarketingDemandeDTO demande) {
@@ -668,6 +733,16 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         return perimetre.isVisionGlobale() ? messages : messages.stream().filter(m -> perimetre.getAgenceIds().contains(m.getAgenceId())).toList();
     }
 
+    /** Lecture par le planificateur, hors de toute session utilisateur. */
+    private Campagne lireSansRestriction(Long id) {
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery(SELECT + " where cp.id = :id", Tuple.class).setParameter("id", id).getResultList();
+        if (lignes.isEmpty()) {
+            throw new RessourceIntrouvableException("Campagne introuvable");
+        }
+        return mapTupleToCampagne(lignes.getFirst());
+    }
+
     private Campagne lire(Long id, boolean verrou) {
         StringBuilder where = new StringBuilder(" where cp.id = :id");
         Map<String, Object> parametres = new LinkedHashMap<>();
@@ -714,6 +789,9 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .promotionIds(Objects.requireNonNullElse(separer(tuple.get("promotionIds", String.class)), List.of()))
                 .promotions(tuple.get("promotionsLibelles") == null ? List.of() : List.of(tuple.get("promotionsLibelles", String.class).split("\\|")))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
+                .recurrence(tuple.get("recurrence", String.class))
+                .finRecurrence(tuple.get("finRecurrence", java.time.LocalDate.class))
+                .nbExecutions(((Number) tuple.get("nbExecutions")).intValue())
                 .statut(tuple.get("statut", String.class))
                 .nbClients(((Number) tuple.get("nbClients")).intValue())
                 .nbMessages(((Number) tuple.get("nbMessages")).intValue())
@@ -738,7 +816,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .build();
         return new Campagne(dto, tuple.get("modeleObjet", String.class), tuple.get("modeleContenu", String.class),
                 tuple.get("modeleStatut", String.class), tuple.get("emailAuteur", String.class), "ACTIF".equals(tuple.get("statutAuteur", String.class)),
-                separer(tuple.get("perimetreAgences", String.class)));
+                separer(tuple.get("perimetreAgences", String.class)), tuple.get("debutRecurrence", LocalDateTime.class));
     }
 
     MessageCampagneDTO mapTupleToMessage(Tuple tuple) {

@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import com.jayway.jsonpath.JsonPath;
 
 import ci.ubipharm.crm.rest.service.CampagneService;
+import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
 
 /** Campagnes : modeles et variables, recapitulatif, validation, programmation, annulation et cloisonnement. */
 class CampagneIT extends IntegrationBase {
@@ -34,6 +35,9 @@ class CampagneIT extends IntegrationBase {
 
     @Autowired
     CampagneService campagneService;
+
+    @Autowired
+    SuiviEnvoiService suiviEnvoiService;
 
     private MockHttpSession admin;
     private MockHttpSession agent;
@@ -213,6 +217,58 @@ class CampagneIT extends IntegrationBase {
                 .andExpect(jsonPath("$.message").value("La date d'exécution est déjà passée."));
     }
 
+    @Test
+    void uneCampagneAutomatiqueRepartSeuleSansRelancerDeuxFoisAvantEcheance() throws Exception {
+        String fin = aujourdhui.plusMonths(2).toString();
+        creerCampagne(admin, "Sans fin", "APRES_ECHEANCE", modeleRetard, "{}", null, "HEBDOMADAIRE", null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Indiquez jusqu'à quelle date la campagne se répète."));
+
+        // Apres echeance, chaque semaine : les factures en retard sont relancees a chaque envoi
+        Long id = idDe(creerCampagne(admin, "Retards hebdo", "PERSONNALISEE", modeleRetard,
+                "{\"clientIds\":[" + c1 + "],\"joursRetardMin\":1}", null, "HEBDOMADAIRE", fin));
+        action(admin, id, "soumission", null);
+        action(admin, id, "validation", null).andExpect(jsonPath("$.statut").value("EN_COURS")).andExpect(jsonPath("$.nbExecutions").value(1));
+        envoyerTout(id);
+        mvc.perform(get("/api/recouvrement/campagnes/" + id).session(admin))
+                .andExpect(jsonPath("$.statut").value("VALIDEE"))
+                .andExpect(jsonPath("$.recurrence").value("HEBDOMADAIRE"))
+                .andExpect(jsonPath("$.dateExecution", org.hamcrest.Matchers.startsWith(aujourdhui.plusWeeks(1).toString())));
+        assertThat(campagneService.demarrerCampagnesEchues()).isZero();
+
+        jdbc.update("update crm_campagne set date_execution = utc_timestamp() - interval 1 minute where id = ?", id);
+        assertThat(campagneService.demarrerCampagnesEchues()).isEqualTo(1);
+        mvc.perform(get("/api/recouvrement/campagnes/" + id).session(admin))
+                .andExpect(jsonPath("$.statut").value("EN_COURS"))
+                .andExpect(jsonPath("$.nbExecutions").value(2))
+                .andExpect(jsonPath("$.nbMessages").value(4));
+        assertThat(jdbc.queryForList("select execution from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER'", Integer.class, id))
+                .containsExactly(2, 2);
+
+        // Avant echeance, chaque jour : une facture deja relancee ne l'est plus
+        Long modeleAvant = idDe(creerModele(admin, "Rappel", "AVANT_ECHEANCE", "{reference_facture} dans {jours_avant_echeance} jours"));
+        Long avant = idDe(creerCampagne(admin, "Rappels quotidiens", "AVANT_ECHEANCE", modeleAvant, "{}", null, "QUOTIDIENNE", fin));
+        action(admin, avant, "soumission", null);
+        action(admin, avant, "validation", null).andExpect(jsonPath("$.nbMessages").value(1));
+        envoyerTout(avant);
+        jdbc.update("update crm_campagne set date_execution = utc_timestamp() - interval 1 minute where id = ?", avant);
+        campagneService.demarrerCampagnesEchues();
+        mvc.perform(get("/api/recouvrement/campagnes/" + avant).session(admin))
+                .andExpect(jsonPath("$.statut").value("VALIDEE"))
+                .andExpect(jsonPath("$.nbExecutions").value(2))
+                .andExpect(jsonPath("$.nbMessages").value(1));
+
+        // Le dernier envoi termine la campagne
+        jdbc.update("update crm_campagne set fin_recurrence = utc_date(), date_execution = utc_timestamp() - interval 1 minute where id = ?", avant);
+        campagneService.demarrerCampagnesEchues();
+        mvc.perform(get("/api/recouvrement/campagnes/" + avant).session(admin)).andExpect(jsonPath("$.statut").value("TERMINEE"));
+    }
+
+    private void envoyerTout(Long id) {
+        jdbc.update("update crm_campagne_message set statut = 'ENVOYE', envoye_le = utc_timestamp() where campagne_id = ? and statut = 'A_ENVOYER'", id);
+        suiviEnvoiService.recompter(id);
+    }
+
     private ResultActions creerModele(MockHttpSession session, String nom, String type, String contenu) throws Exception {
         return mvc.perform(post("/api/recouvrement/modeles-messages").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nom\":\"" + nom + "\",\"typeCampagne\":\"" + type + "\",\"contenu\":\"" + contenu + "\"}"));
@@ -226,6 +282,15 @@ class CampagneIT extends IntegrationBase {
     private ResultActions creerCampagne(MockHttpSession session, String nom, String type, Long modeleId, String criteres, String date) throws Exception {
         return mvc.perform(post("/api/recouvrement/campagnes").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(demande(nom, type, modeleId, criteres, date)));
+    }
+
+    private ResultActions creerCampagne(MockHttpSession session, String nom, String type, Long modeleId, String criteres, String date,
+            String recurrence, String fin) throws Exception {
+        String demande = demande(nom, type, modeleId, criteres, date);
+        demande = demande.substring(0, demande.length() - 1) + ",\"recurrence\":\"" + recurrence + "\""
+                + (fin == null ? "" : ",\"finRecurrence\":\"" + fin + "\"") + "}";
+        return mvc.perform(post("/api/recouvrement/campagnes").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(demande));
     }
 
     private String demande(String nom, String type, Long modeleId, String criteres, String date) {

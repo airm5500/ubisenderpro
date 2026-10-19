@@ -32,17 +32,22 @@ public class SuiviEnvoiServiceImpl implements SuiviEnvoiService {
                 """, Map.of("factureId", factureId));
     }
 
-    /** MariaDB applique les affectations dans l'ordre : termine_le est calcule avant que statut ne change. */
+    /**
+     * MariaDB applique les affectations dans l'ordre : termine_le est calcule avant que statut ne change. Une campagne
+     * automatique dont l'envoi est fini attend le suivant (VALIDEE) au lieu de se terminer.
+     */
     @Override
     public void recompter(Long campagneId) {
         jdbc.update("""
                 update crm_campagne c set
                     nb_envoyes = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut in ('ENVOYE', 'DISTRIBUE', 'LU')),
                     nb_echecs = (select count(*) from crm_campagne_message m where m.campagne_id = c.id and m.statut = 'ECHEC'),
-                    termine_le = case when c.statut = 'EN_COURS' and not exists (select 1 from crm_campagne_message m
+                    termine_le = case when c.statut = 'EN_COURS' and (c.recurrence is null or c.date_execution <= utc_timestamp()) and not exists (select 1 from crm_campagne_message m
                                   where m.campagne_id = c.id and m.statut in ('A_ENVOYER', 'ENVOI')) then utc_timestamp() else c.termine_le end,
                     statut = case when c.statut = 'EN_COURS' and not exists (select 1 from crm_campagne_message m
-                                  where m.campagne_id = c.id and m.statut in ('A_ENVOYER', 'ENVOI')) then 'TERMINEE' else c.statut end
+                                  where m.campagne_id = c.id and m.statut in ('A_ENVOYER', 'ENVOI'))
+                                  then case when c.recurrence is not null and c.date_execution > utc_timestamp() then 'VALIDEE' else 'TERMINEE' end
+                                  else c.statut end
                 where c.id = :id
                 """, Map.of("id", campagneId));
     }

@@ -36,6 +36,7 @@ export const LIBELLES = {
     AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée',
     PROMOTION: 'Promotion'
   } as Partial<Record<string, string>>,
+  recurrence: { QUOTIDIENNE: 'chaque jour', HEBDOMADAIRE: 'chaque semaine', MENSUELLE: 'chaque mois' } as Partial<Record<string, string>>,
   statutCampagne: {
     BROUILLON: 'Brouillon', A_VALIDER: 'En attente de validation', VALIDEE: 'Programmée', EN_COURS: 'En cours',
     TERMINEE: 'Exécutée', ANNULEE: 'Annulée'

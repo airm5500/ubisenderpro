@@ -30,6 +30,9 @@ public interface ListeDiffusionService {
     /** Clients actifs de la liste dans les agences donnees (null = toutes), desabonnes compris. */
     List<Long> clients(Long id, List<Long> agences);
 
+    /** Definition de la liste sans ses compteurs, lisible hors session (planificateur). */
+    ListeDiffusionDTO consulterDefinition(Long id);
+
     /** Compteurs d'une liste pas encore enregistree, pendant la saisie des criteres. */
     ApercuListeDTO simuler(ListeDiffusionDemandeDTO demande);
 

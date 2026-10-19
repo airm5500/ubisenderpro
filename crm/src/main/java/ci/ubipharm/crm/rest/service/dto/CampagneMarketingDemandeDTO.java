@@ -34,4 +34,10 @@ public class CampagneMarketingDemandeDTO {
 
     /** Vide : execution des la validation. */
     private LocalDateTime dateExecution;
+
+    /** QUOTIDIENNE, HEBDOMADAIRE ou MENSUELLE ; vide : un seul envoi. */
+    private String recurrence;
+
+    /** Dernier jour ou la campagne peut repartir. */
+    private java.time.LocalDate finRecurrence;
 }

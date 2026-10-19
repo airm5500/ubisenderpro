@@ -25,6 +25,9 @@ public class CampagneDTO {
     private String canal;
     private CriteresCampagneDTO criteres;
     private LocalDateTime dateExecution;
+    private String recurrence;
+    private java.time.LocalDate finRecurrence;
+    private int nbExecutions;
     private String statut;
     private int nbClients;
     private int nbFactures;

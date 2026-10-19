@@ -111,6 +111,22 @@
               <label class="f">Heure<input class="sel" type="time" name="heure" [(ngModel)]="heureEnvoi"></label>
             </div>
           }
+          <div class="grille">
+            <label class="f">Répétition
+              <select class="sel" name="recurrence" [(ngModel)]="recurrence" (ngModelChange)="modifie()">
+                <option value="">Une seule fois</option>
+                <option value="QUOTIDIENNE">Chaque jour</option>
+                <option value="HEBDOMADAIRE">Chaque semaine</option>
+                <option value="MENSUELLE">Chaque mois</option>
+              </select>
+            </label>
+            @if (recurrence) {
+              <label class="f">Jusqu'au<input class="sel" type="date" name="finRecurrence" [(ngModel)]="finRecurrence" [min]="aujourdhui" required></label>
+            }
+          </div>
+          @if (recurrence) {
+            <p class="discret">Validée une fois, la campagne repart seule à la même heure avec les factures du jour. Une facture déjà relancée avant ou le jour de l'échéance ne l'est pas une seconde fois ; après l'échéance, elle l'est à chaque envoi tant qu'elle n'est pas soldée.</p>
+          }
           @if (canal() === 'EMAIL') {
             <p class="discret">Les e-mails partent entre {{ etatEmail()?.heureDebut ?? 8 }} h et {{ etatEmail()?.heureFin ?? 18 }} h, heure d'Abidjan, depuis {{ etatEmail()?.expediteur || "l'adresse d'envoi d'UBIPHARM" }}, l'un après l'autre.</p>
           } @else if (canal() === 'SMS') {
