@@ -188,6 +188,10 @@ export interface SessionAgent {
   agentId: number; agentNom: string; numero: string | null; fournisseur: 'WA_WEB' | 'META'; metaPhoneNumberId: string | null; statut: string; sante: string | null; raison: string | null;
   connecteLe: string | null; envoyesAujourdhui: number; enAttente: number;
 }
+export interface AgenceGestion {
+  id: number; code: string; codeImport: string | null; libelle: string; statut: string; nbClients: number; nbUtilisateurs: number;
+  modifiePar: string | null; modifieLe: string | null;
+}
 export interface CompteMeta {
   jetonRenseigne: boolean; secretRenseigne: boolean; jetonVerification: string; urlWebhook: string | null; versionApi: string;
   modifiePar: string | null; modifieLe: string | null;

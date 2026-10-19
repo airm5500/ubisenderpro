@@ -36,6 +36,7 @@ export const routes: Routes = [
       { path: 'campagnes/:id', canActivate: [droit('CAMPAGNES', 'MA_JOURNEE')], loadComponent: () => import('./pages/campagne-suivi/campagne-suivi').then(m => m.CampagneSuivi), title: 'Campagne' },
       { path: 'delais-relance', canActivate: [droit('DELAIS_RELANCE')], loadComponent: () => import('./pages/delais-relance/delais-relance').then(m => m.DelaisRelance), title: 'Délais de relance' },
       { path: 'modeles', canActivate: [droit('MODELES', 'MODELES_GERER')], loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles de messages' },
+      { path: 'agences', canActivate: [droit('AGENCES')], loadComponent: () => import('./pages/agences/agences').then(m => m.Agences), title: 'Agences' },
       { path: 'numeros', canActivate: [droit('NUMEROS', 'NUMEROS_TOUS')], loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Numéros WhatsApp' },
       { path: 'parametres', canActivate: [droit('PARAMETRES')], loadComponent: () => import('./pages/parametres/parametres').then(m => m.Parametres), title: 'Paramètres' },
       { path: 'fournisseurs-sms', canActivate: [droit('FOURNISSEURS_SMS')], loadComponent: () => import('./pages/fournisseurs-sms/fournisseurs-sms').then(m => m.FournisseursSms), title: 'Fournisseurs SMS' },

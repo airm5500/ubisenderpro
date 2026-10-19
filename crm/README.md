@@ -626,3 +626,13 @@ A l'envoi : si le client a ecrit a ce numero depuis moins de 24 h, le message pa
 sinon seul le modele approuve part, et un modele sans nom Meta met le message en echec avec la consigne. Les accuses (distribue,
 lu), les refus apres coup et les reponses des clients arrivent par le webhook, signe par Meta (`X-Hub-Signature-256`).
 Configuration : `crm.meta.url` (`CRM_META_URL`, defaut `https://graph.facebook.com`), version de l'API dans l'ecran.
+
+## Agences (generalisation)
+
+Menu **Administration > Agences** (droit `AGENCES`, administrateur et Direction Generale) : les 5 agences sont livrees (Yopougon,
+Vridi, Centrale, Bouake, Gagnoa) ; creation, changement de nom, de code et de code d'import (code des fichiers de clients et de
+factures), archivage et reactivation. Une agence qui a encore des clients actifs ou des utilisateurs ne s'archive pas. Rien ne
+limite le CRM a une agence : la generalisation consiste a rattacher les utilisateurs (Utilisateurs et habilitations) et les
+clients (import ou fiche) a leur agence, puis a regler au besoin ses delais de relance.
+
+API : `GET /api/agences/gestion?archives=`, `POST /api/agences`, `PUT /api/agences/{id}`, `POST /api/agences/{id}/archivage|reactivation`.

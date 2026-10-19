@@ -85,6 +85,8 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_contact");
         jdbc.update("delete from crm_client");
         jdbc.update("delete from crm_utilisateur_agence");
+        jdbc.update("delete from crm_agence where code not in ('YOP', 'VRI', 'CEN', 'BKE', 'GAG')");
+        jdbc.update("update crm_agence set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_habilitation where utilisateur_id <> (select id from crm_utilisateur where login = 'admin')");
         jdbc.update("delete from crm_journal_connexion");
         // Roles crees par les tests ; les roles livres retrouvent leur nom et leur perimetre
