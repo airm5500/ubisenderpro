@@ -311,6 +311,63 @@ class CampagneIT extends IntegrationBase {
         suivi(agent, f2, "{}").andExpect(status().isBadRequest());
     }
 
+    @Test
+    void lesDelaisSuiventLAgenceEtLeSegmentDuClient() throws Exception {
+        jdbc.update("update crm_client set segmentation = 'P' where id = ?", c1);
+        Long modeleAvant = idDe(creerModele(admin, "Rappel", "AVANT_ECHEANCE", "{reference_facture} dans {jours_avant_echeance} jours"));
+        delai(admin, "{\"segment\":\"P\",\"avantJoursMax\":10}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.segmentLibelle").value("Platinum"));
+        delai(admin, "{\"segment\":\"P\",\"retardJoursMin\":2}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Une règle existe déjà pour cette agence et ce segment : modifiez-la plutôt."));
+        delai(admin, "{\"retardJoursMin\":2}").andExpect(status().isBadRequest());
+        delai(admin, "{\"segment\":\"S\",\"avantJoursMin\":8}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.startsWith("Avant échéance : le dernier jour (J-8)")));
+
+        // Platinum : relance des J-10 ; la fenetre propre a une campagne reste prioritaire
+        Long avant = idDe(creerCampagne(admin, "Avant", "AVANT_ECHEANCE", modeleAvant, "{}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + avant + "/messages").session(admin))
+                .andExpect(jsonPath("$.elements[*].factureReference", contains("K-F6", "K-F7")));
+        Long fenetre = idDe(creerCampagne(admin, "Fenetre", "AVANT_ECHEANCE", modeleAvant, "{\"joursAvantMax\":5}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + fenetre + "/messages").session(admin))
+                .andExpect(jsonPath("$.elements[*].factureReference", contains("K-F6")));
+
+        // Un directeur d'agence regle son agence, pas les autres ni toutes ; la regle agence + segment l'emporte
+        creerUtilisateur("it-directeur", "DIR_AGENCE", "RECOUVREMENT", YOPOUGON);
+        MockHttpSession directeur = connecter("it-directeur", MOT_DE_PASSE_ADMIN);
+        delai(directeur, "{\"segment\":\"B\",\"retardJoursMin\":3}").andExpect(status().isBadRequest());
+        delai(directeur, "{\"agenceId\":2,\"retardJoursMin\":3}").andExpect(status().isBadRequest());
+        String regle = delai(directeur, "{\"agenceId\":" + YOPOUGON + ",\"segment\":\"P\",\"retardJoursMin\":5}")
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        mvc.perform(get("/api/recouvrement/delais-relance").session(directeur))
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[?(@.agenceId == null)].modifiable", contains(false)));
+        Long apres = idDe(creerCampagne(agent, "Retards", "APRES_ECHEANCE", modeleRetard, "{}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + apres + "/messages").param("statut", "A_ENVOYER").session(agent))
+                .andExpect(jsonPath("$.elements[*].factureReference", contains("K-F1")));
+        Long idRegle = ((Number) JsonPath.read(regle, "$.id")).longValue();
+        mvc.perform(post("/api/recouvrement/delais-relance/" + idRegle + "/archivage").session(directeur).with(csrf()))
+                .andExpect(jsonPath("$.statut").value("ARCHIVE"));
+        mvc.perform(get("/api/recouvrement/delais-relance").session(agent)).andExpect(status().isForbidden());
+
+        // Intervalle minimal : une facture relancee aujourd'hui attend 7 jours, quelle que soit la campagne
+        Long envoyee = idDe(creerCampagne(admin, "Retards c1", "APRES_ECHEANCE", modeleRetard, "{\"clientIds\":[" + c1 + "]}", null));
+        action(admin, envoyee, "soumission", null);
+        action(admin, envoyee, "validation", null).andExpect(jsonPath("$.statut").value("EN_COURS"));
+        envoyerTout(envoyee);
+        jdbc.update("update crm_parametre set valeur = '7' where cle = 'campagne.relance_intervalle_jours'");
+        Long suivante = idDe(creerCampagne(agent, "Retards encore", "APRES_ECHEANCE", modeleRetard, "{}", null));
+        mvc.perform(get("/api/recouvrement/campagnes/" + suivante + "/recapitulatif").session(agent))
+                .andExpect(jsonPath("$.nbMessages").value(0))
+                .andExpect(jsonPath("$.exclusions[*].motif", containsInAnyOrder("Client sans numéro WhatsApp",
+                        "Déjà relancée le " + aujourdhui.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                + " (7 jours minimum entre deux relances)")));
+    }
+
+    private ResultActions delai(MockHttpSession session, String json) throws Exception {
+        return mvc.perform(post("/api/recouvrement/delais-relance").session(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(json));
+    }
+
     private ResultActions suivi(MockHttpSession session, Long factureId, String json) throws Exception {
         return mvc.perform(post("/api/recouvrement/factures/" + factureId + "/suivi").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(json));

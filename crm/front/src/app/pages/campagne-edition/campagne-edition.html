@@ -22,11 +22,11 @@
               </select>
             </label>
             @if (typeCampagne === 'AVANT_ECHEANCE') {
-              <label class="f">Échéance dans (jours, de)<input class="sel" type="number" min="1" name="avMin" [(ngModel)]="criteres.joursAvantMin" (ngModelChange)="modifie()" placeholder="1"></label>
-              <label class="f">à<input class="sel" type="number" min="1" name="avMax" [(ngModel)]="criteres.joursAvantMax" (ngModelChange)="modifie()" placeholder="5"></label>
+              <label class="f">Échéance dans (jours, de)<input class="sel" type="number" min="1" name="avMin" [(ngModel)]="criteres.joursAvantMin" (ngModelChange)="modifie()" placeholder="selon le segment"></label>
+              <label class="f">à<input class="sel" type="number" min="1" name="avMax" [(ngModel)]="criteres.joursAvantMax" (ngModelChange)="modifie()" placeholder="selon le segment"></label>
             }
             @if (typeCampagne === 'APRES_ECHEANCE' || typeCampagne === 'PERSONNALISEE') {
-              <label class="f">Échue depuis (jours, de)<input class="sel" type="number" min="0" name="rtMin" [(ngModel)]="criteres.joursRetardMin" (ngModelChange)="modifie()" placeholder="1"></label>
+              <label class="f">Échue depuis (jours, de)<input class="sel" type="number" min="0" name="rtMin" [(ngModel)]="criteres.joursRetardMin" (ngModelChange)="modifie()" placeholder="selon le segment"></label>
               <label class="f">à<input class="sel" type="number" min="0" name="rtMax" [(ngModel)]="criteres.joursRetardMax" (ngModelChange)="modifie()" placeholder="60"></label>
             }
             @if (typeCampagne === 'PERSONNALISEE') {

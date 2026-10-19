@@ -39,6 +39,11 @@ export interface Client {
   numeros?: Record<string, string>;
 }
 export interface Segment { code: string; libelle: string; }
+export interface DelaiRelance {
+  id: number | null; agenceId: number | null; agenceLibelle: string | null; segment: string | null; segmentLibelle: string | null;
+  avantJoursMax: number | null; avantJoursMin: number | null; retardJoursMin: number | null; intervalleJours: number | null;
+  statut: string; modifiable: boolean; modifiePar: string | null; modifieLe: string | null;
+}
 
 export interface Facture {
   id: number; reference: string; clientId: number; clientCode: string; clientRaisonSociale: string;

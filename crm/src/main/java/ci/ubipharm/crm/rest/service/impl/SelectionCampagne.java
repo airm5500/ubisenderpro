@@ -122,6 +122,10 @@ class SelectionCampagne {
                        ct.id as contactId, ct.numero_whatsapp as numeroDestinataire, f.suivi_date as datePromesse,
                        case when f.suivi in ('LITIGE', 'CONTENTIEUX') then f.suivi
                             when f.suivi = 'PROMESSE' and f.suivi_date >= :reference then 'PROMESSE' end as suspension,
+                       (select max(dm2.envoye_le) from crm_campagne_message dm2
+                        where dm2.facture_id = f.id and dm2.statut in ('ENVOYE', 'DISTRIBUE', 'LU')) as derniereRelance,
+                       coalesce(""" + regle("intervalle_jours") + """
+                , :defIntervalle) as intervalle,
                        (select cp.nom from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id
                         where m.facture_id = f.id and m.statut = 'A_ENVOYER' and cp.id <> :campagneId limit 1) as campagneEnAttente
                 """).append(colonnes).append("""
@@ -140,6 +144,7 @@ class SelectionCampagne {
         Map<String, Object> parametres = new HashMap<>();
         parametres.put("reference", reference);
         parametres.put("campagneId", campagneId == null ? 0L : campagneId);
+        parametres.put("defIntervalle", parametreService.entier(DelaiRelanceServiceImpl.INTERVALLE, 0));
         if (perimetre.agents() != null) {
             sql.append(" and af.agent_id in (:pAgents)");
             parametres.put("pAgents", perimetre.agents());
@@ -158,23 +163,32 @@ class SelectionCampagne {
         filtre(sql, parametres, "f.date_echeance >= :echeanceDu", "echeanceDu", c.getEcheanceDu());
         filtre(sql, parametres, "f.date_echeance <= :echeanceAu", "echeanceAu", c.getEcheanceAu());
 
-        // Fenetre du type de relance, comptee depuis la date d'execution (ecart > 0 = jours de retard)
-        Integer avantMin = c.getJoursAvantMin();
-        Integer avantMax = c.getJoursAvantMax();
-        Integer retardMin = c.getJoursRetardMin();
+        // Fenetre du type de relance, comptee depuis la date d'execution (ecart > 0 = jours de retard). Sans fenetre propre a la
+        // campagne, chaque facture suit les delais de l'agence et du segment de son client, sinon les delais par defaut.
         switch (typeCampagne) {
             case "AVANT_ECHEANCE" -> {
-                avantMin = avantMin != null ? avantMin : parametreService.entier("campagne.avant_echeance_jours_min", 1);
-                avantMax = avantMax != null ? avantMax : parametreService.entier("campagne.avant_echeance_jours_max", 5);
+                if (c.getJoursAvantMin() == null) {
+                    sql.append(" and datediff(:reference, f.date_echeance) <= -coalesce(").append(regle("avant_jours_min")).append(", :defAvantMin)");
+                    parametres.put("defAvantMin", parametreService.entier(DelaiRelanceServiceImpl.AVANT_MIN, 1));
+                }
+                if (c.getJoursAvantMax() == null) {
+                    sql.append(" and datediff(:reference, f.date_echeance) >= -coalesce(").append(regle("avant_jours_max")).append(", :defAvantMax)");
+                    parametres.put("defAvantMax", parametreService.entier(DelaiRelanceServiceImpl.AVANT_MAX, 5));
+                }
             }
             case "JOUR_ECHEANCE" -> sql.append(" and f.date_echeance = :reference");
-            case "APRES_ECHEANCE" -> retardMin = retardMin != null ? retardMin : 1;
+            case "APRES_ECHEANCE" -> {
+                if (c.getJoursRetardMin() == null) {
+                    sql.append(" and datediff(:reference, f.date_echeance) >= coalesce(").append(regle("retard_jours_min")).append(", :defRetardMin)");
+                    parametres.put("defRetardMin", parametreService.entier(DelaiRelanceServiceImpl.RETARD_MIN, 1));
+                }
+            }
             default -> {
             }
         }
-        filtre(sql, parametres, "datediff(:reference, f.date_echeance) <= -:avantMin", "avantMin", avantMin);
-        filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= -:avantMax", "avantMax", avantMax);
-        filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= :retardMin", "retardMin", retardMin);
+        filtre(sql, parametres, "datediff(:reference, f.date_echeance) <= -:avantMin", "avantMin", c.getJoursAvantMin());
+        filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= -:avantMax", "avantMax", c.getJoursAvantMax());
+        filtre(sql, parametres, "datediff(:reference, f.date_echeance) >= :retardMin", "retardMin", c.getJoursRetardMin());
         filtre(sql, parametres, "datediff(:reference, f.date_echeance) <= :retardMax", "retardMax", c.getJoursRetardMax());
         // Campagne automatique : une facture deja relancee avant ou le jour de l'echeance ne l'est plus ; apres l'echeance,
         // elle l'est a chaque envoi, sauf si le message de l'envoi precedent n'est pas encore parti.
@@ -190,16 +204,26 @@ class SelectionCampagne {
         List<Tuple> lignes = requete.getResultList();
         List<Ligne> resultat = new ArrayList<>(lignes.size());
         for (Tuple t : lignes) {
-            resultat.add(ligne(t, modele, sourcesParCode, aliasParSource));
+            resultat.add(ligne(t, modele, sourcesParCode, aliasParSource, reference));
         }
         return resultat;
     }
 
-    private Ligne ligne(Tuple t, Modele modele, Map<String, String> sourcesParCode, Map<String, String> aliasParSource) {
+    /** Valeur de la regle de delais la plus precise pour le client : agence et segment, agence, segment, puis aucune (null). */
+    private static String regle(String colonne) {
+        return "(select d." + colonne + " from crm_delai_relance d where d.statut = 'ACTIF' and d." + colonne + " is not null"
+                + " and (d.agence_id is null or d.agence_id = c.agence_id) and (d.segment is null or d.segment = c.segmentation)"
+                + " order by d.agence_id is null, d.segment is null limit 1)";
+    }
+
+    private Ligne ligne(Tuple t, Modele modele, Map<String, String> sourcesParCode, Map<String, String> aliasParSource, LocalDate reference) {
         boolean email = "EMAIL".equals(modele.canal());
         boolean sms = "SMS".equals(modele.canal());
         String adresse = email ? premiereAdresse(t.get("clientEmail", String.class)) : null;
         String motif = motifSuspension(t);
+        if (motif == null) {
+            motif = motifIntervalle(t, reference);
+        }
         if (motif == null) {
             motif = email ? motifExclusionEmail(t, adresse) : sms ? motifExclusionSms(t) : motifExclusion(t);
         }
@@ -246,6 +270,16 @@ class SelectionCampagne {
             case "LITIGE" -> "Facture en litige";
             default -> "Facture au contentieux";
         };
+    }
+
+    /** Delai minimal entre deux relances d'une meme facture, toutes campagnes confondues. */
+    private static String motifIntervalle(Tuple t, LocalDate reference) {
+        LocalDateTime derniere = t.get("derniereRelance", LocalDateTime.class);
+        int intervalle = ((Number) t.get("intervalle")).intValue();
+        if (derniere == null || intervalle <= 0 || !reference.isBefore(derniere.toLocalDate().plusDays(intervalle))) {
+            return null;
+        }
+        return "Déjà relancée le " + derniere.toLocalDate().format(DATE_LISIBLE) + " (" + intervalle + " jours minimum entre deux relances)";
     }
 
     private String motifExclusion(Tuple t) {

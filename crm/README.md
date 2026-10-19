@@ -544,3 +544,21 @@ le motif « Promesse de paiement jusqu'au jj/mm/aaaa », « Facture en litige »
 
 API : `POST /api/recouvrement/factures/{id}/suivi` (`{"suivi":"PROMESSE","datePromesse":"2026-10-31","montantPromis":50000,"commentaire":"..."}`,
 corps sans `suivi` pour lever), `GET /api/recouvrement/factures/{id}/suivis`, filtre `suivi=PROMESSE|PROMESSE_ECHUE|LITIGE|CONTENTIEUX|AUCUN`.
+
+## Delais de relance par agence et par segment (pilote)
+
+Menu **Relances > Delais de relance** (droit `DELAIS_RELANCE` : admin, direction du recouvrement, directeur d'agence).
+
+- **Par defaut** : les parametres `campagne.avant_echeance_jours_max` / `_min` (J-5 a J-1), `campagne.apres_echeance_jours_min` (J+1)
+  et `campagne.relance_intervalle_jours` (0 = pas de minimum entre deux relances d'une meme facture), modifiables dans Parametres.
+- **Regles** (`crm_delai_relance`) pour une agence, un segment (Platinum, Silver, Bronze) ou les deux. Une valeur vide reprend
+  le niveau au-dessus : agence + segment, puis agence, puis segment, puis defaut. Une seule regle active par couple ; on archive,
+  on ne supprime pas. Un directeur d'agence ne regle que ses agences ; les regles communes a toutes les agences sont reservees
+  a la vision globale.
+- Les campagnes **Avant echeance** et **Apres echeance** sans fenetre propre appliquent a chaque facture les delais de l'agence
+  et du segment de son client. Une fenetre saisie dans la campagne reste prioritaire.
+- **Intervalle** : une facture relancee (message envoye, distribue ou lu, toutes campagnes) moins de n jours avant est exclue avec
+  le motif « Deja relancee le jj/mm/aaaa (n jours minimum entre deux relances) ».
+
+API : `GET /api/recouvrement/delais-relance[?archives=true]`, `GET .../defauts`, `POST`, `PUT /{id}`, `POST /{id}/archivage`,
+`POST /{id}/reactivation`.

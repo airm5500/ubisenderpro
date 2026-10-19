@@ -31,6 +31,7 @@ export const routes: Routes = [
       { path: 'campagnes/nouvelle', canActivate: [droit('CAMPAGNES_PREPARER')], loadComponent: () => import('./pages/campagne-edition/campagne-edition').then(m => m.CampagneEdition), title: 'Nouvelle campagne' },
       { path: 'campagnes/:id/modifier', canActivate: [droit('CAMPAGNES_PREPARER', 'CAMPAGNES_VALIDER')], loadComponent: () => import('./pages/campagne-edition/campagne-edition').then(m => m.CampagneEdition), title: 'Modifier la campagne' },
       { path: 'campagnes/:id', canActivate: [droit('CAMPAGNES', 'MA_JOURNEE')], loadComponent: () => import('./pages/campagne-suivi/campagne-suivi').then(m => m.CampagneSuivi), title: 'Campagne' },
+      { path: 'delais-relance', canActivate: [droit('DELAIS_RELANCE')], loadComponent: () => import('./pages/delais-relance/delais-relance').then(m => m.DelaisRelance), title: 'Délais de relance' },
       { path: 'modeles', canActivate: [droit('MODELES', 'MODELES_GERER')], loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles de messages' },
       { path: 'numeros', canActivate: [droit('NUMEROS', 'NUMEROS_TOUS')], loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Numéros WhatsApp' },
       { path: 'parametres', canActivate: [droit('PARAMETRES')], loadComponent: () => import('./pages/parametres/parametres').then(m => m.Parametres), title: 'Paramètres' },

@@ -54,6 +54,9 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_fournisseur_sms where code <> 'LETEXTO'");
         jdbc.update("update crm_fournisseur_sms set par_defaut = true, actif = true, cle_api = null, modifie_par = null where code = 'LETEXTO'");
         jdbc.update("delete from crm_campagne");
+        jdbc.update("delete from crm_delai_relance");
+        jdbc.update("update crm_parametre set valeur = '0' where cle = 'campagne.relance_intervalle_jours'");
+        jdbc.update("update crm_parametre set valeur = '1' where cle = 'campagne.apres_echeance_jours_min'");
         jdbc.update("delete from crm_piece_jointe");
         jdbc.update("delete from crm_modele_message");
         jdbc.update("delete from crm_variable_message where code not in ('code_client', 'numero_compte', 'nom_client', 'nom_pharmacie', "

@@ -29,10 +29,11 @@
       @if (auth.peut('IMPORTS')) { <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a> }
       @if (auth.peut('PORTEFEUILLES')) { <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a> }
     }
-    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER')) {
+    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER', 'DELAIS_RELANCE')) {
       <div class="gl">Relances</div>
       @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a> }
       @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a> }
+      @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on">Délais de relance</a> }
     }
     @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS')) {
       <div class="gl">Échanges</div>

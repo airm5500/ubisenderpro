@@ -1,0 +1,91 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Délais de relance</h1>
+      <p class="sous-titre">Quand une facture est relancée, selon l'agence et le segment de son client. Une case vide reprend le niveau au-dessus :
+        agence et segment, puis agence, puis segment, puis les délais par défaut.</p>
+    </div>
+    @if (!archives()) { <div class="actions"><button class="ba" type="button" (click)="nouvelle()">Nouvelle règle</button></div> }
+  </div>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr>
+        <th>Agence</th><th>Segment</th><th class="n">Avant échéance, de</th><th class="n">à</th><th class="n">Après échéance, dès</th>
+        <th class="n">Entre deux relances</th><th>Modifié</th><th></th>
+      </tr></thead>
+      <tbody>
+        @if (defauts(); as d) {
+          @if (!archives()) {
+            <tr style="background: var(--fond-doux, #F5F8FA)">
+              <td><strong>Par défaut</strong></td><td>Tous</td>
+              <td class="n">J-{{ d.avantJoursMax }}</td><td class="n">J-{{ d.avantJoursMin }}</td><td class="n">J+{{ d.retardJoursMin }}</td>
+              <td class="n">{{ d.intervalleJours ? d.intervalleJours + ' j' : 'sans minimum' }}</td>
+              <td class="second">Paramètres</td>
+              <td class="nw">@if (auth.peut('PARAMETRES')) { <a routerLink="/parametres">Modifier</a> }</td>
+            </tr>
+          }
+        }
+        @for (r of regles(); track r.id) {
+          <tr>
+            <td>{{ r.agenceLibelle ?? 'Toutes' }}</td><td>{{ r.segmentLibelle ?? 'Tous' }}</td>
+            <td class="n">@if (r.avantJoursMax !== null) { J-{{ r.avantJoursMax }} } @else { <span class="discret">défaut</span> }</td>
+            <td class="n">@if (r.avantJoursMin !== null) { J-{{ r.avantJoursMin }} } @else { <span class="discret">défaut</span> }</td>
+            <td class="n">@if (r.retardJoursMin !== null) { J+{{ r.retardJoursMin }} } @else { <span class="discret">défaut</span> }</td>
+            <td class="n">@if (r.intervalleJours !== null) { {{ r.intervalleJours ? r.intervalleJours + ' j' : 'sans minimum' }} } @else { <span class="discret">défaut</span> }</td>
+            <td><div>{{ r.modifieLe | jour }}</div><div class="second">{{ r.modifiePar }}</div></td>
+            <td class="nw">
+              @if (r.modifiable) {
+                @if (r.statut === 'ACTIF') { <a (click)="modifier(r)">Modifier</a> · <a (click)="changerStatut(r, 'archivage')">Archiver</a> }
+                @else { <a (click)="changerStatut(r, 'reactivation')">Réactiver</a> }
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8" class="vide">{{ archives() ? 'Aucune règle archivée.' : 'Aucune règle propre à une agence ou à un segment : les délais par défaut s\'appliquent partout.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="discret">Une campagne qui fixe sa propre fenêtre (par exemple « échéance dans 2 à 4 jours ») l'applique à toutes ses factures.
+    L'écart entre deux relances compte toutes les campagnes ; une promesse de paiement, un litige ou un contentieux suspendent les relances.</p>
+  <a style="font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux règles actives' : 'Voir les règles archivées' }}</a>
+</div>
+
+<p-dialog [header]="cible() ? 'Modifier la règle' : 'Nouvelle règle de délais'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '620px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Agence
+        <select class="sel" name="agenceId" [(ngModel)]="edition.agenceId" [disabled]="!!cible()">
+          @if (auth.utilisateur()?.visionGlobale) { <option [ngValue]="null">Toutes les agences</option> }
+          @for (a of agences(); track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Segment client
+        <select class="sel" name="segment" [(ngModel)]="edition.segment" [disabled]="!!cible()">
+          <option value="">Tous les segments</option>
+          @for (s of ref.segments | async; track s.code) { <option [value]="s.code">{{ s.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Avant échéance, à partir de J-
+        <input class="sel" type="number" min="1" max="90" name="avantJoursMax" [(ngModel)]="edition.avantJoursMax" [placeholder]="'défaut : ' + (defauts()?.avantJoursMax ?? '')">
+      </label>
+      <label class="f">jusqu'à J-
+        <input class="sel" type="number" min="1" max="90" name="avantJoursMin" [(ngModel)]="edition.avantJoursMin" [placeholder]="'défaut : ' + (defauts()?.avantJoursMin ?? '')">
+      </label>
+      <label class="f">Après échéance, dès J+
+        <input class="sel" type="number" min="0" max="365" name="retardJoursMin" [(ngModel)]="edition.retardJoursMin" [placeholder]="'défaut : ' + (defauts()?.retardJoursMin ?? '')">
+      </label>
+      <label class="f">Jours minimum entre deux relances
+        <input class="sel" type="number" min="0" max="90" name="intervalleJours" [(ngModel)]="edition.intervalleJours" [placeholder]="'défaut : ' + (defauts()?.intervalleJours ?? '')">
+      </label>
+    </div>
+    <p class="discret" style="margin: 0">Laissez vide ce qui ne change pas : la valeur du niveau au-dessus s'applique.</p>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>
