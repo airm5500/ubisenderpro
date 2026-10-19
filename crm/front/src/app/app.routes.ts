@@ -42,6 +42,7 @@ export const routes: Routes = [
       { path: 'parametres', canActivate: [droit('PARAMETRES')], loadComponent: () => import('./pages/parametres/parametres').then(m => m.Parametres), title: 'Paramètres' },
       { path: 'fournisseurs-sms', canActivate: [droit('FOURNISSEURS_SMS')], loadComponent: () => import('./pages/fournisseurs-sms/fournisseurs-sms').then(m => m.FournisseursSms), title: 'Fournisseurs SMS' },
       { path: 'utilisateurs', canActivate: [droit('UTILISATEURS')], loadComponent: () => import('./pages/utilisateurs/utilisateurs').then(m => m.Utilisateurs), title: 'Utilisateurs et habilitations' },
+      { path: 'journal', canActivate: [droit('JOURNAL')], loadComponent: () => import('./pages/journal/journal').then(m => m.Journal), title: 'Journal des actions' },
       { path: 'roles', canActivate: [droit('ROLES')], loadComponent: () => import('./pages/roles/roles').then(m => m.Roles), title: 'Rôles et droits' },
       { path: 'support', loadComponent: () => import('./pages/support/support').then(m => m.Support), title: 'Centre de support' },
       { path: 'mot-de-passe', loadComponent: () => import('./pages/mot-de-passe/mot-de-passe').then(m => m.MotDePasse), title: 'Mon mot de passe' },

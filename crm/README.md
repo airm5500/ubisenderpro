@@ -707,3 +707,25 @@ limite le CRM a une agence : la generalisation consiste a rattacher les utilisat
 clients (import ou fiche) a leur agence, puis a regler au besoin ses delais de relance.
 
 API : `GET /api/agences/gestion?archives=`, `POST /api/agences`, `PUT /api/agences/{id}`, `POST /api/agences/{id}/archivage|reactivation`.
+
+## Journal des actions (qui a fait quoi)
+
+Menu Administration > **Journal des actions** (route `/journal`, droit `JOURNAL` donne a ADMIN, administrateur sans SMS, DG et
+Directeur commercial ; migration V1.4.4). Une seule liste reunit le journal des actions (`crm_journal_action`) et celui des
+connexions (`crm_journal_connexion`), en lecture seule : rien n'y est modifie ni supprime.
+
+- Recherche : periode (par defaut aujourd'hui ; raccourcis Aujourd'hui, 7 et 30 derniers jours), utilisateur (ou traitements
+  automatiques), type de donnee (Client, Facture, Utilisateur, Role et droits, Agence, Parametre, Campagne, Produit...), nature
+  (Creation, Modification, Desactivation / archivage, Reactivation, Connexion, Envoi, Autre, deduite du code d'action) et texte libre
+  (reference, code ou nom du client, login, detail).
+- Chaque ligne : date, auteur, nature (pastille), type et operation, objet concerne (lien vers la fiche client, la campagne, la
+  promotion, la liste... ou l'ecran de gestion), detail. Une modification donne ses ecarts `champ : ancienne -> nouvelle valeur`
+  (clients, factures, utilisateurs, agences, produits, modeles, fournisseurs SMS, parametres...) ; les cles et textes longs sont
+  signales sans etre recopies.
+- Impression (page sans menu ni filtres, 2 000 lignes au plus), export Excel (.xlsx) et CSV (50 000 lignes au plus) avec les memes
+  filtres ; chaque export est archive (`exports-journal`) et lui-meme trace (`JOURNAL_EXPORT`).
+- Sur la fiche client, le bloc **Modifications de la fiche** montre les dernieres actions sur le client et ses factures (lien
+  « Tout le journal »).
+
+API : `GET /api/journal?du=&au=&utilisateurId=&type=&nature=&q=&clientId=&page=&taille=`, `GET /api/journal/referentiel`,
+`GET /api/journal/export` (CSV), `GET /api/journal/export-excel` (.xlsx) ; `utilisateurId=0` = traitements automatiques.

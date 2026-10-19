@@ -92,9 +92,13 @@ public class AgenceServiceImpl implements AgenceService {
                 where id = :id
                 """).setParameter("code", code(demande)).setParameter("codeImport", codeImport(demande)).setParameter("libelle", demande.getLibelle().trim())
                 .setParameter("par", utilisateurCourantService.utilisateur().getId()).setParameter("id", id).executeUpdate();
-        journalActionService.enregistrer("AGENCE_MODIFICATION", "crm_agence", id,
-                avant.getCode() + " " + avant.getLibelle() + " -> " + code(demande) + " " + demande.getLibelle().trim());
-        return consulter(id);
+        AgenceGestionDTO apres = consulter(id);
+        journalActionService.enregistrer("AGENCE_MODIFICATION", "crm_agence", id, new EcartsJournal()
+                .champ("Code", avant.getCode(), apres.getCode())
+                .champ("Code d'import", avant.getCodeImport(), apres.getCodeImport())
+                .champ("Libellé", avant.getLibelle(), apres.getLibelle())
+                .detail(avant.getCode() + " " + avant.getLibelle()));
+        return apres;
     }
 
     @Override

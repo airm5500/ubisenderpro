@@ -214,9 +214,15 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         if (droitsChanges) {
             reviserDroits(id);
         }
-        journalActionService.enregistrer("UTILISATEUR_MODIFICATION", "crm_utilisateur", id,
-                avant.getLogin() + " : " + resume(habilitations) + (droitsChanges ? " (droits modifiés)" : ""));
-        return consulter(id);
+        UtilisateurDTO apres = consulter(id);
+        journalActionService.enregistrer("UTILISATEUR_MODIFICATION", "crm_utilisateur", id, new EcartsJournal()
+                .champ("Nom", avant.getNomComplet(), apres.getNomComplet())
+                .champ("E-mail", avant.getEmail(), apres.getEmail())
+                .champ("WhatsApp", avant.getNumeroWhatsapp(), apres.getNumeroWhatsapp())
+                .champ("Rôles", roles(avant), roles(apres))
+                .champ("Agences", agencesLisibles(avant), agencesLisibles(apres))
+                .detail(avant.getLogin()));
+        return apres;
     }
 
     @Override
@@ -521,6 +527,17 @@ public class UtilisateurServiceImpl implements UtilisateurService {
             codes.put((String) ligne[0], ((Number) ligne[1]).longValue());
         }
         return codes;
+    }
+
+    private static String roles(UtilisateurDTO u) {
+        return u.getHabilitations() == null ? null : u.getHabilitations().stream()
+                .map(h -> (h.getRoleLibelle() == null ? h.getRoleCode() : h.getRoleLibelle())
+                        + (h.getModuleCode() == null ? "" : " / " + (h.getModuleLibelle() == null ? h.getModuleCode() : h.getModuleLibelle())))
+                .sorted().collect(Collectors.joining(", "));
+    }
+
+    private static String agencesLisibles(UtilisateurDTO u) {
+        return u.getAgences() == null ? null : u.getAgences().stream().map(AgenceUtilisateurDTO::getLibelle).sorted().collect(Collectors.joining(", "));
     }
 
     private String resume(List<HabilitationVoulue> habilitations) {

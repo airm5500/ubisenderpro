@@ -92,6 +92,10 @@
             <p class="discret">Aucune réponse ni changement d'agent enregistré pour l'instant.</p>
           }
         </section>
+
+        @if (auth.peut('JOURNAL')) {
+          <section class="bloc" appJournalFiche [clientId]="c.id" [libelle]="c.code + ' - ' + c.raisonSociale"></section>
+        }
       </div>
 
       <section class="restant">

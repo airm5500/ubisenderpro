@@ -63,13 +63,14 @@
       @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
     }
     <!-- Administration : la meme dans les deux modules -->
-    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'FOURNISSEURS_SMS', 'AGENCES')) {
+    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'FOURNISSEURS_SMS', 'AGENCES', 'JOURNAL')) {
       <div class="gl">Administration</div>
       @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a> }
       @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on">Rôles et droits</a> }
       @if (auth.peut('AGENCES')) { <a class="nv" routerLink="/agences" routerLinkActive="on">Agences</a> }
       @if (auth.peut('PARAMETRES')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
       @if (auth.peut('FOURNISSEURS_SMS')) { <a class="nv" routerLink="/fournisseurs-sms" routerLinkActive="on">Fournisseurs SMS</a> }
+      @if (auth.peut('JOURNAL')) { <a class="nv" routerLink="/journal" routerLinkActive="on">Journal des actions</a> }
     }
     <!-- Centre de support : ouvert a tout utilisateur connecte -->
     <div class="gl">Aide</div>

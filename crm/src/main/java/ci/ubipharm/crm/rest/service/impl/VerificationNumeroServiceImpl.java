@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
@@ -34,6 +35,7 @@ public class VerificationNumeroServiceImpl implements VerificationNumeroService 
     private final ParametreService parametreService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
+    private final JournalActionService journalActionService;
 
     @Override
     @Transactional
@@ -82,6 +84,9 @@ public class VerificationNumeroServiceImpl implements VerificationNumeroService 
                 avertissement = e.getMessage() + " Les numéros restants n'ont pas été vérifiés.";
             }
         }
+        journalActionService.enregistrer("CLIENT_VERIFICATION_NUMEROS", "crm_contact", null, resultats.size() + " numéro(s) : "
+                + compter(resultats, "SUR_WHATSAPP") + " sur WhatsApp, " + compter(resultats, "ABSENT") + " absent(s), "
+                + compter(resultats, "FORMAT_INVALIDE") + " format(s) invalide(s)" + (session == null ? " (format seul)" : " via " + session));
         return VerificationNumerosDTO.builder()
                 .sessionUtilisee(session)
                 .avertissement(avertissement)

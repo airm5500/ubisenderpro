@@ -116,9 +116,29 @@ public class FournisseurSmsServiceImpl implements FournisseurSmsService {
                 .setParameter("cle", texte(demande.getCleApi()));
         valeurs(modification, demande).executeUpdate();
         boolean nouvelleCle = texte(demande.getCleApi()) != null;
-        journalActionService.enregistrer("FOURNISSEUR_SMS_MODIFICATION", "crm_fournisseur_sms", id,
-                actuel.getCode() + (nouvelleCle ? " : clé API remplacée" : ""));
-        return consulter(id);
+        FournisseurSmsDTO apres = consulter(id);
+        EcartsJournal ecarts = new EcartsJournal()
+                .champ("Libellé", actuel.getLibelle(), apres.getLibelle())
+                .champ("Actif", actuel.isActif(), apres.isActif())
+                .champ("Expéditeur", actuel.getExpediteur(), apres.getExpediteur())
+                .champ("Format du numéro", actuel.getFormatNumero(), apres.getFormatNumero())
+                .champ("URL d'envoi", actuel.getUrlEnvoi(), apres.getUrlEnvoi())
+                .champ("Méthode", actuel.getMethodeEnvoi(), apres.getMethodeEnvoi())
+                .masque("Paramétrage technique", technique(actuel), technique(apres));
+        if (nouvelleCle) {
+            ecarts.masque("Clé API", "ancienne", "nouvelle");
+        }
+        journalActionService.enregistrer("FOURNISSEUR_SMS_MODIFICATION", "crm_fournisseur_sms", id, ecarts.detail(actuel.getCode()));
+        return apres;
+    }
+
+    /** Champs techniques (en-tetes, corps, chemins de lecture) : signales sans etre recopies dans le journal. */
+    private static String technique(FournisseurSmsDTO f) {
+        return String.join("|", String.valueOf(f.getTypeContenu()), String.valueOf(f.getEntetes()), String.valueOf(f.getCorps()),
+                String.valueOf(f.getCheminIdentifiant()), String.valueOf(f.getCheminNbSms()), String.valueOf(f.getCheminErreur()),
+                String.valueOf(f.getUrlStatut()), String.valueOf(f.getCheminStatut()), String.valueOf(f.getChampIdentifiantAccuse()),
+                String.valueOf(f.getChampStatutAccuse()), String.valueOf(f.getCorrespondanceStatuts()), String.valueOf(f.getUrlSolde()),
+                String.valueOf(f.getCheminSolde()));
     }
 
     @Override
