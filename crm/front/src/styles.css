@@ -294,3 +294,61 @@ details.faq summary { cursor: pointer; font-size: 14px; color: var(--bleu); }
 .etat-numero.ABSENT, .etat-numero.FORMAT_INVALIDE { background: #FDECEC; color: #A32020; }
 .bandeau-inactif { padding: 12px 16px; border-radius: 10px; background: #FDECEC; color: #7A1A1A; font-size: 14px; margin-bottom: 16px; }
 tr.inactif td { color: var(--gris, #6B7C88); }
+
+/* =====================================================================
+   Themes de la partie droite (parametre charte.theme). A par defaut.
+   Toutes les teintes viennent de la charte : --bleu, --vert, --fond-page, --survol.
+   ===================================================================== */
+:root { --fond-page: #EEF1F4; --survol: #E6F8EE; }
+.t tbody tr { transition: background .12s; }
+.t tr.choisi td a, .t tr.choisi td .discret { color: inherit; }
+
+/* A : panneaux blancs a en-tete bleu et titre vert, lignes alternees, selection bleue */
+[data-charte="A"] main, [data-charte="C"] main { background: var(--fond-page); }
+[data-charte="A"] .page > section.bloc, [data-charte="A"] .page > .defile, [data-charte="A"] .page > .filtres,
+[data-charte="A"] .deux-colonnes > * > section.bloc, [data-charte="A"] .deux-colonnes > section.bloc {
+  background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(5, 37, 61, .10);
+}
+[data-charte="A"] section.bloc { border-top: 0; padding: 0 20px 16px; overflow: hidden; }
+[data-charte="A"] section.bloc > :first-child:not(.titre) { margin-top: 16px; }
+[data-charte="A"] section.bloc > .titre { background: var(--bleu); margin: 0 -20px; padding: 14px 20px; align-items: center; color: #fff; }
+[data-charte="A"] section.bloc > .titre :is(h2, h3, .h2, .h) { color: var(--vert); }
+[data-charte="A"] section.bloc > .titre :is(a, .discret, span:not(.cnt)) { color: #D6E0E7; }
+[data-charte="A"] section.bloc > .titre .bp { background: var(--vert); color: var(--bleu); }
+[data-charte="A"] .page > .defile { padding: 12px 16px; }
+[data-charte="A"] .t th { background: var(--fond-2); color: var(--texte); font-weight: 700; }
+[data-charte="A"] .t tbody tr:nth-child(odd) { background: #F4F4F4; }
+[data-charte="A"] .t tbody tr:nth-child(even) { background: color-mix(in srgb, var(--vert) 5%, #fff); }
+[data-charte="A"] .t tbody td { border-bottom-color: #E6EAED; }
+[data-charte="A"] .t tbody tr:hover { background: var(--survol); box-shadow: inset 4px 0 0 var(--vert); }
+[data-charte="A"] .t tbody tr.choisi, [data-charte="A"] .t tbody tr.choisi:hover { background: var(--bleu); color: #fff; box-shadow: none; }
+[data-charte="A"] .t tbody tr.choisi td a, [data-charte="A"] .t tbody tr.choisi td .discret { color: var(--vert); }
+
+/* B : sobre, titre souligne de vert, en-tete de tableau bleu, selection verte claire */
+[data-charte="B"] .page > .entete h1 { padding-bottom: 6px; border-bottom: 4px solid var(--vert); align-self: flex-start; }
+[data-charte="B"] .t th { background: var(--bleu); color: #fff; }
+[data-charte="B"] .t thead th:first-child { border-top-left-radius: 8px; }
+[data-charte="B"] .t thead th:last-child { border-top-right-radius: 8px; }
+[data-charte="B"] .t tbody tr:nth-child(even) { background: #F7F9FA; }
+[data-charte="B"] .t tbody tr:hover { background: color-mix(in srgb, var(--bleu) 6%, #fff); }
+[data-charte="B"] .t tbody tr.choisi, [data-charte="B"] .t tbody tr.choisi:hover { background: var(--survol); box-shadow: inset 5px 0 0 var(--vert); }
+
+/* C : bandeau bleu en haut de page (titre vert), panneaux blancs coiffes d'un filet vert, selection bleue */
+[data-charte="C"] .page > .entete:first-child {
+  background: var(--bleu); margin: -32px -40px 0; padding: 24px 40px;
+  box-shadow: 0 0 0 100vmax var(--bleu); clip-path: inset(0 -100vmax 0 0);
+}
+[data-charte="C"] .page > .entete:first-child h1 { color: var(--vert); }
+[data-charte="C"] .page > .entete:first-child :is(.sous-titre, .discret, a.retour) { color: #C6D2DC; }
+[data-charte="C"] .page > .entete:first-child .bp { background: #fff; color: var(--bleu); }
+[data-charte="C"] .page > section.bloc, [data-charte="C"] .page > .defile,
+[data-charte="C"] .deux-colonnes > * > section.bloc, [data-charte="C"] .deux-colonnes > section.bloc {
+  background: #fff; border: 1px solid var(--filet); border-top: 3px solid var(--vert); border-radius: 8px; padding: 4px 18px 14px;
+}
+[data-charte="C"] .page > .filtres { background: #fff; border: 1px solid var(--filet); }
+[data-charte="C"] .t th { text-transform: uppercase; letter-spacing: .06em; font-size: 11.5px; border-bottom: 2px solid var(--bleu); }
+[data-charte="C"] .t tbody tr:nth-child(odd) { background: #FAFBFC; }
+[data-charte="C"] .t tbody tr:hover { background: var(--survol); }
+[data-charte="C"] .t tbody tr.choisi, [data-charte="C"] .t tbody tr.choisi:hover { background: var(--bleu); color: #fff; }
+[data-charte="C"] .t tbody tr.choisi td a, [data-charte="C"] .t tbody tr.choisi td .discret { color: var(--vert); }
+@media (prefers-reduced-motion: reduce) { .t tbody tr { transition: none; } }

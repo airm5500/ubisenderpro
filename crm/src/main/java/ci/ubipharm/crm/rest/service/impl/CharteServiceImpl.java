@@ -44,6 +44,9 @@ public class CharteServiceImpl implements CharteService {
                 .nom(parametreService.valeur("app.nom", "UBIPHARM CRM"))
                 .couleurPrincipale(parametreService.valeur("charte.couleur_principale", "#05253D"))
                 .couleurSecondaire(parametreService.valeur("charte.couleur_secondaire", "#51D78E"))
+                .theme(parametreService.valeur("charte.theme", "A"))
+                .couleurFond(parametreService.valeur("charte.couleur_fond", "#EEF1F4"))
+                .couleurSurvol(parametreService.valeur("charte.couleur_survol", "#E6F8EE"))
                 .siteWeb(parametreService.valeur("entreprise.site_web", null))
                 .canalDefaut(parametreService.valeur("envoi.canal_defaut", "WHATSAPP"))
                 .modeEnvoiDefaut(parametreService.valeur("whatsapp.mode_envoi_defaut", "WA_WEB"));

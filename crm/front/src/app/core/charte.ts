@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 export interface Charte {
-  nom: string; couleurPrincipale: string; couleurSecondaire: string; logoVersion: number | null; logoNom: string | null;
+  nom: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; logoVersion: number | null; logoNom: string | null;
   iconeVersion: number | null; iconeNom: string | null; siteWeb: string | null; canalDefaut: string; modeEnvoiDefaut: string;
 }
 
@@ -28,6 +28,9 @@ export class CharteService {
     const racine = document.documentElement.style;
     racine.setProperty('--bleu', c.couleurPrincipale);
     racine.setProperty('--vert', c.couleurSecondaire);
+    if (c.couleurFond) racine.setProperty('--fond-page', c.couleurFond);
+    if (c.couleurSurvol) racine.setProperty('--survol', c.couleurSurvol);
+    document.documentElement.dataset['charte'] = ['A', 'B', 'C'].includes(c.theme) ? c.theme : 'A';
     document.title = c.nom;
     let icone = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!icone) {

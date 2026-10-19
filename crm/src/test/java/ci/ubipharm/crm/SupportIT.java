@@ -167,7 +167,7 @@ class SupportIT extends IntegrationBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(6)))
                 .andExpect(jsonPath("$[?(@.code == 'BASE')].etat").value("OK"))
-                .andExpect(jsonPath("$[?(@.code == 'BASE')].detail", hasItem(containsString("1.4.1"))))
+                .andExpect(jsonPath("$[?(@.code == 'BASE')].detail", hasItem(containsString("schéma en version"))))
                 .andExpect(jsonPath("$[?(@.code == 'WHATSAPP_WEB')].etat").value("KO"))
                 .andExpect(jsonPath("$[?(@.code == 'EMAIL')].etat").value("OK"))
                 .andExpect(jsonPath("$[?(@.code == 'SMS')].etat").value("ALERTE"))

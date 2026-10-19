@@ -1,5 +1,5 @@
 .cadre { display: flex; min-height: 100vh; }
-nav { flex: 0 0 248px; background: #05253D; color: #fff; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+nav { flex: 0 0 248px; background: var(--bleu); color: #fff; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .marque { display: flex; align-items: center; gap: 12px; padding: 4px 8px 18px; }
 .nom { font-weight: 800; font-size: 15px; letter-spacing: .04em; }
@@ -8,7 +8,7 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .md { display: flex; align-items: center; justify-content: center; height: 36px; border-radius: 7px; color: #B8C7D3; font-size: 13px; font-weight: 700; cursor: default; }
 .md { text-decoration: none; cursor: pointer; }
 .md:hover { color: #fff; }
-.mdon, .mdon:hover { background: #51D78E; color: #05253D; }
+.mdon, .mdon:hover { background: var(--vert); color: var(--bleu); }
 .gl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--vert); padding: 16px 12px 6px; font-weight: 700; }
 .nv { display: block; padding: 8px 12px; border-radius: 8px; color: #B8C7D3; text-decoration: none; font-size: 14px; font-weight: 500; }
 .nv:hover { color: #fff; background: rgba(255,255,255,.06); }
@@ -21,4 +21,4 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
   .cadre { flex-direction: column; }
   nav { position: static; height: auto; flex-basis: auto; }
 }
-.module-seul { padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.07); font-size: 13px; font-weight: 700; color: #51D78E; }
+.module-seul { padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.07); font-size: 13px; font-weight: 700; color: var(--vert); }

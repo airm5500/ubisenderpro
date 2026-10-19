@@ -633,6 +633,9 @@ Ecran Parametres (droit `PARAMETRES`), migrations V1.3.4 et V1.3.5.
 - Charte : logo et icone de l'onglet (PNG, JPEG, SVG sans script, ICO pour l'icone ; 5 Mo au plus), couleurs principale et d'accent,
   appliques a tout l'ecran et a la page de connexion (`GET /api/charte`, `/api/charte/logo`, `/api/charte/icone`, lus sans connexion).
   Chaque depot reste en base (`crm_charte_fichier`), le dernier s'affiche ; « Revenir au logo d'origine » reprend celui livre.
+- Theme de la partie droite (`charte.theme`, V1.4.2) : A panneaux a en-tete bleu et titre vert (par defaut), B sobre (en-tete de tableau bleu),
+  C bandeau bleu en haut de page. Couleurs modifiables : principale, accent, fond de page (`charte.couleur_fond`) et survol des lignes
+  (`charte.couleur_survol`) ; le menu de gauche suit aussi les couleurs choisies.
 - Mode d'envoi : canal propose d'office pour un nouveau modele (WhatsApp, e-mail, SMS) et mode WhatsApp propose pour relier un numero
   (WhatsApp Web ou API officielle Meta).
 - Archivage : copie de chaque document recu ou produit (fichiers importes, rejets, exports de promotion, affiches, listes de produits)

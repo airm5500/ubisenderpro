@@ -17,6 +17,10 @@ public class CharteDTO {
     private String nom;
     private String couleurPrincipale;
     private String couleurSecondaire;
+    /** A, B ou C : habillage de la partie droite des ecrans. */
+    private String theme;
+    private String couleurFond;
+    private String couleurSurvol;
     /** Depot du logo affiche, null = logo livre avec l'application ; sert aussi a contourner le cache du navigateur. */
     private Long logoVersion;
     private String logoNom;
