@@ -164,7 +164,7 @@ export interface MessageCampagne {
   envoyeLe: string | null; distribueLe: string | null; luLe: string | null;
 }
 export interface Parametre {
-  cle: string; valeur: string | null; typeValeur: string; minimum: number | null; maximum: number | null; obligatoire: boolean;
+  cle: string; valeur: string | null; typeValeur: string; minimum: number | null; maximum: number | null; options: string | null; obligatoire: boolean;
   description: string; categorie: string; modifiePar: string | null; modifieLe: string | null;
 }
 

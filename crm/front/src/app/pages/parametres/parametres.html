@@ -17,6 +17,26 @@
       @if (courante(); as c) {
         <div><h2 class="h2">{{ c[1] }}</h2><p class="sous-titre" style="margin: 4px 0 0">{{ c[2] }}</p></div>
       }
+      @if (categorie() === 'CHARTE') {
+        <div class="param">
+          <label>Logo de l'entreprise (PNG, JPEG ou SVG, 5 Mo au plus)
+            <span class="second">{{ charteService.charte()?.logoNom ?? "Logo livré avec l'application" }}</span></label>
+          <div class="champ">
+            <span class="apercu-logo" [class.clair]="charteService.charte()?.logoVersion"><img [src]="charteService.logo()" alt="Logo actuel" width="56" height="56"></span>
+            <label class="bs petit">Choisir un logo<input type="file" hidden accept=".png,.jpg,.jpeg,.svg" (change)="deposer('logo', $event)"></label>
+            @if (charteService.charte()?.logoVersion) { <a (click)="reinitialiser('logo')">Revenir au logo d'origine</a> }
+          </div>
+        </div>
+        <div class="param">
+          <label>Icône de l'onglet du navigateur (PNG, SVG ou ICO, carrée)
+            <span class="second">{{ charteService.charte()?.iconeNom ?? "Icône livrée avec l'application" }}</span></label>
+          <div class="champ">
+            <span class="apercu-logo" [class.clair]="charteService.charte()?.iconeVersion"><img [src]="charteService.charte()?.iconeVersion ? '/api/charte/icone?v=' + charteService.charte()?.iconeVersion : 'logo.svg'" alt="Icône actuelle" width="32" height="32"></span>
+            <label class="bs petit">Choisir une icône<input type="file" hidden accept=".png,.svg,.ico,.jpg,.jpeg" (change)="deposer('icone', $event)"></label>
+            @if (charteService.charte()?.iconeVersion) { <a (click)="reinitialiser('icone')">Revenir à l'icône d'origine</a> }
+          </div>
+        </div>
+      }
       @for (p of liste(); track p.cle) {
         <div class="param">
           <label [for]="p.cle">{{ p.description }}
@@ -37,15 +57,32 @@
               }
               @case ('EMAIL') { <input class="sel" type="email" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]"> }
               @case ('URL') { <input class="sel" type="url" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="https://"> }
+              @case ('LIEN') {
+                <input class="sel" type="url" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="https://www.exemple.ci">
+                @if (p.valeur) { <a class="unite" [href]="p.valeur" target="_blank" rel="noopener">Ouvrir</a> }
+              }
+              @case ('CHOIX') {
+                <select class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]">
+                  @for (o of options(p); track o[0]) { <option [value]="o[0]">{{ o[1] }}</option> }
+                </select>
+              }
+              @case ('OUI_NON') {
+                <select class="sel court" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]">
+                  <option value="OUI">Oui</option><option value="NON">Non</option>
+                </select>
+              }
+              @case ('DOSSIER') { <input class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="C:\UBIPHARM-CRM\donnees\archives"> }
               @default { <input class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]"> }
             }
           </div>
         </div>
       }
+      @if (liste().length) {
       <div class="actions">
         <button class="bs" (click)="annuler()" [disabled]="!modifies()">Annuler</button>
         <button class="bp" (click)="enregistrer()" [disabled]="!modifies()">Enregistrer{{ modifies() ? ' (' + modifies() + ')' : '' }}</button>
       </div>
+      }
     </div>
   </div>
 </div>

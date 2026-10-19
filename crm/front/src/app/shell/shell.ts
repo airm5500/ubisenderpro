@@ -4,6 +4,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../core/auth';
+import { CharteService } from '../core/charte';
 
 @Component({
   selector: 'app-shell',
@@ -13,6 +14,7 @@ import { Auth } from '../core/auth';
 })
 export class Shell {
   protected readonly auth = inject(Auth);
+  protected readonly charte = inject(CharteService);
   private readonly router = inject(Router);
 
   /** Module affiche : Marketing sur ses ecrans, Recouvrement ailleurs. */

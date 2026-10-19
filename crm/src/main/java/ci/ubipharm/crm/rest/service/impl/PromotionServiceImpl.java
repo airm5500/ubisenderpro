@@ -25,6 +25,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.ArchivageService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.PromotionService;
@@ -73,6 +74,7 @@ public class PromotionServiceImpl implements PromotionService {
     private final EntityManager em;
     private final PerimetreService perimetreService;
     private final JournalActionService journalActionService;
+    private final ArchivageService archivageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -291,7 +293,9 @@ public class PromotionServiceImpl implements PromotionService {
             lignes.add(List.of(promotion.getCode(), p.getProduitCode(), p.getProduitLibelle(), String.valueOf(p.getQuantiteMin()),
                     texte(p.getUgQuantite()), texte(p.getUgPourcentage()), texte(p.getUgPlafond()), texte(p.getPrixPromo()), p.getResume()));
         }
-        return FichierCsv.csv("promotion_" + promotion.getCode().replaceAll("[^A-Za-z0-9_-]", "_") + ".csv", lignes);
+        FichierDTO fichier = FichierCsv.csv("promotion_" + promotion.getCode().replaceAll("[^A-Za-z0-9_-]", "_") + ".csv", lignes);
+        archivageService.archiver("exports-promotions", fichier.getNom(), fichier.getContenu());
+        return fichier;
     }
 
     @Override

@@ -378,11 +378,21 @@ class SelectionCampagne {
             case "calcul.jours_avant_echeance" -> String.valueOf(Math.max(-ecart, 0));
             case "calcul.agent_nom", "calcul.expediteur_nom" -> t.get("agentNom", String.class);
             case "calcul.agent_numero", "calcul.expediteur_numero" -> numeroLisible(t.get("agentNumero", String.class));
+            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise" -> valeurEntreprise(parametreService, source);
             default -> {
                 String alias = aliasParSource.get(source);
                 yield alias == null ? "" : formater(t.get(alias));
             }
         };
+    }
+
+    /** Coordonnees de l'entreprise saisies dans les Parametres, vides tant qu'elles ne le sont pas. */
+    static String valeurEntreprise(ParametreService parametreService, String source) {
+        return parametreService.valeur(switch (source) {
+            case "calcul.site_entreprise" -> "entreprise.site_web";
+            case "calcul.lien_commande" -> "entreprise.lien_commande";
+            default -> "entreprise.telephone";
+        }, "");
     }
 
     /** Dates en jj/mm/aaaa, montants avec separateur de milliers et sans decimales inutiles. */

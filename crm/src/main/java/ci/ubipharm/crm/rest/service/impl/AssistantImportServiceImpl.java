@@ -12,6 +12,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import ci.ubipharm.crm.rest.service.ArchivageService;
 import ci.ubipharm.crm.rest.service.AssistantImportService;
 import ci.ubipharm.crm.rest.service.CorrespondanceImportService;
 import ci.ubipharm.crm.rest.service.ImportMetierService;
@@ -41,15 +42,17 @@ public class AssistantImportServiceImpl implements AssistantImportService {
     private final CorrespondanceImportService correspondanceImportService;
     private final ImportService importService;
     private final UtilisateurCourantService utilisateurCourantService;
+    private final ArchivageService archivageService;
 
     public AssistantImportServiceImpl(List<ImportMetierService> metiers, LecteurTableurService lecteurTableurService,
             CorrespondanceImportService correspondanceImportService, ImportService importService,
-            UtilisateurCourantService utilisateurCourantService) {
+            UtilisateurCourantService utilisateurCourantService, ArchivageService archivageService) {
         this.metiers = metiers.stream().collect(Collectors.toMap(ImportMetierService::type, Function.identity()));
         this.lecteurTableurService = lecteurTableurService;
         this.correspondanceImportService = correspondanceImportService;
         this.importService = importService;
         this.utilisateurCourantService = utilisateurCourantService;
+        this.archivageService = archivageService;
     }
 
     @Override
@@ -126,7 +129,9 @@ public class AssistantImportServiceImpl implements AssistantImportService {
             ligne.add(rejet.getMessage());
             lignes.add(ligne);
         }
-        return csv("rejets_import_" + importId + ".csv", lignes);
+        FichierDTO fichier = csv("rejets_import_" + importId + ".csv", lignes);
+        archivageService.archiver("rejets", fichier.getNom(), fichier.getContenu());
+        return fichier;
     }
 
     /** Le type vient de l'URL (clients, factures, produits) ; un import d'un droit ou d'un module non attribue est refuse. */

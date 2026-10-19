@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import ci.ubipharm.crm.rest.service.ArchivageService;
 import ci.ubipharm.crm.rest.service.CorrespondanceImportService;
 import ci.ubipharm.crm.rest.service.ImportPromotionService;
 import ci.ubipharm.crm.rest.service.ImportService;
@@ -71,6 +72,7 @@ public class ImportPromotionServiceImpl implements ImportPromotionService {
 
     private final EntityManager em;
     private final LecteurTableurService lecteurTableurService;
+    private final ArchivageService archivageService;
     private final ImportService importService;
     private final CorrespondanceImportService correspondanceImportService;
     private final PerimetreService perimetreService;
@@ -99,6 +101,7 @@ public class ImportPromotionServiceImpl implements ImportPromotionService {
     @Transactional
     public ImportDTO simuler(MultipartFile fichier, ParametresImportDTO parametres) {
         TableurDTO tableur = lecteurTableurService.lire(fichier);
+        archivageService.archiver("imports-promotions", fichier);
         Map<String, String> correspondance = correspondanceImportService.resoudre(TYPE, CHAMPS, tableur.getEntetes(), parametres);
         List<ImportLigneDTO> lignes = correspondanceImportService.appliquer(CHAMPS, tableur, correspondance).stream()
                 .map(l -> ImportLigneDTO.builder().numeroLigne(l.getNumero()).donnees(l.getValeurs()).build())

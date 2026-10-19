@@ -28,6 +28,7 @@ import ci.ubipharm.crm.rest.service.EvenementService;
 import ci.ubipharm.crm.rest.service.InformationService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
+import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.ProduitService;
@@ -120,6 +121,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private final InformationService informationService;
     private final PieceJointeService pieceJointeService;
     private final PerimetreService perimetreService;
+    private final ParametreService parametreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
 
@@ -679,6 +681,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             case "calcul.segment" -> t.get("segment", String.class);
             case "calcul.expediteur_nom" -> dto.getCreePar();
             case "calcul.expediteur_numero" -> SelectionCampagne.numeroLisible(dto.getNumeroExpediteur());
+            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise" ->
+                SelectionCampagne.valeurEntreprise(parametreService, source);
             default -> {
                 String alias = aliasParSource.get(source);
                 yield alias == null ? "" : SelectionCampagne.formater(t.get(alias));

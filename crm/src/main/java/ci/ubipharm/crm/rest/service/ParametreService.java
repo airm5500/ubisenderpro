@@ -12,6 +12,11 @@ public interface ParametreService {
 
     int entier(String cle, int parDefaut);
 
+    /** Vrai si le parametre OUI_NON vaut OUI (ou, absent, selon la valeur par defaut). */
+    default boolean oui(String cle, boolean parDefaut) {
+        return "OUI".equals(valeur(cle, parDefaut ? "OUI" : "NON"));
+    }
+
     /** Parametres modifiables, par categorie puis dans l'ordre d'affichage. */
     List<ParametreDTO> lister();
 

@@ -35,8 +35,10 @@
               }
               @else {
                 @if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Délier le téléphone</a> }
+                @else if (metaParDefaut(s)) { <button class="ba petit" (click)="ouvrirBascule(s)">Relier à l'API officielle</button> }
                 @else { <button class="ba petit" (click)="connecter(s)">Scanner le QR</button> }
-                @if (auth.peut('WHATSAPP_META')) { <div><a (click)="ouvrirBascule(s)">Passer à l'API officielle</a></div> }
+                @if (metaParDefaut(s)) { <div><a (click)="connecter(s)">ou scanner le QR (WhatsApp Web)</a></div> }
+                @else if (auth.peut('WHATSAPP_META')) { <div><a (click)="ouvrirBascule(s)">Passer à l'API officielle</a></div> }
               }
             </td>
           </tr>

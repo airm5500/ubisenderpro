@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Auth } from '../../core/auth';
+import { CharteService } from '../../core/charte';
 import { messageErreur } from '../../core/intercepteur';
 
 const CLE_IDENTIFIANT = 'crm.identifiant';
@@ -15,6 +16,7 @@ const CLE_IDENTIFIANT = 'crm.identifiant';
 })
 export class Connexion {
   private readonly auth = inject(Auth);
+  protected readonly charte = inject(CharteService);
   private readonly router = inject(Router);
 
   login = lire(CLE_IDENTIFIANT);

@@ -18,10 +18,12 @@ public class ParametreDTO {
 
     private String cle;
     private String valeur;
-    /** TEXTE, ENTIER, HEURE, EMAIL, URL ou COULEUR. */
+    /** TEXTE, ENTIER, HEURE, EMAIL, URL, COULEUR, LIEN, CHOIX, OUI_NON ou DOSSIER. */
     private String typeValeur;
     private Integer minimum;
     private Integer maximum;
+    /** Choix possibles d'un parametre CHOIX : CODE=Libelle|CODE=Libelle. */
+    private String options;
     private boolean obligatoire;
     private String description;
     private String categorie;

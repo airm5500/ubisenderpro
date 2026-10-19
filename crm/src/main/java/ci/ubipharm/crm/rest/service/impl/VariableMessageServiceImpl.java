@@ -66,6 +66,9 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.pharmacien_garde", "Pharmacien de garde (Marketing)");
         SOURCES_CALCULEES.put("calcul.telephone_pharmacien", "Téléphone du pharmacien de garde (Marketing)");
         SOURCES_CALCULEES.put("calcul.direction_signataire", "Signataire de l'information, sinon « Direction » et son agence (Marketing)");
+        SOURCES_CALCULEES.put("calcul.site_entreprise", "Site internet de l'entreprise (Paramètres, Général)");
+        SOURCES_CALCULEES.put("calcul.lien_commande", "Lien de commande en ligne (Paramètres, Général)");
+        SOURCES_CALCULEES.put("calcul.telephone_entreprise", "Téléphone de l'entreprise (Paramètres, Général)");
     }
 
     /** Colonnes techniques jamais proposees. */

@@ -29,6 +29,8 @@ public class ParametreServiceImpl implements ParametreService {
 
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
     private static final Pattern URL = Pattern.compile("https://[^\\s]+");
+    private static final Pattern LIEN = Pattern.compile("https?://[^\\s.]+\\.[^\\s]+");
+    private static final Pattern DOSSIER = Pattern.compile("([A-Za-z]:\\\\|\\\\\\\\|/)[^<>\"|?*]*");
     private static final Pattern COULEUR = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final Pattern ENTIER = Pattern.compile("-?\\d{1,9}");
 
@@ -43,7 +45,7 @@ public class ParametreServiceImpl implements ParametreService {
                 "Relance avant échéance : le dernier jour (J-n) doit être plus proche de l'échéance que le premier."});
 
     private static final String SELECT = """
-            select p.cle as cle, p.valeur as valeur, p.type_valeur as typeValeur, p.minimum as minimum, p.maximum as maximum,
+            select p.cle as cle, p.valeur as valeur, p.type_valeur as typeValeur, p.minimum as minimum, p.maximum as maximum, p.options as options,
                    p.obligatoire as obligatoire, p.description as description, p.categorie as categorie, u.nom_complet as modifiePar,
                    p.updated_at as modifieLe
             from crm_parametre p
@@ -164,6 +166,30 @@ public class ParametreServiceImpl implements ParametreService {
                 }
                 return valeur.toUpperCase(java.util.Locale.ROOT);
             }
+            case "LIEN" -> {
+                if (!LIEN.matcher(valeur).matches()) {
+                    throw new ErreurMetierException("« " + p.getDescription() + " » : lien complet attendu, par exemple https://www.ubipharm.ci.");
+                }
+                return valeur;
+            }
+            case "CHOIX" -> {
+                if (p.getOptions() == null || java.util.Arrays.stream(p.getOptions().split("\\|")).noneMatch(o -> o.split("=", 2)[0].equals(valeur))) {
+                    throw new ErreurMetierException("« " + p.getDescription() + " » : choix inconnu.");
+                }
+                return valeur;
+            }
+            case "OUI_NON" -> {
+                if (!"OUI".equals(valeur) && !"NON".equals(valeur)) {
+                    throw new ErreurMetierException("« " + p.getDescription() + " » : OUI ou NON.");
+                }
+                return valeur;
+            }
+            case "DOSSIER" -> {
+                if (!DOSSIER.matcher(valeur).matches()) {
+                    throw new ErreurMetierException("« " + p.getDescription() + " » : chemin complet attendu, par exemple C:\\UBIPHARM-CRM\\donnees\\archives.");
+                }
+                return valeur.length() > 3 ? valeur.replaceAll("[\\\\/]+$", "") : valeur;
+            }
             default -> {
                 return valeur;
             }
@@ -189,6 +215,7 @@ public class ParametreServiceImpl implements ParametreService {
                 .typeValeur(tuple.get("typeValeur", String.class))
                 .minimum(tuple.get("minimum") == null ? null : ((Number) tuple.get("minimum")).intValue())
                 .maximum(tuple.get("maximum") == null ? null : ((Number) tuple.get("maximum")).intValue())
+                .options(tuple.get("options", String.class))
                 .obligatoire(vrai(tuple.get("obligatoire")))
                 .description(tuple.get("description", String.class))
                 .categorie(tuple.get("categorie", String.class))

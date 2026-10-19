@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import ci.ubipharm.crm.rest.service.ArchivageService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
@@ -29,6 +30,7 @@ public class PieceJointeServiceImpl implements PieceJointeService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ParametreService parametreService;
+    private final ArchivageService archivageService;
     private final UtilisateurCourantService utilisateurCourantService;
 
     @Override
@@ -112,6 +114,7 @@ public class PieceJointeServiceImpl implements PieceJointeService {
                 values (:nature, :nom, :type, :taille, :contenu, :creePar, utc_timestamp())
                 """, new MapSqlParameterSource().addValue("nature", nature).addValue("nom", nom).addValue("type", type)
                 .addValue("taille", contenu.length).addValue("contenu", contenu).addValue("creePar", creePar), cle, new String[] {"id"});
+        archivageService.archiver("AFFICHE".equals(nature) ? "affiches" : "listes-produits", nom, contenu);
         return cle.getKey().longValue();
     }
 

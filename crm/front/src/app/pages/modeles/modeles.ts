@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
+import { CharteService } from '../../core/charte';
 import { Auth } from '../../core/auth';
 import { EtatSms, ModeleMessage, SourceVariable, Variable } from '../../core/modeles';
 import { JourPipe, LIBELLES, compterSms } from '../../core/format';
@@ -20,6 +21,7 @@ export class Modeles implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
+  private readonly charte = inject(CharteService);
   protected readonly L = LIBELLES;
 
   /** Donnee de route : les modeles des relances ou ceux des promotions du Marketing. */
@@ -107,11 +109,12 @@ export class Modeles implements OnInit {
 
   nouveau(): void {
     this.choisi.set(null);
-    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', typeInformation: '', canal: 'WHATSAPP', objet: '', contenu: '',
+    const canal = this.charte.charte()?.canalDefaut ?? 'WHATSAPP';
+    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', typeInformation: '', canal, objet: '', contenu: '',
       metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
     this.contenu.set('');
     this.objet.set('');
-    this.canalApercu.set('WHATSAPP');
+    this.canalApercu.set(canal);
     this.enEdition.set(true);
   }
 

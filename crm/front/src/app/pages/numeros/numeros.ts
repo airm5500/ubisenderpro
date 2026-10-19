@@ -5,6 +5,7 @@ import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
+import { CharteService } from '../../core/charte';
 import { CompteMeta, EtatSession, SessionAgent } from '../../core/modeles';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 
@@ -17,6 +18,12 @@ export class Numeros implements OnInit, OnDestroy {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
+  private readonly charte = inject(CharteService);
+
+  /** Numero jamais relie et mode Meta choisi par defaut dans les Parametres : l'API officielle passe en premier. */
+  metaParDefaut(s: SessionAgent): boolean {
+    return this.charte.charte()?.modeEnvoiDefaut === 'META' && !s.connecteLe && this.auth.peut('WHATSAPP_META');
+  }
   protected readonly L = LIBELLES;
 
   protected readonly sessions = signal<SessionAgent[] | null>(null);

@@ -624,6 +624,21 @@ Repris d'UbiSenderPro (onglet « Informations Clients »). Menu Marketing > Info
   `{pharmacien_garde}`, `{telephone_pharmacien}`, `{direction_signataire}`. Une ligne du modele dont la variable est vide disparait.
 - Non repris : les anniversaires clients (la base clients ne porte pas de date de naissance).
 
+## Parametres de l'entreprise, charte et archivage
+
+Ecran Parametres (droit `PARAMETRES`), migrations V1.3.4 et V1.3.5.
+
+- General : adresse publique HTTPS du CRM (`application.url_publique`), site internet, lien de commande et telephone de l'entreprise,
+  cites dans les messages par `{site_entreprise}`, `{lien_commande}` et `{telephone_entreprise}`.
+- Charte : logo et icone de l'onglet (PNG, JPEG, SVG sans script, ICO pour l'icone ; 5 Mo au plus), couleurs principale et d'accent,
+  appliques a tout l'ecran et a la page de connexion (`GET /api/charte`, `/api/charte/logo`, `/api/charte/icone`, lus sans connexion).
+  Chaque depot reste en base (`crm_charte_fichier`), le dernier s'affiche ; « Revenir au logo d'origine » reprend celui livre.
+- Mode d'envoi : canal propose d'office pour un nouveau modele (WhatsApp, e-mail, SMS) et mode WhatsApp propose pour relier un numero
+  (WhatsApp Web ou API officielle Meta).
+- Archivage : copie de chaque document recu ou produit (fichiers importes, rejets, exports de promotion, affiches, listes de produits)
+  dans le repertoire choisi, classe par type puis par mois (ou l'inverse). Un repertoire absent ou invalide n'empeche jamais l'action :
+  l'echec est seulement trace dans le journal du serveur.
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

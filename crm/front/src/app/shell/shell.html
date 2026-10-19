@@ -1,7 +1,7 @@
 <div class="cadre">
   <nav aria-label="Navigation principale">
     <div class="marque">
-      <img src="logo.svg" alt="" width="44" height="44">
+      <img [src]="charte.logo()" [class.logo-perso]="charte.charte()?.logoVersion" alt="" width="44" height="44" style="object-fit: contain">
       <div><div class="nom">UBIPHARM CI</div><div class="sous">Relation client</div></div>
     </div>
     <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
