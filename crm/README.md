@@ -717,7 +717,7 @@ API : `GET /api/agences/gestion?archives=`, `POST /api/agences`, `PUT /api/agenc
 ## Journal des actions (qui a fait quoi)
 
 Menu Administration > **Journal des actions** (route `/journal`, droit `JOURNAL` donne a ADMIN, administrateur sans SMS, DG et
-Directeur commercial ; migration V1.4.4). Une seule liste reunit le journal des actions (`crm_journal_action`) et celui des
+Directeur commercial ; migration V1.4.6). Une seule liste reunit le journal des actions (`crm_journal_action`) et celui des
 connexions (`crm_journal_connexion`), en lecture seule : rien n'y est modifie ni supprime.
 
 - Recherche : periode (par defaut aujourd'hui ; raccourcis Aujourd'hui, 7 et 30 derniers jours), utilisateur (ou traitements
