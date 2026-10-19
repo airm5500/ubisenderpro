@@ -65,6 +65,11 @@ export interface TableauBordMarketing {
   parCanal: Repartition[]; echecs: Repartition[];
   campagnes: { id: number; nom: string; statut: string; canal: string; lanceLe: string; envoyes: number; lus: number; reponses: number; echecs: number }[];
 }
+/** Marketing : fete, jour ferie ou fermeture annonce aux clients. */
+export interface Evenement {
+  id: number; nom: string; nature: string; dateDebut: string; dateFin: string | null; annuel: boolean; statut: string;
+  prochaineDate: string | null; prochaineFin: string | null; envoiPropose: string | null; modifiePar: string | null; modifieLe: string | null;
+}
 export interface DelaiRelance {
   id: number | null; agenceId: number | null; agenceLibelle: string | null; segment: string | null; segmentLibelle: string | null;
   avantJoursMax: number | null; avantJoursMin: number | null; retardJoursMin: number | null; intervalleJours: number | null;
@@ -208,7 +213,7 @@ export interface PieceJointe { id: number; nature: string; nomFichier: string; t
 /** Marketing : campagne promotionnelle sur une liste de diffusion. */
 export interface CampagneMarketing {
   id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
-  produitIds: number[]; produits: string[];
+  produitIds: number[]; produits: string[]; typeCampagne: string; evenementId: number | null; evenementNom: string | null;
   canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   afficheId: number | null; afficheNom: string | null; afficheType: string | null; joindreProduits: boolean; listeProduitsId: number | null;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.CampagneMarketingService;
+import ci.ubipharm.crm.rest.service.EvenementService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
@@ -73,7 +74,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                    cp.joindre_produits as joindreProduits, cp.liste_produits_id as listeProduitsId,
                    (select group_concat(concat(p.code, ' · ', p.nom) order by p.code separator '|') from crm_promotion p
                     where find_in_set(p.id, cp.promotion_ids) > 0) as promotionsLibelles,
-                   cp.produit_ids as produitIds,
+                   cp.produit_ids as produitIds, cp.type_campagne as typeCampagne, cp.evenement_id as evenementId, ev.nom as evenementNom,
                    (select group_concat(concat(pr.code, ' · ', pr.libelle) order by pr.libelle separator '|') from crm_produit pr
                     where find_in_set(pr.id, cp.produit_ids) > 0) as produitsLibelles,
                    cp.date_execution as dateExecution, cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence,
@@ -88,6 +89,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             join crm_modele_message mo on mo.id = cp.modele_id
             join crm_liste_diffusion l on l.id = cp.liste_id
             left join crm_piece_jointe pa on pa.id = cp.affiche_id
+            left join crm_evenement ev on ev.id = cp.evenement_id
             join crm_utilisateur uc on uc.id = cp.cree_par
             left join crm_utilisateur uv on uv.id = cp.valide_par
             left join crm_utilisateur ur on ur.id = cp.rejete_par
@@ -111,6 +113,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private final VariableMessageService variableMessageService;
     private final PromotionService promotionService;
     private final ProduitService produitService;
+    private final EvenementService evenementService;
     private final PieceJointeService pieceJointeService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
@@ -173,11 +176,13 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         em.createNativeQuery("""
-                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, produit_ids, affiche_id, joindre_produits,
-                                          criteres, date_execution, recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
-                values ('MARKETING', :nom, 'PROMOTION', :modeleId, :listeId, :promotionIds, :produitIds, :afficheId, :joindreProduits, '{}',
+                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, produit_ids, evenement_id, affiche_id,
+                                          joindre_produits, criteres, date_execution, recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
+                values ('MARKETING', :nom, (select type_campagne from crm_modele_message where id = :modeleId), :modeleId, :listeId, :promotionIds,
+                        :produitIds, :evenementId, :afficheId, :joindreProduits, '{}',
                         :dateExecution, :recurrence, :finRecurrence, :perimetreAgences, :creePar, utc_timestamp())
                 """)
+                .setParameter("evenementId", demande.getEvenementId())
                 .setParameter("produitIds", joindre(produits(demande)))
                 .setParameter("afficheId", demande.getAfficheId())
                 .setParameter("joindreProduits", demande.isJoindreProduits())
@@ -207,6 +212,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         em.createNativeQuery("""
                 update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, promotion_ids = :promotionIds,
+                       type_campagne = (select type_campagne from crm_modele_message where id = :modeleId), evenement_id = :evenementId,
                        produit_ids = :produitIds, affiche_id = :afficheId, joindre_produits = :joindreProduits,
                        date_execution = :dateExecution, recurrence = :recurrence, fin_recurrence = :finRecurrence, statut = 'BROUILLON',
                        soumise_le = null, updated_at = utc_timestamp()
@@ -218,6 +224,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .setParameter("joindreProduits", demande.isJoindreProduits())
                 .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("produitIds", joindre(produits(demande)))
+                .setParameter("evenementId", demande.getEvenementId())
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
                 .setParameter("listeId", demande.getListeId())
@@ -582,6 +589,11 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         if (!dto.getProduitIds().isEmpty()) {
             valeursPromotions.putAll(produitService.valeursCampagne(dto.getProduitIds()));
         }
+        if (dto.getEvenementId() != null) {
+            // L'occurrence annoncee est celle qui suit l'envoi : une campagne annuelle annonce celle de l'annee
+            valeursPromotions.putAll(evenementService.valeursCampagne(dto.getEvenementId(),
+                    (dto.getDateExecution() != null ? dto.getDateExecution() : maintenant()).toLocalDate()));
+        }
 
         List<Ligne> resultat = new ArrayList<>();
         Set<String> servis = new HashSet<>();
@@ -589,6 +601,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             Map<String, String> valeurs = new HashMap<>();
             sourcesParCode.forEach((code, source) -> valeurs.put(code,
                     ModeleMessageServiceImpl.sourcePromotion(source) || ModeleMessageServiceImpl.sourceDisponibilite(source)
+                            || ModeleMessageServiceImpl.sourceEvenement(source)
                     ? valeursPromotions.getOrDefault(source, "") : valeur(t, source, aliasParSource, dto)));
             Long clientId = t.get("clientId", Long.class);
             if (t.get("desabonneLe") != null) {
@@ -689,6 +702,10 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierPromotionsDuModele(contenus.getFirst(), promotions(demande));
         produitService.verifierAnnoncables(produits(demande));
         verifierDisponiblesDuModele(contenus.getFirst(), produits(demande));
+        if (demande.getEvenementId() != null) {
+            evenementService.verifierCitable(demande.getEvenementId());
+        }
+        verifierEvenementDuModele(contenus.getFirst(), demande.getEvenementId());
         Recurrence.verifier(demande.getRecurrence(), demande.getFinRecurrence(), demande.getDateExecution(), maintenant().toLocalDate());
         verifierPiecesJointes(demande);
     }
@@ -725,6 +742,19 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         boolean cite = GabaritMessage.variables(texte).stream().anyMatch(v -> ModeleMessageServiceImpl.sourceDisponibilite(sources.get(v)));
         if (cite && produits.isEmpty()) {
             throw new ErreurMetierException("Le modèle cite {produits_disponibles} : choisissez au moins un produit de retour en stock.");
+        }
+    }
+
+    /** Un modele qui cite {evenement_nom}, {evenement_date} ou {evenement_fin} demande l'evenement annonce. */
+    private void verifierEvenementDuModele(String texte, Long evenementId) {
+        if (evenementId != null) {
+            return;
+        }
+        Map<String, String> sources = variableMessageService.sourcesParCode();
+        List<String> citees = GabaritMessage.variables(texte).stream().filter(v -> ModeleMessageServiceImpl.sourceEvenement(sources.get(v)))
+                .map(v -> "{" + v + "}").toList();
+        if (!citees.isEmpty()) {
+            throw new ErreurMetierException("Le modèle cite " + String.join(", ", citees) + " : choisissez l'événement annoncé.");
         }
     }
 
@@ -868,6 +898,9 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .promotions(tuple.get("promotionsLibelles") == null ? List.of() : List.of(tuple.get("promotionsLibelles", String.class).split("\\|")))
                 .produitIds(Objects.requireNonNullElse(separer(tuple.get("produitIds", String.class)), List.of()))
                 .produits(tuple.get("produitsLibelles") == null ? List.of() : List.of(tuple.get("produitsLibelles", String.class).split("\\|")))
+                .typeCampagne(tuple.get("typeCampagne", String.class))
+                .evenementId(tuple.get("evenementId", Long.class))
+                .evenementNom(tuple.get("evenementNom", String.class))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
                 .recurrence(tuple.get("recurrence", String.class))
                 .finRecurrence(tuple.get("finRecurrence", java.time.LocalDate.class))

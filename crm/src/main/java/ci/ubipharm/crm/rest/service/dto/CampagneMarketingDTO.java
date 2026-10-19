@@ -30,6 +30,11 @@ public class CampagneMarketingDTO {
     private List<Long> produitIds;
     /** « CODE · Libelle » de chaque produit cite. */
     private List<String> produits;
+    /** PROMOTION ou EVENEMENT, selon le modele. */
+    private String typeCampagne;
+    /** Evenement du calendrier annonce (message de courtoisie). */
+    private Long evenementId;
+    private String evenementNom;
     private String canal;
     private LocalDateTime dateExecution;
     private String recurrence;

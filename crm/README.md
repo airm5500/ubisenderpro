@@ -594,3 +594,16 @@ API : `GET /api/recouvrement/tableau-de-bord?du=&au=&agenceId=&agentId=`, `GET /
 
 API : `POST /api/marketing/produits/{id}/rupture`, `POST /api/marketing/produits/{id}/retour-stock`,
 `GET /api/marketing/produits?disponibilite=RUPTURE|DISPONIBLE|RETOUR`.
+
+## Messages d'evenement (pilote)
+
+- **Calendrier** : menu **Marketing > Calendrier des evenements** (droit `EVENEMENTS`). Fetes, jours feries, fermetures d'agence ;
+  un evenement annuel revient chaque annee a la meme date, les fetes a date variable (Paques, Ramadan, Tabaski...) se saisissent
+  pour l'annee. Les jours feries a date fixe de Cote d'Ivoire sont livres ; un evenement n'est jamais supprime, il est archive.
+- **Modeles** : un modele Marketing de type **Evenement** cite `{evenement_nom}`, `{evenement_date}`, `{evenement_fin}` ; deux modeles
+  de depart sont livres (voeux, fermeture de l'agence). Un modele de relance ne peut pas les citer.
+- **Campagne** : choisir l'evenement annonce ; la date d'envoi proposee vient des parametres `marketing.evenement_jours_avant` (0,
+  fetes et feries), `marketing.fermeture_jours_avant` (3) et `marketing.evenement_heure` (8 h). La repetition **Chaque annee**
+  renvoie le message a chaque occurrence. Un evenement annonce par une campagne non terminee ne s'archive pas.
+
+API : `GET/POST /api/marketing/evenements`, `PUT /api/marketing/evenements/{id}`, `POST /api/marketing/evenements/{id}/archivage|reactivation`.

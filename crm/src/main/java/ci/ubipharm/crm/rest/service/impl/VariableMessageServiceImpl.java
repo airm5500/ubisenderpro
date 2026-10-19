@@ -46,6 +46,10 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.promotion_debut", "Début des promotions citées (Marketing)");
         SOURCES_CALCULEES.put("calcul.promotion_fin", "Fin des promotions citées (Marketing)");
         SOURCES_CALCULEES.put("calcul.produits_promotion", "Produits des promotions citées et leur avantage, un par ligne (Marketing)");
+        SOURCES_CALCULEES.put("calcul.produits_disponibles", "Produits de retour en stock annoncés, un par ligne (Marketing)");
+        SOURCES_CALCULEES.put("calcul.evenement_nom", "Nom de l'événement annoncé (Marketing)");
+        SOURCES_CALCULEES.put("calcul.evenement_date", "Premier jour de l'événement annoncé (Marketing)");
+        SOURCES_CALCULEES.put("calcul.evenement_fin", "Dernier jour de l'événement annoncé (Marketing)");
     }
 
     /** Colonnes techniques jamais proposees. */

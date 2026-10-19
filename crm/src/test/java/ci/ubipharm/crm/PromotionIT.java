@@ -73,7 +73,7 @@ class PromotionIT extends IntegrationBase {
 
         // Les variables de promotion n'ont pas cours en Recouvrement
         envoyer(admin, post("/api/recouvrement/modeles-messages"), "{\"nom\":\"Relance promo\",\"typeCampagne\":\"APRES_ECHEANCE\",\"contenu\":\"{produits_promotion}\"}")
-                .andExpect(jsonPath("$.message").value("Une relance ne cite aucune promotion : retirez {produits_promotion}."));
+                .andExpect(jsonPath("$.message").value("Une relance ne cite ni promotion ni événement : retirez {produits_promotion}."));
         Long modele = idDe(envoyer(charge, post("/api/marketing/modeles"), """
                 {"nom":"Promo du mois","typeCampagne":"PROMOTION","contenu":"Bonjour {nom_pharmacie}, {promotion_nom} jusqu'au {promotion_fin} :\\n{produits_promotion}"}"""));
         idDe(envoyer(admin, post("/api/clients"), "{\"code\":\"P-1\",\"raisonSociale\":\"Pharmacie Un\",\"agenceId\":1,\"numeros\":{\"PRINCIPAL\":\"0700000001\"}}"));

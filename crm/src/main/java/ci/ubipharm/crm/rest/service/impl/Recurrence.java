@@ -7,12 +7,12 @@ import java.util.Set;
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
 
 /**
- * Repetition d'une campagne validee une fois : chaque jour, chaque semaine ou chaque mois jusqu'a une date de fin.
+ * Repetition d'une campagne validee une fois : chaque jour, chaque semaine, chaque mois ou chaque annee jusqu'a une date de fin.
  * Les envois se calculent depuis le premier, pour qu'un mois court ne decale pas les suivants.
  */
 final class Recurrence {
 
-    static final Set<String> FREQUENCES = Set.of("QUOTIDIENNE", "HEBDOMADAIRE", "MENSUELLE");
+    static final Set<String> FREQUENCES = Set.of("QUOTIDIENNE", "HEBDOMADAIRE", "MENSUELLE", "ANNUELLE");
 
     private Recurrence() {
     }
@@ -47,6 +47,7 @@ final class Recurrence {
                 case "QUOTIDIENNE" -> debut.plusDays(rang);
                 case "HEBDOMADAIRE" -> debut.plusWeeks(rang);
                 case "MENSUELLE" -> debut.plusMonths(rang);
+                case "ANNUELLE" -> debut.plusYears(rang);
                 default -> throw new IllegalArgumentException(frequence);
             };
             if (envoi.toLocalDate().isAfter(fin)) {

@@ -25,8 +25,8 @@ export class Modeles implements OnInit {
   /** Donnee de route : les modeles des relances ou ceux des promotions du Marketing. */
   readonly module = input<'RECOUVREMENT' | 'MARKETING'>('RECOUVREMENT');
   protected readonly marketing = computed(() => this.module() === 'MARKETING');
-  protected readonly types = computed(() => this.marketing() ? [['PROMOTION', 'Promotion']]
-    : Object.entries(LIBELLES.typeCampagne).filter(([code]) => code !== 'PROMOTION'));
+  protected readonly types = computed(() => this.marketing() ? [['PROMOTION', 'Promotion'], ['EVENEMENT', 'Événement (fête, férié, fermeture)']]
+    : Object.entries(LIBELLES.typeCampagne).filter(([code]) => code !== 'PROMOTION' && code !== 'EVENEMENT'));
   /** Ecrire les modeles ; les variables ne s'administrent que cote Recouvrement. */
   protected readonly peutGerer = computed(() => this.auth.peut(this.marketing() ? 'MODELES_MARKETING' : 'MODELES_GERER'));
   protected readonly peutVariables = computed(() => !this.marketing() && this.auth.peut('MODELES_GERER'));

@@ -54,6 +54,8 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_fournisseur_sms where code <> 'LETEXTO'");
         jdbc.update("update crm_fournisseur_sms set par_defaut = true, actif = true, cle_api = null, modifie_par = null where code = 'LETEXTO'");
         jdbc.update("delete from crm_campagne");
+        jdbc.update("delete from crm_evenement where cree_par is not null");
+        jdbc.update("update crm_evenement set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_delai_relance");
         jdbc.update("update crm_parametre set valeur = '0' where cle = 'campagne.relance_intervalle_jours'");
         jdbc.update("update crm_parametre set valeur = '1' where cle = 'campagne.apres_echeance_jours_min'");
@@ -62,7 +64,8 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_variable_message where code not in ('code_client', 'numero_compte', 'nom_client', 'nom_pharmacie', "
                 + "'agence', 'sous_type', 'reference_facture', 'date_facture', 'date_echeance', 'montant', 'solde', 'jours_retard', "
                 + "'jours_avant_echeance', 'agent_nom', 'agent_numero', 'expediteur_nom', 'expediteur_numero', 'segment', "
-                + "'promotion_nom', 'promotion_code', 'promotion_debut', 'promotion_fin', 'produits_promotion', 'produits_disponibles')");
+                + "'promotion_nom', 'promotion_code', 'promotion_debut', 'promotion_fin', 'produits_promotion', 'produits_disponibles', "
+                + "'evenement_nom', 'evenement_date', 'evenement_fin')");
         jdbc.update("update crm_variable_message set statut = 'ACTIF'");
         jdbc.update("delete from crm_delegation");
         jdbc.update("delete from crm_affectation");

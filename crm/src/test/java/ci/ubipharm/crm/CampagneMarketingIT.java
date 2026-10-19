@@ -287,6 +287,48 @@ class CampagneMarketingIT extends IntegrationBase {
                 {"nom":"Relance dispo","typeCampagne":"APRES_ECHEANCE","contenu":"{produits_disponibles}"}""").andExpect(status().isBadRequest());
     }
 
+    @Test
+    void unMessageDEvenementAnnonceLaFermetureEtSeRepeteChaqueAnnee() throws Exception {
+        java.time.LocalDate jour = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        java.time.format.DateTimeFormatter lisible = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        // Les jours feries a date fixe sont livres et reviennent chaque annee
+        mvc.perform(get("/api/marketing/evenements").session(charge))
+                .andExpect(jsonPath("$[?(@.nom == 'Noël')].annuel").value(true))
+                .andExpect(jsonPath("$[?(@.nom == 'Noël')].prochaineDate").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.endsWith("-12-25"))));
+        envoyer(charge, post("/api/marketing/evenements"), """
+                {"nom":"Ancien","nature":"AUTRE","dateDebut":"%s"}""".formatted(jour.minusDays(3)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Cet événement est déjà passé."));
+        java.time.LocalDate debut = jour.plusDays(10);
+        Long inventaire = idDe(envoyer(charge, post("/api/marketing/evenements"), """
+                {"nom":"Inventaire annuel","nature":"FERMETURE","dateDebut":"%s","dateFin":"%s","annuel":true}"""
+                .formatted(debut, debut.plusDays(2)))
+                .andExpect(jsonPath("$.prochaineDate").value(debut.toString()))
+                .andExpect(jsonPath("$.envoiPropose").value(debut.minusDays(3) + "T08:00:00")));
+
+        Long fermeture = idDe(envoyer(charge, post("/api/marketing/modeles"), """
+                {"nom":"Fermeture inventaire","typeCampagne":"EVENEMENT","contenu":"Bonjour {nom_pharmacie}, agence fermée du {evenement_date} au {evenement_fin} ({evenement_nom})."}""")
+                .andExpect(jsonPath("$.typeCampagne").value("EVENEMENT")));
+        envoyer(charge, post("/api/marketing/campagnes"), campagne("Sans evenement", fermeture)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le modèle cite {evenement_date}, {evenement_fin}, {evenement_nom} : choisissez l'événement annoncé."));
+        Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Inventaire","listeId":%d,"modeleId":%d,"evenementId":%d,"dateExecution":"%sT08:00:00",
+                 "recurrence":"ANNUELLE","finRecurrence":"%s"}""".formatted(liste, fermeture, inventaire, debut.minusDays(1), debut.plusYears(3)))
+                .andExpect(jsonPath("$.typeCampagne").value("EVENEMENT"))
+                .andExpect(jsonPath("$.evenementNom").value("Inventaire annuel")));
+        mvc.perform(get("/api/marketing/campagnes/" + campagne + "/recapitulatif").session(charge))
+                .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros, agence fermée du " + debut.format(lisible)
+                        + " au " + debut.plusDays(2).format(lisible) + " (Inventaire annuel)."));
+
+        // L'evenement annonce ne s'archive pas tant que la campagne peut partir
+        envoyer(charge, post("/api/marketing/evenements/" + inventaire + "/archivage"), "").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("L'événement est annoncé par des campagnes en préparation ou programmées : Inventaire. "
+                        + "Annulez-les d'abord."));
+        // Un modele de relance ne cite pas d'evenement
+        envoyer(admin, post("/api/recouvrement/modeles-messages"), """
+                {"nom":"Relance fete","typeCampagne":"APRES_ECHEANCE","contenu":"{evenement_nom}"}""").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Une relance ne cite ni promotion ni événement : retirez {evenement_nom}."));
+    }
+
     private String campagne(String nom, Long modeleId) {
         return "{\"nom\":\"" + nom + "\",\"listeId\":" + liste + ",\"modeleId\":" + modeleId + "}";
     }

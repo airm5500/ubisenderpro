@@ -35,6 +35,9 @@ public class CampagneMarketingDemandeDTO {
     /** Produits de retour en stock annonces ({produits_disponibles}). */
     private java.util.List<Long> produitIds;
 
+    /** Evenement du calendrier annonce ({evenement_nom}, {evenement_date}, {evenement_fin}). */
+    private Long evenementId;
+
     /** Affiche deposee (image ou PDF) jointe a chaque message WhatsApp ou e-mail. */
     private Long afficheId;
 
@@ -44,7 +47,7 @@ public class CampagneMarketingDemandeDTO {
     /** Vide : execution des la validation. */
     private LocalDateTime dateExecution;
 
-    /** QUOTIDIENNE, HEBDOMADAIRE ou MENSUELLE ; vide : un seul envoi. */
+    /** QUOTIDIENNE, HEBDOMADAIRE, MENSUELLE ou ANNUELLE ; vide : un seul envoi. */
     private String recurrence;
 
     /** Dernier jour ou la campagne peut repartir. */

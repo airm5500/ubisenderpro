@@ -45,7 +45,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     /** Sources utilisables sans facture ni agent de recouvrement. */
     private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero",
             "calcul.promotion_nom", "calcul.promotion_code", "calcul.promotion_debut", "calcul.promotion_fin", "calcul.produits_promotion",
-            "calcul.produits_disponibles");
+            "calcul.produits_disponibles", "calcul.evenement_nom", "calcul.evenement_date", "calcul.evenement_fin");
 
     /** 4 SMS de 153 caracteres. */
     private static final int SMS_LONGUEUR_MAX = 612;
@@ -187,10 +187,10 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                         + String.join(", ", horsMarketing) + ".");
             }
         } else {
-            List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v)) || sourceDisponibilite(connues.get(v)))
-                    .map(v -> "{" + v + "}").toList();
+            List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v)) || sourceDisponibilite(connues.get(v))
+                    || sourceEvenement(connues.get(v))).map(v -> "{" + v + "}").toList();
             if (!promotions.isEmpty()) {
-                throw new ErreurMetierException("Une relance ne cite aucune promotion : retirez " + String.join(", ", promotions) + ".");
+                throw new ErreurMetierException("Une relance ne cite ni promotion ni événement : retirez " + String.join(", ", promotions) + ".");
             }
         }
         // Le nom reste unique tous modules confondus : les journaux et les campagnes le citent
@@ -218,8 +218,17 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         return "calcul.produits_disponibles".equals(source);
     }
 
+    /** Variables remplies par l'evenement du calendrier qu'une campagne Marketing annonce. */
+    static boolean sourceEvenement(String source) {
+        return source != null && source.startsWith("calcul.evenement_");
+    }
+
+    /** Un modele Marketing sert aux promotions ou aux evenements (messages de courtoisie). */
     private static String type(String module, ModeleMessageDemandeDTO demande) {
-        return "MARKETING".equals(module) ? "PROMOTION" : demande.getTypeCampagne();
+        if ("MARKETING".equals(module)) {
+            return "EVENEMENT".equals(demande.getTypeCampagne()) ? "EVENEMENT" : "PROMOTION";
+        }
+        return demande.getTypeCampagne();
     }
 
     private static String canal(ModeleMessageDemandeDTO demande) {

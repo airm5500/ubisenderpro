@@ -11,10 +11,23 @@
     <label class="f">Modèle de message
       <select class="sel" name="modeleId" [(ngModel)]="formulaire.modeleId" required>
         <option [ngValue]="null" disabled>Choisir…</option>
-        @for (m of modeles(); track m.id) { <option [ngValue]="m.id">{{ m.nom }} · {{ L.canal[m.canal] }}</option> }
+        @for (m of modeles(); track m.id) { <option [ngValue]="m.id">{{ m.nom }} · {{ L.typeCampagne[m.typeCampagne] }} · {{ L.canal[m.canal] }}</option> }
       </select>
     </label>
     @if (!modeles().length) { <p class="discret" style="margin: 0">Aucun modèle promotionnel : créez-en un dans Modèles promotionnels.</p> }
+    @if (modeleEvenement() || formulaire.evenementId) {
+      <label class="f">Événement annoncé
+        <select class="sel" name="evenementId" [ngModel]="formulaire.evenementId" (ngModelChange)="choisirEvenement($event)">
+          <option [ngValue]="null">Aucun</option>
+          @for (e of evenements(); track e.id) {
+            <option [ngValue]="e.id">{{ e.nom }} · {{ (e.prochaineDate ?? e.dateDebut) | jour }}{{ e.annuel ? ' · chaque année' : '' }}</option>
+          }
+        </select>
+      </label>
+      <p class="discret" style="margin: 0">Les variables {{ '{' }}evenement_nom{{ '}' }}, {{ '{' }}evenement_date{{ '}' }} et {{ '{' }}evenement_fin{{ '}' }}
+        se remplissent avec l'événement ; la date d'envoi proposée suit les paramètres du Marketing.
+        @if (evenementChoisi()?.annuel) { Événement annuel : choisissez « Chaque année » pour le renvoyer chaque année. }</p>
+    }
     <div class="f">Promotions citées
       @for (p of promotions(); track p.id) {
         <label class="droit"><input type="checkbox" [checked]="formulaire.promotionIds.has(p.id)" (change)="basculer(p.id, $any($event.target).checked)">
@@ -51,6 +64,7 @@
           <option value="QUOTIDIENNE">Chaque jour</option>
           <option value="HEBDOMADAIRE">Chaque semaine</option>
           <option value="MENSUELLE">Chaque mois</option>
+          <option value="ANNUELLE">Chaque année</option>
         </select>
       </label>
       @if (formulaire.recurrence) {
