@@ -20,7 +20,31 @@
           @for (s of segments | async; track s.code) { <option [value]="s.code">{{ s.libelle }}</option> }
         </select>
       </label>
-      <label class="f">Ville<input class="sel" name="ville" [(ngModel)]="formulaire.ville"></label>
+      <label class="f">Date d'anniversaire<input class="sel" name="dateAnniversaire" type="date" [(ngModel)]="formulaire.dateAnniversaire"></label>
+      <label class="f">Région
+        <select class="sel" name="regionId" [(ngModel)]="formulaire.regionId">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (r of listes()['REGION']; track r.id) { <option [ngValue]="r.id">{{ r.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Ville
+        <select class="sel" name="villeId" [(ngModel)]="formulaire.villeId" (ngModelChange)="villeChoisie()">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (v of villes(); track v.id) { <option [ngValue]="v.id">{{ v.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Commune
+        <select class="sel" name="communeId" [(ngModel)]="formulaire.communeId" (ngModelChange)="communeChoisie()">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (c of communes(); track c.id) { <option [ngValue]="c.id">{{ c.libelle }}{{ formulaire.villeId ? '' : ' (' + c.parentLibelle + ')' }}</option> }
+        </select>
+      </label>
+      <label class="f">Tournée
+        <select class="sel" name="tourneeId" [(ngModel)]="formulaire.tourneeId" [disabled]="!formulaire.agenceId">
+          <option [ngValue]="null">{{ formulaire.agenceId ? (tournees().length ? 'Non renseignée' : 'Aucune tournée pour cette agence') : "Choisir d'abord l'agence" }}</option>
+          @for (t of tournees(); track t.id) { <option [ngValue]="t.id">{{ t.libelle }}</option> }
+        </select>
+      </label>
       <label class="f">E-mail<input class="sel" name="email" type="email" [(ngModel)]="formulaire.email"></label>
       <label class="f large">Adresse<input class="sel" name="adresse" [(ngModel)]="formulaire.adresse"></label>
     </div>

@@ -5,6 +5,7 @@ import { Auth } from '../../core/auth';
 import { Affectation, Client, Facture, MessageRecu, Page } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, TelephonePipe } from '../../core/format';
 import { ClientFormulaire } from '../clients/client-formulaire';
+import { BadgeSegment } from '../../core/badges';
 import { FactureFormulaire } from '../factures/facture-formulaire';
 
 interface Evenement { quand: string; qui: string; titre: string; detail: string; couleur: string; }
@@ -13,7 +14,7 @@ const PALETTE = ['#05253D', '#51D78E', '#0B5C8E', '#F4B740', '#9DB0BF'];
 
 @Component({
   selector: 'app-fiche-client',
-  imports: [RouterLink, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire],
+  imports: [RouterLink, JourPipe, MontantPipe, TelephonePipe, ClientFormulaire, FactureFormulaire, BadgeSegment],
   templateUrl: './fiche-client.html',
   styleUrl: './fiche-client.css'
 })

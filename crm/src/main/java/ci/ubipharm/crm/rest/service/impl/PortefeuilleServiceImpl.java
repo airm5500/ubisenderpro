@@ -46,7 +46,8 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
 
     private static final String SELECT_PORTEFEUILLE = """
             select c.id as clientId, c.code as code, c.raison_sociale as raisonSociale, c.nom_pharmacien as nomPharmacien,
-                   a.id as agenceId, a.libelle as agenceLibelle, c.segmentation as segmentation,
+                   a.id as agenceId, a.libelle as agenceLibelle, c.segmentation as segmentation, sg.libelle as segmentationLibelle,
+                   sg.badge as segmentationBadge,
                    (select ct.numero_whatsapp from crm_contact ct
                      where ct.client_id = c.id and ct.rang = 1 and ct.statut = 'ACTIF' order by ct.id desc limit 1) as numeroPrincipal,
                    af.agent_id as agentId, ag.nom_complet as agentNom, af.date_debut as affecteLe,
@@ -59,6 +60,7 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
     private static final String FROM_PORTEFEUILLE = """
             from crm_client c
             join crm_agence a on a.id = c.agence_id
+            left join crm_segment sg on sg.code = c.segmentation
             left join crm_affectation af on af.client_id = c.id and af.date_fin is null
             left join crm_utilisateur ag on ag.id = af.agent_id
             """;
@@ -217,6 +219,8 @@ public class PortefeuilleServiceImpl implements PortefeuilleService {
                 .agenceId(tuple.get("agenceId", Long.class))
                 .agenceLibelle(tuple.get("agenceLibelle", String.class))
                 .segmentation(tuple.get("segmentation", String.class))
+                .segmentationLibelle(tuple.get("segmentationLibelle", String.class))
+                .segmentationBadge(tuple.get("segmentationBadge", String.class))
                 .numeroPrincipal(tuple.get("numeroPrincipal", String.class))
                 .agentId(tuple.get("agentId", Long.class))
                 .agentNom(tuple.get("agentNom", String.class))

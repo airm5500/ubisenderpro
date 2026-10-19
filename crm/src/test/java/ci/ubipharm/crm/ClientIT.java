@@ -66,9 +66,9 @@ class ClientIT extends IntegrationBase {
     @Test
     void unNumeroRemplaceEstArchiveEtLaModificationJournalisee() throws Exception {
         String reponse = enregistrer(admin, post("/api/clients"), """
-                {"code":"C-9010","raisonSociale":"Pharmacie Avant","agenceId":1,"ville":"Abidjan",
+                {"code":"C-9010","raisonSociale":"Pharmacie Avant","agenceId":1,"villeId":%d,
                  "numeros":{"PRINCIPAL":"0700000001","COMPTABLE":"0700000003"}}
-                """).andReturn().getResponse().getContentAsString();
+                """.formatted(referentiel("VILLE", "Abidjan"))).andReturn().getResponse().getContentAsString();
         Long id = ((Number) JsonPath.read(reponse, "$.id")).longValue();
 
         enregistrer(admin, put("/api/clients/" + id), """

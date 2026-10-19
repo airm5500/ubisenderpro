@@ -29,7 +29,7 @@ class ListeDiffusionIT extends IntegrationBase {
         reinitialiser();
         admin = connecter("admin", MOT_DE_PASSE_ADMIN);
         platine = client(admin, """
-                {"code":"M-1","raisonSociale":"Pharmacie Platine","agenceId":1,"segmentation":"P","ville":"Abidjan","numeros":{"PRINCIPAL":"0700000001"}}""");
+                {"code":"M-1","raisonSociale":"Pharmacie Platine","agenceId":1,"segmentation":"P","villeId":%d,"numeros":{"PRINCIPAL":"0700000001"}}""".formatted(referentiel("VILLE", "Abidjan")));
         sansNumero = client(admin, """
                 {"code":"M-2","raisonSociale":"Pharmacie Sans Numero","agenceId":1,"segmentation":"S"}""");
         autreAgence = client(admin, """

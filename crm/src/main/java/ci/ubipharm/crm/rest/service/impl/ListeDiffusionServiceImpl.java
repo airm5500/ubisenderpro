@@ -230,7 +230,8 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
         String filtre = " where statut = 'ACTIF'" + (perimetre.isVisionGlobale() ? "" : " and agence_id in (:agences)");
         return ValeursCriteresDTO.builder()
                 .sousAgences(distincts("select distinct sous_agence from crm_client" + filtre + " and sous_agence is not null order by 1", perimetre))
-                .villes(distincts("select distinct ville from crm_client" + filtre + " and ville is not null and ville <> '' order by 1", perimetre))
+                .villes(distincts("select distinct r.libelle from crm_client c join crm_referentiel r on r.id = c.ville_id where c.statut = 'ACTIF'"
+                        + (perimetre.isVisionGlobale() ? "" : " and c.agence_id in (:agences)") + " order by 1", perimetre))
                 .build();
     }
 
@@ -288,7 +289,7 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
         filtres.forEach(total::setParameter);
         Query page = em.createNativeQuery("""
                 select c.id as clientId, c.code as code, c.raison_sociale as raisonSociale, c.nom_pharmacien as nomPharmacien,
-                       a.libelle as agenceLibelle, c.segmentation as segmentation, c.ville as ville, m.origine as origine, m.motif as motif,
+                       a.libelle as agenceLibelle, c.segmentation as segmentation, (select r.libelle from crm_referentiel r where r.id = c.ville_id) as ville, m.origine as origine, m.motif as motif,
                        c.email as email, c.desabonne_marketing_le as desabonneLe,
                        (select group_concat(n.numero_whatsapp order by n.rang, n.id separator ',') from crm_contact n
                         where n.client_id = c.id and n.statut = 'ACTIF' and n.fonction in (:fonctions)) as numeros
@@ -330,7 +331,7 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
                 parametres.put("critSousAgences", d.sousAgences());
             }
             if (!d.villes().isEmpty()) {
-                sql.append(" and c.ville in (:critVilles)");
+                sql.append(" and c.ville_id in (select r.id from crm_referentiel r where r.libelle in (:critVilles))");
                 parametres.put("critVilles", d.villes());
             }
             if (!d.segments().isEmpty()) {

@@ -4,6 +4,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -88,6 +90,13 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_liste_diffusion");
         jdbc.update("delete from crm_contact");
         jdbc.update("delete from crm_client");
+        // Entrees de referentiel creees par les tests (libelle « IT ... ») ; les entrees livrees redeviennent actives
+        for (String type : List.of("COMMUNE", "TOURNEE", "VILLE", "REGION")) {
+            jdbc.update("delete from crm_referentiel where type_referentiel = ? and (libelle like 'IT %' or agence_id is not null)", type);
+        }
+        jdbc.update("update crm_referentiel set statut = 'ACTIF', modifie_par = null, updated_at = null");
+        jdbc.update("delete from crm_segment where code not in ('P', 'S', 'B')");
+        jdbc.update("update crm_segment set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_utilisateur_agence");
         jdbc.update("delete from crm_agence where code not in ('YOP', 'VRI', 'CEN', 'BKE', 'GAG')");
         jdbc.update("update crm_agence set statut = 'ACTIF', modifie_par = null, updated_at = null");
@@ -127,5 +136,10 @@ abstract class IntegrationBase {
 
     String identifiants(String login, String motDePasse) {
         return "{\"login\":\"" + login + "\",\"motDePasse\":\"" + motDePasse + "\"}";
+    }
+
+    /** Identifiant d'une entree de referentiel livree (Abidjan, Cocody...). */
+    Long referentiel(String type, String libelle) {
+        return jdbc.queryForObject("select id from crm_referentiel where type_referentiel = ? and libelle = ?", Long.class, type, libelle);
     }
 }

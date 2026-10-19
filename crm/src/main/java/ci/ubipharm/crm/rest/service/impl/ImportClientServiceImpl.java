@@ -4,6 +4,7 @@ import static ci.ubipharm.crm.rest.service.impl.ValeursImport.champ;
 import static ci.ubipharm.crm.rest.service.impl.ValeursImport.normaliserLibelle;
 import static ci.ubipharm.crm.rest.service.impl.ValeursImport.valeur;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +26,9 @@ import ci.ubipharm.crm.rest.service.ImportClientService;
 import ci.ubipharm.crm.rest.service.ImportService;
 import ci.ubipharm.crm.rest.service.LecteurTableurService;
 import ci.ubipharm.crm.rest.service.ParametreService;
+import ci.ubipharm.crm.rest.service.ReferentielService;
+import ci.ubipharm.crm.rest.service.ResolutionReferentiels;
+import ci.ubipharm.crm.rest.service.dto.LocalisationDTO;
 import ci.ubipharm.crm.rest.service.dto.ChampImportDTO;
 import ci.ubipharm.crm.rest.service.dto.CorrectionLigneDTO;
 import ci.ubipharm.crm.rest.service.dto.ImportDTO;
@@ -57,7 +61,11 @@ public class ImportClientServiceImpl implements ImportClientService {
     static final List<String> AGENCE = List.of("agence", "agce", "code_agence", "agence_code", "libelle_agence");
     static final List<String> SOUS_AGENCE = List.of("sous_agence", "sgce", "secteur");
     static final List<String> SEGMENTATION = List.of("segmentation", "seg", "segment", "categorie");
-    static final List<String> VILLE = List.of("ville", "localite", "commune");
+    static final List<String> REGION = List.of("region", "district");
+    static final List<String> VILLE = List.of("ville", "localite");
+    static final List<String> COMMUNE = List.of("commune", "quartier");
+    static final List<String> TOURNEE = List.of("tournee", "tournee_livraison", "code_tournee");
+    static final List<String> ANNIVERSAIRE = List.of("date_anniversaire", "anniversaire", "date_naissance", "date_de_naissance", "ne_le");
     static final List<String> ADRESSE = List.of("adresse", "adresse_postale", "localisation");
     /** Dans le fichier UBIPHARM, la colonne Adresse1 contient le nom du pharmacien. */
     static final List<String> NOM_PHARMACIEN = List.of("nom_pharmacien", "adresse1", "adresse_1", "pharmacien", "nom_du_pharmacien");
@@ -94,7 +102,11 @@ public class ImportClientServiceImpl implements ImportClientService {
                 champ("Sous-agence", false, "Y2", SOUS_AGENCE),
                 champ("Segment", false, "P", SEGMENTATION),
                 champ("Nom du pharmacien", false, "KOFFI AYA", NOM_PHARMACIEN),
+                champ("Région", false, "District autonome d'Abidjan", REGION),
                 champ("Ville", false, "Abidjan", VILLE),
+                champ("Commune", false, "Cocody", COMMUNE),
+                champ("Tournée", false, "", TOURNEE),
+                champ("Date d'anniversaire", false, "15/03/1980", ANNIVERSAIRE),
                 champ("Adresse", false, "Boulevard Latrille", ADRESSE),
                 champ("E-mail", false, "contact@pharmacie.ci", EMAIL),
                 champ("Commentaire", false, "", COMMENTAIRE)));
@@ -112,6 +124,7 @@ public class ImportClientServiceImpl implements ImportClientService {
     private final CorrespondanceImportService correspondanceImportService;
     private final PerimetreService perimetreService;
     private final ParametreService parametreService;
+    private final ReferentielService referentielService;
 
     @Override
     public String type() {
@@ -234,6 +247,14 @@ public class ImportClientServiceImpl implements ImportClientService {
                 numeros.put(fonction, numero);
             }
         });
+        LocalisationDTO localisation = contexte.referentiels().parLibelles(renseigne(valeur(valeurs, REGION)), renseigne(valeur(valeurs, VILLE)),
+                renseigne(valeur(valeurs, COMMUNE)), renseigne(valeur(valeurs, TOURNEE)), agence == null ? null : agence.id(), motifs);
+        String anniversaireSaisi = renseigne(valeur(valeurs, ANNIVERSAIRE));
+        LocalDate anniversaire = anniversaireSaisi == null ? null : ValeursImport.date(anniversaireSaisi)
+                .filter(d -> !d.isAfter(LocalDate.now()) && d.getYear() >= 1900).orElse(null);
+        if (anniversaireSaisi != null && anniversaire == null) {
+            motifs.add("Date d'anniversaire invalide : " + anniversaireSaisi + " (format jj/mm/aaaa).");
+        }
         String email = renseigne(valeur(valeurs, EMAIL));
         if (email != null && !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
             motifs.add("Adresse e-mail invalide : " + email + ".");
@@ -250,7 +271,7 @@ public class ImportClientServiceImpl implements ImportClientService {
         }
 
         ClientLu lu = new ClientLu(code, raisonSociale, renseigne(valeur(valeurs, NOM_PHARMACIEN)), agence, valeur(valeurs, SOUS_AGENCE),
-                segment, valeur(valeurs, VILLE), valeur(valeurs, ADRESSE), email, renseigne(valeur(valeurs, COMMENTAIRE)), numeros);
+                segment, localisation, anniversaire, valeur(valeurs, ADRESSE), email, renseigne(valeur(valeurs, COMMENTAIRE)), numeros);
         if (existant == null) {
             return new Evaluation(verdict("CREATION", code, null), lu, null);
         }
@@ -284,7 +305,12 @@ public class ImportClientServiceImpl implements ImportClientService {
         ecart(ecarts, "Agence", existant.agenceLibelle(), lu.agence().libelle());
         ecart(ecarts, "Sous-agence", existant.sousAgence(), lu.sousAgence());
         ecart(ecarts, "Segmentation", existant.segmentation(), lu.segmentation());
-        ecart(ecarts, "Ville", existant.ville(), lu.ville());
+        ecart(ecarts, "Région", existant.region(), lu.localisation().getRegion());
+        ecart(ecarts, "Ville", existant.ville(), lu.localisation().getVille());
+        ecart(ecarts, "Commune", existant.commune(), lu.localisation().getCommune());
+        ecart(ecarts, "Tournée", existant.tournee(), lu.localisation().getTournee());
+        ecart(ecarts, "Anniversaire", existant.anniversaire() == null ? null : existant.anniversaire().toString(),
+                lu.anniversaire() == null ? null : lu.anniversaire().toString());
         ecart(ecarts, "Adresse", existant.adresse(), lu.adresse());
         ecart(ecarts, "E-mail", existant.email(), lu.email());
         ecart(ecarts, "Commentaire", existant.commentaire(), lu.commentaire());
@@ -300,10 +326,10 @@ public class ImportClientServiceImpl implements ImportClientService {
 
     private void creer(ClientLu lu) {
         em.createNativeQuery("""
-                insert into crm_client (code, raison_sociale, nom_pharmacien, segmentation, agence_id, sous_agence, ville, adresse, email,
-                                        commentaire, statut, created_at)
-                values (:code, :raisonSociale, :nomPharmacien, :segmentation, :agenceId, :sousAgence, :ville, :adresse, :email,
-                        :commentaire, 'ACTIF', utc_timestamp())
+                insert into crm_client (code, raison_sociale, nom_pharmacien, segmentation, agence_id, sous_agence, region_id, ville_id,
+                                        commune_id, tournee_id, date_anniversaire, adresse, email, commentaire, statut, created_at)
+                values (:code, :raisonSociale, :nomPharmacien, :segmentation, :agenceId, :sousAgence, :regionId, :villeId, :communeId,
+                        :tourneeId, :anniversaire, :adresse, :email, :commentaire, 'ACTIF', utc_timestamp())
                 """)
                 .setParameter("code", lu.code())
                 .setParameter("raisonSociale", lu.raisonSociale())
@@ -311,7 +337,11 @@ public class ImportClientServiceImpl implements ImportClientService {
                 .setParameter("segmentation", lu.segmentation())
                 .setParameter("agenceId", lu.agence().id())
                 .setParameter("sousAgence", lu.sousAgence())
-                .setParameter("ville", lu.ville())
+                .setParameter("regionId", lu.localisation().getRegionId())
+                .setParameter("villeId", lu.localisation().getVilleId())
+                .setParameter("communeId", lu.localisation().getCommuneId())
+                .setParameter("tourneeId", lu.localisation().getTourneeId())
+                .setParameter("anniversaire", lu.anniversaire())
                 .setParameter("adresse", lu.adresse())
                 .setParameter("email", lu.email())
                 .setParameter("commentaire", lu.commentaire())
@@ -325,7 +355,9 @@ public class ImportClientServiceImpl implements ImportClientService {
                 update crm_client set raison_sociale = :raisonSociale, agence_id = :agenceId,
                        nom_pharmacien = coalesce(:nomPharmacien, nom_pharmacien),
                        sous_agence = coalesce(:sousAgence, sous_agence), segmentation = coalesce(:segmentation, segmentation),
-                       ville = coalesce(:ville, ville), adresse = coalesce(:adresse, adresse), email = coalesce(:email, email),
+                       region_id = coalesce(:regionId, region_id), ville_id = coalesce(:villeId, ville_id),
+                       commune_id = coalesce(:communeId, commune_id), tournee_id = coalesce(:tourneeId, tournee_id),
+                       date_anniversaire = coalesce(:anniversaire, date_anniversaire), adresse = coalesce(:adresse, adresse), email = coalesce(:email, email),
                        commentaire = coalesce(:commentaire, commentaire), updated_at = utc_timestamp()
                 where id = :id
                 """)
@@ -334,7 +366,11 @@ public class ImportClientServiceImpl implements ImportClientService {
                 .setParameter("nomPharmacien", lu.nomPharmacien())
                 .setParameter("sousAgence", lu.sousAgence())
                 .setParameter("segmentation", lu.segmentation())
-                .setParameter("ville", lu.ville())
+                .setParameter("regionId", lu.localisation().getRegionId())
+                .setParameter("villeId", lu.localisation().getVilleId())
+                .setParameter("communeId", lu.localisation().getCommuneId())
+                .setParameter("tourneeId", lu.localisation().getTourneeId())
+                .setParameter("anniversaire", lu.anniversaire())
                 .setParameter("adresse", lu.adresse())
                 .setParameter("email", lu.email())
                 .setParameter("commentaire", lu.commentaire())
@@ -413,7 +449,7 @@ public class ImportClientServiceImpl implements ImportClientService {
                 codes.add(code.toUpperCase(Locale.ROOT));
             }
         });
-        return new Contexte(perimetre, agencesParCle, listeAgences, segmentsParCle, listeSegments, chargerExistants(codes),
+        return new Contexte(perimetre, agencesParCle, listeAgences, segmentsParCle, listeSegments, referentielService.resolution(), chargerExistants(codes),
                 parametreService.valeur("whatsapp.prefixe_pays", "225"), new HashMap<>());
     }
 
@@ -427,9 +463,14 @@ public class ImportClientServiceImpl implements ImportClientService {
                     select c.id as id, c.code as code, c.raison_sociale as raisonSociale, c.nom_pharmacien as nomPharmacien,
                            c.agence_id as agenceId,
                            a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.segmentation as segmentation,
-                           c.ville as ville, c.adresse as adresse, c.email as email, c.commentaire as commentaire,
+                           rg.libelle as region, vi.libelle as ville, co.libelle as commune, tr.libelle as tournee,
+                           c.date_anniversaire as anniversaire, c.adresse as adresse, c.email as email, c.commentaire as commentaire,
                            c.statut as statut
                     from crm_client c join crm_agence a on a.id = c.agence_id
+                    left join crm_referentiel rg on rg.id = c.region_id
+                    left join crm_referentiel vi on vi.id = c.ville_id
+                    left join crm_referentiel co on co.id = c.commune_id
+                    left join crm_referentiel tr on tr.id = c.tournee_id
                     where c.code in (:codes)
                     """, Tuple.class).setParameter("codes", lot).getResultList();
             @SuppressWarnings("unchecked")
@@ -462,7 +503,11 @@ public class ImportClientServiceImpl implements ImportClientService {
                 tuple.get("agenceLibelle", String.class),
                 tuple.get("sousAgence", String.class),
                 tuple.get("segmentation", String.class),
+                tuple.get("region", String.class),
                 tuple.get("ville", String.class),
+                tuple.get("commune", String.class),
+                tuple.get("tournee", String.class),
+                tuple.get("anniversaire", LocalDate.class),
                 tuple.get("adresse", String.class),
                 tuple.get("email", String.class),
                 tuple.get("commentaire", String.class),
@@ -481,12 +526,13 @@ public class ImportClientServiceImpl implements ImportClientService {
     record Agence(Long id, String libelle) {
     }
 
-    record ClientLu(String code, String raisonSociale, String nomPharmacien, Agence agence, String sousAgence, String segmentation, String ville,
-            String adresse, String email, String commentaire, Map<String, String> numeros) {
+    record ClientLu(String code, String raisonSociale, String nomPharmacien, Agence agence, String sousAgence, String segmentation,
+            LocalisationDTO localisation, LocalDate anniversaire, String adresse, String email, String commentaire, Map<String, String> numeros) {
     }
 
     record ClientExistant(Long id, String code, String raisonSociale, String nomPharmacien, Long agenceId, String agenceLibelle, String sousAgence,
-            String segmentation, String ville, String adresse, String email, String commentaire, String statut,
+            String segmentation, String region, String ville, String commune, String tournee, LocalDate anniversaire, String adresse,
+            String email, String commentaire, String statut,
             Map<String, String> numeros) {
     }
 
@@ -495,7 +541,7 @@ public class ImportClientServiceImpl implements ImportClientService {
 
     /** Referentiels charges une fois par import ; lignesVues detecte les doublons dans le fichier. */
     record Contexte(PerimetreDTO perimetre, Map<String, Agence> agences, String listeAgences,
-            Map<String, String> segments, String listeSegments,
+            Map<String, String> segments, String listeSegments, ResolutionReferentiels referentiels,
             Map<String, ClientExistant> existants, String prefixePays, Map<String, Integer> lignesVues) {
 
         boolean dansPerimetre(Long agenceId) {

@@ -55,7 +55,7 @@
             <td><a class="ref" [routerLink]="['/clients', c.clientId]">{{ c.raisonSociale }}</a><div class="second">{{ c.code }}</div></td>
             <td>{{ c.nomPharmacien || '—' }}</td>
             <td>{{ c.agenceLibelle }}</td>
-            <td>{{ c.segmentation || '—' }}</td>
+            <td>@if (c.segmentationLibelle) { <app-badge-segment [badge]="c.segmentationBadge" [libelle]="c.segmentationLibelle" /> } @else { — }</td>
             <td class="nw">{{ (c.numeroPrincipal | telephone) || '—' }}</td>
             <td>{{ c.agentNom || 'Sans agent' }}</td>
             <td class="n">{{ c.nbFacturesOuvertes }}</td>

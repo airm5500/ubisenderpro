@@ -24,6 +24,8 @@ public class PortefeuilleClientDTO {
     private Long agenceId;
     private String agenceLibelle;
     private String segmentation;
+    private String segmentationLibelle;
+    private String segmentationBadge;
     private String numeroPrincipal;
     private Long agentId;
     private String agentNom;

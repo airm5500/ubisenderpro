@@ -33,12 +33,18 @@ export interface SousType { id: number; code: string; libelle: string; }
 
 export interface Client {
   id: number; code: string; raisonSociale: string; segmentation: string; segmentationLibelle: string;
-  nomPharmacien: string; ville: string; agenceId: number; agenceLibelle: string; sousAgence: string;
+  segmentationBadge: string | null; nomPharmacien: string; agenceId: number; agenceLibelle: string; sousAgence: string;
+  regionId: number | null; region: string | null; villeId: number | null; ville: string | null; communeId: number | null; commune: string | null;
+  tourneeId: number | null; tournee: string | null; dateAnniversaire: string | null;
   adresse: string; email: string; commentaire: string; numeroPrincipal: string; numeroSecondaire: string; statut: string;
   /** Numeros actifs par role, renseignes sur la fiche client seulement. */
   numeros?: Record<string, string>;
 }
-export interface Segment { code: string; libelle: string; }
+export interface Segment { id?: number; code: string; libelle: string; badge: string; ordre?: number; statut?: string; nbClients?: number; }
+export interface Referentiel {
+  id: number; type: string; code: string | null; libelle: string; parentId: number | null; parentLibelle: string | null;
+  agenceId: number | null; agenceLibelle: string | null; statut: string; nbClients: number; modifiePar: string | null; modifieLe: string | null;
+}
 export interface Indicateurs {
   id: number | null; libelle: string; nbClients: number; nbFactures: number; solde: number; nbEchues: number; soldeEchu: number;
   messagesTentes: number; messagesEnvoyes: number; messagesDistribues: number; messagesLus: number; messagesEchecs: number;
@@ -117,7 +123,7 @@ export interface Agent {
 }
 export interface PortefeuilleClient {
   clientId: number; code: string; raisonSociale: string; nomPharmacien: string; agenceId: number; agenceLibelle: string;
-  segmentation: string; numeroPrincipal: string; agentId: number | null; agentNom: string | null; affecteLe: string | null;
+  segmentation: string; segmentationLibelle: string | null; segmentationBadge: string | null; numeroPrincipal: string; agentId: number | null; agentNom: string | null; affecteLe: string | null;
   nbFacturesOuvertes: number; totalSolde: number; retardMax: number;
 }
 export interface ResultatAffectation { nbTraites: number; nbInchanges: number; refus: string[]; }

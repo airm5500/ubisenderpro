@@ -274,3 +274,11 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .taux strong { font-size: 24px; font-weight: 800; color: var(--bleu); }
 .taux span { font-size: 13px; color: var(--texte-2); }
 @media (max-width: 720px) { .entonnoir .etage { grid-template-columns: 120px minmax(0, 1fr) 70px; } }
+
+/* Badge d'un segment de clients */
+.badge-segment { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; background: #fff; white-space: nowrap; }
+.badge-segment .pi { font-size: 13px; }
+.choix-badges { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.choix-badges button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border: 1px solid var(--bordure); border-radius: 10px; background: #fff; font: inherit; font-size: 11px; cursor: pointer; color: var(--texte-2); }
+.choix-badges button .pi { font-size: 20px; }
+.choix-badges button.choisi { border: 2px solid var(--bleu); color: var(--bleu); font-weight: 700; }

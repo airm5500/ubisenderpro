@@ -13,6 +13,12 @@ import lombok.Setter;
 @AllArgsConstructor
 public class SegmentDTO {
 
+    private Long id;
     private String code;
     private String libelle;
+    /** Badge choisi dans le jeu fixe (COURONNE, TROPHEE, ETOILE...). */
+    private String badge;
+    private int ordre;
+    private String statut;
+    private long nbClients;
 }

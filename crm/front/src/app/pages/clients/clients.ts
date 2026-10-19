@@ -10,9 +10,10 @@ import { Agent, Page, PortefeuilleClient } from '../../core/modeles';
 import { MontantPipe, TelephonePipe } from '../../core/format';
 import { ClientFormulaire } from './client-formulaire';
 
+import { BadgeSegment } from '../../core/badges';
 @Component({
   selector: 'app-clients',
-  imports: [FormsModule, AsyncPipe, RouterLink, MontantPipe, TelephonePipe, ClientFormulaire],
+  imports: [FormsModule, AsyncPipe, RouterLink, MontantPipe, TelephonePipe, ClientFormulaire, BadgeSegment],
   templateUrl: './clients.html'
 })
 export class Clients implements OnInit {

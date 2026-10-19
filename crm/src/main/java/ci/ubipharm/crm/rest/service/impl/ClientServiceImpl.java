@@ -6,12 +6,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.ClientService;
 import ci.ubipharm.crm.rest.service.ParametreService;
+import ci.ubipharm.crm.rest.service.ReferentielService;
+import ci.ubipharm.crm.rest.service.dto.LocalisationDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientDTO;
 import ci.ubipharm.crm.rest.service.dto.ClientDemandeDTO;
@@ -34,7 +37,10 @@ public class ClientServiceImpl implements ClientService {
     private static final String SELECT = """
             select c.id as id, c.code as code, c.raison_sociale as raisonSociale,
                    c.segmentation as segmentation, sg.libelle as segmentationLibelle,
-                   c.nom_pharmacien as nomPharmacien, c.ville as ville, c.statut as statut,
+                   sg.badge as segmentationBadge, c.nom_pharmacien as nomPharmacien, c.statut as statut,
+                   c.region_id as regionId, rg.libelle as region, c.ville_id as villeId, vi.libelle as ville,
+                   c.commune_id as communeId, co.libelle as commune, c.tournee_id as tourneeId, tr.libelle as tournee,
+                   c.date_anniversaire as dateAnniversaire,
                    a.id as agenceId, a.libelle as agenceLibelle, c.sous_agence as sousAgence, c.adresse as adresse,
                    c.email as email, c.commentaire as commentaire,
                    (select ct.numero_whatsapp from crm_contact ct
@@ -46,6 +52,10 @@ public class ClientServiceImpl implements ClientService {
             from crm_client c
             join crm_agence a on a.id = c.agence_id
             left join crm_segment sg on sg.code = c.segmentation
+            left join crm_referentiel rg on rg.id = c.region_id
+            left join crm_referentiel vi on vi.id = c.ville_id
+            left join crm_referentiel co on co.id = c.commune_id
+            left join crm_referentiel tr on tr.id = c.tournee_id
             """;
 
     private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
@@ -53,6 +63,7 @@ public class ClientServiceImpl implements ClientService {
     private final EntityManager em;
     private final PerimetreService perimetreService;
     private final ParametreService parametreService;
+    private final ReferentielService referentielService;
     private final JournalActionService journalActionService;
 
     @Override
@@ -139,20 +150,19 @@ public class ClientServiceImpl implements ClientService {
         if (homonymes.longValue() > 0) {
             throw new ErreurMetierException("Le numéro de compte " + code + " existe déjà.");
         }
-        Saisie saisie = verifier(demande);
-        em.createNativeQuery("""
-                insert into crm_client (code, raison_sociale, nom_pharmacien, segmentation, agence_id, sous_agence, ville, adresse, email,
-                                        commentaire, statut, created_at)
-                values (:code, :raisonSociale, :nomPharmacien, :segmentation, :agenceId, :sousAgence, :ville, :adresse, :email,
-                        :commentaire, 'ACTIF', utc_timestamp())
-                """)
+        Saisie saisie = verifier(demande, Set.of());
+        localiser(em.createNativeQuery("""
+                insert into crm_client (code, raison_sociale, nom_pharmacien, segmentation, agence_id, sous_agence, region_id, ville_id,
+                                        commune_id, tournee_id, date_anniversaire, adresse, email, commentaire, statut, created_at)
+                values (:code, :raisonSociale, :nomPharmacien, :segmentation, :agenceId, :sousAgence, :regionId, :villeId, :communeId,
+                        :tourneeId, :dateAnniversaire, :adresse, :email, :commentaire, 'ACTIF', utc_timestamp())
+                """), saisie)
                 .setParameter("code", code)
                 .setParameter("raisonSociale", saisie.raisonSociale())
                 .setParameter("nomPharmacien", saisie.nomPharmacien())
                 .setParameter("segmentation", saisie.segmentation())
                 .setParameter("agenceId", demande.getAgenceId())
                 .setParameter("sousAgence", saisie.sousAgence())
-                .setParameter("ville", saisie.ville())
                 .setParameter("adresse", saisie.adresse())
                 .setParameter("email", saisie.email())
                 .setParameter("commentaire", saisie.commentaire())
@@ -170,19 +180,22 @@ public class ClientServiceImpl implements ClientService {
         if ("ARCHIVE".equals(avant.getStatut())) {
             throw new ErreurMetierException("Ce client est archivé.");
         }
-        Saisie saisie = verifier(demande);
-        em.createNativeQuery("""
+        Set<Long> dejaPortes = new java.util.HashSet<>();
+        java.util.stream.Stream.of(avant.getRegionId(), avant.getVilleId(), avant.getCommuneId(), avant.getTourneeId())
+                .filter(Objects::nonNull).forEach(dejaPortes::add);
+        Saisie saisie = verifier(demande, dejaPortes);
+        localiser(em.createNativeQuery("""
                 update crm_client set raison_sociale = :raisonSociale, nom_pharmacien = :nomPharmacien, segmentation = :segmentation,
-                       agence_id = :agenceId, sous_agence = :sousAgence, ville = :ville, adresse = :adresse, email = :email,
-                       commentaire = :commentaire, updated_at = utc_timestamp()
+                       agence_id = :agenceId, sous_agence = :sousAgence, region_id = :regionId, ville_id = :villeId,
+                       commune_id = :communeId, tournee_id = :tourneeId, date_anniversaire = :dateAnniversaire, adresse = :adresse,
+                       email = :email, commentaire = :commentaire, updated_at = utc_timestamp()
                 where id = :id
-                """)
+                """), saisie)
                 .setParameter("raisonSociale", saisie.raisonSociale())
                 .setParameter("nomPharmacien", saisie.nomPharmacien())
                 .setParameter("segmentation", saisie.segmentation())
                 .setParameter("agenceId", demande.getAgenceId())
                 .setParameter("sousAgence", saisie.sousAgence())
-                .setParameter("ville", saisie.ville())
                 .setParameter("adresse", saisie.adresse())
                 .setParameter("email", saisie.email())
                 .setParameter("commentaire", saisie.commentaire())
@@ -195,7 +208,12 @@ public class ClientServiceImpl implements ClientService {
         ecart(ecarts, "Agence", String.valueOf(avant.getAgenceId()), String.valueOf(demande.getAgenceId()));
         ecart(ecarts, "Sous-agence", avant.getSousAgence(), saisie.sousAgence());
         ecart(ecarts, "Segment", avant.getSegmentation(), saisie.segmentation());
-        ecart(ecarts, "Ville", avant.getVille(), saisie.ville());
+        ecart(ecarts, "Région", avant.getRegion(), saisie.localisation().getRegion());
+        ecart(ecarts, "Ville", avant.getVille(), saisie.localisation().getVille());
+        ecart(ecarts, "Commune", avant.getCommune(), saisie.localisation().getCommune());
+        ecart(ecarts, "Tournée", avant.getTournee(), saisie.localisation().getTournee());
+        ecart(ecarts, "Anniversaire", avant.getDateAnniversaire() == null ? null : avant.getDateAnniversaire().toString(),
+                saisie.dateAnniversaire() == null ? null : saisie.dateAnniversaire().toString());
         ecart(ecarts, "Adresse", avant.getAdresse(), saisie.adresse());
         ecart(ecarts, "E-mail", avant.getEmail(), saisie.email());
         ecart(ecarts, "Commentaire", avant.getCommentaire(), saisie.commentaire());
@@ -223,17 +241,26 @@ public class ClientServiceImpl implements ClientService {
     @Transactional(readOnly = true)
     public List<SegmentDTO> segments() {
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery("select code as code, libelle as libelle from crm_segment where statut = 'ACTIF' order by ordre, code",
+        List<Tuple> lignes = em.createNativeQuery("select code as code, libelle as libelle, badge as badge from crm_segment where statut = 'ACTIF' order by ordre, code",
                 Tuple.class).getResultList();
-        return lignes.stream().map(t -> SegmentDTO.builder().code(t.get("code", String.class)).libelle(t.get("libelle", String.class)).build()).toList();
+        return lignes.stream().map(t -> SegmentDTO.builder().code(t.get("code", String.class)).libelle(t.get("libelle", String.class))
+                .badge(t.get("badge", String.class)).build()).toList();
     }
 
-    private record Saisie(String raisonSociale, String nomPharmacien, String segmentation, String sousAgence, String ville, String adresse,
-                          String email, String commentaire, Map<String, String> numeros) {
+    private record Saisie(String raisonSociale, String nomPharmacien, String segmentation, String sousAgence, LocalisationDTO localisation,
+                          java.time.LocalDate dateAnniversaire, String adresse, String email, String commentaire, Map<String, String> numeros) {
+    }
+
+    private Query localiser(Query requete, Saisie saisie) {
+        return requete.setParameter("regionId", saisie.localisation().getRegionId())
+                .setParameter("villeId", saisie.localisation().getVilleId())
+                .setParameter("communeId", saisie.localisation().getCommuneId())
+                .setParameter("tourneeId", saisie.localisation().getTourneeId())
+                .setParameter("dateAnniversaire", saisie.dateAnniversaire());
     }
 
     /** Memes controles que l'import : agence du perimetre, segment connu, numeros a 10 chiffres, e-mail valide. */
-    private Saisie verifier(ClientDemandeDTO demande) {
+    private Saisie verifier(ClientDemandeDTO demande, Set<Long> dejaPortes) {
         List<String> motifs = new ArrayList<>();
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         Number agence = (Number) em.createNativeQuery("select count(*) from crm_agence where id = :id and statut = 'ACTIF'")
@@ -246,6 +273,12 @@ public class ClientServiceImpl implements ClientService {
         String segment = vide(demande.getSegmentation());
         if (segment != null && segments().stream().noneMatch(sg -> sg.getCode().equals(segment))) {
             motifs.add("Segment inconnu : " + segment + ".");
+        }
+        LocalisationDTO localisation = referentielService.resolution().parIdentifiants(demande.getRegionId(), demande.getVilleId(),
+                demande.getCommuneId(), demande.getTourneeId(), demande.getAgenceId(), dejaPortes, motifs);
+        java.time.LocalDate anniversaire = demande.getDateAnniversaire();
+        if (anniversaire != null && (anniversaire.isAfter(java.time.LocalDate.now()) || anniversaire.getYear() < 1900)) {
+            motifs.add("Date d'anniversaire invalide.");
         }
         String email = vide(demande.getEmail());
         if (email != null && !EMAIL.matcher(email).matches()) {
@@ -267,7 +300,7 @@ public class ClientServiceImpl implements ClientService {
             throw new ErreurMetierException(String.join(" ", motifs));
         }
         return new Saisie(demande.getRaisonSociale().trim(), vide(demande.getNomPharmacien()), segment,
-                vide(demande.getSousAgence()) == null ? null : demande.getSousAgence().trim().toUpperCase(Locale.ROOT), vide(demande.getVille()),
+                vide(demande.getSousAgence()) == null ? null : demande.getSousAgence().trim().toUpperCase(Locale.ROOT), localisation, anniversaire,
                 vide(demande.getAdresse()), email == null ? null : email.toLowerCase(Locale.ROOT), vide(demande.getCommentaire()), numeros);
     }
 
@@ -314,7 +347,16 @@ public class ClientServiceImpl implements ClientService {
                 .segmentation(tuple.get("segmentation", String.class))
                 .segmentationLibelle(tuple.get("segmentationLibelle", String.class))
                 .nomPharmacien(tuple.get("nomPharmacien", String.class))
+                .segmentationBadge(tuple.get("segmentationBadge", String.class))
+                .regionId(tuple.get("regionId") == null ? null : ((Number) tuple.get("regionId")).longValue())
+                .region(tuple.get("region", String.class))
+                .villeId(tuple.get("villeId") == null ? null : ((Number) tuple.get("villeId")).longValue())
                 .ville(tuple.get("ville", String.class))
+                .communeId(tuple.get("communeId") == null ? null : ((Number) tuple.get("communeId")).longValue())
+                .commune(tuple.get("commune", String.class))
+                .tourneeId(tuple.get("tourneeId") == null ? null : ((Number) tuple.get("tourneeId")).longValue())
+                .tournee(tuple.get("tournee", String.class))
+                .dateAnniversaire(tuple.get("dateAnniversaire", java.time.LocalDate.class))
                 .statut(tuple.get("statut", String.class))
                 .agenceId(tuple.get("agenceId", Long.class))
                 .agenceLibelle(tuple.get("agenceLibelle", String.class))

@@ -3,8 +3,9 @@
   @if (client(); as c) {
     <div class="entete">
       <div>
-        <h1>{{ c.raisonSociale }}</h1>
-        <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.segmentationLibelle ? ' · segment ' + c.segmentationLibelle : '' }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
+        <h1 style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">{{ c.raisonSociale }}
+          <app-badge-segment [badge]="c.segmentationBadge" [libelle]="c.segmentationLibelle" /></h1>
+        <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
       </div>
       <div class="actions">
         @if (auth.peut('CLIENTS_GERER') && c.statut !== 'ARCHIVE') { <button class="bs" type="button" (click)="modification.set(true)">Modifier</button> }
@@ -24,6 +25,13 @@
       <div class="kv"><span>WhatsApp principal</span><strong>{{ (c.numeroPrincipal | telephone) || 'Non renseigné' }}</strong></div>
       <div class="kv"><span>Second numéro</span><strong>{{ (c.numeroSecondaire | telephone) || '—' }}</strong></div>
       <div class="kv"><span>E-mail</span><strong>{{ c.email || '—' }}</strong></div>
+    </div>
+    <div class="kvs bandeau">
+      <div class="kv"><span>Région</span><strong>{{ c.region || '—' }}</strong></div>
+      <div class="kv"><span>Ville</span><strong>{{ c.ville || '—' }}</strong></div>
+      <div class="kv"><span>Commune</span><strong>{{ c.commune || '—' }}</strong></div>
+      <div class="kv"><span>Tournée</span><strong>{{ c.tournee || '—' }}</strong></div>
+      <div class="kv"><span>Anniversaire</span><strong>{{ c.dateAnniversaire ? (c.dateAnniversaire | jour) : '—' }}</strong></div>
     </div>
     @if (!c.numeroPrincipal) {
       <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ce client n'a pas de numéro WhatsApp : il sera exclu des campagnes tant qu'on ne l'aura pas complété (Modifier, ou un import).</span></div>

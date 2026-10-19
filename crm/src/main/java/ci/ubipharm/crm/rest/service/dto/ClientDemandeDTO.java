@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service.dto;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 import jakarta.validation.constraints.NotBlank;
@@ -37,8 +38,14 @@ public class ClientDemandeDTO {
     @Size(max = 255, message = "Le nom du pharmacien tient en 255 caractères.")
     private String nomPharmacien;
 
-    @Size(max = 100, message = "La ville tient en 100 caractères.")
-    private String ville;
+    /** Choisis dans les referentiels ; la commune donne sa ville, la ville sa region. */
+    private Long regionId;
+    private Long villeId;
+    private Long communeId;
+    /** Tournee de livraison, desservie par l'agence du client. */
+    private Long tourneeId;
+
+    private LocalDate dateAnniversaire;
 
     @Size(max = 255, message = "L'adresse tient en 255 caractères.")
     private String adresse;

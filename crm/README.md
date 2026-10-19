@@ -639,6 +639,19 @@ Ecran Parametres (droit `PARAMETRES`), migrations V1.3.4 et V1.3.5.
   dans le repertoire choisi, classe par type puis par mois (ou l'inverse). Un repertoire absent ou invalide n'empeche jamais l'action :
   l'echec est seulement trace dans le journal du serveur.
 
+## Referentiels des clients et badges des segments
+
+Parametres > Referentiels (droit `REFERENTIELS`, donne aux roles qui gerent les agences), migration V1.3.6.
+
+- Agences, regions (31 regions et 2 districts autonomes livres), villes (34 livrees, rattachees a leur region), communes
+  (les 13 d'Abidjan livrees, chacune dans sa ville), tournees (chacune desservie par une agence) et segments.
+- La fiche client choisit region, ville, commune et tournee dans ces listes (plus de ville en texte libre) et porte la date
+  d'anniversaire. La commune donne sa ville, la ville sa region ; une tournee doit etre celle de l'agence du client.
+- L'import des clients lit les colonnes Region, Ville, Commune, Tournee et Date d'anniversaire et les compare aux listes, sans tenir
+  compte des accents ni des majuscules ; une valeur inconnue ou incoherente rejette la ligne avec son motif.
+- Chaque segment porte un badge choisi parmi 12 (couronne, trophee, etoile...), affiche sur la fiche et la liste des clients.
+- Rien ne se supprime : une entree archivee reste sur les clients qui la portent mais ne se choisit plus.
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

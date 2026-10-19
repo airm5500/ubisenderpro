@@ -5,6 +5,9 @@ import { Api } from '../../core/api';
 import { Parametre } from '../../core/modeles';
 import { JourPipe } from '../../core/format';
 import { Charte, CharteService } from '../../core/charte';
+import { Auth } from '../../core/auth';
+import { ReferentielsListe, TypeReferentiel } from '../referentiels/referentiels';
+import { Agences } from '../agences/agences';
 
 const CATEGORIES: [string, string, string][] = [
   ['GENERAL', 'Général', "Nom de l'application, adresse publique HTTPS du CRM et coordonnées de l'entreprise citées dans les messages."],
@@ -20,23 +23,37 @@ const CATEGORIES: [string, string, string][] = [
   ['MARKETING', 'Marketing', 'Désabonnement des clients par une réponse WhatsApp.']
 ];
 
+/** Listes de reference tenues dans les Parametres (droit Referentiels). */
+const REFERENTIELS: [string, string, string][] = [
+  ['AGENCES', 'Agences', ''],
+  ['REGION', 'Régions', 'Régions et districts autonomes.'],
+  ['VILLE', 'Villes', 'Villes et leur région.'],
+  ['COMMUNE', 'Communes', 'Communes et leur ville.'],
+  ['TOURNEE', 'Tournées', 'Tournées de livraison et leur agence.'],
+  ['SEGMENT', 'Segments', 'Segments de clients et leur badge.']
+];
+
 /** Parametres de l'application, par categorie ; seuls ceux qui ont change sont envoyes. */
 @Component({
   selector: 'app-parametres',
-  imports: [FormsModule, JourPipe],
+  imports: [FormsModule, JourPipe, ReferentielsListe, Agences],
   templateUrl: './parametres.html'
 })
 export class Parametres implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly charteService = inject(CharteService);
+  protected readonly auth = inject(Auth);
+  protected readonly referentiels = REFERENTIELS;
 
   protected readonly parametres = signal<Parametre[]>([]);
   protected readonly categorie = signal('GENERAL');
   protected saisies: Record<string, string | number | null> = {};
 
   protected readonly categories = computed(() => CATEGORIES.filter(([code]) => code === 'CHARTE' || this.parametres().some(p => p.categorie === code)));
-  protected readonly courante = computed(() => CATEGORIES.find(([code]) => code === this.categorie()));
+  protected readonly courante = computed(() => [...CATEGORIES, ...REFERENTIELS].find(([code]) => code === this.categorie()));
+  protected readonly typeReferentiel = computed(() => this.categorie() as TypeReferentiel);
+  protected readonly estReferentiel = computed(() => REFERENTIELS.some(([code]) => code === this.categorie()));
   protected readonly liste = computed(() => this.parametres().filter(p => p.categorie === this.categorie()));
 
   ngOnInit(): void {

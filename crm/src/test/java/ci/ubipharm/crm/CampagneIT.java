@@ -87,11 +87,11 @@ class CampagneIT extends IntegrationBase {
 
         // Une colonne de la base devient une variable sans developpement
         mvc.perform(get("/api/recouvrement/variables/sources").session(admin))
-                .andExpect(jsonPath("$[?(@.source == 'client.ville')]", hasSize(1)))
+                .andExpect(jsonPath("$[?(@.source == 'client.adresse')]", hasSize(1)))
                 .andExpect(jsonPath("$[?(@.source == 'client.id')]", hasSize(0)));
-        variable("ville", "client.ville").andExpect(status().isOk());
+        variable("adresse_client", "client.adresse").andExpect(status().isOk());
         variable("pirate", "client.mot_de_passe; drop table x").andExpect(status().isBadRequest());
-        creerModele(admin, "Avec ville", "PERSONNALISEE", "Agence de {ville}").andExpect(status().isOk());
+        creerModele(admin, "Avec adresse", "PERSONNALISEE", "Livraison au {adresse_client}").andExpect(status().isOk());
 
         Long idSolde = id("crm_variable_message", "code", "solde");
         mvc.perform(post("/api/recouvrement/variables/" + idSolde + "/archivage").session(admin).with(csrf()))
@@ -462,8 +462,8 @@ class CampagneIT extends IntegrationBase {
     }
 
     private Long client(String code, String pharmacien, String numero) {
-        jdbc.update("insert into crm_client (code, raison_sociale, nom_pharmacien, agence_id, ville, created_at) "
-                + "values (?, ?, ?, ?, 'Abidjan', utc_timestamp())", code, "Pharmacie " + code, pharmacien, YOPOUGON);
+        jdbc.update("insert into crm_client (code, raison_sociale, nom_pharmacien, agence_id, created_at) "
+                + "values (?, ?, ?, ?, utc_timestamp())", code, "Pharmacie " + code, pharmacien, YOPOUGON);
         Long id = id("crm_client", "code", code);
         if (numero != null) {
             jdbc.update("insert into crm_contact (client_id, nom, fonction, numero_whatsapp, rang, created_at) "

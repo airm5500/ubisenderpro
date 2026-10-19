@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -17,6 +17,9 @@ interface Edition { code: string; codeImport: string; libelle: string; }
 export class Agences implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
+
+  /** Affichee dans les Parametres, sous Referentiels. */
+  readonly integre = input(false);
 
   protected readonly agences = signal<AgenceGestion[] | null>(null);
   protected readonly archives = signal(false);
