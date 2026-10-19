@@ -1,6 +1,7 @@
 package ci.ubipharm.crm.rest.service.impl;
 
 import java.util.LinkedHashSet;
+import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -24,6 +25,18 @@ final class GabaritMessage {
             codes.add(m.group(1));
         }
         return codes;
+    }
+
+    /**
+     * Valeurs des variables citees, dans leur ordre d'apparition et une par ligne : les parametres {{1}}, {{2}}... d'un modele
+     * approuve par Meta. Meta refuse un parametre vide, multiligne ou avec plus de quatre espaces de suite.
+     */
+    static String parametres(String contenu, Map<String, String> valeurs) {
+        return variables(contenu).stream().map(code -> {
+            String valeur = valeurs.getOrDefault(code, "");
+            String nette = valeur == null ? "" : valeur.replaceAll("\\s*\\R\\s*", " · ").replaceAll("\\s+", " ").strip();
+            return nette.isEmpty() ? "-" : nette;
+        }).collect(Collectors.joining("\n"));
     }
 
     /** Remplace chaque {code} par sa valeur ; une variable sans valeur devient vide. */

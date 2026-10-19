@@ -35,4 +35,15 @@ public class ModeleMessageDemandeDTO {
     @NotBlank(message = "Saisissez le texte du message.")
     @Size(max = 4000, message = "Le message ne peut pas dépasser 4000 caractères.")
     private String contenu;
+
+    /** Nom du modele approuve par Meta (API officielle, hors fenetre de 24 h) ; {{1}}, {{2}}... = variables dans l'ordre. */
+    @Pattern(regexp = "[a-z0-9_]{1,512}", message = "Le nom du modèle Meta s'écrit en minuscules, chiffres et _ (ex. relance_echeance).")
+    private String metaModele;
+
+    @Pattern(regexp = "[a-z]{2,3}(_[A-Z]{2})?", message = "La langue du modèle Meta s'écrit comme fr ou fr_FR.")
+    private String metaLangue;
+
+    /** AUCUN, IMAGE ou DOCUMENT : en-tete du modele Meta, rempli par la premiere piece jointe de ce type. */
+    @Pattern(regexp = "AUCUN|IMAGE|DOCUMENT", message = "En-tête du modèle Meta inconnu.")
+    private String metaEntete;
 }

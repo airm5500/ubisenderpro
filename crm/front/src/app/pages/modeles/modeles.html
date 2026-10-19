@@ -41,11 +41,9 @@
           <h2 class="h2">{{ choisi() ? 'Modifier « ' + choisi()!.nom + ' »' : 'Nouveau modèle' }}</h2>
           <div class="grille">
             <label class="f large">Nom<input class="sel" [(ngModel)]="edition.nom" [placeholder]="marketing() ? 'Ex. Promotion du mois' : 'Ex. Après échéance · Normal'"></label>
-            @if (!marketing()) {
-              <label class="f">Type de relance
-                <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types(); track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
-              </label>
-            }
+            <label class="f">{{ marketing() ? 'Usage' : 'Type de relance' }}
+              <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types(); track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
+            </label>
           </div>
           <div class="f">Canal d'envoi
             <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
@@ -58,11 +56,29 @@
             <label class="f">Objet de l'e-mail<input class="sel" [(ngModel)]="edition.objet" (ngModelChange)="objet.set($event)" maxlength="200" [placeholder]="marketing() ? 'Ex. Offre du mois pour {nom_pharmacie}' : 'Ex. Facture {reference_facture} échue'"></label>
           }
           <div class="f">Variables disponibles <span class="discret">(cliquez pour insérer)</span>
-            <div class="chips">@for (v of variables(); track v.id) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
+            <div class="chips">@for (v of insertables(); track v.id) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
           </div>
           <label class="f">Message<textarea #zone class="sel" [style.min-height]="edition.canal === 'SMS' ? '110px' : '200px'" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)" [attr.maxlength]="edition.canal === 'SMS' ? 612 : null"></textarea></label>
           @if (edition.canal === 'SMS') {
             <p class="discret" style="margin: -6px 0 0">Le client ne peut pas répondre à un SMS : indiquez plutôt {{ marketing() ? 'votre numéro avec la variable {expediteur_numero}' : 'le numéro de son agent avec la variable {agent_numero}' }}.</p>
+          }
+          @if (edition.canal === 'WHATSAPP') {
+            <details class="f">
+              <summary>API officielle Meta (facultatif) @if (edition.metaModele) { · {{ edition.metaModele }} }</summary>
+              <p class="discret">Pour un numéro passé à l'API officielle : hors des 24 h qui suivent une réponse du client, seul le modèle approuvé par Meta part.
+                Ses paramètres reprennent les variables de ce message, dans l'ordre :
+                @for (v of ordreMeta(); track v) { <span class="tag">{{ v }}</span> }
+                @if (!ordreMeta().length) { aucun paramètre. }</p>
+              <div class="grille">
+                <label class="f">Nom du modèle approuvé<input class="sel" [(ngModel)]="edition.metaModele" placeholder="Ex. relance_apres_echeance"></label>
+                <label class="f">Langue<input class="sel" [(ngModel)]="edition.metaLangue" placeholder="fr"></label>
+                <label class="f">En-tête du modèle
+                  <select class="sel" [(ngModel)]="edition.metaEntete">
+                    <option value="AUCUN">Aucun</option><option value="IMAGE">Image (affiche ou logo joint)</option><option value="DOCUMENT">Document joint</option>
+                  </select>
+                </label>
+              </div>
+            </details>
           }
           <div class="actions">
             <button class="bs" (click)="enEdition.set(false)">Annuler</button>

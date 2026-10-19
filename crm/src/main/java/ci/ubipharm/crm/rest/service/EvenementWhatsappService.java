@@ -17,4 +17,7 @@ public interface EvenementWhatsappService {
 
     /** Garde une copie de la reponse, rattachee au client et a sa derniere relance. */
     void message(EvenementMessageDTO evenement);
+
+    /** Message refuse apres coup (API officielle) : il passe en echec avec le motif donne. */
+    void echec(String numero, String identifiant, String motif);
 }

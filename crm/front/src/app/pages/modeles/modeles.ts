@@ -40,8 +40,14 @@ export class Modeles implements OnInit {
   protected readonly sources = signal<SourceVariable[]>([]);
   protected readonly choisi = signal<ModeleMessage | null>(null);
   protected readonly enEdition = signal(false);
-  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
+  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '', metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
   protected readonly contenu = signal('');
+  /** Variables qu'un modele de relance peut citer : ni promotion, ni produit disponible, ni evenement (Marketing). */
+  protected readonly insertables = computed(() => this.marketing() ? this.variables()
+    : this.variables().filter(v => !/^calcul\.(promotion_|produits_|evenement_)/.test(v.source)));
+  /** Parametres {{1}}, {{2}}... du modele Meta : les variables du message, dans leur ordre d'apparition. */
+  protected readonly ordreMeta = computed(() => [...new Set([...this.contenu().matchAll(/\{([a-z][a-z0-9_]*)\}/g)].map(m => m[1]))]
+    .map((v, i) => `{{${i + 1}}} = ${v}`));
   protected readonly objet = signal('');
   /** Canal du modele affiche ou edite : l'apercu change de forme (bulle WhatsApp ou e-mail). */
   protected readonly canalApercu = signal('WHATSAPP');
@@ -100,7 +106,8 @@ export class Modeles implements OnInit {
 
   nouveau(): void {
     this.choisi.set(null);
-    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '' };
+    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '',
+      metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
     this.contenu.set('');
     this.objet.set('');
     this.canalApercu.set('WHATSAPP');
@@ -108,7 +115,8 @@ export class Modeles implements OnInit {
   }
 
   modifier(m: ModeleMessage): void {
-    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, canal: m.canal, objet: m.objet ?? '', contenu: m.contenu };
+    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, canal: m.canal, objet: m.objet ?? '', contenu: m.contenu,
+      metaModele: m.metaModele ?? '', metaLangue: m.metaLangue ?? 'fr', metaEntete: m.metaEntete ?? 'AUCUN' };
     this.contenu.set(m.contenu);
     this.objet.set(m.objet ?? '');
     this.canalApercu.set(m.canal);
@@ -126,11 +134,17 @@ export class Modeles implements OnInit {
     setTimeout(() => { zone?.focus(); zone?.setSelectionRange(debut + code.length + 2, debut + code.length + 2); });
   }
 
+  /** Champs Meta vides : envoyes absents, pour ne pas etre refuses par les controles de format. */
+  private corps(): object {
+    const e = this.edition;
+    return { ...e, metaModele: e.metaModele.trim() || null, metaLangue: e.metaLangue.trim() || null };
+  }
+
   enregistrer(): void {
     const m = this.choisi();
     const requete = m
-      ? this.api.put<ModeleMessage>(`${this.base()}/${m.id}`, this.edition)
-      : this.api.post<ModeleMessage>(this.base(), this.edition);
+      ? this.api.put<ModeleMessage>(`${this.base()}/${m.id}`, this.corps())
+      : this.api.post<ModeleMessage>(this.base(), this.corps());
     requete.subscribe(enregistre => {
       this.messages.add({ severity: 'success', summary: 'Modèle enregistré', detail: enregistre.nom });
       this.enEdition.set(false);

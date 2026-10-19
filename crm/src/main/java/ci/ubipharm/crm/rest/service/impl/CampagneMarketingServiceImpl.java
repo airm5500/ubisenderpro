@@ -507,13 +507,14 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .addValue("emailReponse", l.message().getEmailReponse())
                 .addValue("objet", l.message().getObjet())
                 .addValue("contenu", l.message().getContenu())
+                .addValue("parametres", l.message().getParametres())
                 .addValue("statut", l.message().getStatut())
                 .addValue("motif", l.message().getMotif())).toArray(SqlParameterSource[]::new);
         jdbc.batchUpdate("""
                 insert into crm_campagne_message (campagne_id, execution, facture_id, client_id, canal, contact_id, numero_destinataire, email_destinataire,
-                                                  numero_expediteur, email_reponse, objet, contenu, statut, motif, created_at)
+                                                  numero_expediteur, email_reponse, objet, contenu, parametres, statut, motif, created_at)
                 values (:campagneId, :execution, null, :clientId, :canal, :contactId, :numeroDestinataire, :emailDestinataire,
-                        :numeroExpediteur, :emailReponse, :objet, :contenu, :statut, :motif, utc_timestamp())
+                        :numeroExpediteur, :emailReponse, :objet, :contenu, :parametres, :statut, :motif, utc_timestamp())
                 """, lots);
     }
 
@@ -644,6 +645,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .emailReponse(email ? campagne.emailAuteur() : null)
                 .objet(motif == null && email ? GabaritMessage.rendre(campagne.objet(), valeurs) : null)
                 .contenu(motif == null ? GabaritMessage.rendre(campagne.contenu(), valeurs) : null)
+                .parametres(motif == null && !email ? GabaritMessage.parametres(campagne.contenu(), valeurs) : null)
                 .statut(motif == null ? A_ENVOYER : EXCLU)
                 .motif(motif)
                 .build();

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
 import ci.ubipharm.crm.rest.service.ParametreService;
+import ci.ubipharm.crm.rest.service.PasserelleMetaService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.PieceJointeService;
 import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
@@ -37,6 +39,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final PasserelleWhatsappService passerelle;
+    private final PasserelleMetaService passerelleMeta;
     private final ParametreService parametreService;
     private final SuiviEnvoiService suiviEnvoi;
     private final PieceJointeService pieceJointeService;
@@ -45,7 +48,14 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     private final Map<String, Instant> prochainEnvoi = new ConcurrentHashMap<>();
 
     private record Message(Long id, Long campagneId, Long factureId, String numeroExpediteur, String numeroDestinataire, String contenu,
-            int tentatives) {
+            int tentatives, String parametres, String modeleNom, String metaModele, String metaLangue, String metaEntete) {
+    }
+
+    /** Envoi libre (texte, image, document) par WhatsApp Web ou, dans la fenetre de 24 h, par l'API officielle. */
+    private interface Canal {
+        ResultatEnvoiDTO texte(String destinataire, String texte);
+
+        ResultatEnvoiDTO fichier(String destinataire, FichierDTO fichier, String legende);
     }
 
     @Override
@@ -77,7 +87,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             if (message == null) {
                 continue;
             }
-            ResultatEnvoiDTO resultat = envoyer(numero, message);
+            ResultatEnvoiDTO resultat = envoyer(numero, phoneNumberIdMeta(numero), message);
             transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
             prochainEnvoi.put(numero, Instant.now().plusSeconds(attente()));
             envoyes++;
@@ -90,26 +100,101 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
      * l'affiche puis le texte. La liste des produits suit en document. Le message compte comme envoye des que son texte
      * est parti ; une piece jointe perdue ensuite est signalee dans son motif, sans renvoyer le texte.
      */
-    private ResultatEnvoiDTO envoyer(String numero, Message message) {
+    private ResultatEnvoiDTO envoyer(String numero, String phoneNumberId, Message message) {
         List<FichierDTO> reste = new ArrayList<>(pieceJointeService.piecesDeCampagne(message.campagneId()));
+        if (phoneNumberId == null) {
+            return envoyerLibre(new Canal() {
+                @Override
+                public ResultatEnvoiDTO texte(String destinataire, String texte) {
+                    return passerelle.envoyerTexte(numero, destinataire, texte);
+                }
+
+                @Override
+                public ResultatEnvoiDTO fichier(String destinataire, FichierDTO fichier, String legende) {
+                    return passerelle.envoyerFichier(numero, destinataire, fichier, legende);
+                }
+            }, message, reste);
+        }
+        if (fenetreOuverte(numero, message.numeroDestinataire())) {
+            return envoyerLibre(new Canal() {
+                @Override
+                public ResultatEnvoiDTO texte(String destinataire, String texte) {
+                    return passerelleMeta.envoyerTexte(phoneNumberId, destinataire, texte);
+                }
+
+                @Override
+                public ResultatEnvoiDTO fichier(String destinataire, FichierDTO fichier, String legende) {
+                    return passerelleMeta.envoyerFichier(phoneNumberId, destinataire, fichier, legende);
+                }
+            }, message, reste);
+        }
+        return envoyerModeleMeta(phoneNumberId, message, reste);
+    }
+
+    /**
+     * Hors de la fenetre de 24 h, Meta n'accepte qu'un modele approuve : ses parametres sont les variables du message, son
+     * en-tete la premiere piece jointe du bon type. Les autres pieces jointes ne peuvent pas partir.
+     */
+    private ResultatEnvoiDTO envoyerModeleMeta(String phoneNumberId, Message message, List<FichierDTO> reste) {
+        if (message.metaModele() == null) {
+            return ResultatEnvoiDTO.builder().erreur("Hors des 24 h qui suivent une réponse du client, Meta n'accepte qu'un modèle approuvé : "
+                    + "renseignez le modèle Meta de « " + message.modeleNom() + " »").build();
+        }
+        FichierDTO entete = null;
+        if (!"AUCUN".equals(message.metaEntete())) {
+            boolean image = "IMAGE".equals(message.metaEntete());
+            entete = reste.stream().filter(f -> f.getTypeContenu().startsWith("image/") == image).findFirst().orElse(null);
+            if (entete == null) {
+                return ResultatEnvoiDTO.builder().erreur("Le modèle Meta « " + message.metaModele() + " » attend "
+                        + (image ? "une image" : "un document") + " en en-tête : joignez-la à la campagne").build();
+            }
+            reste.remove(entete);
+        }
+        List<String> parametres = message.parametres() == null || message.parametres().isEmpty() ? List.of()
+                : Arrays.asList(message.parametres().split("\n"));
+        ResultatEnvoiDTO resultat = passerelleMeta.envoyerModele(phoneNumberId, message.numeroDestinataire(), message.metaModele(),
+                message.metaLangue() == null ? "fr" : message.metaLangue(), parametres, entete);
+        if (resultat.isSucces() && !reste.isEmpty()) {
+            resultat.setErreur(String.join(", ", reste.stream().map(FichierDTO::getNom).toList())
+                    + " non envoyé : hors des 24 h, Meta n'accepte que le modèle");
+        }
+        return resultat;
+    }
+
+    /** Le client a ecrit a ce numero il y a moins de 24 h (marge d'une heure) : Meta accepte un message libre. */
+    private boolean fenetreOuverte(String numero, String destinataire) {
+        Long recus = jdbc.queryForObject("""
+                select count(*) from crm_message_recu
+                where numero_agent = :numero and numero_client = :client and recu_le >= utc_timestamp() - interval 23 hour
+                """, Map.of("numero", numero, "client", destinataire), Long.class);
+        return recus != null && recus > 0;
+    }
+
+    private String phoneNumberIdMeta(String numero) {
+        List<String> ids = jdbc.queryForList("select meta_phone_number_id from crm_session_whatsapp where numero = :numero and fournisseur = 'META'",
+                Map.of("numero", numero), String.class);
+        return ids.isEmpty() ? null : ids.getFirst();
+    }
+
+    private ResultatEnvoiDTO envoyerLibre(Canal canal, Message message, List<FichierDTO> reste) {
         String destinataire = message.numeroDestinataire();
         ResultatEnvoiDTO principal;
         if (!reste.isEmpty() && reste.getFirst().getTypeContenu().startsWith("image/") && message.contenu().length() <= LEGENDE_MAX) {
-            principal = passerelle.envoyerFichier(numero, destinataire, reste.removeFirst(), message.contenu());
+            principal = canal.fichier(destinataire, reste.removeFirst(), message.contenu());
         } else {
             if (!reste.isEmpty() && !CLASSEUR.equals(reste.getFirst().getTypeContenu())) {
-                ResultatEnvoiDTO affiche = passerelle.envoyerFichier(numero, destinataire, reste.removeFirst(), null);
+                ResultatEnvoiDTO affiche = canal.fichier(destinataire, reste.removeFirst(), null);
                 if (!affiche.isSucces()) {
                     return affiche;
                 }
             }
-            principal = passerelle.envoyerTexte(numero, destinataire, message.contenu());
+            principal = canal.texte(destinataire, message.contenu());
         }
         if (!principal.isSucces()) {
             return principal;
         }
         for (FichierDTO fichier : reste) {
-            ResultatEnvoiDTO piece = passerelle.envoyerFichier(numero, destinataire, fichier, null);
+            ResultatEnvoiDTO piece = canal.fichier(destinataire, fichier, null);
             if (!piece.isSucces()) {
                 principal.setErreur(fichier.getNom() + " non envoyé : " + piece.getErreur());
                 break;
@@ -136,12 +221,15 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     private Message reserver(String numero) {
         return transaction.execute(statut -> {
             List<Message> messages = jdbc.query("""
-                    select m.id, m.campagne_id, m.facture_id, m.numero_expediteur, m.numero_destinataire, m.contenu, m.tentatives
+                    select m.id, m.campagne_id, m.facture_id, m.numero_expediteur, m.numero_destinataire, m.contenu, m.tentatives,
+                           m.parametres, mo.nom, mo.meta_modele, mo.meta_langue, mo.meta_entete
                     from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
+                    join crm_modele_message mo on mo.id = c.modele_id
                     where m.numero_expediteur = :numero and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
                     order by c.lance_le, m.id limit 1 for update
                     """, Map.of("numero", numero), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4),
-                    rs.getString(5), rs.getString(6), rs.getInt(7)));
+                    rs.getString(5), rs.getString(6), rs.getInt(7), rs.getString(8), rs.getString(9), rs.getString(10), rs.getString(11),
+                    rs.getString(12)));
             if (messages.isEmpty()) {
                 return null;
             }

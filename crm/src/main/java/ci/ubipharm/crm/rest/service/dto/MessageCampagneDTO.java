@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,6 +39,9 @@ public class MessageCampagneDTO {
     private String emailReponse;
     private String objet;
     private String contenu;
+    /** Valeurs des variables, une par ligne, pour un modele approuve par Meta. */
+    @JsonIgnore
+    private String parametres;
     private String statut;
     private String motif;
     private LocalDateTime envoyeLe;

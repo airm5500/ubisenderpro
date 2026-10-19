@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.DesabonnementService;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
+import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
 import ci.ubipharm.crm.rest.service.dto.EvenementAccuseDTO;
 import ci.ubipharm.crm.rest.service.dto.EvenementMessageDTO;
 import ci.ubipharm.crm.rest.service.dto.EvenementStatutDTO;
@@ -31,12 +32,14 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final DesabonnementService desabonnementService;
+    private final SuiviEnvoiService suiviEnvoi;
     private final byte[] jeton;
 
-    public EvenementWhatsappServiceImpl(NamedParameterJdbcTemplate jdbc, DesabonnementService desabonnementService,
+    public EvenementWhatsappServiceImpl(NamedParameterJdbcTemplate jdbc, DesabonnementService desabonnementService, SuiviEnvoiService suiviEnvoi,
                                         @Value("${crm.whatsapp.jeton:}") String jeton) {
         this.jdbc = jdbc;
         this.desabonnementService = desabonnementService;
+        this.suiviEnvoi = suiviEnvoi;
         this.jeton = jeton.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -121,6 +124,25 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                 .addValue("identifiant", relances.getFirst().get("identifiant_whatsapp"));
         lu(p);
         avancerFacture(p, "REPONSE_RECUE", AVANT_REPONSE);
+    }
+
+    @Override
+    @Transactional
+    public void echec(String numero, String identifiant, String motif) {
+        List<Map<String, Object>> messages = jdbc.queryForList("""
+                select id, campagne_id, facture_id from crm_campagne_message
+                where numero_expediteur = :numero and identifiant_whatsapp = :identifiant and statut in ('ENVOYE', 'DISTRIBUE')
+                """, Map.of("numero", numero, "identifiant", identifiant));
+        if (messages.isEmpty()) {
+            return;
+        }
+        Map<String, Object> m = messages.getFirst();
+        jdbc.update("update crm_campagne_message set statut = 'ECHEC', motif = :motif, updated_at = utc_timestamp() where id = :id",
+                Map.of("id", m.get("id"), "motif", motif.length() > 255 ? motif.substring(0, 255) : motif));
+        if (m.get("facture_id") != null) {
+            suiviEnvoi.factureNonRelancee(((Number) m.get("facture_id")).longValue());
+        }
+        suiviEnvoi.recompter(((Number) m.get("campagne_id")).longValue());
     }
 
     private void lu(MapSqlParameterSource p) {

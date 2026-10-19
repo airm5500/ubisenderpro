@@ -124,6 +124,7 @@ export interface Variable { id: number; code: string; libelle: string; source: s
 export interface SourceVariable { source: string; libelle: string; }
 export interface ModeleMessage {
   id: number; nom: string; typeCampagne: string; canal: string; objet: string | null; contenu: string; statut: string; variables: string[];
+  metaModele: string | null; metaLangue: string | null; metaEntete: string;
   creePar: string; modifiePar: string; createdAt: string; updatedAt: string;
 }
 
@@ -184,8 +185,12 @@ export interface Recapitulatif {
 }
 
 export interface SessionAgent {
-  agentId: number; agentNom: string; numero: string | null; statut: string; sante: string | null; raison: string | null;
+  agentId: number; agentNom: string; numero: string | null; fournisseur: 'WA_WEB' | 'META'; metaPhoneNumberId: string | null; statut: string; sante: string | null; raison: string | null;
   connecteLe: string | null; envoyesAujourdhui: number; enAttente: number;
+}
+export interface CompteMeta {
+  jetonRenseigne: boolean; secretRenseigne: boolean; jetonVerification: string; urlWebhook: string | null; versionApi: string;
+  modifiePar: string | null; modifieLe: string | null;
 }
 export interface EtatSession { statut: string; sante: string | null; raison: string | null; qr: string | null; }
 export interface MessageRecu {

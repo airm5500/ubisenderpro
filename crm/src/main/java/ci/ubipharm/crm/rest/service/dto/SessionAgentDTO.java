@@ -19,6 +19,9 @@ public class SessionAgentDTO {
     private Long agentId;
     private String agentNom;
     private String numero;
+    /** WA_WEB (QR code, par defaut) ou META (API officielle). */
+    private String fournisseur;
+    private String metaPhoneNumberId;
     private String statut;
     private String sante;
     private String raison;

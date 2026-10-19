@@ -229,11 +229,13 @@ class SelectionCampagne {
         }
         String texte = null;
         String objet = null;
+        String parametres = null;
         if (motif == null) {
             Map<String, String> valeurs = new HashMap<>();
             sourcesParCode.forEach((code, source) -> valeurs.put(code, valeur(t, source, aliasParSource)));
             texte = GabaritMessage.rendre(modele.contenu(), valeurs);
             objet = email ? GabaritMessage.rendre(modele.objet(), valeurs) : null;
+            parametres = email ? null : GabaritMessage.parametres(modele.contenu(), valeurs);
         }
         MessageCampagneDTO message = MessageCampagneDTO.builder()
                 .factureId(t.get("factureId", Long.class))
@@ -253,6 +255,7 @@ class SelectionCampagne {
                 .emailReponse(email ? t.get("agentEmail", String.class) : null)
                 .objet(objet)
                 .contenu(texte)
+                .parametres(parametres)
                 .statut(motif == null ? A_ENVOYER : EXCLU)
                 .motif(motif)
                 .build();

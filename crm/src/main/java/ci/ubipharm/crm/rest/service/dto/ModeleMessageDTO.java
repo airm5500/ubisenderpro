@@ -23,6 +23,9 @@ public class ModeleMessageDTO {
     private String canal;
     private String objet;
     private String contenu;
+    private String metaModele;
+    private String metaLangue;
+    private String metaEntete;
     private String statut;
     private List<String> variables;
     private String creePar;

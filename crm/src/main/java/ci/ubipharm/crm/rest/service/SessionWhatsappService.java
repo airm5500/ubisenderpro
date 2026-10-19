@@ -16,4 +16,10 @@ public interface SessionWhatsappService {
     EtatSessionDTO etat(Long agentId);
 
     void deconnecter(Long agentId);
+
+    /** Fait passer le numero a l'API officielle de Meta, apres verification du numero chez Meta. */
+    SessionAgentDTO passerMeta(Long agentId, String phoneNumberId);
+
+    /** Ramene le numero a WhatsApp Web : il faudra de nouveau scanner le QR code. */
+    SessionAgentDTO passerWhatsappWeb(Long agentId);
 }

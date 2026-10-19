@@ -50,6 +50,7 @@ abstract class IntegrationBase {
     void reinitialiser() {
         jdbc.update("delete from crm_message_recu");
         jdbc.update("delete from crm_session_whatsapp");
+        jdbc.update("update crm_compte_meta set jeton_acces = null, secret_application = null, version_api = 'v21.0', modifie_par = null");
         jdbc.update("delete from crm_campagne_message");
         jdbc.update("delete from crm_fournisseur_sms where code <> 'LETEXTO'");
         jdbc.update("update crm_fournisseur_sms set par_defaut = true, actif = true, cle_api = null, modifie_par = null where code = 'LETEXTO'");

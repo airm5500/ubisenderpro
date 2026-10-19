@@ -36,6 +36,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     private static final String SELECT = """
             select m.id as id, m.nom as nom, m.type_campagne as typeCampagne, m.canal as canal, m.objet as objet, m.contenu as contenu, m.statut as statut,
+                   m.meta_modele as metaModele, m.meta_langue as metaLangue, m.meta_entete as metaEntete,
                    c.nom_complet as creePar, u.nom_complet as modifiePar, m.created_at as createdAt, m.updated_at as updatedAt
             from crm_modele_message m
             join crm_utilisateur c on c.id = m.cree_par
@@ -94,8 +95,8 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     public ModeleMessageDTO creer(String module, ModeleMessageDemandeDTO demande) {
         verifier(module, demande, null);
         em.createNativeQuery("""
-                insert into crm_modele_message (module, nom, type_campagne, canal, objet, contenu, cree_par, created_at)
-                values (:module, :nom, :typeCampagne, :canal, :objet, :contenu, :creePar, utc_timestamp())
+                insert into crm_modele_message (module, nom, type_campagne, canal, objet, contenu, meta_modele, meta_langue, meta_entete, cree_par, created_at)
+                values (:module, :nom, :typeCampagne, :canal, :objet, :contenu, :metaModele, :metaLangue, :metaEntete, :creePar, utc_timestamp())
                 """)
                 .setParameter("module", module)
                 .setParameter("nom", demande.getNom().trim())
@@ -103,6 +104,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("canal", canal(demande))
                 .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
+                .setParameter("metaModele", metaModele(demande))
+                .setParameter("metaLangue", metaModele(demande) == null ? null : metaLangue(demande))
+                .setParameter("metaEntete", metaModele(demande) == null ? "AUCUN" : metaEntete(demande))
                 .setParameter("creePar", utilisateurCourantService.utilisateur().getId())
                 .executeUpdate();
         Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
@@ -127,6 +131,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         }
         em.createNativeQuery("""
                 update crm_modele_message set nom = :nom, type_campagne = :typeCampagne, canal = :canal, objet = :objet, contenu = :contenu,
+                       meta_modele = :metaModele, meta_langue = :metaLangue, meta_entete = :metaEntete,
                        modifie_par = :modifiePar, updated_at = utc_timestamp()
                 where id = :id
                 """)
@@ -135,6 +140,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("canal", canal(demande))
                 .setParameter("objet", objet(demande))
                 .setParameter("contenu", demande.getContenu())
+                .setParameter("metaModele", metaModele(demande))
+                .setParameter("metaLangue", metaModele(demande) == null ? null : metaLangue(demande))
+                .setParameter("metaEntete", metaModele(demande) == null ? "AUCUN" : metaEntete(demande))
                 .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
                 .setParameter("id", id)
                 .executeUpdate();
@@ -235,6 +243,20 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         return demande.getCanal() == null || demande.getCanal().isBlank() ? "WHATSAPP" : demande.getCanal();
     }
 
+    /** Le modele Meta ne sert qu'au canal WhatsApp. */
+    private static String metaModele(ModeleMessageDemandeDTO demande) {
+        return "WHATSAPP".equals(canal(demande)) && demande.getMetaModele() != null && !demande.getMetaModele().isBlank()
+                ? demande.getMetaModele().trim() : null;
+    }
+
+    private static String metaLangue(ModeleMessageDemandeDTO demande) {
+        return demande.getMetaLangue() == null || demande.getMetaLangue().isBlank() ? "fr" : demande.getMetaLangue().trim();
+    }
+
+    private static String metaEntete(ModeleMessageDemandeDTO demande) {
+        return demande.getMetaEntete() == null || demande.getMetaEntete().isBlank() ? "AUCUN" : demande.getMetaEntete();
+    }
+
     /** L'objet n'a de sens que pour un e-mail. */
     private static String objet(ModeleMessageDemandeDTO demande) {
         return "EMAIL".equals(canal(demande)) && demande.getObjet() != null && !demande.getObjet().isBlank() ? demande.getObjet().trim() : null;
@@ -249,6 +271,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .canal(tuple.get("canal", String.class))
                 .objet(tuple.get("objet", String.class))
                 .contenu(contenu)
+                .metaModele(tuple.get("metaModele", String.class))
+                .metaLangue(tuple.get("metaLangue", String.class))
+                .metaEntete(tuple.get("metaEntete", String.class))
                 .statut(tuple.get("statut", String.class))
                 .variables(List.copyOf(GabaritMessage.variables(contenu)))
                 .creePar(tuple.get("creePar", String.class))

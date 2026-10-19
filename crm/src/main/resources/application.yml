@@ -47,6 +47,9 @@ crm:
     # Service compagnon wa-web (dossier wa-web/) ; le jeton est le meme que WA_WEB_TOKEN
     url: ${CRM_WHATSAPP_URL:http://localhost:3000}
     jeton: ${CRM_WHATSAPP_JETON:}
+  meta:
+    # API WhatsApp Cloud (numeros passes a l'API officielle) ; jeton et secret se reglent dans l'ecran Numeros WhatsApp
+    url: ${CRM_META_URL:https://graph.facebook.com}
 
 logging:
   level:

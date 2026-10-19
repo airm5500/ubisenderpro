@@ -2,7 +2,8 @@
   <div class="entete">
     <div>
       <h1>{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</h1>
-      <p class="sous-titre">Chaque agent relance depuis son numéro professionnel, relié par WhatsApp Web. Le téléphone doit rester allumé et connecté à internet.</p>
+      <p class="sous-titre">Chaque agent relance depuis son numéro professionnel, relié par WhatsApp Web (QR code) ou, une fois enregistré chez Meta,
+        par l'API officielle. Un téléphone relié par WhatsApp Web doit rester allumé et connecté à internet.</p>
     </div>
     @if (auth.peut('NUMEROS_TOUS')) { <a class="bs" routerLink="/portefeuilles">Changer le numéro d'un agent</a> }
   </div>
@@ -12,21 +13,31 @@
 
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Agent</th><th>Numéro</th><th>Session WhatsApp Web</th><th>Connecté depuis</th><th class="n">Envoyés aujourd'hui</th><th class="n">En attente</th><th></th></tr></thead>
+      <thead><tr><th>Agent</th><th>Numéro</th><th>Canal et état</th><th>Connecté depuis</th><th class="n">Envoyés aujourd'hui</th><th class="n">En attente</th><th></th></tr></thead>
       <tbody>
         @for (s of sessions(); track s.agentId) {
           <tr>
             <td><strong>{{ s.agentNom }}</strong></td>
             <td class="nw">{{ (s.numero | telephone) || 'Non renseigné' }}</td>
-            <td><span class="dot" [style.background]="L.couleurSession[s.statut]"></span>{{ L.statutSession[s.statut] ?? s.statut }}
-              @if (s.raison && s.statut !== 'CONNECTE') {<div class="second">{{ s.raison }}</div>}</td>
+            <td><span class="dot" [style.background]="L.couleurSession[s.statut]"></span>
+              @if (s.fournisseur === 'META') { {{ s.statut === 'CONNECTE' ? 'API officielle active' : 'API officielle en pause' }} }
+              @else { {{ L.statutSession[s.statut] ?? s.statut }} }
+              <div class="second">{{ s.fournisseur === 'META' ? 'Meta · ' + (s.raison ?? s.metaPhoneNumberId) : (s.statut !== 'CONNECTE' && s.raison ? s.raison : 'WhatsApp Web') }}</div></td>
             <td class="nw">{{ s.statut === 'CONNECTE' ? (s.connecteLe | jour: true) : '—' }}</td>
             <td class="n">{{ s.envoyesAujourdhui }}</td>
             <td class="n">{{ s.enAttente }}</td>
             <td class="nw">
               @if (!s.numero) { <span class="discret">Numéro à renseigner</span> }
-              @else if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Délier le téléphone</a> }
-              @else { <button class="ba petit" (click)="connecter(s)">Scanner le QR</button> }
+              @else if (s.fournisseur === 'META') {
+                @if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Mettre en pause</a> }
+                @else { <button class="ba petit" (click)="connecter(s)">Vérifier et reprendre</button> }
+                @if (auth.peut('WHATSAPP_META')) { <div><a (click)="passerWhatsappWeb(s)">Revenir à WhatsApp Web</a></div> }
+              }
+              @else {
+                @if (s.statut === 'CONNECTE') { <a (click)="deconnecter(s)">Délier le téléphone</a> }
+                @else { <button class="ba petit" (click)="connecter(s)">Scanner le QR</button> }
+                @if (auth.peut('WHATSAPP_META')) { <div><a (click)="ouvrirBascule(s)">Passer à l'API officielle</a></div> }
+              }
             </td>
           </tr>
         } @empty {
@@ -50,7 +61,49 @@
     <div class="li"><span>3. Cliquez sur « Scanner le QR » ci-dessus et visez le code avec le téléphone.</span></div>
     <p class="discret">Les clients continuent de répondre sur ce WhatsApp ; une copie de leurs réponses arrive dans la fiche client.</p>
   </section>
+
+  @if (compte(); as c) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">API WhatsApp officielle (Meta)</h2></div>
+      <p class="discret">Facultatif : WhatsApp Web reste le canal par défaut. Un numéro enregistré dans WhatsApp Manager passe à l'API officielle avec son
+        identifiant (Phone number ID). Hors des 24 h qui suivent une réponse du client, Meta n'accepte qu'un modèle approuvé : renseignez son nom
+        dans le modèle de message ; ses paramètres {{ parametresMeta }}… sont les variables du modèle, dans l'ordre.</p>
+      <form class="formulaire" (ngSubmit)="enregistrerCompte()">
+        <div class="grille">
+          <label class="f">Jeton d'accès (utilisateur système)
+            <input class="sel" type="password" name="jetonAcces" [(ngModel)]="edition.jetonAcces" autocomplete="off"
+                   [placeholder]="c.jetonRenseigne ? 'Enregistré : laissez vide pour le garder' : 'À coller depuis Meta Business'"></label>
+          <label class="f">Secret de l'application
+            <input class="sel" type="password" name="secretApplication" [(ngModel)]="edition.secretApplication" autocomplete="off"
+                   [placeholder]="c.secretRenseigne ? 'Enregistré : laissez vide pour le garder' : 'Signe les notifications de Meta'"></label>
+          <label class="f">Version de l'API<input class="sel" name="versionApi" [(ngModel)]="edition.versionApi"></label>
+          <div class="f">Webhook à déclarer chez Meta
+            <span><strong>{{ c.urlWebhook ?? 'Renseignez d\'abord l\'adresse publique du CRM dans les paramètres' }}</strong></span>
+            <span class="discret">Jeton de vérification : <strong>{{ c.jetonVerification }}</strong> · <a (click)="renouvelerJeton()">Renouveler</a></span>
+          </div>
+        </div>
+        <div class="pied">
+          @if (c.modifiePar) { <span class="discret">Modifié le {{ c.modifieLe | jour: true }} par {{ c.modifiePar }}</span> }
+          <button class="bp" type="submit" [disabled]="enCours()">Enregistrer le compte Meta</button>
+        </div>
+      </form>
+    </section>
+  }
 </div>
+
+<p-dialog [header]="'API officielle pour ' + (bascule()?.numero | telephone)" [visible]="bascule() !== null" (visibleChange)="!$event && bascule.set(null)"
+          [modal]="true" [style]="{ width: '480px' }">
+  <form class="formulaire" (ngSubmit)="passerMeta()">
+    <label class="f">Identifiant du numéro chez Meta (Phone number ID)
+      <input class="sel" name="phoneNumberId" [(ngModel)]="phoneNumberId" placeholder="Ex. 109876543210" inputmode="numeric" required></label>
+    <p class="discret" style="margin: 0">Le numéro est vérifié chez Meta avec le jeton du compte. Sa session WhatsApp Web est fermée : un seul canal par numéro.</p>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="bascule.set(null)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !phoneNumberId.trim()">Passer à l'API officielle</button>
+    </div>
+  </form>
+</p-dialog>
 
 <p-dialog [header]="'Relier ' + (liaison()?.numero | telephone)" [visible]="liaison() !== null" (visibleChange)="!$event && fermer()" [modal]="true" [style]="{ width: '420px' }">
   <div class="qr">

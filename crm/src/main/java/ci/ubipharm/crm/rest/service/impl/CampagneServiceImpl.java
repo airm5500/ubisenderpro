@@ -477,13 +477,14 @@ public class CampagneServiceImpl implements CampagneService {
                 .addValue("emailReponse", l.message().getEmailReponse())
                 .addValue("objet", l.message().getObjet())
                 .addValue("contenu", l.message().getContenu())
+                .addValue("parametres", l.message().getParametres())
                 .addValue("statut", l.message().getStatut())
                 .addValue("motif", l.message().getMotif())).toArray(SqlParameterSource[]::new);
         jdbc.batchUpdate("""
                 insert into crm_campagne_message (campagne_id, execution, facture_id, client_id, canal, contact_id, numero_destinataire, email_destinataire,
-                                                  agent_id, numero_expediteur, email_reponse, objet, contenu, statut, motif, created_at)
+                                                  agent_id, numero_expediteur, email_reponse, objet, contenu, parametres, statut, motif, created_at)
                 values (:campagneId, :execution, :factureId, :clientId, :canal, :contactId, :numeroDestinataire, :emailDestinataire, :agentId,
-                        :numeroExpediteur, :emailReponse, :objet, :contenu, :statut, :motif, utc_timestamp())
+                        :numeroExpediteur, :emailReponse, :objet, :contenu, :parametres, :statut, :motif, utc_timestamp())
                 """, lots);
         em.createNativeQuery("""
                 update crm_facture f join crm_campagne_message m on m.facture_id = f.id

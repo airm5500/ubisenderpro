@@ -607,3 +607,22 @@ API : `POST /api/marketing/produits/{id}/rupture`, `POST /api/marketing/produits
   renvoie le message a chaque occurrence. Un evenement annonce par une campagne non terminee ne s'archive pas.
 
 API : `GET/POST /api/marketing/evenements`, `PUT /api/marketing/evenements/{id}`, `POST /api/marketing/evenements/{id}/archivage|reactivation`.
+
+## API WhatsApp officielle de Meta (option par numero)
+
+WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a
+l'API WhatsApp Cloud de Meta, numero par numero (droit `WHATSAPP_META`, administrateur) :
+
+1. **Numeros WhatsApp > API WhatsApp officielle** : coller le jeton d'acces (utilisateur systeme) et le secret de l'application ;
+   ils ne se relisent jamais. Declarer chez Meta le webhook `https://<adresse publique>/api/passerelle/meta/webhook` (parametre
+   `application.url_publique`) avec le jeton de verification affiche, abonne au champ `messages`.
+2. Sur la ligne du numero, **Passer a l'API officielle** avec son identifiant Meta (Phone number ID) : le numero est verifie chez
+   Meta, sa session WhatsApp Web est fermee. **Revenir a WhatsApp Web** fait l'inverse (nouveau QR).
+3. Dans chaque modele WhatsApp, section **API officielle Meta** : nom du modele approuve chez Meta, langue (`fr`), en-tete (image ou
+   document joint a la campagne). Les parametres `{{1}}`, `{{2}}`... du modele Meta sont les variables du message, dans leur ordre
+   d'apparition (une variable citee deux fois compte une fois).
+
+A l'envoi : si le client a ecrit a ce numero depuis moins de 24 h, le message part en texte libre (avec ses pieces jointes) ;
+sinon seul le modele approuve part, et un modele sans nom Meta met le message en echec avec la consigne. Les accuses (distribue,
+lu), les refus apres coup et les reponses des clients arrivent par le webhook, signe par Meta (`X-Hub-Signature-256`).
+Configuration : `crm.meta.url` (`CRM_META_URL`, defaut `https://graph.facebook.com`), version de l'API dans l'ecran.

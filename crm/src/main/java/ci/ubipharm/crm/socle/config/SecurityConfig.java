@@ -51,6 +51,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/passerelle/wa-web/**").permitAll()
                 .requestMatchers("/api/passerelle/sms/**").permitAll()
+                .requestMatchers("/api/passerelle/meta/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll());
         return http.build();

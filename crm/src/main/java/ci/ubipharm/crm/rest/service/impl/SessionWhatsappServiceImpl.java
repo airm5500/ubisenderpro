@@ -18,6 +18,7 @@ import ci.ubipharm.crm.rest.service.dto.UtilisateurPrincipal;
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
 import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
+import ci.ubipharm.crm.rest.service.PasserelleMetaService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.SessionWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
@@ -37,6 +38,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
 
     private static final String SELECT = """
             select u.id as agentId, u.nom_complet as agentNom, u.numero_whatsapp as numero, coalesce(s.statut, 'DECONNECTE') as statut,
+                   coalesce(s.fournisseur, 'WA_WEB') as fournisseur, s.meta_phone_number_id as metaPhoneNumberId,
                    coalesce(s.sante, 'OK') as sante, s.raison as raison, s.connecte_le as connecteLe,
                    (select count(*) from crm_campagne_message m where m.numero_expediteur = u.numero_whatsapp and m.envoye_le >= utc_date())
                        as envoyesAujourdhui,
@@ -49,6 +51,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
 
     private final EntityManager em;
     private final PasserelleWhatsappService passerelle;
+    private final PasserelleMetaService passerelleMeta;
     private final EvenementWhatsappService evenementWhatsappService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
@@ -81,7 +84,11 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     @Transactional
     public EtatSessionDTO connecter(Long agentId) {
         String numero = numeroAutorise(agentId);
-        EtatSessionDTO etat = passerelle.demarrer(numero);
+        String phoneNumberId = phoneNumberIdMeta(numero);
+        // Un numero de l'API officielle n'a pas de QR : on verifie qu'il repond chez Meta
+        EtatSessionDTO etat = phoneNumberId != null
+                ? EtatSessionDTO.builder().statut("CONNECTE").sante("OK").raison(passerelleMeta.verifierNumero(phoneNumberId)).build()
+                : passerelle.demarrer(numero);
         memoriser(numero, etat);
         journalActionService.enregistrer("WHATSAPP_CONNEXION", "crm_utilisateur", agentId, numero);
         return etat;
@@ -91,6 +98,9 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     @Transactional
     public EtatSessionDTO etat(Long agentId) {
         String numero = numeroAutorise(agentId);
+        if (phoneNumberIdMeta(numero) != null) {
+            return etatEnBase(numero);
+        }
         EtatSessionDTO etat = passerelle.etat(numero);
         memoriser(numero, etat);
         return etat;
@@ -100,9 +110,74 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     @Transactional
     public void deconnecter(Long agentId) {
         String numero = numeroAutorise(agentId);
-        passerelle.deconnecter(numero);
+        if (phoneNumberIdMeta(numero) == null) {
+            passerelle.deconnecter(numero);
+        }
         memoriser(numero, EtatSessionDTO.builder().statut("DECONNECTE").sante("OK").build());
         journalActionService.enregistrer("WHATSAPP_DECONNEXION", "crm_utilisateur", agentId, numero);
+    }
+
+    @Override
+    @Transactional
+    public SessionAgentDTO passerMeta(Long agentId, String phoneNumberId) {
+        String numero = numeroAutorise(agentId);
+        String autre = (String) em.createNativeQuery("select max(numero) from crm_session_whatsapp where meta_phone_number_id = :id and numero <> :numero")
+                .setParameter("id", phoneNumberId).setParameter("numero", numero).getSingleResult();
+        if (autre != null) {
+            throw new ErreurMetierException("Cet identifiant Meta est déjà celui du numéro " + SelectionCampagne.numeroLisible(autre) + ".");
+        }
+        String verifie = passerelleMeta.verifierNumero(phoneNumberId);
+        if (phoneNumberIdMeta(numero) == null) {
+            // Un seul canal d'envoi par numero : la session WhatsApp Web du telephone est fermee
+            try {
+                passerelle.deconnecter(numero);
+            } catch (ErreurMetierException serviceArrete) {
+                // wa-web injoignable : rien a fermer
+            }
+        }
+        em.createNativeQuery("""
+                insert into crm_session_whatsapp (numero, fournisseur, meta_phone_number_id, statut, sante, raison, connecte_le, updated_at)
+                values (:numero, 'META', :id, 'CONNECTE', 'OK', :raison, utc_timestamp(), utc_timestamp())
+                on duplicate key update fournisseur = 'META', meta_phone_number_id = :id, statut = 'CONNECTE', sante = 'OK', raison = :raison,
+                    connecte_le = utc_timestamp(), updated_at = utc_timestamp()
+                """).setParameter("numero", numero).setParameter("id", phoneNumberId).setParameter("raison", verifie).executeUpdate();
+        journalActionService.enregistrer("WHATSAPP_PASSAGE_META", "crm_utilisateur", agentId, numero + " -> API Meta " + phoneNumberId + " (" + verifie + ")");
+        return session(agentId);
+    }
+
+    @Override
+    @Transactional
+    public SessionAgentDTO passerWhatsappWeb(Long agentId) {
+        String numero = numeroAutorise(agentId);
+        em.createNativeQuery("""
+                update crm_session_whatsapp set fournisseur = 'WA_WEB', meta_phone_number_id = null, statut = 'DECONNECTE', raison = null,
+                       updated_at = utc_timestamp()
+                where numero = :numero
+                """).setParameter("numero", numero).executeUpdate();
+        journalActionService.enregistrer("WHATSAPP_PASSAGE_WA_WEB", "crm_utilisateur", agentId, numero + " -> WhatsApp Web");
+        return session(agentId);
+    }
+
+    private SessionAgentDTO session(Long agentId) {
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery(SELECT + " and u.id = :id", Tuple.class).setParameter("id", agentId).getResultList();
+        return mapTupleToDto(lignes.getFirst());
+    }
+
+    /** Identifiant Meta du numero s'il passe par l'API officielle, sinon null (WhatsApp Web). */
+    private String phoneNumberIdMeta(String numero) {
+        @SuppressWarnings("unchecked")
+        List<String> ids = em.createNativeQuery("select meta_phone_number_id from crm_session_whatsapp where numero = :numero and fournisseur = 'META'")
+                .setParameter("numero", numero).getResultList();
+        return ids.isEmpty() ? null : ids.getFirst();
+    }
+
+    private EtatSessionDTO etatEnBase(String numero) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> lignes = em.createNativeQuery("select statut, sante, raison from crm_session_whatsapp where numero = :numero")
+                .setParameter("numero", numero).getResultList();
+        Object[] l = lignes.getFirst();
+        return EtatSessionDTO.builder().statut((String) l[0]).sante((String) l[1]).raison((String) l[2]).build();
     }
 
     private String numeroAutorise(Long agentId) {
@@ -132,6 +207,8 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
                 .agentId(tuple.get("agentId", Long.class))
                 .agentNom(tuple.get("agentNom", String.class))
                 .numero(tuple.get("numero", String.class))
+                .fournisseur(tuple.get("fournisseur", String.class))
+                .metaPhoneNumberId(tuple.get("metaPhoneNumberId", String.class))
                 .statut(tuple.get("statut", String.class))
                 .sante(tuple.get("sante", String.class))
                 .raison(tuple.get("raison", String.class))
