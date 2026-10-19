@@ -562,3 +562,20 @@ Menu **Relances > Delais de relance** (droit `DELAIS_RELANCE` : admin, direction
 
 API : `GET /api/recouvrement/delais-relance[?archives=true]`, `GET .../defauts`, `POST`, `PUT /{id}`, `POST /{id}/archivage`,
 `POST /{id}/reactivation`.
+
+## Tableaux de bord (pilote)
+
+- **Recouvrement** : menu **Mon activite > Tableau de bord** (droit `TABLEAU_BORD`, donne a tous les roles qui voient les
+  campagnes). L'agent voit son portefeuille (et celui qu'il remplace), le directeur d'agence ses agences, la direction tout ;
+  filtres periode (30 derniers jours par defaut, un an au plus), agence et agent.
+  - Creances du jour : solde du, echu, echeances proches (`tableau_bord.echeance_proche_jours`, 7), promesses en cours et non
+    tenues, litiges, contentieux ; balance agee ; repartition par sous-type de compte.
+  - Relances de la periode : tentees, envoyees, distribuees, lues, echecs ; taux de reussite, d'echec, de reponse (clients
+    relances qui ont repondu) et de conversion (factures relancees dont le solde a baisse apres la premiere relance).
+  - Resultats : montant encaisse et factures soldees (historique `crm_facture_solde`, alimente par la saisie et l'import),
+    promesses enregistrees, campagnes par statut ; performances par agence et par agent ; anomalies (motifs d'echec,
+    campagnes arretees automatiquement).
+- **Marketing** : menu **Marketing > Tableau de bord** (droit `TABLEAU_BORD_MARKETING`) : audience joignable, listes, promotions
+  en cours, desabonnements, messages par canal, taux de lecture et de reponse, campagnes lancees sur la periode.
+
+API : `GET /api/recouvrement/tableau-de-bord?du=&au=&agenceId=&agentId=`, `GET /api/marketing/tableau-de-bord?du=&au=`.

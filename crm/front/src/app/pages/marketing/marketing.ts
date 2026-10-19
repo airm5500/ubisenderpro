@@ -12,6 +12,12 @@ import { Auth } from '../../core/auth';
         <h1>Marketing</h1>
         <p class="sous-titre">Listes de diffusion, campagnes promotionnelles WhatsApp, e-mail et SMS, catalogue des produits et promotions.</p>
       </div></div>
+      @if (auth.peut('TABLEAU_BORD_MARKETING')) {
+        <a class="bloc tuile" routerLink="/marketing/tableau-de-bord" style="text-decoration: none; max-width: 420px">
+          <b style="font-size: 16px">Tableau de bord</b>
+          <span class="discret">Campagnes, messages envoyés et lus par canal, réponses, désabonnements et promotions en cours.</span>
+        </a>
+      }
       @if (auth.peut('CAMPAGNES_MARKETING')) {
         <a class="bloc tuile" routerLink="/marketing/campagnes" style="text-decoration: none; max-width: 420px">
           <b style="font-size: 16px">Campagnes promotionnelles</b>

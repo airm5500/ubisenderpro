@@ -20,6 +20,8 @@ export const routes: Routes = [
       { path: 'marketing/promotions/:id', canActivate: [droit('PROMOTIONS')], loadComponent: () => import('./pages/promotion/promotion').then(m => m.PromotionDetail), title: 'Promotion' },
       { path: 'marketing/numero', canActivate: [droit('NUMERO_MARKETING')], loadComponent: () => import('./pages/numeros/numeros').then(m => m.Numeros), title: 'Mon numéro WhatsApp' },
       { path: 'marketing/listes/:id', canActivate: [droit('LISTES')], loadComponent: () => import('./pages/liste-diffusion/liste-diffusion').then(m => m.ListeDiffusionDetail), title: 'Liste de diffusion' },
+      { path: 'tableau-de-bord', canActivate: [droit('TABLEAU_BORD')], loadComponent: () => import('./pages/tableau-bord/tableau-bord').then(m => m.TableauBordPage), title: 'Tableau de bord' },
+      { path: 'marketing/tableau-de-bord', canActivate: [droit('TABLEAU_BORD_MARKETING')], loadComponent: () => import('./pages/tableau-bord-marketing/tableau-bord-marketing').then(m => m.TableauBordMarketingPage), title: 'Tableau de bord Marketing' },
       { path: 'ma-journee', canActivate: [droit('MA_JOURNEE')], loadComponent: () => import('./pages/ma-journee/ma-journee').then(m => m.MaJournee), title: 'Ma journée' },
       { path: 'factures', canActivate: [droit('FACTURES')], loadComponent: () => import('./pages/factures/factures').then(m => m.Factures), title: 'Factures' },
       { path: 'clients', canActivate: [droit('CLIENTS')], loadComponent: () => import('./pages/clients/clients').then(m => m.Clients), title: 'Clients' },

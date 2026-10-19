@@ -1,0 +1,151 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Tableau de bord</h1>
+      @if (tb(); as t) {
+        <p class="sous-titre">
+          @switch (t.vue) { @case ('AGENT') { Votre portefeuille } @case ('AGENCE') { Vos agences } @default { Toutes les agences } }
+          · <strong>{{ t.total.nbClients }} clients</strong>, <strong>{{ t.total.nbFactures }} factures ouvertes</strong> pour
+          <strong>{{ t.total.solde | montant }} FCFA</strong>. Du {{ t.du | jour }} au {{ t.au | jour }} :
+          <strong>{{ t.total.messagesEnvoyes }} relances envoyées</strong> et <strong>{{ t.total.montantEncaisse | montant }} FCFA encaissés</strong>.
+        </p>
+      }
+    </div>
+  </div>
+
+  <form class="periode" (ngSubmit)="charger()" aria-label="Période et périmètre">
+    <label class="f">Du<input class="sel" type="date" name="du" [(ngModel)]="filtres.du"></label>
+    <label class="f">au<input class="sel" type="date" name="au" [(ngModel)]="filtres.au"></label>
+    @if (!auth.portefeuillePersonnel()) {
+      @if (agences().length > 1) {
+        <label class="f">Agence
+          <select class="sel" name="agenceId" [(ngModel)]="filtres.agenceId" (ngModelChange)="agenceChoisie()">
+            <option [ngValue]="null">Toutes</option>
+            @for (a of agences(); track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+          </select>
+        </label>
+      }
+      <label class="f">Agent
+        <select class="sel" name="agentId" [(ngModel)]="filtres.agentId" (ngModelChange)="charger()">
+          <option [ngValue]="null">Tous</option>
+          @for (a of agents(); track a.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> }
+        </select>
+      </label>
+    }
+    <button class="bp" type="submit">Actualiser</button>
+  </form>
+  @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+
+  @if (tb(); as t) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Créances aujourd'hui</h2><a routerLink="/factures">Voir les factures</a></div>
+      <div class="chiffres">
+        <div><strong>{{ t.total.solde | montant }}</strong><span>FCFA restant dû · {{ t.total.nbFactures }} factures</span></div>
+        <div><strong>{{ t.total.soldeEchu | montant }}</strong><span>FCFA échus · {{ t.total.nbEchues }} factures</span></div>
+        <div><strong>{{ t.nbEcheanceProche }}</strong><span>échéances dans les {{ t.joursEcheanceProche }} jours · {{ t.soldeEcheanceProche | montant }} FCFA</span></div>
+        <div><strong>{{ t.nbPromessesEnCours }}</strong><span>promesses en cours · {{ t.montantPromis | montant }} FCFA
+          @if (t.nbPromessesNonTenues) { · <span class="retard">{{ t.nbPromessesNonTenues }} non tenue{{ t.nbPromessesNonTenues > 1 ? 's' : '' }}</span> }</span></div>
+        <div><strong>{{ t.nbLitiges }} · {{ t.nbContentieux }}</strong><span>litiges · contentieux</span></div>
+      </div>
+    </section>
+
+    <div class="deux-colonnes">
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Balance âgée</h2><span class="discret">Solde dû selon le retard</span></div>
+        <div class="entonnoir">
+          @for (b of t.balanceAgee; track b.code) {
+            <div class="etage">
+              <span>{{ b.libelle }}</span>
+              <div class="barre" [class.vert]="b.code === '0'" [class.alerte]="b.code === '4'"><div [style.width.%]="(b.montant ?? 0) * 100 / maxTranche()"></div></div>
+              <strong>{{ b.montant | montant }}<div class="second">{{ b.nombre }} fact.</div></strong>
+            </div>
+          }
+        </div>
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Par sous-type de compte</h2></div>
+        @for (s of t.parSousType; track s.code) {
+          <div class="sum"><span>{{ s.libelle }} <span class="discret">· {{ s.nombre }} fact.</span></span><strong>{{ s.montant | montant }}</strong></div>
+        } @empty { <p class="discret">Aucune facture ouverte.</p> }
+      </section>
+    </div>
+
+    <div class="deux-colonnes">
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Relances de la période</h2>
+          <span class="discret">{{ t.total.facturesRelancees }} factures · {{ t.total.clientsRelances }} clients relancés</span></div>
+        <div class="entonnoir">
+          @for (e of entonnoir(); track e.libelle) {
+            <div class="etage"><span>{{ e.libelle }}</span><div class="barre" [class]="'barre ' + e.classe"><div [style.width.%]="e.largeur"></div></div><strong>{{ e.valeur }}</strong></div>
+          }
+        </div>
+        <div class="taux" style="margin-top: 12px">
+          <div><strong>{{ pc(t.total.tauxReussite) }}</strong><span>relances réussies</span></div>
+          <div><strong>{{ pc(t.total.tauxEchec) }}</strong><span>relances échouées</span></div>
+          <div><strong>{{ pc(t.total.tauxReponse) }}</strong><span>clients relancés qui ont répondu ({{ t.total.reponses }} réponses)</span></div>
+          <div><strong>{{ pc(t.total.tauxConversion) }}</strong><span>factures relancées réglées ensuite, en tout ou partie</span></div>
+        </div>
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Résultats</h2></div>
+        <div class="sum"><span>Montant encaissé</span><strong>{{ t.total.montantEncaisse | montant }} FCFA</strong></div>
+        <div class="sum"><span>Factures soldées</span><strong>{{ t.total.facturesSoldees }}</strong></div>
+        <div class="sum"><span>Promesses enregistrées</span><strong>{{ t.total.promesses }}</strong></div>
+        <h3 class="lbl" style="margin-top: 14px">Campagnes</h3>
+        <div class="sum"><span>En attente de validation</span><strong>{{ t.campagnesAValider }}</strong></div>
+        <div class="sum"><span>Programmées</span><strong>{{ t.campagnesProgrammees }}</strong></div>
+        <div class="sum"><span>En cours</span><strong>{{ t.campagnesEnCours }}</strong></div>
+        <div class="sum"><span>Exécutées sur la période</span><strong>{{ t.campagnesTerminees }}</strong></div>
+        <div class="sum"><span>Annulées sur la période</span><strong>{{ t.campagnesAnnulees }}</strong></div>
+        <a routerLink="/campagnes" style="font-size: 13px">Voir les campagnes</a>
+      </section>
+    </div>
+
+    @if (t.parAgence.length) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Performances par agence</h2></div>
+        <ng-container *ngTemplateOutlet="tableau; context: { lignes: t.parAgence, premier: 'Agence' }" />
+      </section>
+    }
+    @if (t.vue !== 'AGENT' || t.parAgent.length > 1) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Performances par agent</h2></div>
+        <ng-container *ngTemplateOutlet="tableau; context: { lignes: t.parAgent, premier: 'Agent' }" />
+      </section>
+    }
+
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Anomalies de la période</h2></div>
+      @for (e of t.echecs; track e.libelle) {
+        <div class="sum"><span>{{ e.libelle }}</span><strong class="retard">{{ e.nombre }} échec{{ e.nombre > 1 ? 's' : '' }}</strong></div>
+      }
+      @for (a of t.annulations; track a.code) {
+        <div class="sum"><span>Campagne arrêtée : <a [routerLink]="['/campagnes', a.code]">{{ a.libelle }}</a></span><strong>{{ a.nombre }} messages</strong></div>
+      }
+      @if (!t.echecs.length && !t.annulations.length) { <p class="discret">Aucun échec d'envoi ni campagne arrêtée sur la période.</p> }
+    </section>
+  }
+</div>
+
+<ng-template #tableau let-lignes="lignes" let-premier="premier">
+  <div class="defile">
+    <table class="t">
+      <thead><tr>
+        <th>{{ premier }}</th><th class="n">Clients</th><th class="n">Solde dû</th><th class="n">dont échu</th><th class="n">Relances</th>
+        <th class="n">Lues</th><th class="n">Échecs</th><th class="n">Réponse</th><th class="n">Promesses</th><th class="n">Encaissé</th><th class="n">Conversion</th>
+      </tr></thead>
+      <tbody>
+        @for (l of lignes; track l.id) {
+          <tr>
+            <td><strong>{{ l.libelle }}</strong></td>
+            <td class="n">{{ l.nbClients }}</td><td class="n">{{ l.solde | montant }}</td><td class="n">{{ l.soldeEchu | montant }}</td>
+            <td class="n">{{ l.messagesEnvoyes }}</td><td class="n">{{ l.messagesLus }}</td>
+            <td class="n" [class.retard]="l.messagesEchecs > 0">{{ l.messagesEchecs }}</td>
+            <td class="n">{{ pc(l.tauxReponse) }}</td><td class="n">{{ l.promesses }}</td>
+            <td class="n">{{ l.montantEncaisse | montant }}</td><td class="n">{{ pc(l.tauxConversion) }}</td>
+          </tr>
+        } @empty { <tr><td colspan="11" class="vide">Aucune donnée.</td></tr> }
+      </tbody>
+    </table>
+  </div>
+</ng-template>

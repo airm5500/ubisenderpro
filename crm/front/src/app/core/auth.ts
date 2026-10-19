@@ -79,7 +79,7 @@ export class Auth {
     if (this.utilisateur()?.motDePasseProvisoire) return '/mot-de-passe';
     if (!this.recouvrement()) return '/marketing';
     // Premier ecran permis, dans l'ordre du menu
-    const ecrans: [string, string][] = [['MA_JOURNEE', '/ma-journee'], ['FACTURES', '/factures'], ['CLIENTS', '/clients'],
+    const ecrans: [string, string][] = [['MA_JOURNEE', '/ma-journee'], ['TABLEAU_BORD', '/tableau-de-bord'], ['FACTURES', '/factures'], ['CLIENTS', '/clients'],
       ['PORTEFEUILLES', '/portefeuilles'], ['CAMPAGNES', '/campagnes'], ['MODELES', '/modeles'], ['REPONSES', '/reponses'],
       ['NUMEROS', '/numeros'], ['NUMEROS_TOUS', '/numeros'], ['UTILISATEURS', '/utilisateurs'], ['ROLES', '/roles'],
       ['PARAMETRES', '/parametres'], ['FOURNISSEURS_SMS', '/fournisseurs-sms']];

@@ -253,3 +253,20 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .ligne-choix:hover, .ligne-choix:focus-visible { background: var(--fond-2); }
 .tuile { padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
 .tuile b { font-size: 24px; color: var(--bleu); }
+
+/* Tableaux de bord */
+.periode { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.periode .f { min-width: 150px; }
+.entonnoir { display: flex; flex-direction: column; gap: 10px; }
+.entonnoir .etage { display: grid; grid-template-columns: 190px minmax(0, 1fr) 90px; gap: 14px; align-items: center; font-size: 14px; }
+.entonnoir .etage > span:first-child { color: var(--texte-2); }
+.entonnoir .etage strong { text-align: right; font-variant-numeric: tabular-nums; }
+.entonnoir .barre { height: 14px; border-radius: 7px; background: #EAF0F4; overflow: hidden; }
+.entonnoir .barre > div { height: 100%; background: var(--bleu); border-radius: 7px; }
+.entonnoir .barre.vert > div { background: var(--vert); }
+.entonnoir .barre.alerte > div { background: var(--alerte); }
+.taux { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px 28px; }
+.taux > div { display: flex; flex-direction: column; gap: 6px; }
+.taux strong { font-size: 24px; font-weight: 800; color: var(--bleu); }
+.taux span { font-size: 13px; color: var(--texte-2); }
+@media (max-width: 720px) { .entonnoir .etage { grid-template-columns: 120px minmax(0, 1fr) 70px; } }

@@ -18,9 +18,10 @@
 
     @if (auth.recouvrement() && !surMarketing()) {
 
-    @if (auth.peut('MA_JOURNEE')) {
+    @if (auth.peut('MA_JOURNEE', 'TABLEAU_BORD')) {
       <div class="gl">Mon activité</div>
-      <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a>
+      @if (auth.peut('MA_JOURNEE')) { <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a> }
+      @if (auth.peut('TABLEAU_BORD')) { <a class="nv" routerLink="/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
     }
     @if (auth.peut('FACTURES', 'CLIENTS', 'IMPORTS', 'PORTEFEUILLES')) {
       <div class="gl">Créances</div>
@@ -45,6 +46,7 @@
     } @else {
       <div class="gl">Marketing</div>
       <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
+      @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
       @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on">Campagnes promotionnelles</a> }
       @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
       @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }

@@ -363,6 +363,48 @@ class CampagneIT extends IntegrationBase {
                                 + " (7 jours minimum entre deux relances)")));
     }
 
+    @Test
+    void leTableauDeBordMesureLesRelancesEtLeursEffets() throws Exception {
+        Long id = idDe(creerCampagne(admin, "Retards", "APRES_ECHEANCE", modeleRetard, "{}", null));
+        action(admin, id, "soumission", null);
+        action(admin, id, "validation", null);
+        envoyerTout(id);
+        jdbc.update("update crm_campagne_message set statut = 'LU' where campagne_id = ? and facture_id = ?", id, id("crm_facture", "reference", "K-F2"));
+        // K-F1 est reglee apres la relance
+        Long f1 = id("crm_facture", "reference", "K-F1");
+        mvc.perform(put("/api/recouvrement/factures/" + f1).session(admin).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"clientId\":" + c1 + ",\"sousTypeId\":" + jdbc.queryForObject("select sous_type_id from crm_facture where id = ?", Long.class, f1)
+                        + ",\"nature\":\"FACTURE\",\"dateFacture\":\"" + aujourdhui.minusDays(40) + "\",\"dateEcheance\":\""
+                        + aujourdhui.minusDays(10) + "\",\"montant\":150000,\"solde\":0}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/recouvrement/tableau-de-bord").session(admin))
+                .andExpect(jsonPath("$.vue").value("GLOBAL"))
+                .andExpect(jsonPath("$.total.messagesEnvoyes").value(2))
+                .andExpect(jsonPath("$.total.messagesLus").value(1))
+                .andExpect(jsonPath("$.total.facturesRelancees").value(2))
+                .andExpect(jsonPath("$.total.facturesConverties").value(1))
+                .andExpect(jsonPath("$.total.tauxConversion").value(50.0))
+                .andExpect(jsonPath("$.total.montantEncaisse").value(150000.0))
+                .andExpect(jsonPath("$.total.facturesSoldees").value(1))
+                .andExpect(jsonPath("$.total.nbEchues").value(4))
+                .andExpect(jsonPath("$.nbEcheanceProche").value(2))
+                .andExpect(jsonPath("$.campagnesTerminees").value(1))
+                .andExpect(jsonPath("$.balanceAgee", hasSize(5)))
+                .andExpect(jsonPath("$.parAgence[0].libelle").exists())
+                .andExpect(jsonPath("$.parAgent[?(@.libelle == 'Test it-agent1')].messagesEnvoyes", contains(2)));
+        mvc.perform(get("/api/recouvrement/tableau-de-bord").session(agent))
+                .andExpect(jsonPath("$.vue").value("AGENT"))
+                .andExpect(jsonPath("$.total.nbClients").value(2))
+                .andExpect(jsonPath("$.parAgence", hasSize(0)))
+                .andExpect(jsonPath("$.parAgent", hasSize(1)));
+        mvc.perform(get("/api/recouvrement/tableau-de-bord").param("du", "2026-10-10").param("au", "2026-10-01").session(admin))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/marketing/tableau-de-bord").session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.messagesEnvoyes").value(0));
+        mvc.perform(get("/api/marketing/tableau-de-bord").session(agent)).andExpect(status().isForbidden());
+    }
+
     private ResultActions delai(MockHttpSession session, String json) throws Exception {
         return mvc.perform(post("/api/recouvrement/delais-relance").session(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(json));

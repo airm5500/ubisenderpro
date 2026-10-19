@@ -39,6 +39,32 @@ export interface Client {
   numeros?: Record<string, string>;
 }
 export interface Segment { code: string; libelle: string; }
+export interface Indicateurs {
+  id: number | null; libelle: string; nbClients: number; nbFactures: number; solde: number; nbEchues: number; soldeEchu: number;
+  messagesTentes: number; messagesEnvoyes: number; messagesDistribues: number; messagesLus: number; messagesEchecs: number;
+  facturesRelancees: number; clientsRelances: number; reponses: number; clientsAyantRepondu: number; promesses: number;
+  montantEncaisse: number; facturesSoldees: number; facturesConverties: number;
+  tauxReussite: number | null; tauxEchec: number | null; tauxReponse: number | null; tauxConversion: number | null;
+}
+export interface Repartition { code: string | null; libelle: string; nombre: number; montant: number | null; }
+export interface TableauBord {
+  du: string; au: string; vue: 'AGENT' | 'AGENCE' | 'GLOBAL'; total: Indicateurs;
+  joursEcheanceProche: number; nbEcheanceProche: number; soldeEcheanceProche: number; nbPromessesEnCours: number; montantPromis: number;
+  nbPromessesNonTenues: number; nbLitiges: number; nbContentieux: number;
+  campagnesAValider: number; campagnesProgrammees: number; campagnesEnCours: number; campagnesTerminees: number; campagnesAnnulees: number;
+  parSousType: Repartition[]; balanceAgee: Repartition[]; echecs: Repartition[]; annulations: Repartition[];
+  parAgent: Indicateurs[]; parAgence: Indicateurs[];
+}
+export interface TableauBordMarketing {
+  du: string; au: string;
+  campagnesAValider: number; campagnesProgrammees: number; campagnesEnCours: number; campagnesTerminees: number; campagnesAnnulees: number;
+  messagesTentes: number; messagesEnvoyes: number; messagesDistribues: number; messagesLus: number; messagesEchecs: number;
+  clientsTouches: number; reponses: number; clientsAyantRepondu: number; desabonnements: number;
+  tauxReussite: number | null; tauxLecture: number | null; tauxReponse: number | null;
+  promotionsEnCours: number; listesActives: number; clientsJoignables: number;
+  parCanal: Repartition[]; echecs: Repartition[];
+  campagnes: { id: number; nom: string; statut: string; canal: string; lanceLe: string; envoyes: number; lus: number; reponses: number; echecs: number }[];
+}
 export interface DelaiRelance {
   id: number | null; agenceId: number | null; agenceLibelle: string | null; segment: string | null; segmentLibelle: string | null;
   avantJoursMax: number | null; avantJoursMin: number | null; retardJoursMin: number | null; intervalleJours: number | null;

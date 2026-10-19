@@ -310,6 +310,15 @@ public class ImportFactureServiceImpl implements ImportFactureService {
                 .setParameter("importId", importId)
                 .setParameter("id", existante.id())
                 .executeUpdate();
+        if (existante.solde().compareTo(lue.solde()) != 0) {
+            em.createNativeQuery("""
+                    insert into crm_facture_solde (facture_id, ancien_solde, nouveau_solde, import_id, created_at)
+                    values (:id, :ancien, :nouveau, :importId, utc_timestamp())
+                    """)
+                    .setParameter("id", existante.id()).setParameter("ancien", existante.solde()).setParameter("nouveau", lue.solde())
+                    .setParameter("importId", importId)
+                    .executeUpdate();
+        }
     }
 
     private Contexte contexte(List<Map<String, String>> lignes) {

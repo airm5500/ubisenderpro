@@ -233,6 +233,15 @@ public class FactureServiceImpl implements FactureService {
                 .setParameter("solde", saisie.solde())
                 .setParameter("id", id)
                 .executeUpdate();
+        if (avant.getSolde().compareTo(saisie.solde()) != 0) {
+            em.createNativeQuery("""
+                    insert into crm_facture_solde (facture_id, ancien_solde, nouveau_solde, cree_par, created_at)
+                    values (:id, :ancien, :nouveau, :par, utc_timestamp())
+                    """)
+                    .setParameter("id", id).setParameter("ancien", avant.getSolde()).setParameter("nouveau", saisie.solde())
+                    .setParameter("par", utilisateurCourantService.utilisateur().getId())
+                    .executeUpdate();
+        }
         FactureDTO apres = consulter(id);
         List<String> ecarts = new ArrayList<>();
         ecart(ecarts, "Nature", avant.getNature(), apres.getNature());
