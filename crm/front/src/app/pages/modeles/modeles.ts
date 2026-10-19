@@ -25,8 +25,8 @@ export class Modeles implements OnInit {
   /** Donnee de route : les modeles des relances ou ceux des promotions du Marketing. */
   readonly module = input<'RECOUVREMENT' | 'MARKETING'>('RECOUVREMENT');
   protected readonly marketing = computed(() => this.module() === 'MARKETING');
-  protected readonly types = computed(() => this.marketing() ? [['PROMOTION', 'Promotion'], ['EVENEMENT', 'Événement (fête, férié, fermeture)']]
-    : Object.entries(LIBELLES.typeCampagne).filter(([code]) => code !== 'PROMOTION' && code !== 'EVENEMENT'));
+  protected readonly types = computed(() => this.marketing() ? [['PROMOTION', 'Promotion'], ['EVENEMENT', 'Événement (fête, férié, fermeture)'], ['INFORMATION', 'Information (livraison, horaires, annonce)']]
+    : Object.entries(LIBELLES.typeCampagne).filter(([code]) => !['PROMOTION', 'EVENEMENT', 'INFORMATION'].includes(code)));
   /** Ecrire les modeles ; les variables ne s'administrent que cote Recouvrement. */
   protected readonly peutGerer = computed(() => this.auth.peut(this.marketing() ? 'MODELES_MARKETING' : 'MODELES_GERER'));
   protected readonly peutVariables = computed(() => !this.marketing() && this.auth.peut('MODELES_GERER'));
@@ -40,7 +40,8 @@ export class Modeles implements OnInit {
   protected readonly sources = signal<SourceVariable[]>([]);
   protected readonly choisi = signal<ModeleMessage | null>(null);
   protected readonly enEdition = signal(false);
-  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '', metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
+  protected readonly typesInformation = Object.entries(LIBELLES.typeInformation);
+  edition = { nom: '', typeCampagne: 'APRES_ECHEANCE', typeInformation: '', canal: 'WHATSAPP', objet: '', contenu: '', metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
   protected readonly contenu = signal('');
   /** Variables qu'un modele de relance peut citer : ni promotion, ni produit disponible, ni evenement (Marketing). */
   protected readonly insertables = computed(() => this.marketing() ? this.variables()
@@ -106,7 +107,7 @@ export class Modeles implements OnInit {
 
   nouveau(): void {
     this.choisi.set(null);
-    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', canal: 'WHATSAPP', objet: '', contenu: '',
+    this.edition = { nom: '', typeCampagne: this.marketing() ? 'PROMOTION' : 'APRES_ECHEANCE', typeInformation: '', canal: 'WHATSAPP', objet: '', contenu: '',
       metaModele: '', metaLangue: 'fr', metaEntete: 'AUCUN' };
     this.contenu.set('');
     this.objet.set('');
@@ -115,7 +116,7 @@ export class Modeles implements OnInit {
   }
 
   modifier(m: ModeleMessage): void {
-    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, canal: m.canal, objet: m.objet ?? '', contenu: m.contenu,
+    this.edition = { nom: m.nom, typeCampagne: m.typeCampagne, typeInformation: m.typeInformation ?? '', canal: m.canal, objet: m.objet ?? '', contenu: m.contenu,
       metaModele: m.metaModele ?? '', metaLangue: m.metaLangue ?? 'fr', metaEntete: m.metaEntete ?? 'AUCUN' };
     this.contenu.set(m.contenu);
     this.objet.set(m.objet ?? '');
@@ -137,7 +138,8 @@ export class Modeles implements OnInit {
   /** Champs Meta vides : envoyes absents, pour ne pas etre refuses par les controles de format. */
   private corps(): object {
     const e = this.edition;
-    return { ...e, metaModele: e.metaModele.trim() || null, metaLangue: e.metaLangue.trim() || null };
+    return { ...e, metaModele: e.metaModele.trim() || null, metaLangue: e.metaLangue.trim() || null,
+      typeInformation: e.typeCampagne === 'INFORMATION' && e.typeInformation ? e.typeInformation : null };
   }
 
   enregistrer(): void {

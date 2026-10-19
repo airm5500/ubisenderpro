@@ -28,6 +28,19 @@
         se remplissent avec l'événement ; la date d'envoi proposée suit les paramètres du Marketing.
         @if (evenementChoisi()?.annuel) { Événement annuel : choisissez « Chaque année » pour le renvoyer chaque année. }</p>
     }
+    @if (modeleInformation() || formulaire.informationId) {
+      <label class="f">Information annoncée
+        <select class="sel" name="informationId" [ngModel]="formulaire.informationId" (ngModelChange)="choisirInformation($event)">
+          <option [ngValue]="null">Aucune</option>
+          @for (i of informations(); track i.id) {
+            <option [ngValue]="i.id">{{ i.titre }} · {{ L.typeInformation[i.typeInformation] }}{{ i.priorite !== 'NORMALE' ? ' · ' + L.prioriteInformation[i.priorite] : '' }}</option>
+          }
+        </select>
+      </label>
+      <p class="discret" style="margin: 0">La tournée, l'heure estimée, la cause, le pharmacien de garde… se remplissent avec l'information ; une ligne dont le détail
+        n'est pas renseigné disparaît du message. Programmez la date et l'heure d'envoi ci-dessous.</p>
+    }
+    @if (!modeleInformation()) {
     <div class="f">Promotions citées
       @for (p of promotions(); track p.id) {
         <label class="droit"><input type="checkbox" [checked]="formulaire.promotionIds.has(p.id)" (change)="basculer(p.id, $any($event.target).checked)">
@@ -42,6 +55,7 @@
       } @empty { <span class="discret">Aucun produit remis en stock récemment : marquez-les dans le catalogue.</span> }
     </div>
     <p class="discret" style="margin: 0">La variable {{ '{' }}produits_disponibles{{ '}' }} liste les produits cochés. Si l'un repart en rupture avant l'envoi, la campagne est bloquée.</p>
+    }
     <div class="f">Affiche (image JPEG ou PNG, ou PDF)
       @if (formulaire.afficheId) {
         <span style="display: flex; gap: 10px; align-items: center"><i class="pi pi-image"></i> {{ formulaire.afficheNom }}

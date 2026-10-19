@@ -39,6 +39,20 @@ final class GabaritMessage {
         }).collect(Collectors.joining("\n"));
     }
 
+    /**
+     * Retire les lignes qui citent une variable sans valeur (information client : heure estimee, cause... facultatives),
+     * sans laisser plus d'une ligne blanche de suite.
+     */
+    static String retirerLignes(String contenu, Set<String> codesVides) {
+        if (contenu == null || codesVides.isEmpty()) {
+            return contenu;
+        }
+        String garde = java.util.Arrays.stream(contenu.split("\\R", -1))
+                .filter(ligne -> codesVides.stream().noneMatch(code -> ligne.contains("{" + code + "}")))
+                .collect(Collectors.joining("\n"));
+        return garde.replaceAll("\\n{3,}", "\n\n").strip();
+    }
+
     /** Remplace chaque {code} par sa valeur ; une variable sans valeur devient vide. */
     static String rendre(String contenu, Map<String, String> valeurs) {
         Matcher m = VARIABLE.matcher(contenu);

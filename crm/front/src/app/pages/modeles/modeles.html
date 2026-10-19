@@ -44,6 +44,14 @@
             <label class="f">{{ marketing() ? 'Usage' : 'Type de relance' }}
               <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types(); track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
             </label>
+            @if (edition.typeCampagne === 'INFORMATION') {
+              <label class="f">Proposé d'office pour
+                <select class="sel" [(ngModel)]="edition.typeInformation">
+                  <option value="">Tout type d'information</option>
+                  @for (t of typesInformation; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
+                </select>
+              </label>
+            }
           </div>
           <div class="f">Canal d'envoi
             <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
@@ -86,7 +94,7 @@
           </div>
         } @else if (choisi(); as m) {
           <div class="entete">
-            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
+            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }}{{ m.typeInformation ? ' · ' + L.typeInformation[m.typeInformation] : '' }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
             @if (peutGerer() && m.statut === 'ACTIF') {
               <div class="actions"><button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button></div>
             }

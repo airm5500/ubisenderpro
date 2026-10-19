@@ -70,6 +70,16 @@ export interface Evenement {
   id: number; nom: string; nature: string; dateDebut: string; dateFin: string | null; annuel: boolean; statut: string;
   prochaineDate: string | null; prochaineFin: string | null; envoiPropose: string | null; modifiePar: string | null; modifieLe: string | null;
 }
+/** Marketing : information client ou alerte operationnelle (livraison, garde, horaires...). */
+export interface Information {
+  id: number; titre: string; typeInformation: string; priorite: string; message: string | null; agenceId: number | null; agence: string | null;
+  tournee: string | null; signataire: string | null; finValidite: string | null; dateLivraison: string | null; creneau: string | null;
+  heureInitiale: string | null; nouvelleHeure: string | null; causeCommunicable: string | null; causeInterne: string | null;
+  dateResolution: string | null; jourFerie: string | null; dateGarde: string | null; heureLimiteCommande: string | null;
+  consignesLivraison: string | null; pharmacienGarde: string | null; telephonePharmacien: string | null; statut: string; expiree: boolean;
+  nbCampagnes: number; derniereCampagne: string | null; derniereCampagneStatut: string | null; creePar: string; modifiePar: string | null;
+  modifieLe: string | null;
+}
 export interface DelaiRelance {
   id: number | null; agenceId: number | null; agenceLibelle: string | null; segment: string | null; segmentLibelle: string | null;
   avantJoursMax: number | null; avantJoursMin: number | null; retardJoursMin: number | null; intervalleJours: number | null;
@@ -123,7 +133,8 @@ export interface Delegation {
 export interface Variable { id: number; code: string; libelle: string; source: string; exemple: string; statut: string; }
 export interface SourceVariable { source: string; libelle: string; }
 export interface ModeleMessage {
-  id: number; nom: string; typeCampagne: string; canal: string; objet: string | null; contenu: string; statut: string; variables: string[];
+  id: number; nom: string; typeCampagne: string; typeInformation: string | null; canal: string; objet: string | null; contenu: string; statut: string;
+  variables: string[];
   metaModele: string | null; metaLangue: string | null; metaEntete: string;
   creePar: string; modifiePar: string; createdAt: string; updatedAt: string;
 }
@@ -223,6 +234,7 @@ export interface PieceJointe { id: number; nature: string; nomFichier: string; t
 export interface CampagneMarketing {
   id: number; nom: string; listeId: number; listeNom: string; modeleId: number; modeleNom: string; promotionIds: number[]; promotions: string[];
   produitIds: number[]; produits: string[]; typeCampagne: string; evenementId: number | null; evenementNom: string | null;
+  informationId: number | null; informationTitre: string | null;
   canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   afficheId: number | null; afficheNom: string | null; afficheType: string | null; joindreProduits: boolean; listeProduitsId: number | null;
   statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;

@@ -326,7 +326,54 @@ class CampagneMarketingIT extends IntegrationBase {
         // Un modele de relance ne cite pas d'evenement
         envoyer(admin, post("/api/recouvrement/modeles-messages"), """
                 {"nom":"Relance fete","typeCampagne":"APRES_ECHEANCE","contenu":"{evenement_nom}"}""").andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Une relance ne cite ni promotion ni événement : retirez {evenement_nom}."));
+                .andExpect(jsonPath("$.message").value("Une relance ne cite ni promotion, ni événement, ni information : retirez {evenement_nom}."));
+    }
+
+    @Test
+    void unRetardDeLivraisonSAnnonceAuxClientsALHeureProgrammee() throws Exception {
+        envoyer(charge, post("/api/marketing/informations"), """
+                {"titre":"Retard","typeInformation":"RETARD_LIVRAISON"}""").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Précisez l'agence ou la tournée concernée par la livraison."));
+        envoyer(charge, post("/api/marketing/informations"), """
+                {"titre":"Annonce","typeInformation":"INFORMATION_GENERALE"}""").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Saisissez le message : le modèle de ce type d'information le cite."));
+        Long retard = idDe(envoyer(charge, post("/api/marketing/informations"), """
+                {"titre":"Camion en panne","typeInformation":"RETARD_LIVRAISON","priorite":"URGENTE","agenceId":1,
+                 "tournee":"Tournée Yopougon Nord","nouvelleHeure":"15 h","causeInterne":"Batterie du camion 3"}""")
+                .andExpect(jsonPath("$.priorite").value("URGENTE")));
+
+        Long modeleRetard = idDe(envoyer(charge, post("/api/marketing/modeles"), """
+                {"nom":"Retard court","typeCampagne":"INFORMATION","typeInformation":"RETARD_LIVRAISON",
+                 "contenu":"Bonjour {nom_pharmacie},\\nretard sur {agence_ou_tournee}.\\nCause : {cause_retard}\\n{nouvelle_estimation_livraison}\\n{direction_signataire}"}""")
+                .andExpect(jsonPath("$.typeCampagne").value("INFORMATION"))
+                .andExpect(jsonPath("$.typeInformation").value("RETARD_LIVRAISON")));
+        envoyer(charge, post("/api/marketing/campagnes"), campagne("Sans information", modeleRetard)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Le modèle cite {agence_ou_tournee}, {cause_retard}, {nouvelle_estimation_livraison}, "
+                        + "{direction_signataire} : choisissez l'information annoncée."));
+        java.time.LocalDateTime heure = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1).atTime(7, 30);
+        Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Retard camion","listeId":%d,"modeleId":%d,"informationId":%d,"dateExecution":"%s"}""".formatted(liste, modeleRetard, retard, heure))
+                .andExpect(jsonPath("$.typeCampagne").value("INFORMATION"))
+                .andExpect(jsonPath("$.informationTitre").value("Camion en panne"))
+                .andExpect(jsonPath("$.dateExecution").value(heure + ":00")));
+        String agence = jdbc.queryForObject("select libelle from crm_agence where id = 1", String.class);
+        // La cause n'est pas communiquee : sa ligne disparait ; la cause interne ne part jamais
+        mvc.perform(get("/api/marketing/campagnes/" + campagne + "/recapitulatif").session(charge))
+                .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros,\nretard sur Tournée Yopougon Nord.\n"
+                        + "Nouvelle estimation de livraison : 15 h\nDirection " + agence));
+
+        mvc.perform(get("/api/marketing/informations").session(charge))
+                .andExpect(jsonPath("$[0].nbCampagnes").value(1)).andExpect(jsonPath("$[0].derniereCampagne").value("Retard camion"));
+        envoyer(charge, post("/api/marketing/informations/" + retard + "/archivage"), "").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("L'information est annoncée par des campagnes en préparation ou programmées : Retard camion. "
+                        + "Annulez-les d'abord."));
+        Long copie = idDe(envoyer(charge, post("/api/marketing/informations/" + retard + "/duplication"), "")
+                .andExpect(jsonPath("$.titre").value("Camion en panne (copie)")).andExpect(jsonPath("$.tournee").value("Tournée Yopougon Nord")));
+        jdbc.update("update crm_information set fin_validite = utc_date() - interval 1 day where id = ?", copie);
+        envoyer(charge, post("/api/marketing/campagnes"), """
+                {"nom":"Trop tard","listeId":%d,"modeleId":%d,"informationId":%d}""".formatted(liste, modeleRetard, copie))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.startsWith("L'information « Camion en panne (copie) » n'est plus valable")));
     }
 
     private String campagne(String nom, Long modeleId) {

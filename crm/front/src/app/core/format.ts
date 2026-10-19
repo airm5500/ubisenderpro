@@ -32,11 +32,18 @@ export const LIBELLES = {
     MESSAGE_LU: '#05253D', REPONSE_RECUE: '#51D78E', SOLDEE: '#157A47'
   } as Partial<Record<string, string>>,
   suiviFacture: { PROMESSE: 'Promesse de paiement', LITIGE: 'Litige', CONTENTIEUX: 'Contentieux' } as Partial<Record<string, string>>,
+  typeInformation: {
+    RETARD_LIVRAISON: 'Retard de livraison', MODIFICATION_TOURNEE: 'Modification de tournée', ANNULATION_TOURNEE: 'Annulation de tournée',
+    REPRISE_LIVRAISON: 'Reprise des livraisons', INFORMATION_GARDE: 'Information de garde', INFORMATION_JOUR_FERIE: 'Jour férié',
+    MODIFICATION_HORAIRES: 'Modification des horaires', FERMETURE_AGENCE: "Fermeture d'agence", INFORMATION_GENERALE: 'Information générale',
+    ALERTE_URGENTE: 'Alerte urgente', RETRAIT_PRODUIT: 'Retrait de produit'
+  } as Partial<Record<string, string>>,
+  prioriteInformation: { NORMALE: 'Normale', IMPORTANTE: 'Importante', URGENTE: 'Urgente', CRITIQUE: 'Critique' } as Partial<Record<string, string>>,
   natureEvenement: { FETE: 'Fête', JOUR_FERIE: 'Jour férié', FERMETURE: 'Fermeture', AUTRE: 'Autre' } as Partial<Record<string, string>>,
   canal: { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail', SMS: 'SMS' } as Partial<Record<string, string>>,
   typeCampagne: {
     AVANT_ECHEANCE: 'Avant échéance', JOUR_ECHEANCE: "Jour d'échéance", APRES_ECHEANCE: 'Après échéance', PERSONNALISEE: 'Personnalisée',
-    PROMOTION: 'Promotion', EVENEMENT: 'Événement'
+    PROMOTION: 'Promotion', EVENEMENT: 'Événement', INFORMATION: 'Information'
   } as Partial<Record<string, string>>,
   recurrence: { QUOTIDIENNE: 'chaque jour', HEBDOMADAIRE: 'chaque semaine', MENSUELLE: 'chaque mois', ANNUELLE: 'chaque année' } as Partial<Record<string, string>>,
   statutCampagne: {

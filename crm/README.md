@@ -608,6 +608,22 @@ API : `POST /api/marketing/produits/{id}/rupture`, `POST /api/marketing/produits
 
 API : `GET/POST /api/marketing/evenements`, `PUT /api/marketing/evenements/{id}`, `POST /api/marketing/evenements/{id}/archivage|reactivation`.
 
+## Informations clients et problemes de livraison (pilote)
+
+Repris d'UbiSenderPro (onglet « Informations Clients »). Menu Marketing > Informations clients (droit `INFORMATIONS`).
+
+- Types : retard de livraison, modification ou annulation de tournee, reprise des livraisons, information de garde, jour ferie,
+  modification des horaires, fermeture d'agence, information generale, alerte urgente, retrait de produit ; priorite normale a critique.
+- Une information porte son contexte : agence, tournee, heure initiale et nouvelle heure estimee, cause communiquee (la cause interne
+  n'est jamais envoyee), garde (jour ferie, heure limite de commande, consignes, pharmacien de garde et son telephone), signataire,
+  fin de validite. Dupliquer, archiver (refuse tant qu'une campagne l'annonce), reactiver.
+- « Annoncer » ouvre une campagne avec le modele prevu pour le type (11 modeles « Info · ... » livres, modifiables), le titre comme nom
+  et un envoi programme a l'heure suivante, modifiable ; la campagne se valide et peut se repeter comme les autres.
+- Variables : `{information_message}`, `{agence_ou_tournee}`, `{tournee}`, `{nouvelle_estimation_livraison}`, `{cause_retard}`,
+  `{date_livraison}`, `{creneau}`, `{date_resolution}`, `{jour_ferie}`, `{date_garde}`, `{heure_limite_commande}`, `{consignes_livraison}`,
+  `{pharmacien_garde}`, `{telephone_pharmacien}`, `{direction_signataire}`. Une ligne du modele dont la variable est vide disparait.
+- Non repris : les anniversaires clients (la base clients ne porte pas de date de naissance).
+
 ## API WhatsApp officielle de Meta (option par numero)
 
 WhatsApp Web (QR code, service `wa-web`) reste le canal par defaut. Un numero enregistre dans WhatsApp Manager peut passer a

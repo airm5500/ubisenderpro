@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class ModeleMessageServiceImpl implements ModeleMessageService {
 
     private static final String SELECT = """
-            select m.id as id, m.nom as nom, m.type_campagne as typeCampagne, m.canal as canal, m.objet as objet, m.contenu as contenu, m.statut as statut,
+            select m.id as id, m.nom as nom, m.type_campagne as typeCampagne, m.type_information as typeInformation, m.canal as canal, m.objet as objet, m.contenu as contenu, m.statut as statut,
                    m.meta_modele as metaModele, m.meta_langue as metaLangue, m.meta_entete as metaEntete,
                    c.nom_complet as creePar, u.nom_complet as modifiePar, m.created_at as createdAt, m.updated_at as updatedAt
             from crm_modele_message m
@@ -46,7 +46,17 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     /** Sources utilisables sans facture ni agent de recouvrement. */
     private static final Set<String> SOURCES_MARKETING = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero",
             "calcul.promotion_nom", "calcul.promotion_code", "calcul.promotion_debut", "calcul.promotion_fin", "calcul.produits_promotion",
-            "calcul.produits_disponibles", "calcul.evenement_nom", "calcul.evenement_date", "calcul.evenement_fin");
+            "calcul.produits_disponibles", "calcul.evenement_nom", "calcul.evenement_date", "calcul.evenement_fin", "calcul.information_titre",
+            "calcul.information_message", "calcul.agence_ou_tournee", "calcul.tournee", "calcul.date_livraison", "calcul.creneau",
+            "calcul.nouvelle_estimation_livraison", "calcul.cause_retard", "calcul.date_resolution", "calcul.jour_ferie", "calcul.date_garde",
+            "calcul.heure_limite_commande", "calcul.consignes_livraison", "calcul.pharmacien_garde", "calcul.telephone_pharmacien",
+            "calcul.direction_signataire");
+
+    /** Variables remplies par l'information client qu'une campagne Marketing annonce. */
+    static final Set<String> SOURCES_INFORMATION = Set.of("calcul.information_titre", "calcul.information_message", "calcul.agence_ou_tournee",
+            "calcul.tournee", "calcul.date_livraison", "calcul.creneau", "calcul.nouvelle_estimation_livraison", "calcul.cause_retard",
+            "calcul.date_resolution", "calcul.jour_ferie", "calcul.date_garde", "calcul.heure_limite_commande", "calcul.consignes_livraison",
+            "calcul.pharmacien_garde", "calcul.telephone_pharmacien", "calcul.direction_signataire");
 
     /** 4 SMS de 153 caracteres. */
     private static final int SMS_LONGUEUR_MAX = 612;
@@ -95,10 +105,13 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
     public ModeleMessageDTO creer(String module, ModeleMessageDemandeDTO demande) {
         verifier(module, demande, null);
         em.createNativeQuery("""
-                insert into crm_modele_message (module, nom, type_campagne, canal, objet, contenu, meta_modele, meta_langue, meta_entete, cree_par, created_at)
-                values (:module, :nom, :typeCampagne, :canal, :objet, :contenu, :metaModele, :metaLangue, :metaEntete, :creePar, utc_timestamp())
+                insert into crm_modele_message (module, nom, type_campagne, type_information, canal, objet, contenu, meta_modele, meta_langue,
+                                                meta_entete, cree_par, created_at)
+                values (:module, :nom, :typeCampagne, :typeInformation, :canal, :objet, :contenu, :metaModele, :metaLangue, :metaEntete, :creePar,
+                        utc_timestamp())
                 """)
                 .setParameter("module", module)
+                .setParameter("typeInformation", typeInformation(module, demande))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("typeCampagne", type(module, demande))
                 .setParameter("canal", canal(demande))
@@ -130,7 +143,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             }
         }
         em.createNativeQuery("""
-                update crm_modele_message set nom = :nom, type_campagne = :typeCampagne, canal = :canal, objet = :objet, contenu = :contenu,
+                update crm_modele_message set nom = :nom, type_campagne = :typeCampagne, type_information = :typeInformation, canal = :canal, objet = :objet, contenu = :contenu,
                        meta_modele = :metaModele, meta_langue = :metaLangue, meta_entete = :metaEntete,
                        modifie_par = :modifiePar, updated_at = utc_timestamp()
                 where id = :id
@@ -143,6 +156,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .setParameter("metaModele", metaModele(demande))
                 .setParameter("metaLangue", metaModele(demande) == null ? null : metaLangue(demande))
                 .setParameter("metaEntete", metaModele(demande) == null ? "AUCUN" : metaEntete(demande))
+                .setParameter("typeInformation", typeInformation(module, demande))
                 .setParameter("modifiePar", utilisateurCourantService.utilisateur().getId())
                 .setParameter("id", id)
                 .executeUpdate();
@@ -196,9 +210,9 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             }
         } else {
             List<String> promotions = utilisees.stream().filter(v -> sourcePromotion(connues.get(v)) || sourceDisponibilite(connues.get(v))
-                    || sourceEvenement(connues.get(v))).map(v -> "{" + v + "}").toList();
+                    || sourceEvenement(connues.get(v)) || sourceInformation(connues.get(v))).map(v -> "{" + v + "}").toList();
             if (!promotions.isEmpty()) {
-                throw new ErreurMetierException("Une relance ne cite ni promotion ni événement : retirez " + String.join(", ", promotions) + ".");
+                throw new ErreurMetierException("Une relance ne cite ni promotion, ni événement, ni information : retirez " + String.join(", ", promotions) + ".");
             }
         }
         // Le nom reste unique tous modules confondus : les journaux et les campagnes le citent
@@ -231,10 +245,29 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
         return source != null && source.startsWith("calcul.evenement_");
     }
 
-    /** Un modele Marketing sert aux promotions ou aux evenements (messages de courtoisie). */
+    /** Variables remplies par l'information client qu'une campagne Marketing annonce. */
+    static boolean sourceInformation(String source) {
+        return SOURCES_INFORMATION.contains(source);
+    }
+
+    /** Type d'information d'un modele d'information ; vide pour les autres modeles. */
+    private static String typeInformation(String module, ModeleMessageDemandeDTO demande) {
+        if (!"INFORMATION".equals(type(module, demande)) || demande.getTypeInformation() == null || demande.getTypeInformation().isBlank()) {
+            return null;
+        }
+        if (!InformationServiceImpl.TYPES.contains(demande.getTypeInformation())) {
+            throw new ErreurMetierException("Type d'information inconnu : " + demande.getTypeInformation() + ".");
+        }
+        return demande.getTypeInformation();
+    }
+
+    /** Un modele Marketing sert aux promotions, aux evenements (courtoisie) ou aux informations (livraison...). */
     private static String type(String module, ModeleMessageDemandeDTO demande) {
         if ("MARKETING".equals(module)) {
-            return "EVENEMENT".equals(demande.getTypeCampagne()) ? "EVENEMENT" : "PROMOTION";
+            return switch (Objects.requireNonNullElse(demande.getTypeCampagne(), "")) {
+                case "EVENEMENT", "INFORMATION" -> demande.getTypeCampagne();
+                default -> "PROMOTION";
+            };
         }
         return demande.getTypeCampagne();
     }
@@ -268,6 +301,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
                 .id(tuple.get("id", Long.class))
                 .nom(tuple.get("nom", String.class))
                 .typeCampagne(tuple.get("typeCampagne", String.class))
+                .typeInformation(tuple.get("typeInformation", String.class))
                 .canal(tuple.get("canal", String.class))
                 .objet(tuple.get("objet", String.class))
                 .contenu(contenu)

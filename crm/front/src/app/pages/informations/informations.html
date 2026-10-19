@@ -1,0 +1,107 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Informations clients</h1>
+      <p class="sous-titre">Problèmes de livraison, gardes et jours fériés, horaires, fermetures, alertes et retraits de produit. Saisissez l'information,
+        puis annoncez-la par une campagne programmée à la date et à l'heure voulues.</p>
+    </div>
+    @if (onglet() !== 'ARCHIVES') { <div class="actions"><button class="ba" type="button" (click)="nouveau()">Nouvelle information</button></div> }
+  </div>
+
+  <div role="tablist" aria-label="Catégorie" class="onglets">
+    @for (o of onglets; track o.code) {
+      <button class="tab" [class.tabon]="onglet() === o.code" role="tab" [attr.aria-selected]="onglet() === o.code" (click)="choisirOnglet(o.code)">{{ o.libelle }}</button>
+    }
+  </div>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Information</th><th>Type</th><th>Priorité</th><th>Concerne</th><th>Annonce</th><th>Modifiée</th><th></th></tr></thead>
+      <tbody>
+        @for (i of visibles(); track i.id) {
+          <tr>
+            <td><strong>{{ i.titre }}</strong>
+              @if (i.nouvelleHeure) { <div class="second">Nouvelle estimation : {{ i.nouvelleHeure }}</div> }
+              @if (i.jourFerie) { <div class="second">{{ i.jourFerie }}@if (i.heureLimiteCommande) { · commandes avant {{ i.heureLimiteCommande }} }</div> }
+              @if (i.expiree) { <div class="second" style="color: var(--alerte)">plus valable depuis le {{ i.finValidite | jour }}</div> }
+              @else if (i.finValidite) { <div class="second">valable jusqu'au {{ i.finValidite | jour }}</div> }
+            </td>
+            <td>{{ L.typeInformation[i.typeInformation] }}</td>
+            <td [style.color]="i.priorite === 'URGENTE' || i.priorite === 'CRITIQUE' ? 'var(--alerte)' : null" [style.font-weight]="i.priorite !== 'NORMALE' ? 700 : null">
+              {{ L.prioriteInformation[i.priorite] }}</td>
+            <td>{{ i.tournee ?? i.agence ?? 'Toutes agences' }}@if (i.tournee && i.agence) { <div class="second">{{ i.agence }}</div> }</td>
+            <td>@if (i.derniereCampagne) { {{ i.derniereCampagne }}<div class="second">{{ L.statutCampagne[i.derniereCampagneStatut!] }}{{ i.nbCampagnes > 1 ? ' · ' + i.nbCampagnes + ' campagnes' : '' }}</div> }
+              @else { <span class="discret">pas encore annoncée</span> }</td>
+            <td><div>{{ i.modifieLe | jour }}</div><div class="second">{{ i.modifiePar }}</div></td>
+            <td class="nw">
+              @if (i.statut === 'ACTIF') {
+                @if (!i.expiree) { <a (click)="annoncer(i)">Annoncer</a> · }
+                <a (click)="modifier(i)">Modifier</a> · <a (click)="action(i, 'duplication')">Dupliquer</a> · <a (click)="action(i, 'archivage')">Archiver</a>
+              } @else { <a (click)="action(i, 'reactivation')">Réactiver</a> }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="vide">{{ onglet() === 'ARCHIVES' ? 'Aucune information archivée.' : 'Aucune information : saisissez un retard de livraison, une garde, une alerte…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="discret">Les modèles de type « Information » citent les détails saisis ici (tournée, heure estimée, cause, pharmacien de garde…). Une ligne du modèle
+    dont le détail n'est pas renseigné disparaît du message. La cause interne n'est jamais envoyée.</p>
+</div>
+
+<p-dialog [header]="cible() ? 'Modifier l\'information' : 'Nouvelle information'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '680px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">Titre<input class="sel" name="titre" [(ngModel)]="edition.titre" placeholder="Ex. Camion en panne sur Yopougon" required></label>
+    <div class="grille">
+      <label class="f">Type
+        <select class="sel" name="typeInformation" [(ngModel)]="edition.typeInformation">@for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
+      </label>
+      <label class="f">Priorité
+        <select class="sel" name="priorite" [(ngModel)]="edition.priorite">@for (p of priorites; track p[0]) { <option [value]="p[0]">{{ p[1] }}</option> }</select>
+      </label>
+      <label class="f">Agence concernée
+        <select class="sel" name="agenceId" [(ngModel)]="edition.agenceId">
+          <option [ngValue]="null">Toutes les agences</option>
+          @for (a of agences(); track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Tournée<input class="sel" name="tournee" [(ngModel)]="edition.tournee" placeholder="Ex. Tournée Yopougon Nord"></label>
+      <label class="f">Signataire<input class="sel" name="signataire" [(ngModel)]="edition.signataire" placeholder="Vide : « Direction » et l'agence"></label>
+      <label class="f">Valable jusqu'au (facultatif)<input class="sel" type="date" name="finValidite" [(ngModel)]="edition.finValidite"></label>
+    </div>
+    <label class="f">Message {{ livraison() || garde() ? '(facultatif)' : '' }}
+      <textarea class="sel" rows="3" name="message" [(ngModel)]="edition.message" placeholder="Texte cité par {information_message} : nouveaux horaires, produit retiré…"></textarea></label>
+    @if (livraison()) {
+      <h2 class="h2" style="margin: 6px 0 0">Détails de la livraison</h2>
+      <div class="grille">
+        <label class="f">Date de livraison<input class="sel" type="date" name="dateLivraison" [(ngModel)]="edition.dateLivraison"></label>
+        <label class="f">Créneau<input class="sel" name="creneau" [(ngModel)]="edition.creneau" placeholder="Ex. matin"></label>
+        <label class="f">Heure initiale<input class="sel" name="heureInitiale" [(ngModel)]="edition.heureInitiale" placeholder="Ex. 10 h"></label>
+        <label class="f">Nouvelle heure estimée<input class="sel" name="nouvelleHeure" [(ngModel)]="edition.nouvelleHeure" placeholder="Ex. 15 h"></label>
+        <label class="f">Cause communiquée au client<input class="sel" name="causeCommunicable" [(ngModel)]="edition.causeCommunicable" placeholder="Ex. panne du véhicule"></label>
+        <label class="f">Cause interne (jamais envoyée)<input class="sel" name="causeInterne" [(ngModel)]="edition.causeInterne"></label>
+        <label class="f">Résolution estimée<input class="sel" type="date" name="dateResolution" [(ngModel)]="edition.dateResolution"></label>
+      </div>
+    }
+    @if (garde()) {
+      <h2 class="h2" style="margin: 6px 0 0">Garde et jour férié</h2>
+      <div class="grille">
+        <label class="f">Jour férié ou occasion<input class="sel" name="jourFerie" [(ngModel)]="edition.jourFerie" placeholder="Ex. la Tabaski"></label>
+        <label class="f">Date de la garde<input class="sel" type="date" name="dateGarde" [(ngModel)]="edition.dateGarde"></label>
+        <label class="f">Heure limite de commande<input class="sel" name="heureLimiteCommande" [(ngModel)]="edition.heureLimiteCommande" placeholder="Ex. 11 h"></label>
+        <label class="f">Consignes de livraison<input class="sel" name="consignesLivraison" [(ngModel)]="edition.consignesLivraison"></label>
+        <label class="f">Pharmacien de garde<input class="sel" name="pharmacienGarde" [(ngModel)]="edition.pharmacienGarde"></label>
+        <label class="f">Téléphone du pharmacien<input class="sel" name="telephonePharmacien" [(ngModel)]="edition.telephonePharmacien"></label>
+      </div>
+    }
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !edition.titre.trim()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>
+
+<app-campagne-marketing-formulaire [(ouvert)]="annonce" [informationInitiale]="aAnnoncer()" (enregistre)="creee($event)" />

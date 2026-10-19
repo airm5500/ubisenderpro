@@ -3,12 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
-import { CampagneMarketing, Evenement, ListeDiffusion, ModeleMessage, Page, PieceJointe, Produit, Promotion } from '../../core/modeles';
+import { CampagneMarketing, Evenement, Information, ListeDiffusion, ModeleMessage, Page, PieceJointe, Produit, Promotion } from '../../core/modeles';
 import { JourPipe } from '../../core/format';
 import { LIBELLES } from '../../core/format';
 
 interface Formulaire {
-  nom: string; listeId: number | null; modeleId: number | null; evenementId: number | null; promotionIds: Set<number>; produitIds: Set<number>; dateExecution: string; recurrence: string; finRecurrence: string;
+  nom: string; listeId: number | null; modeleId: number | null; evenementId: number | null; informationId: number | null; promotionIds: Set<number>; produitIds: Set<number>; dateExecution: string; recurrence: string; finRecurrence: string;
   afficheId: number | null; afficheNom: string; joindreProduits: boolean;
 }
 
@@ -27,12 +27,15 @@ export class CampagneMarketingFormulaire {
   readonly campagne = input<CampagneMarketing | null>(null);
   /** Produits a annoncer, choisis dans le catalogue (nouvelle campagne). */
   readonly produitsInitiaux = input<number[]>([]);
+  /** Information client a annoncer, choisie dans Informations clients (nouvelle campagne). */
+  readonly informationInitiale = input<number | null>(null);
   readonly enregistre = output<CampagneMarketing>();
 
   protected readonly listes = signal<ListeDiffusion[]>([]);
   protected readonly modeles = signal<ModeleMessage[]>([]);
   protected readonly promotions = signal<Promotion[]>([]);
   protected readonly evenements = signal<Evenement[]>([]);
+  protected readonly informations = signal<Information[]>([]);
   /** Produits de retour en stock, et ceux deja cites par la campagne. */
   protected readonly produits = signal<{ id: number; libelle: string; detail: string }[]>([]);
   protected readonly enCours = signal(false);
@@ -44,12 +47,19 @@ export class CampagneMarketingFormulaire {
     const c = this.campagne();
     this.erreur.set(null);
     this.formulaire = c
-      ? { nom: c.nom, listeId: c.listeId, modeleId: c.modeleId, evenementId: c.evenementId, promotionIds: new Set(c.promotionIds), produitIds: new Set(c.produitIds ?? []),
+      ? { nom: c.nom, listeId: c.listeId, modeleId: c.modeleId, evenementId: c.evenementId, informationId: c.informationId, promotionIds: new Set(c.promotionIds), produitIds: new Set(c.produitIds ?? []),
           dateExecution: c.dateExecution ? c.dateExecution.substring(0, 16) : '', recurrence: c.recurrence ?? '', finRecurrence: c.finRecurrence ?? '',
           afficheId: c.afficheId, afficheNom: c.afficheNom ?? '', joindreProduits: c.joindreProduits }
       : { ...this.vide(), produitIds: new Set(this.produitsInitiaux()) };
     this.api.get<ListeDiffusion[]>('/api/marketing/listes').subscribe(l => this.listes.set(l));
-    this.api.get<ModeleMessage[]>('/api/marketing/modeles').subscribe(m => this.modeles.set(m));
+    const information = c ? null : this.informationInitiale();
+    this.api.get<ModeleMessage[]>('/api/marketing/modeles').subscribe(m => {
+      this.modeles.set(m);
+      this.api.get<Information[]>('/api/marketing/informations').subscribe(i => {
+        this.informations.set(i.filter(x => !x.expiree || x.id === this.formulaire.informationId));
+        if (information) this.choisirInformation(information);
+      });
+    });
     this.api.get<Promotion[]>('/api/marketing/promotions', { statut: 'ACTIVE' }).subscribe(p => this.promotions.set(p));
     this.api.get<Evenement[]>('/api/marketing/evenements').subscribe(e => this.evenements.set(e.filter(x => x.prochaineDate || x.id === this.formulaire.evenementId)));
     const choisis = [...this.formulaire.produitIds];
@@ -79,7 +89,7 @@ export class CampagneMarketingFormulaire {
   }
 
   private vide(): Formulaire {
-    return { nom: '', listeId: null, modeleId: null, evenementId: null, promotionIds: new Set(), produitIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '',
+    return { nom: '', listeId: null, modeleId: null, evenementId: null, informationId: null, promotionIds: new Set(), produitIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '',
       afficheId: null, afficheNom: '', joindreProduits: false };
   }
 
@@ -88,6 +98,31 @@ export class CampagneMarketingFormulaire {
     this.formulaire.evenementId = id;
     const e = this.evenements().find(x => x.id === id);
     if (e?.envoiPropose) this.formulaire.dateExecution = e.envoiPropose.substring(0, 16);
+  }
+
+  /** L'information choisie propose le modele prevu pour son type, son titre comme nom et un envoi a l'heure suivante. */
+  choisirInformation(id: number | null): void {
+    this.formulaire.informationId = id;
+    const i = this.informations().find(x => x.id === id);
+    if (!i) return;
+    const actuel = this.modeles().find(m => m.id === this.formulaire.modeleId);
+    if (!actuel || actuel.typeCampagne !== 'INFORMATION' || (actuel.typeInformation && actuel.typeInformation !== i.typeInformation)) {
+      const prevu = this.modeles().find(m => m.typeCampagne === 'INFORMATION' && m.typeInformation === i.typeInformation)
+        ?? this.modeles().find(m => m.typeCampagne === 'INFORMATION' && !m.typeInformation);
+      if (prevu) this.formulaire.modeleId = prevu.id;
+    }
+    if (!this.formulaire.nom.trim()) this.formulaire.nom = i.titre;
+    if (!this.formulaire.dateExecution) {
+      const h = new Date();
+      h.setMinutes(0, 0, 0);
+      h.setHours(h.getHours() + 1);
+      const z = (n: number) => String(n).padStart(2, '0');
+      this.formulaire.dateExecution = `${h.getFullYear()}-${z(h.getMonth() + 1)}-${z(h.getDate())}T${z(h.getHours())}:00`;
+    }
+  }
+
+  protected modeleInformation(): boolean {
+    return this.modeles().find(m => m.id === this.formulaire.modeleId)?.typeCampagne === 'INFORMATION';
   }
 
   protected evenementChoisi(): Evenement | undefined {
@@ -109,7 +144,7 @@ export class CampagneMarketingFormulaire {
   enregistrer(): void {
     const c = this.campagne();
     const f = this.formulaire;
-    const corps = { nom: f.nom.trim(), listeId: f.listeId, modeleId: f.modeleId, evenementId: f.evenementId, promotionIds: [...f.promotionIds], produitIds: [...f.produitIds], dateExecution: f.dateExecution ? f.dateExecution + ':00' : null,
+    const corps = { nom: f.nom.trim(), listeId: f.listeId, modeleId: f.modeleId, evenementId: f.evenementId, informationId: f.informationId, promotionIds: [...f.promotionIds], produitIds: [...f.produitIds], dateExecution: f.dateExecution ? f.dateExecution + ':00' : null,
       recurrence: f.recurrence || null, finRecurrence: f.recurrence && f.finRecurrence ? f.finRecurrence : null,
       afficheId: f.afficheId, joindreProduits: f.joindreProduits && (f.promotionIds.size > 0 || f.produitIds.size > 0) };
     this.enCours.set(true);

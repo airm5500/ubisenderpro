@@ -50,6 +50,22 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.evenement_nom", "Nom de l'événement annoncé (Marketing)");
         SOURCES_CALCULEES.put("calcul.evenement_date", "Premier jour de l'événement annoncé (Marketing)");
         SOURCES_CALCULEES.put("calcul.evenement_fin", "Dernier jour de l'événement annoncé (Marketing)");
+        SOURCES_CALCULEES.put("calcul.information_titre", "Titre de l'information annoncée (Marketing)");
+        SOURCES_CALCULEES.put("calcul.information_message", "Texte libre de l'information annoncée (Marketing)");
+        SOURCES_CALCULEES.put("calcul.agence_ou_tournee", "Tournée de l'information, sinon son agence (Marketing)");
+        SOURCES_CALCULEES.put("calcul.tournee", "Tournée de l'information (Marketing)");
+        SOURCES_CALCULEES.put("calcul.date_livraison", "Date de livraison concernée par l'information (Marketing)");
+        SOURCES_CALCULEES.put("calcul.creneau", "Créneau de livraison de l'information (Marketing)");
+        SOURCES_CALCULEES.put("calcul.nouvelle_estimation_livraison", "« Nouvelle estimation de livraison : » et l'heure saisie (Marketing)");
+        SOURCES_CALCULEES.put("calcul.cause_retard", "Cause communiquée au client (Marketing)");
+        SOURCES_CALCULEES.put("calcul.date_resolution", "Date estimée de résolution (Marketing)");
+        SOURCES_CALCULEES.put("calcul.jour_ferie", "Jour férié ou occasion de la garde (Marketing)");
+        SOURCES_CALCULEES.put("calcul.date_garde", "Date de la garde (Marketing)");
+        SOURCES_CALCULEES.put("calcul.heure_limite_commande", "Heure limite de commande (Marketing)");
+        SOURCES_CALCULEES.put("calcul.consignes_livraison", "Consignes de livraison (Marketing)");
+        SOURCES_CALCULEES.put("calcul.pharmacien_garde", "Pharmacien de garde (Marketing)");
+        SOURCES_CALCULEES.put("calcul.telephone_pharmacien", "Téléphone du pharmacien de garde (Marketing)");
+        SOURCES_CALCULEES.put("calcul.direction_signataire", "Signataire de l'information, sinon « Direction » et son agence (Marketing)");
     }
 
     /** Colonnes techniques jamais proposees. */

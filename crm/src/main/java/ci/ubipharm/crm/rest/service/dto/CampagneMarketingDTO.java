@@ -35,6 +35,9 @@ public class CampagneMarketingDTO {
     /** Evenement du calendrier annonce (message de courtoisie). */
     private Long evenementId;
     private String evenementNom;
+    /** Information client annoncee (livraison, garde, horaires, alerte). */
+    private Long informationId;
+    private String informationTitre;
     private String canal;
     private LocalDateTime dateExecution;
     private String recurrence;

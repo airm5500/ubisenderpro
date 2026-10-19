@@ -24,6 +24,9 @@ public class ModeleMessageDemandeDTO {
     @NotBlank(message = "Choisissez le type de relance.")
     private String typeCampagne;
 
+    /** Modele d'information (Marketing) : type d'information qu'il annonce, pour le proposer d'office. */
+    private String typeInformation;
+
     /** WHATSAPP, EMAIL ou SMS ; vide = WHATSAPP. */
     @Pattern(regexp = "WHATSAPP|EMAIL|SMS", message = "Canal inconnu.")
     private String canal;

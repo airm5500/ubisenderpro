@@ -20,6 +20,8 @@ public class ModeleMessageDTO {
     private Long id;
     private String nom;
     private String typeCampagne;
+    /** Modele d'information : type d'information qu'il annonce d'office. */
+    private String typeInformation;
     private String canal;
     private String objet;
     private String contenu;

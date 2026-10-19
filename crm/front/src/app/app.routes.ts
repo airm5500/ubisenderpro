@@ -13,6 +13,7 @@ export const routes: Routes = [
       { path: 'marketing/campagnes', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagnes-marketing/campagnes-marketing').then(m => m.CampagnesMarketing), title: 'Campagnes promotionnelles' },
       { path: 'marketing/campagnes/:id', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagne-marketing/campagne-marketing').then(m => m.CampagneMarketingSuivi), title: 'Campagne promotionnelle' },
       { path: 'marketing/modeles', canActivate: [droit('MODELES_MARKETING')], data: { module: 'MARKETING' }, loadComponent: () => import('./pages/modeles/modeles').then(m => m.Modeles), title: 'Modèles promotionnels' },
+      { path: 'marketing/informations', canActivate: [droit('INFORMATIONS')], loadComponent: () => import('./pages/informations/informations').then(m => m.Informations), title: 'Informations clients' },
       { path: 'marketing/evenements', canActivate: [droit('EVENEMENTS')], loadComponent: () => import('./pages/evenements/evenements').then(m => m.Evenements), title: 'Calendrier des événements' },
       { path: 'marketing/catalogue', canActivate: [droit('PRODUITS')], loadComponent: () => import('./pages/catalogue/catalogue').then(m => m.Catalogue), title: 'Catalogue des produits' },
       { path: 'marketing/catalogue/import', canActivate: [droit('PRODUITS_GERER')], data: { type: 'produits' }, loadComponent: () => import('./pages/assistant-import/assistant-import').then(m => m.AssistantImport), title: 'Importer des produits' },

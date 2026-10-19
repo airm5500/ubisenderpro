@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.EvenementService;
+import ci.ubipharm.crm.rest.service.InformationService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
@@ -75,6 +76,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                    (select group_concat(concat(p.code, ' · ', p.nom) order by p.code separator '|') from crm_promotion p
                     where find_in_set(p.id, cp.promotion_ids) > 0) as promotionsLibelles,
                    cp.produit_ids as produitIds, cp.type_campagne as typeCampagne, cp.evenement_id as evenementId, ev.nom as evenementNom,
+                   cp.information_id as informationId, inf.titre as informationTitre,
                    (select group_concat(concat(pr.code, ' · ', pr.libelle) order by pr.libelle separator '|') from crm_produit pr
                     where find_in_set(pr.id, cp.produit_ids) > 0) as produitsLibelles,
                    cp.date_execution as dateExecution, cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence,
@@ -90,6 +92,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             join crm_liste_diffusion l on l.id = cp.liste_id
             left join crm_piece_jointe pa on pa.id = cp.affiche_id
             left join crm_evenement ev on ev.id = cp.evenement_id
+            left join crm_information inf on inf.id = cp.information_id
             join crm_utilisateur uc on uc.id = cp.cree_par
             left join crm_utilisateur uv on uv.id = cp.valide_par
             left join crm_utilisateur ur on ur.id = cp.rejete_par
@@ -114,6 +117,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
     private final PromotionService promotionService;
     private final ProduitService produitService;
     private final EvenementService evenementService;
+    private final InformationService informationService;
     private final PieceJointeService pieceJointeService;
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
@@ -176,13 +180,14 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         verifierDemande(demande);
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         em.createNativeQuery("""
-                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, produit_ids, evenement_id, affiche_id,
+                insert into crm_campagne (module, nom, type_campagne, modele_id, liste_id, promotion_ids, produit_ids, evenement_id, information_id, affiche_id,
                                           joindre_produits, criteres, date_execution, recurrence, fin_recurrence, perimetre_agences, cree_par, created_at)
                 values ('MARKETING', :nom, (select type_campagne from crm_modele_message where id = :modeleId), :modeleId, :listeId, :promotionIds,
-                        :produitIds, :evenementId, :afficheId, :joindreProduits, '{}',
+                        :produitIds, :evenementId, :informationId, :afficheId, :joindreProduits, '{}',
                         :dateExecution, :recurrence, :finRecurrence, :perimetreAgences, :creePar, utc_timestamp())
                 """)
                 .setParameter("evenementId", demande.getEvenementId())
+                .setParameter("informationId", demande.getInformationId())
                 .setParameter("produitIds", joindre(produits(demande)))
                 .setParameter("afficheId", demande.getAfficheId())
                 .setParameter("joindreProduits", demande.isJoindreProduits())
@@ -213,6 +218,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         em.createNativeQuery("""
                 update crm_campagne set nom = :nom, modele_id = :modeleId, liste_id = :listeId, promotion_ids = :promotionIds,
                        type_campagne = (select type_campagne from crm_modele_message where id = :modeleId), evenement_id = :evenementId,
+                       information_id = :informationId,
                        produit_ids = :produitIds, affiche_id = :afficheId, joindre_produits = :joindreProduits,
                        date_execution = :dateExecution, recurrence = :recurrence, fin_recurrence = :finRecurrence, statut = 'BROUILLON',
                        soumise_le = null, updated_at = utc_timestamp()
@@ -225,6 +231,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .setParameter("promotionIds", joindre(promotions(demande)))
                 .setParameter("produitIds", joindre(produits(demande)))
                 .setParameter("evenementId", demande.getEvenementId())
+                .setParameter("informationId", demande.getInformationId())
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("modeleId", demande.getModeleId())
                 .setParameter("listeId", demande.getListeId())
@@ -596,13 +603,27 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                     (dto.getDateExecution() != null ? dto.getDateExecution() : maintenant()).toLocalDate()));
         }
 
+        if (dto.getInformationId() != null) {
+            Map<String, String> valeursInformation = informationService.valeursCampagne(dto.getInformationId());
+            valeursPromotions.putAll(valeursInformation);
+            // Une ligne dont le detail facultatif n'est pas renseigne (heure estimee, cause...) disparait du message
+            Set<String> vides = new HashSet<>();
+            sourcesParCode.forEach((code, source) -> {
+                if (ModeleMessageServiceImpl.sourceInformation(source) && valeursInformation.getOrDefault(source, "").isBlank()) {
+                    vides.add(code);
+                }
+            });
+            campagne = new Campagne(dto, GabaritMessage.retirerLignes(campagne.objet(), vides), GabaritMessage.retirerLignes(campagne.contenu(), vides),
+                    campagne.modeleStatut(), campagne.emailAuteur(), campagne.auteurActif(), campagne.perimetre(), campagne.debutRecurrence());
+        }
+
         List<Ligne> resultat = new ArrayList<>();
         Set<String> servis = new HashSet<>();
         for (Tuple t : fiches) {
             Map<String, String> valeurs = new HashMap<>();
             sourcesParCode.forEach((code, source) -> valeurs.put(code,
                     ModeleMessageServiceImpl.sourcePromotion(source) || ModeleMessageServiceImpl.sourceDisponibilite(source)
-                            || ModeleMessageServiceImpl.sourceEvenement(source)
+                            || ModeleMessageServiceImpl.sourceEvenement(source) || ModeleMessageServiceImpl.sourceInformation(source)
                     ? valeursPromotions.getOrDefault(source, "") : valeur(t, source, aliasParSource, dto)));
             Long clientId = t.get("clientId", Long.class);
             if (t.get("desabonneLe") != null) {
@@ -686,7 +707,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         List<String> modeles = em.createNativeQuery("select statut from crm_modele_message where id = :id and module = 'MARKETING'")
                 .setParameter("id", demande.getModeleId()).getResultList();
         if (modeles.isEmpty() || !"ACTIF".equals(modeles.getFirst())) {
-            throw new ErreurMetierException("Choisissez un modèle promotionnel actif.");
+            throw new ErreurMetierException("Choisissez un modèle Marketing actif.");
         }
         @SuppressWarnings("unchecked")
         List<String> listes = em.createNativeQuery("select statut from crm_liste_diffusion where id = :id")
@@ -708,6 +729,10 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             evenementService.verifierCitable(demande.getEvenementId());
         }
         verifierEvenementDuModele(contenus.getFirst(), demande.getEvenementId());
+        if (demande.getInformationId() != null) {
+            informationService.verifierCitable(demande.getInformationId());
+        }
+        verifierInformationDuModele(contenus.getFirst(), demande.getInformationId());
         Recurrence.verifier(demande.getRecurrence(), demande.getFinRecurrence(), demande.getDateExecution(), maintenant().toLocalDate());
         verifierPiecesJointes(demande);
     }
@@ -744,6 +769,19 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         boolean cite = GabaritMessage.variables(texte).stream().anyMatch(v -> ModeleMessageServiceImpl.sourceDisponibilite(sources.get(v)));
         if (cite && produits.isEmpty()) {
             throw new ErreurMetierException("Le modèle cite {produits_disponibles} : choisissez au moins un produit de retour en stock.");
+        }
+    }
+
+    /** Un modele qui cite une variable d'information (tournee, heure estimee...) demande l'information annoncee. */
+    private void verifierInformationDuModele(String texte, Long informationId) {
+        if (informationId != null) {
+            return;
+        }
+        Map<String, String> sources = variableMessageService.sourcesParCode();
+        List<String> citees = GabaritMessage.variables(texte).stream().filter(v -> ModeleMessageServiceImpl.sourceInformation(sources.get(v)))
+                .map(v -> "{" + v + "}").toList();
+        if (!citees.isEmpty()) {
+            throw new ErreurMetierException("Le modèle cite " + String.join(", ", citees) + " : choisissez l'information annoncée.");
         }
     }
 
@@ -903,6 +941,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .typeCampagne(tuple.get("typeCampagne", String.class))
                 .evenementId(tuple.get("evenementId", Long.class))
                 .evenementNom(tuple.get("evenementNom", String.class))
+                .informationId(tuple.get("informationId", Long.class))
+                .informationTitre(tuple.get("informationTitre", String.class))
                 .dateExecution(tuple.get("dateExecution", LocalDateTime.class))
                 .recurrence(tuple.get("recurrence", String.class))
                 .finRecurrence(tuple.get("finRecurrence", java.time.LocalDate.class))

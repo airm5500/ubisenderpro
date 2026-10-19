@@ -38,6 +38,9 @@ public class CampagneMarketingDemandeDTO {
     /** Evenement du calendrier annonce ({evenement_nom}, {evenement_date}, {evenement_fin}). */
     private Long evenementId;
 
+    /** Information client annoncee (livraison, garde, horaires...) ; ses variables se remplissent d'office. */
+    private Long informationId;
+
     /** Affiche deposee (image ou PDF) jointe a chaque message WhatsApp ou e-mail. */
     private Long afficheId;
 
