@@ -1,8 +1,21 @@
 <div class="cadre">
   <nav aria-label="Navigation principale">
     <div class="marque">
-      <img [src]="charte.logo()" [class.logo-perso]="charte.charte()?.logoVersion" alt="" width="44" height="44" style="object-fit: contain">
-      <div><div class="nom">UBIPHARM CI</div><div class="sous">Relation client</div></div>
+      <!-- Logo livre : dessine en ligne pour que l'animation du theme anime le U et le point ; logo depose : anime en bloc -->
+      @if (charte.charte()?.logoVersion) {
+        <img class="logo logo-perso" [src]="charte.logo()" alt="" width="44" height="44" style="object-fit: contain">
+      } @else {
+        <svg class="logo" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+          <defs><clipPath id="logo-cadre"><rect width="64" height="64" rx="14"/></clipPath>
+            <linearGradient id="logo-reflet" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+          <rect width="64" height="64" rx="14" fill="#0B3A5C"/>
+          <path class="logo-u" d="M18 16v18a14 14 0 0 0 28 0V16" fill="none" stroke="var(--vert)" stroke-width="7" stroke-linecap="round"/>
+          <circle class="logo-onde" cx="46" cy="48" r="5" fill="none" stroke="var(--vert)" stroke-width="2"/>
+          <circle class="logo-point" cx="46" cy="48" r="5" fill="#fff"/>
+          <g clip-path="url(#logo-cadre)"><rect class="logo-lueur" x="0" y="-10" width="24" height="84" fill="url(#logo-reflet)" transform="rotate(20)"/></g>
+        </svg>
+      }
+      <div><div class="nom" [attr.aria-label]="nomEntreprise">@for (l of lettres; track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
     </div>
     <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
     @if (!auth.utilisateur()?.motDePasseProvisoire) {

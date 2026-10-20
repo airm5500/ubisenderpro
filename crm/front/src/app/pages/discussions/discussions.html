@@ -38,7 +38,23 @@
               }
             </div>
           }
-          <label class="f">Message<textarea class="sel" name="contenu" rows="4" [(ngModel)]="redac.contenu"></textarea></label>
+          @if (modeles().length) {
+            <label class="f">Modèle (facultatif)
+              <select class="sel" name="modeleRedac" (change)="redac.contenu = modeleTexte($any($event.target).value) || redac.contenu">
+                <option value="">Aucun</option>
+                @for (m of modeles(); track m.id) { <option [value]="m.id">{{ m.nom }}</option> }
+              </select>
+            </label>
+          }
+          <label class="f">Message<textarea class="sel" name="contenu" rows="4" [(ngModel)]="redac.contenu"></textarea>
+            <span class="second">Les variables du modèle se remplissent avec la fiche du client à l'envoi.</span></label>
+          <div class="chips">@for (p of piecesRedac(); track p.id) {
+              <span class="tag"><i class="pi" [class.pi-image]="p.typeMime.startsWith('image/')" [class.pi-file]="!p.typeMime.startsWith('image/')"></i> {{ p.nomFichier }}
+                <button class="bi" type="button" [attr.aria-label]="'Retirer ' + p.nomFichier" (click)="retirer(p.id, 'redac')"><i class="pi pi-times"></i></button></span>
+            }
+            <label class="bs petit"><i class="pi pi-paperclip"></i> {{ depot() ? 'Dépôt…' : 'Joindre un fichier' }}
+              <input type="file" hidden multiple accept="image/jpeg,image/png,application/pdf,.xlsx,.docx" (change)="deposer($any($event.target), 'redac')"></label>
+          </div>
           @if (erreurRedac()) { <div class="erreur">{{ erreurRedac() }}</div> }
           <div class="pied-filtres">
             <button class="bs" type="button" (click)="redaction.set(false)">Annuler</button>
@@ -82,7 +98,21 @@
         </div>
         @if (d.peutRepondre) {
           <form class="saisie-d" (ngSubmit)="envoyer()">
-            <textarea class="sel" name="texte" rows="2" [(ngModel)]="texte" placeholder="Écrire une réponse…"></textarea>
+            <div class="saisie-zone">
+              @if (piecesReponse().length) { <div class="chips">@for (p of piecesReponse(); track p.id) {
+              <span class="tag"><i class="pi" [class.pi-image]="p.typeMime.startsWith('image/')" [class.pi-file]="!p.typeMime.startsWith('image/')"></i> {{ p.nomFichier }}
+                <button class="bi" type="button" [attr.aria-label]="'Retirer ' + p.nomFichier" (click)="retirer(p.id, 'reponse')"><i class="pi pi-times"></i></button></span>
+            }</div> }
+              <textarea class="sel" name="texte" rows="2" [(ngModel)]="texte" placeholder="Écrire une réponse…"></textarea>
+            </div>
+            @if (modeles().length) {
+              <select class="sel modele-d" name="modeleReponse" aria-label="Insérer un modèle" (change)="texte = modeleTexte($any($event.target).value) || texte; $any($event.target).value = ''">
+                <option value="">Modèle…</option>
+                @for (m of modeles(); track m.id) { <option [value]="m.id">{{ m.nom }}</option> }
+              </select>
+            }
+            <label class="bi" pTooltip="Joindre un fichier" tooltipPosition="top" aria-label="Joindre un fichier"><i class="pi pi-paperclip"></i>
+              <input type="file" hidden multiple accept="image/jpeg,image/png,application/pdf,.xlsx,.docx" (change)="deposer($any($event.target), 'reponse')"></label>
             <button class="bp" type="submit" [disabled]="enCours() || !texte.trim()">{{ enCours() ? 'Envoi…' : 'Envoyer' }}</button>
           </form>
         } @else {

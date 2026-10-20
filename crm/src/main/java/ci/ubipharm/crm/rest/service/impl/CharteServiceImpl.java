@@ -51,10 +51,10 @@ public class CharteServiceImpl implements CharteService {
                 .canalDefaut(parametreService.valeur("envoi.canal_defaut", "WHATSAPP"))
                 .modeEnvoiDefaut(parametreService.valeur("whatsapp.mode_envoi_defaut", "WA_WEB"));
         jdbc.query("select code, id, nom_fichier from crm_charte_fichier where actif = true", Map.of(), rs -> {
-            if ("LOGO".equals(rs.getString(1))) {
-                charte.logoVersion(rs.getLong(2)).logoNom(rs.getString(3));
-            } else {
-                charte.iconeVersion(rs.getLong(2)).iconeNom(rs.getString(3));
+            switch (rs.getString(1)) {
+                case "LOGO" -> charte.logoVersion(rs.getLong(2)).logoNom(rs.getString(3));
+                case "BANNIERE" -> charte.banniereVersion(rs.getLong(2)).banniereNom(rs.getString(3));
+                default -> charte.iconeVersion(rs.getLong(2)).iconeNom(rs.getString(3));
             }
         });
         return charte.build();
@@ -73,9 +73,17 @@ public class CharteServiceImpl implements CharteService {
     @Transactional
     public CharteDTO deposer(String code, MultipartFile fichier) {
         String c = verifierCode(code);
-        String libelle = "LOGO".equals(c) ? "Le logo" : "L'icône";
+        String libelle = switch (c) {
+            case "LOGO" -> "Le logo";
+            case "BANNIERE" -> "La bannière";
+            default -> "L'icône";
+        };
         if (fichier == null || fichier.isEmpty()) {
-            throw new ErreurMetierException("Choisissez le fichier de " + ("LOGO".equals(c) ? "logo." : "l'icône."));
+            throw new ErreurMetierException("Choisissez le fichier " + switch (c) {
+                case "LOGO" -> "du logo.";
+                case "BANNIERE" -> "de la bannière.";
+                default -> "de l'icône.";
+            });
         }
         if (fichier.getSize() > TAILLE_MAX) {
             throw new ErreurMetierException(libelle + " dépasse 5 Mo : réduisez-le avant de le déposer.");
@@ -87,6 +95,13 @@ public class CharteServiceImpl implements CharteService {
             throw new UncheckedIOException(e);
         }
         String type = typeReel(contenu, "ICONE".equals(c));
+        if ("BANNIERE".equals(c) && "image/svg+xml".equals(type)) {
+            // WhatsApp n'affiche pas un SVG : la banniere part en image dans les messages
+            type = null;
+        }
+        if ("BANNIERE".equals(c) && type == null) {
+            throw new ErreurMetierException("La bannière doit être une image PNG ou JPEG : elle part dans les messages WhatsApp.");
+        }
         if (type == null) {
             throw new ErreurMetierException(libelle + " doit être une image PNG, JPEG ou SVG" + ("ICONE".equals(c) ? ", ou un fichier .ico." : "."));
         }
@@ -110,14 +125,15 @@ public class CharteServiceImpl implements CharteService {
     public CharteDTO reinitialiser(String code) {
         String c = verifierCode(code);
         if (jdbc.update("update crm_charte_fichier set actif = false where code = :code and actif = true", Map.of("code", c)) > 0) {
-            journalActionService.enregistrer("CHARTE_MODIFICATION", "crm_charte_fichier", null, c + " : retour à celui livré avec l'application");
+            journalActionService.enregistrer("CHARTE_MODIFICATION", "crm_charte_fichier", null,
+                    "BANNIERE".equals(c) ? "BANNIERE : retirée" : c + " : retour à celui livré avec l'application");
         }
         return charte();
     }
 
     private static String verifierCode(String code) {
         String c = code == null ? "" : code.toUpperCase(Locale.ROOT);
-        if (!"LOGO".equals(c) && !"ICONE".equals(c)) {
+        if (!"LOGO".equals(c) && !"ICONE".equals(c) && !"BANNIERE".equals(c)) {
             throw new RessourceIntrouvableException("Élément de charte inconnu");
         }
         return c;

@@ -22,3 +22,56 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
   nav { position: static; height: auto; flex-basis: auto; }
 }
 .module-seul { padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.07); font-size: 13px; font-weight: 700; color: var(--vert); }
+
+/* ---------------------------------------------------------------------
+   Animations du theme (maquette validee le 20/10/2026 : A avec le theme A, B avec B, C avec C)
+   --------------------------------------------------------------------- */
+.logo { flex: none; border-radius: 10px; }
+.logo-onde, .logo-lueur { opacity: 0; }
+.nom span { display: inline-block; }
+.nv { transition: transform .18s ease, background .18s, color .18s; transform-origin: left center; }
+
+/* A : le U se dessine a l'ouverture, menus qui grossissent, boutons qui se soulevent, lueur verte sur le nom */
+:host-context([data-charte="A"]) .logo-u { stroke-dasharray: 80; stroke-dashoffset: 80; animation: logo-trace 1.4s .2s ease-out forwards; }
+:host-context([data-charte="A"]) .logo-point { transform-origin: 46px 48px; transform: scale(0); animation: logo-pop .4s 1.5s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+:host-context([data-charte="A"]) img.logo { animation: logo-apparait .6s ease-out; }
+:host-context([data-charte="A"]) .nv:hover { transform: scale(1.06); background: rgba(81, 215, 142, .18); color: #fff; }
+:host-context([data-charte="A"]) .nom { background: linear-gradient(90deg, #fff 40%, var(--vert) 50%, #fff 60%); background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: nom-balaye 4s linear infinite; }
+
+/* B : le point bat, menus qui glissent avec un trait vert, lettres du nom qui montent a l'ouverture */
+:host-context([data-charte="B"]) .logo-point { transform-origin: 46px 48px; animation: logo-pouls 2.4s ease-in-out infinite; }
+:host-context([data-charte="B"]) .logo-onde { animation: logo-onde 2.4s ease-out infinite; }
+:host-context([data-charte="B"]) img.logo { animation: logo-pouls-bloc 2.4s ease-in-out infinite; }
+:host-context([data-charte="B"]) .nv { border-left: 3px solid transparent; }
+:host-context([data-charte="B"]) .nv:hover { transform: translateX(6px); border-left-color: var(--vert); background: rgba(255, 255, 255, .08); color: #fff; }
+:host-context([data-charte="B"]) .nom span { opacity: 0; transform: translateY(8px); animation: nom-monte .4s forwards; }
+
+/* C : reflet qui traverse le logo, menus qui grossissent et se soulignent, nom qui s'espace au survol */
+:host-context([data-charte="C"]) .logo-lueur { opacity: 1; animation: logo-lueur 3.5s ease-in-out infinite; }
+:host-context([data-charte="C"]) .logo { transition: transform .3s; }
+:host-context([data-charte="C"]) .marque:hover .logo { transform: rotate(-6deg) scale(1.05); }
+:host-context([data-charte="C"]) .nv { position: relative; }
+:host-context([data-charte="C"]) .nv::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; background: var(--vert);
+  transform: scaleX(0); transform-origin: left; transition: transform .25s; }
+:host-context([data-charte="C"]) .nv:hover { transform: scale(1.08); color: var(--vert); background: transparent; }
+:host-context([data-charte="C"]) .nv:hover::after { transform: scaleX(1); }
+:host-context([data-charte="C"]) .nom { transition: letter-spacing .3s, color .3s; }
+:host-context([data-charte="C"]) .marque:hover .nom { letter-spacing: .12em; color: var(--vert); }
+
+@keyframes logo-trace { to { stroke-dashoffset: 0; } }
+@keyframes logo-pop { to { transform: scale(1); } }
+@keyframes logo-apparait { from { opacity: 0; transform: scale(.85); } }
+@keyframes logo-pouls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes logo-pouls-bloc { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes logo-onde { 0% { r: 5; opacity: .9; } 100% { r: 16; opacity: 0; } }
+@keyframes logo-lueur { 0%, 60% { transform: rotate(20deg) translateX(-70px); } 100% { transform: rotate(20deg) translateX(90px); } }
+@keyframes nom-balaye { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes nom-monte { to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .logo *, .logo, .nom, .nom span, .nv, .nv::after { animation: none !important; transition: none !important; }
+  .logo-u { stroke-dashoffset: 0 !important; }
+  .logo-point, .nom span { transform: none !important; opacity: 1 !important; }
+}
+:host-context([data-charte="C"]) .nv.on:hover { background: rgba(81, 215, 142, .16); }

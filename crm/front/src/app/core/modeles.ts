@@ -339,6 +339,8 @@ export interface EnvoiMasse {
   id: number; nom: string; numeroExpediteur: string; contenu: string; statut: 'EN_COURS' | 'TERMINE' | 'ANNULE'; nbDestinataires: number; nbExclus: number;
   nbEnAttente: number; nbEnvoyes: number; nbDistribues: number; nbLus: number; nbEchecs: number; creePar: string; creeLe: string;
   annulePar: string | null; termineLe: string | null; horsPlage: boolean; plageHoraire: string;
+  modeleId: number | null; modeleNom: string | null; departLe: string | null; piecesJointes: PieceJointe[] | null;
 }
 export interface DestinataireMasse { id: number | null; saisi: string | null; numero: string | null; nom: string | null; clientId: number | null; statut: string; motif: string | null; envoyeLe: string | null; }
-export interface EnvoiMasseApercu { envoi: EnvoiMasse | null; nbRetenus: number; exclus: DestinataireMasse[]; exemple: string | null; horsPlage: boolean; plageHoraire: string; }
+export interface EnvoiMasseApercu { envoi: EnvoiMasse | null; nbRetenus: number; exclus: DestinataireMasse[]; exemple: string | null; horsPlage: boolean; plageHoraire: string;
+  piecesJointes: PieceJointe[] | null; variablesRetirees: string[] | null; }

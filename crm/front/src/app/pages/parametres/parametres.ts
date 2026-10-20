@@ -92,7 +92,7 @@ export class Parametres implements OnInit {
     });
   }
 
-  deposer(code: 'logo' | 'icone', evenement: Event): void {
+  deposer(code: 'logo' | 'icone' | 'banniere', evenement: Event): void {
     const champ = evenement.target as HTMLInputElement;
     const fichier = champ.files?.[0];
     champ.value = '';
@@ -101,14 +101,14 @@ export class Parametres implements OnInit {
     }
     this.api.envoyerFichier<Charte>(`/api/charte/${code}`, fichier).subscribe(c => {
       this.charteService.appliquer(c);
-      this.messages.add({ severity: 'success', summary: code === 'logo' ? 'Logo remplacé' : 'Icône remplacée' });
+      this.messages.add({ severity: 'success', summary: code === 'logo' ? 'Logo remplacé' : code === 'banniere' ? 'Bannière enregistrée' : 'Icône remplacée' });
     });
   }
 
-  reinitialiser(code: 'logo' | 'icone'): void {
+  reinitialiser(code: 'logo' | 'icone' | 'banniere'): void {
     this.api.post<Charte>(`/api/charte/${code}/reinitialisation`).subscribe(c => {
       this.charteService.appliquer(c);
-      this.messages.add({ severity: 'success', summary: code === 'logo' ? "Logo d'origine rétabli" : "Icône d'origine rétablie" });
+      this.messages.add({ severity: 'success', summary: code === 'logo' ? "Logo d'origine rétabli" : code === 'banniere' ? 'Bannière retirée' : "Icône d'origine rétablie" });
     });
   }
 

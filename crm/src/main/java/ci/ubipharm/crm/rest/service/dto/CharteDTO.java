@@ -26,6 +26,9 @@ public class CharteDTO {
     private String logoNom;
     private Long iconeVersion;
     private String iconeNom;
+    /** Banniere jointe en tete des messages d'information, null = aucune. */
+    private Long banniereVersion;
+    private String banniereNom;
     private String siteWeb;
     /** WHATSAPP, EMAIL ou SMS : canal propose d'office pour un nouveau modele. */
     private String canalDefaut;
