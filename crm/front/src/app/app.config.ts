@@ -10,6 +10,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 
 import { routes } from './app.routes';
 import { intercepteurErreurs } from './core/intercepteur';
+import { intercepteurGuidage } from './core/intercepteur-guidage';
 import { ErreursNavigateur } from './core/erreurs-navigateur';
 import { Mesures, intercepteurMesures } from './core/mesures';
 
@@ -32,7 +33,7 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: ErreursNavigateur },
     provideRouter(routes, withComponentInputBinding()),
     // Spring Security (csrf.spa) : cookie XSRF-TOKEN, en-tete X-XSRF-TOKEN
-    provideHttpClient(withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }), withInterceptors([intercepteurMesures, intercepteurErreurs])),
+    provideHttpClient(withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }), withInterceptors([intercepteurMesures, intercepteurGuidage, intercepteurErreurs])),
     // Experience utilisateur : temps d'ouverture des ecrans et duree des appels, envoyes au centre de support
     provideAppInitializer(() => inject(Mesures).demarrer()),
     providePrimeNG({

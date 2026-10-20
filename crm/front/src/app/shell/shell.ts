@@ -6,10 +6,11 @@ import { Auth } from '../core/auth';
 import { CharteService } from '../core/charte';
 import { ModuleCourant } from '../core/module-courant';
 import { apresClic, sectionOuverte } from '../core/menu-sections';
+import { Guidage } from './guidage';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Guidage],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
   host: { '[class.repliable]': 'repliable()' }

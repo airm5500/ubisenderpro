@@ -420,3 +420,33 @@ tr.inactif td { color: var(--gris, #6B7C88); }
 @media (prefers-reduced-motion: reduce) {
   :is(.bp, .bs, .ba, .bd), :is(.bp, .bs, .ba, .bd)::before, :is(.bp, .bs, .ba, .bd) > i.pi { transition: none !important; transform: none !important; }
 }
+
+/* =====================================================================
+   Aide et guidage (maquette validee le 20/10/2026 : 1B, 2B, 3C) ; le reste dans shell/guidage.css.
+   ===================================================================== */
+/* 2B : « ? » pose a cote du titre de chaque ecran */
+/* Le bloc du titre passe en grille : titre et « ? » sur la meme ligne, le reste (sous-titre…) en dessous */
+:has(> h1.aide-titre + .aide-q) { display: grid !important; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; }
+:has(> h1.aide-titre + .aide-q) > :not(h1.aide-titre, .aide-q) { grid-column: 1 / -1; }
+.aide-q {
+  display: inline-grid; place-items: center; justify-self: start; margin: 0; width: 26px; height: 26px; padding: 0; flex: none;
+  border: 2px solid var(--vert); border-radius: 50%; background: transparent; color: var(--bleu);
+  font: inherit; font-size: 13px; font-weight: 800; line-height: 1; cursor: pointer; transition: background .15s, color .15s;
+}
+.aide-q:hover, .aide-q[aria-expanded="true"] { background: var(--vert); color: var(--bleu); }
+.aide-q:focus-visible { outline: 2px solid var(--vert); outline-offset: 2px; }
+[data-charte="C"] .page > .entete:first-child .aide-q { color: #fff; }
+[data-charte="C"] .page > .entete:first-child .aide-q:hover { color: var(--bleu); }
+/* Une seule bulle a la fois : celle du guidage remplace l'infobulle courte du bouton survole */
+html[data-bulle="oui"] .p-tooltip { display: none !important; }
+
+/* 3C : champ refuse qui tremble, avec son message ; etape en cours de l'assistant qui pulse */
+.aide-champ-ko { border-color: var(--alerte, #C0392B) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--alerte, #C0392B) 18%, transparent); }
+html[data-guidage="oui"] .aide-champ-ko { animation: aide-secoue .35s; }
+.aide-champ-msg { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--alerte, #C0392B); }
+html[data-guidage="oui"] .etapes .st.courant .stn { animation: aide-pulse 1.6s ease-in-out infinite; }
+@keyframes aide-secoue { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@keyframes aide-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(81, 215, 142, .6); } 50% { box-shadow: 0 0 0 7px rgba(81, 215, 142, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .aide-q, html[data-guidage="oui"] .aide-champ-ko, html[data-guidage="oui"] .etapes .st.courant .stn { animation: none !important; transition: none !important; }
+}
