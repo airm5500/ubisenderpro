@@ -95,11 +95,17 @@ public class PieceJointeServiceImpl implements PieceJointeService {
     @Override
     @Transactional(readOnly = true)
     public List<FichierDTO> piecesDeCampagne(Long campagneId) {
-        List<Map<String, Object>> lignes = jdbc.queryForList("select affiche_id, liste_produits_id from crm_campagne where id = :id",
+        List<Map<String, Object>> lignes = jdbc.queryForList("select affiche_id, liste_produits_id, type_campagne from crm_campagne where id = :id",
                 Map.of("id", campagneId));
         List<FichierDTO> pieces = new ArrayList<>();
         if (lignes.isEmpty()) {
             return pieces;
+        }
+        // Une information sans affiche part sous la banniere de la charte, si elle est deposee
+        if ("INFORMATION".equals(lignes.getFirst().get("type_campagne")) && lignes.getFirst().get("affiche_id") == null
+                && parametreService.oui("marketing.banniere_informations", true)) {
+            pieces.addAll(jdbc.query("select nom_fichier, type_mime, contenu from crm_charte_fichier where code = 'BANNIERE' and actif = true",
+                    Map.of(), (rs, i) -> FichierDTO.builder().nom(rs.getString(1)).typeContenu(rs.getString(2)).contenu(rs.getBytes(3)).build()));
         }
         for (String colonne : List.of("affiche_id", "liste_produits_id")) {
             Object id = lignes.getFirst().get(colonne);

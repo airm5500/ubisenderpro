@@ -241,6 +241,7 @@ details.faq summary { cursor: pointer; font-size: 14px; color: var(--bleu); }
 .apercu-logo { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 10px; background: var(--bleu); }
 .apercu-logo.clair, img.logo-perso { background: #fff; border-radius: 10px; padding: 4px; box-sizing: border-box; }
 .apercu-logo img { object-fit: contain; }
+.apercu-banniere img { display: block; max-width: 240px; max-height: 64px; border-radius: 6px; border: 1px solid var(--bordure); object-fit: contain; }
 .param .court { width: 110px; }
 .param .unite { font-size: 13px; color: var(--texte-2); }
 .param input[type=color] { width: 44px; height: 40px; padding: 2px; border: 1px solid var(--filet); border-radius: 8px; background: #fff; }
@@ -313,7 +314,8 @@ tr.inactif td { color: var(--gris, #6B7C88); }
 [data-charte="A"] section.bloc > :first-child:not(.titre) { margin-top: 16px; }
 [data-charte="A"] section.bloc > .titre { background: var(--bleu); margin: 0 -20px; padding: 14px 20px; align-items: center; color: #fff; }
 [data-charte="A"] section.bloc > .titre :is(h2, h3, .h2, .h) { color: var(--vert); }
-[data-charte="A"] section.bloc > .titre :is(a, .discret, span:not(.cnt)) { color: #D6E0E7; }
+[data-charte="A"] section.bloc > .titre :is(a:not(.bp, .bs, .ba, .bd), .discret, span:not(.cnt)) { color: #D6E0E7; }
+[data-charte="A"] section.bloc > .titre :is(.bp, .bs, .ba, .bd) span { color: inherit; }
 [data-charte="A"] section.bloc > .titre .bp { background: var(--vert); color: var(--bleu); }
 [data-charte="A"] .page > .defile { padding: 12px 16px; }
 [data-charte="A"] .t th { background: var(--fond-2); color: var(--texte); font-weight: 700; }

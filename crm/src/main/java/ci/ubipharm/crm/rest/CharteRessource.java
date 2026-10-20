@@ -35,7 +35,7 @@ public class CharteRessource {
     }
 
     /** Logo ou icone deposes, sinon ceux livres avec l'application. */
-    @GetMapping("/{code:logo|icone}")
+    @GetMapping("/{code:logo|icone|banniere}")
     public ResponseEntity<byte[]> fichier(@PathVariable String code) {
         FichierDTO fichier = charteService.fichier(code);
         if (fichier == null) {
@@ -48,13 +48,13 @@ public class CharteRessource {
                 .body(fichier.getContenu());
     }
 
-    @PostMapping(value = "/{code:logo|icone}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{code:logo|icone|banniere}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('DROIT_PARAMETRES')")
     public CharteDTO deposer(@PathVariable String code, @RequestPart("fichier") MultipartFile fichier) {
         return charteService.deposer(code, fichier);
     }
 
-    @PostMapping("/{code:logo|icone}/reinitialisation")
+    @PostMapping("/{code:logo|icone|banniere}/reinitialisation")
     @PreAuthorize("hasAuthority('DROIT_PARAMETRES')")
     public CharteDTO reinitialiser(@PathVariable String code) {
         return charteService.reinitialiser(code);
