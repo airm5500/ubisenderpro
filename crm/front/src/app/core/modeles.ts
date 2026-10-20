@@ -5,18 +5,30 @@ export interface Erreur { statut: number; message: string; reference?: string; c
 
 /* Centre de support */
 export interface SupportMessage {
-  id: number; type: 'MESSAGE' | 'SYSTEME'; auteurId: number; auteur: string; support: boolean; contenu: string; creeLe: string;
+  id: number; type: 'MESSAGE' | 'SYSTEME'; auteurId: number | null; auteur: string; support: boolean; contenu: string; creeLe: string;
 }
 export interface SupportTicket {
   id: number; sujet: string; categorie: 'QUESTION' | 'INCIDENT' | 'DEMANDE'; priorite: 'NORMALE' | 'HAUTE' | 'URGENTE';
-  statut: 'OUVERT' | 'EN_COURS' | 'RESOLU' | 'FERME'; auteurId: number; auteur: string; assigneId: number | null; assigne: string | null;
+  statut: 'OUVERT' | 'EN_COURS' | 'RESOLU' | 'FERME'; auteurId: number | null; auteur: string; automatique: boolean; erreurId: number | null;
+  assigneId: number | null; assigne: string | null;
   nbMessages: number; dernierMessageLe: string | null; creeLe: string; modifieLe: string | null; messages: SupportMessage[] | null;
 }
 export interface SupportIntervenant { id: number; login: string; nomComplet: string; }
 export interface SupportErreur {
-  id: number; signature: string; origine: 'SERVEUR' | 'NAVIGATEUR'; type: string; message: string | null; detail: string | null;
+  id: number; signature: string; origine: 'SERVEUR' | 'NAVIGATEUR' | 'LENTEUR' | 'SURVEILLANCE'; type: string; message: string | null; detail: string | null;
   chemin: string | null; utilisateur: string | null; occurrences: number; premiereLe: string; derniereLe: string; traite: boolean;
-  traitePar: string | null; traiteLe: string | null;
+  traitePar: string | null; traiteLe: string | null; ticketId: number | null; ticketStatut: string | null;
+}
+/** Experience utilisateur : synthese d'un ecran, d'un appel ou d'un type de mesure (cle ECRAN ou API dans le resume). */
+export interface SupportExperienceLigne { cle: string; nombre: number; moyenneMs: number; maxMs: number; part1s: number; part3s: number; echecs: number; }
+export interface SupportExperienceUtilisateur {
+  utilisateur: string; appels: number; moyenneAppelMs: number; part3s: number; echecs: number; ecrans: number; moyenneEcranMs: number;
+  derniereActivite: string;
+}
+export interface SupportExperiencePoint { le: string; appels: number; moyenneAppelMs: number; moyenneEcranMs: number; part3s: number; }
+export interface SupportExperience {
+  heures: number; actif: boolean; resume: SupportExperienceLigne[]; ecrans: SupportExperienceLigne[]; appels: SupportExperienceLigne[];
+  echecs: SupportExperienceLigne[]; utilisateurs: SupportExperienceUtilisateur[]; serie: SupportExperiencePoint[];
 }
 export interface SupportSonde { code: string; libelle: string; etat: 'OK' | 'ALERTE' | 'KO'; detail: string; dureeMs: number; }
 export interface SupportFaq {

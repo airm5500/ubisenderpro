@@ -40,12 +40,13 @@ public class SupportTicketServiceImpl implements SupportTicketService {
 
     private static final String SELECT = """
             select t.id as id, t.sujet as sujet, t.categorie as categorie, t.priorite as priorite, t.statut as statut,
-                   t.auteur_id as auteurId, a.nom_complet as auteur, t.assigne_id as assigneId, s.nom_complet as assigne,
+                   t.auteur_id as auteurId, coalesce(a.nom_complet, 'Système (automatique)') as auteur, t.assigne_id as assigneId,
+                   s.nom_complet as assigne, (select e.id from crm_support_erreur e where e.ticket_id = t.id order by e.id limit 1) as erreurId,
                    (select count(*) from crm_support_message m where m.ticket_id = t.id and m.type_message = 'MESSAGE') as nbMessages,
                    (select max(m.created_at) from crm_support_message m where m.ticket_id = t.id) as dernierMessageLe,
                    t.created_at as creeLe, t.updated_at as modifieLe
             from crm_support_ticket t
-            join crm_utilisateur a on a.id = t.auteur_id
+            left join crm_utilisateur a on a.id = t.auteur_id
             left join crm_utilisateur s on s.id = t.assigne_id
             """;
 
@@ -87,10 +88,10 @@ public class SupportTicketServiceImpl implements SupportTicketService {
         SupportTicketDTO ticket = ticketAccessible(id);
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = em.createNativeQuery("""
-                select m.id as id, m.type_message as type, m.auteur_id as auteurId, u.nom_complet as auteur, m.contenu as contenu,
-                       m.created_at as creeLe
+                select m.id as id, m.type_message as type, m.auteur_id as auteurId, coalesce(u.nom_complet, 'Système') as auteur,
+                       m.contenu as contenu, m.created_at as creeLe
                 from crm_support_message m
-                join crm_utilisateur u on u.id = m.auteur_id
+                left join crm_utilisateur u on u.id = m.auteur_id
                 where m.ticket_id = :id
                 order by m.id
                 """, Tuple.class).setParameter("id", id).getResultList();
@@ -188,6 +189,40 @@ public class SupportTicketServiceImpl implements SupportTicketService {
     }
 
     @Override
+    @Transactional
+    public Long ouvrirPourErreur(Long erreurId, String sujet, String contenu, Long auteurId) {
+        em.createNativeQuery("""
+                insert into crm_support_ticket (sujet, categorie, priorite, statut, auteur_id, modifie_par, created_at)
+                values (:sujet, 'INCIDENT', 'HAUTE', 'OUVERT', :auteur, :auteur, utc_timestamp())
+                """)
+                .setParameter("sujet", sujet.length() > 200 ? sujet.substring(0, 199) + "…" : sujet).setParameter("auteur", auteurId)
+                .executeUpdate();
+        Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
+        ajouterMessage(id, auteurId, "MESSAGE", contenu);
+        em.createNativeQuery("update crm_support_erreur set ticket_id = :ticket where id = :erreur")
+                .setParameter("ticket", id).setParameter("erreur", erreurId).executeUpdate();
+        if (auteurId == null) {
+            journalActionService.enregistrerSysteme("SUPPORT_TICKET_AUTO", "crm_support_ticket", id, sujet);
+        } else {
+            journalActionService.enregistrer("SUPPORT_TICKET_CREATION", "crm_support_ticket", id, "INCIDENT HAUTE : " + sujet);
+        }
+        return id;
+    }
+
+    @Override
+    @Transactional
+    public void rouvrirPourErreur(Long ticketId, long occurrences) {
+        int n = em.createNativeQuery("""
+                update crm_support_ticket set statut = 'OUVERT', resolu_le = null, modifie_par = null, updated_at = utc_timestamp()
+                where id = :id and statut = 'RESOLU'
+                """).setParameter("id", ticketId).executeUpdate();
+        if (n > 0) {
+            ajouterMessage(ticketId, null, "SYSTEME", "L'erreur est survenue de nouveau (" + occurrences + " survenue(s)) · Statut : Résolu → Ouvert");
+            journalActionService.enregistrerSysteme("SUPPORT_TICKET_STATUT", "crm_support_ticket", ticketId, "Rouvert : l'erreur est survenue de nouveau");
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<SupportIntervenantDTO> intervenants() {
         @SuppressWarnings("unchecked")
@@ -274,8 +309,10 @@ public class SupportTicketServiceImpl implements SupportTicketService {
                 .categorie(tuple.get("categorie", String.class))
                 .priorite(tuple.get("priorite", String.class))
                 .statut(tuple.get("statut", String.class))
-                .auteurId(((Number) tuple.get("auteurId")).longValue())
+                .auteurId(tuple.get("auteurId") == null ? null : ((Number) tuple.get("auteurId")).longValue())
                 .auteur(tuple.get("auteur", String.class))
+                .automatique(tuple.get("auteurId") == null)
+                .erreurId(tuple.get("erreurId") == null ? null : ((Number) tuple.get("erreurId")).longValue())
                 .assigneId(tuple.get("assigneId") == null ? null : ((Number) tuple.get("assigneId")).longValue())
                 .assigne(tuple.get("assigne", String.class))
                 .nbMessages(((Number) tuple.get("nbMessages")).longValue())
@@ -286,13 +323,14 @@ public class SupportTicketServiceImpl implements SupportTicketService {
     }
 
     SupportMessageDTO mapTupleToMessage(Tuple tuple, Long auteurTicket) {
-        Long auteurId = ((Number) tuple.get("auteurId")).longValue();
+        Long auteurId = tuple.get("auteurId") == null ? null : ((Number) tuple.get("auteurId")).longValue();
         return SupportMessageDTO.builder()
                 .id(((Number) tuple.get("id")).longValue())
                 .type(tuple.get("type", String.class))
                 .auteurId(auteurId)
                 .auteur(tuple.get("auteur", String.class))
-                .support(!auteurId.equals(auteurTicket))
+                // Ticket automatique : le premier message (le systeme) est l'erreur, les reponses viennent du support
+                .support(auteurTicket == null ? auteurId != null : auteurId == null || !auteurId.equals(auteurTicket))
                 .contenu(tuple.get("contenu", String.class))
                 .creeLe(tuple.get("creeLe", LocalDateTime.class))
                 .build();

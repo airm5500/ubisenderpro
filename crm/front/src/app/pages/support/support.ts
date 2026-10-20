@@ -3,27 +3,39 @@ import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
+import { ChartModule } from 'primeng/chart';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { JourPipe } from '../../core/format';
-import { SupportErreur, SupportFaq, SupportIntervenant, SupportSonde, SupportTicket } from '../../core/modeles';
+import { SupportErreur, SupportExperience, SupportExperienceLigne, SupportFaq, SupportIntervenant, SupportSonde, SupportTicket } from '../../core/modeles';
 
-type Onglet = 'mes' | 'tous' | 'diagnostic' | 'sante' | 'faq';
+type Onglet = 'mes' | 'tous' | 'diagnostic' | 'sante' | 'experience' | 'faq';
 
 const STATUTS: Record<string, string> = { OUVERT: 'Ouvert', EN_COURS: 'En cours', RESOLU: 'Résolu', FERME: 'Fermé' };
 const CATEGORIES: Record<string, string> = { QUESTION: 'Question', INCIDENT: 'Incident', DEMANDE: 'Demande' };
 const PRIORITES: Record<string, string> = { NORMALE: 'Normale', HAUTE: 'Haute', URGENTE: 'Urgente' };
+const ORIGINES: Record<string, string> = { SERVEUR: 'Serveur', NAVIGATEUR: 'Navigateur', LENTEUR: 'Lenteur', SURVEILLANCE: 'Surveillance' };
+const PERIODES: { heures: number; libelle: string }[] = [
+  { heures: 1, libelle: 'Dernière heure' }, { heures: 6, libelle: '6 dernières heures' }, { heures: 24, libelle: '24 dernières heures' },
+  { heures: 168, libelle: '7 derniers jours' }, { heures: 336, libelle: '14 derniers jours' }
+];
+
+/** Couleur de la charte lue dans les variables CSS, avec sa valeur livree en secours. */
+function couleur(nom: string, defaut: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(nom).trim() || defaut;
+}
 
 interface EditionTicket { sujet: string; categorie: string; priorite: string; message: string; }
 interface EditionFaq { categorie: string; question: string; reponse: string; ordre: number | null; }
 
 /**
- * Centre de support : chacun ouvre et suit ses tickets et lit la FAQ ; le titulaire du droit Support traite tous les tickets,
- * consulte le diagnostic des erreurs et la sante de l'application, et tient la FAQ. Rien ne se supprime.
+ * Centre de support : chacun ouvre et suit ses tickets et lit la FAQ ; le titulaire du droit Support traite tous les tickets
+ * (dont ceux ouverts automatiquement par une erreur), consulte le diagnostic (erreurs, lenteurs, alertes du serveur), la sante,
+ * l'experience vecue par les utilisateurs, exporte le dossier de diagnostic et tient la FAQ. Rien ne se supprime.
  */
 @Component({
   selector: 'app-support',
-  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, ChartModule, JourPipe],
   templateUrl: './support.html'
 })
 export class Support implements OnInit {
@@ -35,6 +47,9 @@ export class Support implements OnInit {
   protected readonly categories = CATEGORIES;
   protected readonly priorites = PRIORITES;
   protected readonly codesStatut = Object.keys(STATUTS);
+  protected readonly origines = ORIGINES;
+  protected readonly codesOrigine = Object.keys(ORIGINES);
+  protected readonly periodes = PERIODES;
 
   protected readonly support = computed(() => this.auth.peut('SUPPORT'));
   protected readonly onglet = signal<Onglet>('mes');
@@ -53,7 +68,39 @@ export class Support implements OnInit {
   // Diagnostic
   protected readonly erreurs = signal<SupportErreur[] | null>(null);
   protected readonly traitees = signal(false);
+  protected readonly filtreOrigine = signal('');
   protected readonly erreurDetail = signal<SupportErreur | null>(null);
+
+  // Experience utilisateur
+  protected readonly experience = signal<SupportExperience | null>(null);
+  protected readonly heures = signal(24);
+  protected readonly resumeAppels = computed(() => this.experience()?.resume.find(r => r.cle === 'API') ?? null);
+  protected readonly resumeEcrans = computed(() => this.experience()?.resume.find(r => r.cle === 'ECRAN') ?? null);
+  protected readonly courbe = computed(() => {
+    const e = this.experience();
+    if (!e || e.serie.length < 2) return null;
+    const bleu = couleur('--bleu', '#05253D');
+    const vert = couleur('--vert', '#51D78E');
+    const heureSeule = e.heures <= 24;
+    return {
+      labels: e.serie.map(p => {
+        const d = new Date(p.le + 'Z');
+        const heure = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        return heureSeule ? heure : `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${heure}`;
+      }),
+      datasets: [
+        { label: 'Appel moyen (ms)', data: e.serie.map(p => p.appels ? p.moyenneAppelMs : null), borderColor: bleu, backgroundColor: bleu,
+          tension: 0.3, pointRadius: 2, spanGaps: true },
+        { label: 'Ouverture d\'écran moyenne (ms)', data: e.serie.map(p => p.moyenneEcranMs || null), borderColor: vert, backgroundColor: vert,
+          tension: 0.3, pointRadius: 2, spanGaps: true }
+      ]
+    };
+  });
+  protected readonly optionsCourbe = {
+    maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom' } },
+    scales: { y: { beginAtZero: true, ticks: { callback: (v: number) => `${v} ms` } } }
+  };
 
   // Sante
   protected readonly sondes = signal<SupportSonde[] | null>(null);
@@ -93,6 +140,9 @@ export class Support implements OnInit {
         break;
       case 'sante':
         if (!this.sondes()) this.sonder();
+        break;
+      case 'experience':
+        this.chargerExperience();
         break;
       case 'faq':
         this.chargerFaq();
@@ -171,7 +221,62 @@ export class Support implements OnInit {
 
   chargerErreurs(): void {
     this.erreurs.set(null);
-    this.api.get<SupportErreur[]>('/api/support/erreurs', { traitees: this.traitees() }).subscribe(e => this.erreurs.set(e));
+    this.api.get<SupportErreur[]>('/api/support/erreurs', { traitees: this.traitees(), origine: this.filtreOrigine() })
+      .subscribe(e => this.erreurs.set(e));
+  }
+
+  filtrerOrigine(origine: string): void {
+    this.filtreOrigine.set(origine);
+    this.chargerErreurs();
+  }
+
+  /** Ouvre le detail d'une erreur depuis le ticket qu'elle a ouvert. */
+  voirErreur(id: number): void {
+    this.api.get<SupportErreur>(`/api/support/erreurs/${id}`).subscribe(e => this.erreurDetail.set(e));
+  }
+
+  /** Ouvre le ticket d'une erreur depuis son detail. */
+  voirTicket(id: number): void {
+    this.erreurDetail.set(null);
+    if (!this.intervenants().length) {
+      this.api.get<SupportIntervenant[]>('/api/support/intervenants').subscribe(i => this.intervenants.set(i));
+    }
+    this.consulter({ id } as SupportTicket);
+  }
+
+  creerTicket(e: SupportErreur): void {
+    this.api.post<SupportTicket>(`/api/support/erreurs/${e.id}/ticket`).subscribe(t => {
+      this.messages.add({ severity: 'success', summary: 'Ticket ouvert', detail: `n° ${t.id} · ${t.sujet}` });
+      this.erreurDetail.set(null);
+      this.chargerErreurs();
+      this.voirTicket(t.id);
+    });
+  }
+
+  /** Ticket rattache encore actif : l'erreur est suivie, pas besoin d'en ouvrir un autre. */
+  ticketActif(e: SupportErreur): boolean {
+    return e.ticketId !== null && e.ticketStatut !== 'FERME';
+  }
+
+  exporter(): void {
+    this.api.telecharger('/api/support/diagnostic/export', 'diagnostic-crm.zip');
+  }
+
+  // ---- Experience utilisateur ----
+
+  chargerExperience(): void {
+    this.experience.set(null);
+    this.api.get<SupportExperience>('/api/support/experience', { heures: this.heures() }).subscribe(e => this.experience.set(e));
+  }
+
+  choisirPeriode(heures: number): void {
+    this.heures.set(Number(heures));
+    this.chargerExperience();
+  }
+
+  /** Lenteur ressentie : moyenne d'au moins 3 s ou 10 % des mesures a 3 s et plus. */
+  lent(l: SupportExperienceLigne): boolean {
+    return l.moyenneMs >= 3000 || l.part3s >= 10;
   }
 
   basculerTraitees(): void {

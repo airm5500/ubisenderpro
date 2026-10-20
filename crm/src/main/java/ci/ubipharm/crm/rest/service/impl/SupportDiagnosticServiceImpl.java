@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.security.core.Authentication;
@@ -24,12 +25,17 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.SupportDiagnosticService;
+import ci.ubipharm.crm.rest.service.SupportTicketService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.dto.SupportErreurDTO;
 import ci.ubipharm.crm.rest.service.dto.SupportErreurNavigateurDTO;
+import ci.ubipharm.crm.rest.service.dto.SupportTicketDTO;
 import ci.ubipharm.crm.rest.service.dto.UtilisateurPrincipal;
+import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
 import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
+import ci.ubipharm.crm.socle.support.NotificationSupport;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,12 +47,16 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
             select e.id as id, e.signature as signature, e.origine as origine, e.type_erreur as type, e.message as message,
                    e.detail as detail, e.chemin as chemin, u.nom_complet as utilisateur, e.occurrences as occurrences,
                    e.premiere_le as premiereLe, e.derniere_le as derniereLe, e.traite as traite, tp.nom_complet as traitePar,
-                   e.traite_le as traiteLe
+                   e.traite_le as traiteLe, e.ticket_id as ticketId, t.statut as ticketStatut
             from crm_support_erreur e
+            left join crm_support_ticket t on t.id = e.ticket_id
             left join crm_utilisateur u on u.id = e.utilisateur_id
             left join crm_utilisateur tp on tp.id = e.traite_par
             """;
 
+    static final Set<String> ORIGINES = Set.of("SERVEUR", "NAVIGATEUR", "LENTEUR", "SURVEILLANCE");
+    private static final Map<String, String> LIBELLES_ORIGINE = Map.of("SERVEUR", "serveur", "NAVIGATEUR", "navigateur", "LENTEUR", "lenteur",
+            "SURVEILLANCE", "surveillance du serveur");
     private static final int MAX_DETAIL = 20000;
     /** Au-dela, la table des compteurs est videe : elle ne sert qu'a la minute en cours. */
     private static final int MAX_SIGNATURES_SUIVIES = 2000;
@@ -55,17 +65,22 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
     private final ParametreService parametreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
+    private final SupportTicketService supportTicketService;
+    private final NotificationSupport notificationSupport;
     private final TransactionTemplate transactionSeparee;
 
     /** Fenetre de chaque signature : [debut en millisecondes, nombre d'enregistrements]. */
     private final Map<String, long[]> compteurs = new ConcurrentHashMap<>();
 
     public SupportDiagnosticServiceImpl(EntityManager em, ParametreService parametreService, UtilisateurCourantService utilisateurCourantService,
-            JournalActionService journalActionService, PlatformTransactionManager transactions) {
+            JournalActionService journalActionService, SupportTicketService supportTicketService, NotificationSupport notificationSupport,
+            PlatformTransactionManager transactions) {
         this.em = em;
         this.parametreService = parametreService;
         this.utilisateurCourantService = utilisateurCourantService;
         this.journalActionService = journalActionService;
+        this.supportTicketService = supportTicketService;
+        this.notificationSupport = notificationSupport;
         this.transactionSeparee = new TransactionTemplate(transactions);
         this.transactionSeparee.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -80,7 +95,7 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
             StringWriter pile = new StringWriter();
             erreur.printStackTrace(new PrintWriter(pile));
             String detail = (reference == null ? "" : "Référence " + reference + "\n") + pile;
-            enregistrer("SERVEUR", erreur.getClass().getName(), erreur.getMessage(), detail, chemin);
+            enregistrer("SERVEUR", erreur.getClass().getName(), erreur.getMessage(), detail, chemin, utilisateurConnecte());
         } catch (Throwable t) {
             log.warn("Capture d'erreur serveur impossible : {}", t.toString());
         }
@@ -93,21 +108,35 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
                 return;
             }
             String type = erreur.getType() == null || erreur.getType().isBlank() ? "Error" : erreur.getType().trim();
-            enregistrer("NAVIGATEUR", type, erreur.getMessage(), erreur.getPile(), erreur.getUrl());
+            enregistrer("NAVIGATEUR", type, erreur.getMessage(), erreur.getPile(), erreur.getUrl(), utilisateurConnecte());
         } catch (Throwable t) {
             log.warn("Capture d'erreur navigateur impossible : {}", t.toString());
         }
     }
 
-    /** Insertion ou increment du compteur de la signature, dans sa propre transaction ; les repetitions au-dela du plafond sont ignorees. */
-    private void enregistrer(String origine, String type, String message, String detail, String chemin) {
+    @Override
+    public void signaler(String origine, String type, String message, String detail, String chemin, Long utilisateurId) {
+        try {
+            if (!ORIGINES.contains(origine)) {
+                throw new IllegalArgumentException("Origine inconnue : " + origine);
+            }
+            enregistrer(origine, type, message, detail, chemin, utilisateurId);
+        } catch (Throwable t) {
+            log.warn("Signalement {} impossible : {}", origine, t.toString());
+        }
+    }
+
+    /**
+     * Insertion ou increment du compteur de la signature, dans sa propre transaction ; les repetitions au-dela du plafond sont ignorees.
+     * Le ticket automatique s'ouvre dans la meme transaction ; l'e-mail qui le signale part ensuite, en arriere-plan.
+     */
+    private void enregistrer(String origine, String type, String message, String detail, String chemin, Long utilisateurId) {
         String typeCourt = tronquer(type, 255);
         String signature = signature(typeCourt, message);
-        Long utilisateurId = utilisateurConnecte();
-        transactionSeparee.executeWithoutResult(statut -> {
+        Long ticket = transactionSeparee.execute(statut -> {
             int plafond = parametreService.entier("support.capture_max_minute", 10);
             if (!autorise(signature, plafond)) {
-                return;
+                return null;
             }
             em.createNativeQuery("""
                     insert into crm_support_erreur (signature, origine, type_erreur, message, detail, chemin, utilisateur_id, occurrences,
@@ -121,7 +150,69 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
                     .setParameter("message", tronquer(message, 2000)).setParameter("detail", tronquer(detail, MAX_DETAIL))
                     .setParameter("chemin", tronquer(chemin, 500)).setParameter("utilisateur", utilisateurId)
                     .executeUpdate();
+            return ticketAutomatique(signature);
         });
+        if (ticket != null) {
+            notificationSupport.ticketAutomatique(ticket);
+        }
+    }
+
+    /**
+     * Ticket automatique : des la 1re survenue d'une erreur du serveur ou d'une alerte de la surveillance, a partir du seuil pour
+     * une erreur du navigateur, jamais pour une simple lenteur. Une erreur dont le ticket est en cours n'en ouvre pas d'autre ;
+     * celle d'un ticket resolu le rouvre. Plafond quotidien contre les rafales. Renvoie le ticket ouvert, null sinon.
+     */
+    private Long ticketAutomatique(String signature) {
+        if (!parametreService.oui("support.ticket_auto", true)) {
+            return null;
+        }
+        SupportErreurDTO erreur = mapTupleToDto((Tuple) em.createNativeQuery(SELECT + " where e.signature = :signature", Tuple.class)
+                .setParameter("signature", signature).getSingleResult());
+        if (erreur.getTicketId() != null && !"FERME".equals(erreur.getTicketStatut())) {
+            if ("RESOLU".equals(erreur.getTicketStatut())) {
+                supportTicketService.rouvrirPourErreur(erreur.getTicketId(), erreur.getOccurrences());
+            }
+            return null;
+        }
+        int seuil = switch (erreur.getOrigine()) {
+            case "SERVEUR", "SURVEILLANCE" -> 1;
+            case "NAVIGATEUR" -> parametreService.entier("support.ticket_auto_seuil_navigateur", 5);
+            default -> Integer.MAX_VALUE;
+        };
+        if (erreur.getOccurrences() < seuil) {
+            return null;
+        }
+        long aujourdhui = ((Number) em.createNativeQuery(
+                "select count(*) from crm_support_ticket where auteur_id is null and created_at >= utc_date()").getSingleResult()).longValue();
+        if (aujourdhui >= parametreService.entier("support.ticket_auto_max_jour", 10)) {
+            return null;
+        }
+        return supportTicketService.ouvrirPourErreur(erreur.getId(), sujet(erreur), contenu(erreur, true), null);
+    }
+
+    static String sujet(SupportErreurDTO erreur) {
+        String type = erreur.getType().contains(".") && !erreur.getType().contains(" ")
+                ? erreur.getType().substring(erreur.getType().lastIndexOf('.') + 1) : erreur.getType();
+        String message = erreur.getMessage() == null || erreur.getMessage().isBlank() ? "" : " : " + erreur.getMessage().replaceAll("\\s+", " ");
+        return "[Auto] " + type + message;
+    }
+
+    private static String contenu(SupportErreurDTO erreur, boolean automatique) {
+        StringBuilder texte = new StringBuilder(automatique ? "Ticket ouvert automatiquement par le diagnostic du centre de support.\n\n" : "");
+        texte.append("Origine : ").append(LIBELLES_ORIGINE.getOrDefault(erreur.getOrigine(), erreur.getOrigine())).append('\n');
+        texte.append("Erreur : ").append(erreur.getType()).append('\n');
+        if (erreur.getMessage() != null && !erreur.getMessage().isBlank()) {
+            texte.append("Message : ").append(erreur.getMessage()).append('\n');
+        }
+        if (erreur.getChemin() != null) {
+            texte.append("Écran ou adresse : ").append(erreur.getChemin()).append('\n');
+        }
+        if (erreur.getUtilisateur() != null) {
+            texte.append("Utilisateur concerné : ").append(erreur.getUtilisateur()).append('\n');
+        }
+        texte.append("Survenues : ").append(erreur.getOccurrences()).append('\n');
+        texte.append("\nLe détail technique se lit dans Centre de support, onglet Diagnostic.");
+        return texte.toString();
     }
 
     /** Limite le nombre d'enregistrements d'une meme signature sur une fenetre d'une minute ouverte par sa premiere survenue. */
@@ -137,11 +228,31 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SupportErreurDTO> lister(boolean traitees) {
+    public List<SupportErreurDTO> lister(boolean traitees, String origine) {
+        boolean filtre = origine != null && !origine.isBlank();
+        if (filtre && !ORIGINES.contains(origine)) {
+            throw new ErreurMetierException("Origine inconnue : " + origine + ".");
+        }
+        Query requete = em.createNativeQuery(SELECT + " where e.traite = :traite" + (filtre ? " and e.origine = :origine" : "")
+                + " order by e.derniere_le desc, e.id desc limit 500", Tuple.class).setParameter("traite", traitees);
+        if (filtre) {
+            requete.setParameter("origine", origine);
+        }
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery(SELECT + " where e.traite = :traite order by e.derniere_le desc, e.id desc limit 500", Tuple.class)
-                .setParameter("traite", traitees).getResultList();
+        List<Tuple> lignes = requete.getResultList();
         return lignes.stream().map(this::mapTupleToDto).toList();
+    }
+
+    @Override
+    @Transactional
+    public SupportTicketDTO creerTicket(Long id) {
+        SupportErreurDTO erreur = consulter(id);
+        if (erreur.getTicketId() != null && !"FERME".equals(erreur.getTicketStatut())) {
+            throw new ErreurMetierException("Cette erreur a déjà son ticket, le n° " + erreur.getTicketId() + ".");
+        }
+        Long ticket = supportTicketService.ouvrirPourErreur(id, sujet(erreur).replaceFirst("^\\[Auto\\] ", ""), contenu(erreur, false),
+                utilisateurCourantService.utilisateur().getId());
+        return supportTicketService.consulter(ticket);
     }
 
     @Override
@@ -172,7 +283,9 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
         return n;
     }
 
-    private SupportErreurDTO consulter(Long id) {
+    @Override
+    @Transactional(readOnly = true)
+    public SupportErreurDTO consulter(Long id) {
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = em.createNativeQuery(SELECT + " where e.id = :id", Tuple.class).setParameter("id", id).getResultList();
         if (lignes.isEmpty()) {
@@ -226,6 +339,8 @@ public class SupportDiagnosticServiceImpl implements SupportDiagnosticService {
                 .traite(Boolean.TRUE.equals(tuple.get("traite", Boolean.class)))
                 .traitePar(tuple.get("traitePar", String.class))
                 .traiteLe(tuple.get("traiteLe", LocalDateTime.class))
+                .ticketId(tuple.get("ticketId") == null ? null : ((Number) tuple.get("ticketId")).longValue())
+                .ticketStatut(tuple.get("ticketStatut", String.class))
                 .build();
     }
 }

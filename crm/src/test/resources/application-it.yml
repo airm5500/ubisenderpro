@@ -23,3 +23,6 @@ crm:
     envoi: false
   sms:
     envoi: false
+  # La surveillance du serveur (temoin d'arret brutal, releves) se teste a part
+  support:
+    surveillance: false
