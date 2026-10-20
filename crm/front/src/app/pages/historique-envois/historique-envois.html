@@ -43,7 +43,7 @@
 
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th></tr></thead>
+      <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th><th></th></tr></thead>
       <tbody>
         @for (e of page()?.elements; track e.cle) {
           <tr class="cliquable" (click)="basculer(e)">
@@ -60,9 +60,10 @@
             <td class="nw"><span [pTooltip]="e.statut === 'A_ENVOYER' ? 'En attente : les messages partent dans la plage d\'envoi du canal (Paramètres), au rythme des relances, campagnes en premier.' : ''" tooltipPosition="top" [class.attente]="e.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[e.statut]"></span>{{ L.statutMessage[e.statut] ?? e.statut }}@if (e.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>
               @if (e.motif) { <div class="second" style="white-space: normal; max-width: 220px">{{ e.motif }}</div> }
               @if (e.luLe) { <div class="second">lu le {{ e.luLe | jour: true }}</div> } @else if (e.distribueLe) { <div class="second">distribué le {{ e.distribueLe | jour: true }}</div> }</td>
+            <td class="nw">@if (e.contenu) { <button type="button" class="bi" pTooltip="Voir le message" tooltipPosition="top" aria-label="Voir le message" (click)="$event.stopPropagation(); visualise.set(e)"><i class="pi pi-eye"></i></button> }</td>
           </tr>
         } @empty {
-          <tr><td colspan="7" class="vide">{{ page() ? 'Aucun envoi ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          <tr><td colspan="8" class="vide">{{ page() ? 'Aucun envoi ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>
@@ -75,3 +76,24 @@
     </div>
   }
 </div>
+
+<!-- Visualisation du message tel que le client l'a recu, selon le canal -->
+<p-dialog [header]="visualise()?.clientNom || 'Message envoyé'" [visible]="visualise() !== null" (visibleChange)="!$event && visualise.set(null)" [modal]="true" [style]="{ width: '520px' }">
+  @if (visualise(); as e) {
+    <p class="sous-titre" style="margin-top: 0">{{ L.origineEnvoi[e.origine] }}@if (e.source) { · {{ e.source }} } · {{ L.canal[e.canal] }} · {{ e.le | jour: true }}
+      @if (e.utilisateurNom) { · par {{ e.utilisateurNom }} }</p>
+    @if (e.canal === 'EMAIL') {
+      <div class="courriel">
+        <div class="ent"><span>À <strong>{{ e.destinataire }}</strong></span></div>
+        <div class="corps">{{ e.contenu }}</div>
+      </div>
+    } @else if (e.canal === 'SMS') {
+      <div class="fil-sms">@if (e.destinataire) { <div class="exp">vers {{ e.destinataire | telephone }}</div> }<div class="bulle">{{ e.contenu }}</div></div>
+    } @else {
+      <div class="fil-wa"><div class="out">{{ e.contenu }}<span class="meta">@if (e.expediteur) { de {{ e.expediteur | telephone }} } @if (e.destinataire) { vers {{ e.destinataire | telephone }} }</span></div></div>
+    }
+    <p class="second" style="margin: 12px 0 0"><span class="dot" [style.background]="L.couleurMessage[e.statut]"></span>{{ L.statutMessage[e.statut] ?? e.statut }}
+      @if (e.luLe) { · lu le {{ e.luLe | jour: true }} } @else if (e.distribueLe) { · distribué le {{ e.distribueLe | jour: true }} }
+      @if (e.motif) { · {{ e.motif }} }</p>
+  }
+</p-dialog>

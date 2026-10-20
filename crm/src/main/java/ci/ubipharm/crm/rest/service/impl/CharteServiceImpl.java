@@ -47,6 +47,7 @@ public class CharteServiceImpl implements CharteService {
                 .theme(parametreService.valeur("charte.theme", "A"))
                 .couleurFond(parametreService.valeur("charte.couleur_fond", "#EEF1F4"))
                 .couleurSurvol(parametreService.valeur("charte.couleur_survol", "#E6F8EE"))
+                .menuRepliable(parametreService.oui("charte.menu_repliable", false))
                 .siteWeb(parametreService.valeur("entreprise.site_web", null))
                 .canalDefaut(parametreService.valeur("envoi.canal_defaut", "WHATSAPP"))
                 .modeEnvoiDefaut(parametreService.valeur("whatsapp.mode_envoi_defaut", "WA_WEB"));

@@ -15,6 +15,7 @@
     <label class="f">Du<input class="sel" type="date" name="du" [(ngModel)]="filtres.du"></label>
     <label class="f">au<input class="sel" type="date" name="au" [(ngModel)]="filtres.au"></label>
     <button class="bp" type="submit">Actualiser</button>
+    <button class="bs" type="button" (click)="calendrier.set(true)"><i class="pi pi-calendar"></i> Calendrier</button>
   </form>
   @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
 
@@ -96,3 +97,10 @@
     }
   }
 </div>
+
+<!-- Calendrier d'activite, comme dans UbiSenderPro : campagnes, messages, promotions et evenements jour par jour -->
+<p-dialog header="Calendrier d'activité Marketing" [visible]="calendrier()" (visibleChange)="calendrier.set($event)" [modal]="true" [style]="{ width: '980px' }" [breakpoints]="{ '1020px': '96vw' }">
+  @if (calendrier()) {
+    <app-calendrier-activite url="/api/marketing/tableau-de-bord/calendrier" (jourChoisi)="voirJour($event)" />
+  }
+</p-dialog>

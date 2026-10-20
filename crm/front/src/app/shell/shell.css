@@ -9,7 +9,19 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .md { text-decoration: none; cursor: pointer; }
 .md:hover { color: #fff; }
 .mdon, .mdon:hover { background: var(--vert); color: var(--bleu); }
-.gl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--vert); padding: 16px 12px 6px; font-weight: 700; }
+.gl { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; background: transparent; font-family: inherit; text-align: left; cursor: default; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--vert); padding: 16px 12px 6px; font-weight: 700; }
+/* Sections repliables (parametre charte.menu_repliable) : le titre devient un bouton, une seule section ouverte */
+.chevron { display: none; font-size: 10px; transition: transform .25s; }
+.liens { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .25s ease; }
+/* clip et non hidden : laisse deborder le grossissement des menus au survol (themes A et C) */
+.liens > div { min-height: 0; overflow: clip; overflow-clip-margin: 8px; display: flex; flex-direction: column; gap: 2px; }
+:host(.repliable) .gl { cursor: pointer; border-radius: 8px; }
+:host(.repliable) .gl:hover { background: rgba(255,255,255,.06); }
+:host(.repliable) .gl:focus-visible { outline: 2px solid var(--vert); outline-offset: -2px; }
+:host(.repliable) .chevron { display: inline-block; }
+.fermee .chevron { transform: rotate(-90deg); }
+.fermee .liens { grid-template-rows: 0fr; }
+@media (prefers-reduced-motion: reduce) { .liens, .chevron { transition: none; } }
 .nv { display: block; padding: 8px 12px; border-radius: 8px; color: #B8C7D3; text-decoration: none; font-size: 14px; font-weight: 500; }
 .nv:hover { color: #fff; background: rgba(255,255,255,.06); }
 .nv.on { color: #fff; background: rgba(81,215,142,.16); font-weight: 700; }
