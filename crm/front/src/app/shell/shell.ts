@@ -13,6 +13,9 @@ import { ModuleCourant } from '../core/module-courant';
 export class Shell {
   protected readonly auth = inject(Auth);
   protected readonly charte = inject(CharteService);
+  protected readonly nomEntreprise = 'UBIPHARM CI';
+  /** Lettres du nom, pour l'apparition lettre a lettre du theme B. */
+  protected readonly lettres = [...this.nomEntreprise].map(c => c === ' ' ? '\u00a0' : c);
   protected readonly module = inject(ModuleCourant);
 
   /** Module affiche : celui choisi ou d'ou l'on vient ; un utilisateur du seul Marketing reste en Marketing. */
