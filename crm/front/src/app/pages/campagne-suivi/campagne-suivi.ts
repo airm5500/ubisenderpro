@@ -8,12 +8,13 @@ import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Campagne, MessageCampagne, Page, Recapitulatif } from '../../core/modeles';
 import { JourPipe, LIBELLES, MontantPipe, resumeCriteres, TelephonePipe } from '../../core/format';
+import { EnvoyerMaintenant } from '../../core/envoyer-maintenant';
 
 type Action = 'rejet' | 'annulation' | null;
 
 @Component({
   selector: 'app-campagne-suivi',
-  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe, EnvoyerMaintenant],
   templateUrl: './campagne-suivi.html'
 })
 export class CampagneSuivi implements OnInit, OnDestroy {
@@ -90,7 +91,7 @@ export class CampagneSuivi implements OnInit, OnDestroy {
     });
   }
 
-  private charger(complet = true): void {
+  charger(complet = true): void {
     this.api.get<Campagne>(`/api/recouvrement/campagnes/${this.id()}`).subscribe(c => {
       this.campagne.set(c);
       if (complet && ['BROUILLON', 'A_VALIDER'].includes(c.statut)) {

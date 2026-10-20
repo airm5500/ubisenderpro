@@ -6,9 +6,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import ci.ubipharm.crm.rest.service.DiscussionService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
@@ -16,6 +20,11 @@ import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PasserelleMetaService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
+import ci.ubipharm.crm.rest.service.PieceJointeService;
+import ci.ubipharm.crm.rest.service.VariableMessageService;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
+import ci.ubipharm.crm.rest.service.dto.ModeleMessageDTO;
+import ci.ubipharm.crm.rest.service.dto.PieceJointeDTO;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
@@ -84,6 +93,8 @@ public class DiscussionServiceImpl implements DiscussionService {
     private final PasserelleWhatsappService passerelle;
     private final PasserelleMetaService passerelleMeta;
     private final JournalActionService journalActionService;
+    private final PieceJointeService pieceJointeService;
+    private final VariableMessageService variableMessageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -158,7 +169,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             throw new ErreurMetierException("Vous ne pouvez répondre que depuis votre numéro ou celui d'un agent que vous remplacez.");
         }
         verifierAcces(agent, client);
-        return envoyer(agent, client, reponse.getContenu().strip());
+        return envoyer(agent, client, reponse.getContenu().strip(), reponse.getPieceJointeIds());
     }
 
     @Override
@@ -186,11 +197,94 @@ public class DiscussionServiceImpl implements DiscussionService {
         if (client.equals(agent)) {
             throw new ErreurMetierException("Le numéro du client est celui de l'expéditeur.");
         }
-        return envoyer(agent, client, demande.getContenu().strip());
+        return envoyer(agent, client, demande.getContenu().strip(), demande.getPieceJointeIds());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ModeleMessageDTO> modeles() {
+        @SuppressWarnings("unchecked")
+        List<Tuple> lignes = em.createNativeQuery("""
+                select id, module, nom, type_campagne as typeCampagne, contenu from crm_modele_message
+                where canal = 'WHATSAPP' and statut = 'ACTIF' and (module = 'MARKETING' or type_campagne = 'PERSONNALISEE')
+                order by module, type_campagne, nom
+                """, Tuple.class).getResultList();
+        return lignes.stream().map(t -> ModeleMessageDTO.builder().id(t.get("id", Long.class)).nom(t.get("nom", String.class))
+                .typeCampagne(t.get("typeCampagne", String.class)).contenu(t.get("contenu", String.class)).build()).toList();
+    }
+
+    @Override
+    public PieceJointeDTO deposerPieceJointe(MultipartFile fichier) {
+        return pieceJointeService.deposerDocument(fichier);
+    }
+
+    /**
+     * Variables d'un modele remplies avec la fiche du client du numero (colonnes du client, agence, segment), l'entreprise
+     * et l'expediteur ; une variable que rien ne remplit ici (facture, promotion...) bloque l'envoi.
+     */
+    private String rendre(String agent, String client, String texte) {
+        Set<String> codes = GabaritMessage.variables(texte);
+        if (codes.isEmpty()) {
+            return texte;
+        }
+        Map<String, String> sources = variableMessageService.sourcesParCode();
+        Map<String, String> valeurs = new HashMap<>();
+        Set<String> inconnues = new TreeSet<>();
+        @SuppressWarnings("unchecked")
+        List<Object> fiche = em.createNativeQuery("""
+                select ct.client_id from crm_contact ct where ct.numero_whatsapp = :client and ct.statut = 'ACTIF'
+                order by ct.fonction = 'PRINCIPAL' desc, ct.rang, ct.id limit 1
+                """).setParameter("client", client).getResultList();
+        Long clientId = fiche.isEmpty() ? null : ((Number) fiche.getFirst()).longValue();
+        for (String code : codes) {
+            String source = sources.get(code);
+            String valeur = null;
+            if (source == null) {
+                inconnues.add(code);
+                continue;
+            }
+            if (source.startsWith("client.") && source.substring(7).matches("[a-z][a-z0-9_]*") && clientId != null) {
+                valeur = SelectionCampagne.formater(em.createNativeQuery("select `" + source.substring(7) + "` from crm_client where id = :id")
+                        .setParameter("id", clientId).getSingleResult());
+            } else if ("calcul.agence".equals(source) && clientId != null) {
+                valeur = (String) em.createNativeQuery("select a.libelle from crm_client c join crm_agence a on a.id = c.agence_id where c.id = :id")
+                        .setParameter("id", clientId).getSingleResult();
+            } else if ("calcul.segment".equals(source) && clientId != null) {
+                @SuppressWarnings("unchecked")
+                List<String> s = em.createNativeQuery("select g.libelle from crm_client c join crm_segment g on g.code = c.segmentation where c.id = :id")
+                        .setParameter("id", clientId).getResultList();
+                valeur = s.isEmpty() ? "" : s.getFirst();
+            } else if ("calcul.expediteur_nom".equals(source)) {
+                valeur = (String) em.createNativeQuery("select nom_complet from crm_utilisateur where id = :id")
+                        .setParameter("id", perimetreService.perimetreCourant().getUtilisateurId()).getSingleResult();
+            } else if ("calcul.expediteur_numero".equals(source)) {
+                valeur = SelectionCampagne.numeroLisible(agent);
+            } else if (Set.of("calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise").contains(source)) {
+                valeur = SelectionCampagne.valeurEntreprise(parametreService, source);
+            }
+            if (valeur == null) {
+                inconnues.add(code);
+            } else {
+                valeurs.put(code, valeur);
+            }
+        }
+        if (!inconnues.isEmpty()) {
+            throw new ErreurMetierException("Remplacez " + String.join(", ", inconnues.stream().map(c -> "{" + c + "}").toList())
+                    + " avant d'envoyer : " + (clientId == null ? "ce numéro n'est pas celui d'un client, ou " : "") + "ces variables ne se remplissent que dans une campagne.");
+        }
+        return GabaritMessage.rendre(texte, valeurs);
     }
 
     /** Envoie aussitot depuis un numero connecte, garde le message et le journalise. */
-    private MessageDiscussionDTO envoyer(String agent, String client, String texte) {
+    private MessageDiscussionDTO envoyer(String agent, String client, String brut, List<Long> pieceJointeIds) {
+        String texte = rendre(agent, client, brut);
+        List<FichierDTO> pieces = new ArrayList<>();
+        if (pieceJointeIds != null) {
+            if (pieceJointeIds.size() > 10) {
+                throw new ErreurMetierException("Un message porte au plus 10 pièces jointes.");
+            }
+            pieceJointeIds.stream().distinct().forEach(id -> pieces.add(pieceJointeService.lire(id)));
+        }
         @SuppressWarnings("unchecked")
         List<Object[]> sessions = em.createNativeQuery("select statut, fournisseur, meta_phone_number_id from crm_session_whatsapp where numero = :numero")
                 .setParameter("numero", agent).getResultList();
@@ -205,9 +299,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             if (recus.longValue() == 0) {
                 throw new ErreurMetierException("Ce numéro passe par l'API Meta : un message libre n'est accepté que dans les 24 h qui suivent un message du client.");
             }
-            resultat = passerelleMeta.envoyerTexte((String) sessions.getFirst()[2], client, texte);
+            String telephone = (String) sessions.getFirst()[2];
+            resultat = envoyerAvecPieces(texte, pieces, t -> passerelleMeta.envoyerTexte(telephone, client, t),
+                    (f, l) -> passerelleMeta.envoyerFichier(telephone, client, f, l));
         } else {
-            resultat = passerelle.envoyerTexte(agent, client, texte);
+            resultat = envoyerAvecPieces(texte, pieces, t -> passerelle.envoyerTexte(agent, client, t), (f, l) -> passerelle.envoyerFichier(agent, client, f, l));
         }
         Long utilisateur = perimetreService.perimetreCourant().getUtilisateurId();
         em.createNativeQuery("""
@@ -228,6 +324,25 @@ public class DiscussionServiceImpl implements DiscussionService {
             throw new ErreurMetierException("Le message n'est pas parti : " + resultat.getErreur());
         }
         return messages(agent, client, 1).getFirst();
+    }
+
+    /** Une 1re image porte le texte en legende s'il est court ; les autres fichiers suivent ; un fichier perdu est signale. */
+    private static ResultatEnvoiDTO envoyerAvecPieces(String texte, List<FichierDTO> pieces, java.util.function.Function<String, ResultatEnvoiDTO> envoiTexte,
+                                                      java.util.function.BiFunction<FichierDTO, String, ResultatEnvoiDTO> envoiFichier) {
+        List<FichierDTO> reste = new ArrayList<>(pieces);
+        ResultatEnvoiDTO principal = !reste.isEmpty() && reste.getFirst().getTypeContenu().startsWith("image/") && texte.length() <= 1000
+                ? envoiFichier.apply(reste.removeFirst(), texte) : envoiTexte.apply(texte);
+        if (!principal.isSucces()) {
+            return principal;
+        }
+        for (FichierDTO fichier : reste) {
+            ResultatEnvoiDTO piece = envoiFichier.apply(fichier, null);
+            if (!piece.isSucces()) {
+                principal.setErreur(fichier.getNom() + " non envoyé : " + piece.getErreur());
+                break;
+            }
+        }
+        return principal;
     }
 
     /** Numeros WhatsApp depuis lesquels l'utilisateur peut ecrire : le sien et ceux des agents qu'il remplace aujourd'hui. */

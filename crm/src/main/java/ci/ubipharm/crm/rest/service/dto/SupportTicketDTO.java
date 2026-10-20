@@ -25,8 +25,12 @@ public class SupportTicketDTO {
     private String priorite;
     /** OUVERT, EN_COURS, RESOLU ou FERME. */
     private String statut;
+    /** Vide pour un ticket ouvert automatiquement par le systeme. */
     private Long auteurId;
     private String auteur;
+    private boolean automatique;
+    /** Erreur du diagnostic a l'origine du ticket. */
+    private Long erreurId;
     private Long assigneId;
     private String assigne;
     private long nbMessages;

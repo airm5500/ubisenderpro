@@ -82,10 +82,26 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
         if (envoyesAujourdhui() >= parametreService.entier("email.envoi.plafond_jour", 1000)) {
             return 0;
         }
-        Message message = reserver();
+        Message message = reserver(null);
         if (message == null) {
             return 0;
         }
+        Issue issue = traiter(envoi, message);
+        prochainEnvoi.set(Instant.now().plusSeconds(parametreService.entier("email.envoi.delai_secondes", 2)));
+        return issue == Issue.ENVOYE ? 1 : 0;
+    }
+
+    @Override
+    public boolean envoyerMaintenant(Long messageId) {
+        JavaMailSender envoi = serveur.getIfAvailable();
+        if (envoi == null) {
+            throw new ci.ubipharm.crm.socle.erreur.ErreurMetierException("Le serveur de messagerie n'est pas configuré (Paramètres > E-mail).");
+        }
+        Message message = reserver(messageId);
+        return message != null && traiter(envoi, message) == Issue.ENVOYE;
+    }
+
+    private Issue traiter(JavaMailSender envoi, Message message) {
         String erreur = null;
         Issue issue;
         try {
@@ -105,8 +121,7 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
         Issue issueFinale = issue;
         String motif = erreur;
         transaction.executeWithoutResult(statut -> enregistrer(message, issueFinale, motif));
-        prochainEnvoi.set(Instant.now().plusSeconds(parametreService.entier("email.envoi.delai_secondes", 2)));
-        return issue == Issue.ENVOYE ? 1 : 0;
+        return issue;
     }
 
     @Override
@@ -163,15 +178,16 @@ public class EnvoiEmailServiceImpl implements EnvoiEmailService {
         return mime;
     }
 
-    /** Passe le plus ancien e-mail en attente a ENVOI ; null s'il n'y en a pas. */
-    private Message reserver() {
+    /** Passe le plus ancien e-mail en attente (ou celui-ci) a ENVOI ; null s'il n'y en a pas. */
+    private Message reserver(Long id) {
         return transaction.execute(statut -> {
             List<Message> messages = jdbc.query("""
                     select m.id, m.campagne_id, m.facture_id, m.email_destinataire, m.email_reponse, m.objet, m.contenu, m.tentatives
                     from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
-                    where m.canal = 'EMAIL' and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
+                    where m.canal = 'EMAIL' and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'""" + (id == null ? "" : " and m.id = :id") + """
+
                     order by c.lance_le, m.id limit 1 for update
-                    """, Map.of(), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4), rs.getString(5),
+                    """, id == null ? Map.of() : Map.of("id", id), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4), rs.getString(5),
                     rs.getString(6), rs.getString(7), rs.getInt(8)));
             if (messages.isEmpty()) {
                 return null;

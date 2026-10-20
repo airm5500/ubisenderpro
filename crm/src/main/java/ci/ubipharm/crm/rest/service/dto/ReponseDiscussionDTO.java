@@ -30,4 +30,6 @@ public class ReponseDiscussionDTO {
     @NotBlank(message = "Écrivez le message.")
     @Size(max = 4000, message = "Le message ne peut pas dépasser 4000 caractères.")
     private String contenu;
+    /** Pieces jointes deposees, dans l'ordre : une 1re image porte le texte en legende. */
+    private java.util.List<Long> pieceJointeIds;
 }

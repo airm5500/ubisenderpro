@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.SupportSanteService;
 import ci.ubipharm.crm.rest.service.dto.SupportSondeDTO;
+import ci.ubipharm.crm.socle.support.EtatPool;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import lombok.extern.slf4j.Slf4j;
@@ -39,9 +42,12 @@ public class SupportSanteServiceImpl implements SupportSanteService {
     private final String serveurSmtp;
     private final String portSmtp;
 
+    private final DataSource source;
+
     public SupportSanteServiceImpl(EntityManager em, ParametreService parametreService, PasserelleWhatsappService passerelleWhatsappService,
-            @Value("${spring.mail.host:}") String serveurSmtp, @Value("${spring.mail.port:}") String portSmtp) {
+            DataSource source, @Value("${spring.mail.host:}") String serveurSmtp, @Value("${spring.mail.port:}") String portSmtp) {
         this.em = em;
+        this.source = source;
         this.parametreService = parametreService;
         this.passerelleWhatsappService = passerelleWhatsappService;
         this.serveurSmtp = serveurSmtp;
@@ -56,11 +62,14 @@ public class SupportSanteServiceImpl implements SupportSanteService {
     public List<SupportSondeDTO> sonder() {
         List<SupportSondeDTO> sondes = new ArrayList<>();
         sondes.add(sonde("BASE", "Base de données", this::base));
+        sondes.add(sonde("POOL", "Connexions à la base", this::pool));
         sondes.add(sonde("WHATSAPP_WEB", "WhatsApp Web", this::whatsappWeb));
         sondes.add(sonde("EMAIL", "E-mail (SMTP)", this::email));
         sondes.add(sonde("SMS", "Fournisseur SMS", this::sms));
         sondes.add(sonde("ARCHIVAGE", "Répertoire d'archivage", this::archivage));
         sondes.add(sonde("SERVEUR", "Serveur (mémoire, durée de fonctionnement)", this::serveur));
+        sondes.add(sonde("EXPERIENCE", "Expérience utilisateur (dernière heure)", this::experience));
+        sondes.add(sonde("INCIDENTS", "Incidents et tickets", this::incidents));
         return sondes;
     }
 
@@ -183,6 +192,74 @@ public class SupportSanteServiceImpl implements SupportSanteService {
         String detail = "Mémoire " + utiliseeMo + " Mo utilisés sur " + maxMo + " Mo · démarré depuis " + duree.toDays() + " j "
                 + duree.toHoursPart() + " h " + duree.toMinutesPart() + " min · Java " + Runtime.version().feature();
         return new Resultat(maxMo > 0 && utiliseeMo * 100 / maxMo >= 90 ? ALERTE : OK, detail);
+    }
+
+    private Resultat pool() {
+        EtatPool etat = EtatPool.lire(source);
+        if (etat == null) {
+            return new Resultat(OK, "Pool de connexions non instrumenté.");
+        }
+        String detail = etat.actives() + " connexion(s) occupée(s), " + etat.ouvertes() + " ouverte(s) sur " + etat.maximum() + " au maximum";
+        if (etat.enAttente() > 0) {
+            return new Resultat(ALERTE, detail + " · " + etat.enAttente() + " requête(s) en attente d'une connexion");
+        }
+        return new Resultat(OK, detail);
+    }
+
+    /** Appels et ecrans mesures dans les navigateurs depuis une heure : alerte si 10 % des appels prennent 3 s ou plus. */
+    private Resultat experience() {
+        if (!parametreService.oui("support.rum_actif", true)) {
+            return new Resultat(OK, "Mesure désactivée dans les Paramètres.");
+        }
+        Tuple t = (Tuple) em.createNativeQuery("""
+                select sum(case when type_mesure = 'API' then nombre else 0 end) as appels,
+                       sum(case when type_mesure = 'API' then total_ms else 0 end) as totalAppels,
+                       sum(case when type_mesure = 'API' then nb_3s else 0 end) as lents,
+                       sum(case when type_mesure = 'API' then echecs else 0 end) as echecs,
+                       sum(case when type_mesure = 'ECRAN' then nombre else 0 end) as ecrans,
+                       sum(case when type_mesure = 'ECRAN' then total_ms else 0 end) as totalEcrans
+                from crm_support_rum where tranche >= utc_timestamp() - interval 1 hour
+                """, Tuple.class).getSingleResult();
+        long appels = nombre(t.get("appels"));
+        if (appels == 0) {
+            return new Resultat(OK, "Aucune mesure reçue depuis une heure.");
+        }
+        long lents = nombre(t.get("lents"));
+        long ecrans = nombre(t.get("ecrans"));
+        double part = 100.0 * lents / appels;
+        String detail = appels + " appel(s), " + nombre(t.get("totalAppels")) / appels + " ms en moyenne, "
+                + String.format(java.util.Locale.FRANCE, "%.1f", part) + " % d'au moins 3 s, " + nombre(t.get("echecs")) + " en échec"
+                + (ecrans == 0 ? "" : " · " + ecrans + " écran(s) ouverts en " + nombre(t.get("totalEcrans")) / ecrans + " ms en moyenne");
+        return new Resultat(part >= 10 ? ALERTE : OK, detail);
+    }
+
+    private Resultat incidents() {
+        Tuple t = (Tuple) em.createNativeQuery("""
+                select (select count(*) from crm_support_erreur where traite = false) as aTraiter,
+                       (select count(*) from crm_support_erreur where derniere_le >= utc_timestamp() - interval 1 day and origine <> 'LENTEUR') as jour,
+                       (select count(*) from crm_support_erreur where derniere_le >= utc_timestamp() - interval 7 day and origine <> 'LENTEUR') as semaine,
+                       (select count(*) from crm_support_ticket where statut in ('OUVERT', 'EN_COURS')) as tickets,
+                       (select count(*) from crm_support_ticket where statut in ('OUVERT', 'EN_COURS') and priorite = 'URGENTE') as urgents,
+                       (select max(derniere_le) from crm_support_erreur where origine = 'SURVEILLANCE' and type_erreur = 'Arrêt brutal du serveur') as arret
+                """, Tuple.class).getSingleResult();
+        long aTraiter = nombre(t.get("aTraiter"));
+        long urgents = nombre(t.get("urgents"));
+        StringBuilder detail = new StringBuilder();
+        detail.append(aTraiter).append(" erreur(s) à traiter · erreurs survenues : ").append(nombre(t.get("jour"))).append(" sur 24 h, ")
+                .append(nombre(t.get("semaine"))).append(" sur 7 jours · ").append(nombre(t.get("tickets"))).append(" ticket(s) en cours");
+        if (urgents > 0) {
+            detail.append(" dont ").append(urgents).append(" urgent(s)");
+        }
+        Object arret = t.get("arret");
+        if (arret != null) {
+            detail.append(" · dernier arrêt brutal le ").append(((java.time.LocalDateTime) arret).atZone(java.time.ZoneOffset.UTC)
+                    .withZoneSameInstant(java.time.ZoneId.of("Africa/Abidjan")).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        }
+        return new Resultat(aTraiter > 0 || urgents > 0 ? ALERTE : OK, detail.toString());
+    }
+
+    private static long nombre(Object valeur) {
+        return valeur == null ? 0 : ((Number) valeur).longValue();
     }
 
     private static String formaterMo(long mo) {

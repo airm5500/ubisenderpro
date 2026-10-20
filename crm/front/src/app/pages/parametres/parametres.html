@@ -50,6 +50,15 @@
             @if (charteService.charte()?.iconeVersion) { <a (click)="reinitialiser('icone')">Revenir à l'icône d'origine</a> }
           </div>
         </div>
+        <div class="param">
+          <label>Bannière des messages d'information (PNG ou JPEG, large et peu haute, par exemple 1200 × 300)
+            <span class="second">{{ charteService.charte()?.banniereNom ?? "Aucune bannière : les informations partent sans image" }}</span></label>
+          <div class="champ">
+            @if (charteService.charte()?.banniereVersion; as v) { <span class="apercu-banniere"><img [src]="'/api/charte/banniere?v=' + v" alt="Bannière actuelle"></span> }
+            <label class="bs petit">Choisir une bannière<input type="file" hidden accept=".png,.jpg,.jpeg" (change)="deposer('banniere', $event)"></label>
+            @if (charteService.charte()?.banniereVersion) { <a (click)="reinitialiser('banniere')">Retirer la bannière</a> }
+          </div>
+        </div>
       }
       @for (p of liste(); track p.cle) {
         <div class="param">

@@ -2,9 +2,13 @@ package ci.ubipharm.crm.rest.service;
 
 import java.util.List;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.ModeleMessageDTO;
+import ci.ubipharm.crm.rest.service.dto.PieceJointeDTO;
 import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
@@ -16,6 +20,12 @@ import ci.ubipharm.crm.socle.dto.PageDTO;
 public interface DiscussionService {
 
     PageDTO<DiscussionDTO> rechercher(DiscussionCriteresDTO criteres);
+
+    /** Modeles WhatsApp actifs proposes a l'ecriture : Marketing et messages libres du Recouvrement. */
+    List<ModeleMessageDTO> modeles();
+
+    /** Piece jointe deposee pour un message a venir. */
+    PieceJointeDTO deposerPieceJointe(MultipartFile fichier);
 
     /** Les 200 derniers messages, du plus ancien au plus recent. */
     List<MessageDiscussionDTO> fil(String numeroAgent, String numeroClient);

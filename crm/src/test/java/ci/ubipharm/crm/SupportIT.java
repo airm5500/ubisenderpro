@@ -10,8 +10,16 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,15 +29,18 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.jayway.jsonpath.JsonPath;
 
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.SegmentService;
 import ci.ubipharm.crm.rest.service.SupportDiagnosticService;
+import ci.ubipharm.crm.rest.service.SupportExperienceService;
 import ci.ubipharm.crm.rest.service.dto.SupportErreurNavigateurDTO;
+import ci.ubipharm.crm.socle.support.FiltreLenteurs;
 
-/** Centre de support : tickets, diagnostic des erreurs, sante et FAQ. */
+/** Centre de support : tickets (dont automatiques), diagnostic des erreurs et des lenteurs, experience utilisateur, sante, export et FAQ. */
 class SupportIT extends IntegrationBase {
 
     @MockitoBean
@@ -41,6 +52,12 @@ class SupportIT extends IntegrationBase {
 
     @Autowired
     SupportDiagnosticService supportDiagnosticService;
+
+    @Autowired
+    SupportExperienceService supportExperienceService;
+
+    @Autowired
+    FiltreLenteurs filtreLenteurs;
 
     private MockHttpSession admin;
     private MockHttpSession agent;
@@ -165,7 +182,10 @@ class SupportIT extends IntegrationBase {
         jdbc.update("insert into crm_session_whatsapp (numero, statut, sante, updated_at) values ('2250500000000', 'CONNECTE', 'OK', utc_timestamp())");
         mvc.perform(get("/api/support/sante").session(admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(6)))
+                .andExpect(jsonPath("$", hasSize(9)))
+                .andExpect(jsonPath("$[?(@.code == 'POOL')].etat").value("OK"))
+                .andExpect(jsonPath("$[?(@.code == 'EXPERIENCE')].detail").value("Aucune mesure reçue depuis une heure."))
+                .andExpect(jsonPath("$[?(@.code == 'INCIDENTS')].detail", hasItem(containsString("0 erreur(s) à traiter"))))
                 .andExpect(jsonPath("$[?(@.code == 'BASE')].etat").value("OK"))
                 .andExpect(jsonPath("$[?(@.code == 'BASE')].detail", hasItem(containsString("schéma en version"))))
                 .andExpect(jsonPath("$[?(@.code == 'WHATSAPP_WEB')].etat").value("KO"))
@@ -198,6 +218,168 @@ class SupportIT extends IntegrationBase {
         mvc.perform(post("/api/support/faq/" + id + "/reactivation").session(admin).with(csrf())).andExpect(jsonPath("$.statut").value("ACTIF"));
         assertThat(jdbc.queryForList("select action from crm_journal_action where entite = 'crm_support_faq' order by id", String.class))
                 .containsExactly("SUPPORT_FAQ_CREATION", "SUPPORT_FAQ_MODIFICATION", "SUPPORT_FAQ_ARCHIVAGE", "SUPPORT_FAQ_REACTIVATION");
+    }
+
+    @Test
+    void uneErreurInattendueOuvreUnTicketAutomatique() throws Exception {
+        // Erreur du serveur : ticket des la 1re survenue, rattache a l'erreur ; la 2e survenue n'en ouvre pas d'autre
+        when(segmentService.lister(anyBoolean())).thenThrow(new IllegalStateException("Verrou 12 depasse"));
+        mvc.perform(get("/api/segments").session(admin)).andExpect(status().isInternalServerError());
+        mvc.perform(get("/api/segments").session(admin)).andExpect(status().isInternalServerError());
+        Long ticket = jdbc.queryForObject("select ticket_id from crm_support_erreur where type_erreur = 'java.lang.IllegalStateException'", Long.class);
+        assertThat(ticket).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from crm_support_ticket", Integer.class)).isEqualTo(1);
+        mvc.perform(get("/api/support/tickets/tous").session(admin))
+                .andExpect(jsonPath("$[0].sujet").value("[Auto] IllegalStateException : Verrou 12 depasse"))
+                .andExpect(jsonPath("$[0].auteur").value("Système (automatique)"))
+                .andExpect(jsonPath("$[0].automatique").value(true))
+                .andExpect(jsonPath("$[0].priorite").value("HAUTE"))
+                .andExpect(jsonPath("$[0].categorie").value("INCIDENT"));
+        mvc.perform(get("/api/support/tickets/" + ticket).session(admin))
+                .andExpect(jsonPath("$.erreurId").isNotEmpty())
+                .andExpect(jsonPath("$.messages[0].auteur").value("Système"))
+                .andExpect(jsonPath("$.messages[0].contenu", containsString("Écran ou adresse : GET /api/segments")));
+        // Le ticket automatique n'est pas lisible par un utilisateur sans droit Support
+        mvc.perform(get("/api/support/tickets/" + ticket).session(agent)).andExpect(status().isForbidden());
+
+        // Resolu, il est rouvert si l'erreur revient
+        envoyer(admin, post("/api/support/tickets/" + ticket + "/statut"), "{\"statut\":\"RESOLU\"}").andExpect(status().isOk());
+        mvc.perform(get("/api/segments").session(admin)).andExpect(status().isInternalServerError());
+        mvc.perform(get("/api/support/tickets/" + ticket).session(admin))
+                .andExpect(jsonPath("$.statut").value("OUVERT"))
+                .andExpect(jsonPath("$.messages[-1:].contenu", hasItem(containsString("survenue de nouveau (3 survenue(s))"))));
+
+        // Erreur du navigateur : ticket a partir du seuil seulement
+        jdbc.update("update crm_parametre set valeur = '3' where cle = 'support.ticket_auto_seuil_navigateur'");
+        for (int i = 0; i < 2; i++) {
+            envoyer(agent, post("/api/support/erreurs/navigateur"), "{\"type\":\"TypeError\",\"message\":\"x is undefined\",\"url\":\"/factures\"}");
+        }
+        assertThat(jdbc.queryForObject("select ticket_id from crm_support_erreur where type_erreur = 'TypeError'", Long.class)).isNull();
+        envoyer(agent, post("/api/support/erreurs/navigateur"), "{\"type\":\"TypeError\",\"message\":\"x is undefined\",\"url\":\"/factures\"}");
+        assertThat(jdbc.queryForObject("select ticket_id from crm_support_erreur where type_erreur = 'TypeError'", Long.class)).isNotNull();
+        jdbc.update("update crm_parametre set valeur = '5' where cle = 'support.ticket_auto_seuil_navigateur'");
+
+        // Plafond quotidien : au-dela, l'erreur reste au diagnostic sans ticket
+        jdbc.update("update crm_parametre set valeur = '2' where cle = 'support.ticket_auto_max_jour'");
+        supportDiagnosticService.signaler("SURVEILLANCE", "Mémoire du serveur", "La mémoire dépasse le seuil", "détail", null, null);
+        jdbc.update("update crm_parametre set valeur = '10' where cle = 'support.ticket_auto_max_jour'");
+        Long memoire = jdbc.queryForObject("select id from crm_support_erreur where origine = 'SURVEILLANCE'", Long.class);
+        assertThat(jdbc.queryForObject("select ticket_id from crm_support_erreur where id = ?", Long.class, memoire)).isNull();
+
+        // Ticket a la main depuis le diagnostic, une seule fois ; filtre par origine
+        mvc.perform(get("/api/support/erreurs").param("origine", "SURVEILLANCE").session(admin)).andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(post("/api/support/erreurs/" + memoire + "/ticket").session(agent).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/api/support/erreurs/" + memoire + "/ticket").session(admin).with(csrf()))
+                .andExpect(jsonPath("$.sujet").value("Mémoire du serveur : La mémoire dépasse le seuil"))
+                .andExpect(jsonPath("$.auteur").value(nomAdmin()))
+                .andExpect(jsonPath("$.erreurId").value(memoire));
+        mvc.perform(post("/api/support/erreurs/" + memoire + "/ticket").session(admin).with(csrf()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message", containsString("déjà son ticket")));
+
+        // Desactive : plus de ticket automatique
+        jdbc.update("update crm_parametre set valeur = 'NON' where cle = 'support.ticket_auto'");
+        envoyer(agent, post("/api/support/erreurs/navigateur"), "{\"type\":\"SyntaxError\",\"message\":\"y\"}");
+        supportDiagnosticService.capturerServeur(new IllegalArgumentException("Autre"), "REF");
+        jdbc.update("update crm_parametre set valeur = 'OUI' where cle = 'support.ticket_auto'");
+        assertThat(jdbc.queryForObject("select count(*) from crm_support_erreur where ticket_id is null and type_erreur in ('SyntaxError', "
+                + "'java.lang.IllegalArgumentException')", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void uneRequeteLenteEstSignaleeSansTicket() throws Exception {
+        jdbc.update("update crm_parametre set valeur = '1000' where cle = 'support.lenteur_ms'");
+        ReflectionTestUtils.setField(filtreLenteurs, "seuilLuLe", 0L);
+        when(segmentService.lister(anyBoolean())).thenAnswer(i -> {
+            Thread.sleep(1100);
+            return List.of();
+        });
+        mvc.perform(get("/api/segments").session(agent)).andExpect(status().isOk());
+        jdbc.update("update crm_parametre set valeur = '3000' where cle = 'support.lenteur_ms'");
+        ReflectionTestUtils.setField(filtreLenteurs, "seuilLuLe", 0L);
+        // Enregistree en arriere-plan
+        Map<String, Object> lenteur = null;
+        for (int i = 0; i < 50 && lenteur == null; i++) {
+            List<Map<String, Object>> lignes = jdbc.queryForList("select * from crm_support_erreur where origine = 'LENTEUR'");
+            if (lignes.isEmpty()) {
+                Thread.sleep(100);
+            } else {
+                lenteur = lignes.getFirst();
+            }
+        }
+        assertThat(lenteur).isNotNull().containsEntry("type_erreur", "Requête lente").containsEntry("message", "GET /api/segments")
+                .containsEntry("ticket_id", null);
+        assertThat((String) lenteur.get("detail")).contains("seuil 1000 ms", "Statut HTTP : 200");
+        assertThat(lenteur.get("utilisateur_id")).isNotNull();
+    }
+
+    @Test
+    void lExperienceUtilisateurEstAgregeeParTranche() throws Exception {
+        String mesures = """
+                [{"type":"API","cle":"GET /api/factures/1234?page=2","nombre":3,"totalMs":4500,"maxMs":3200,"nb1s":2,"nb3s":1,"echecs":1},
+                 {"type":"API","cle":"GET /api/factures/98","nombre":1,"totalMs":500,"maxMs":500},
+                 {"type":"ECRAN","cle":"  Factures  ","nombre":2,"totalMs":1800,"maxMs":1200,"nb1s":1},
+                 {"type":"AUTRE","cle":"x","nombre":5,"totalMs":5},
+                 {"type":"API","cle":"GET https://ailleurs.ci/api/x","nombre":1,"totalMs":5},
+                 {"type":"API","cle":"POST /api/clients","nombre":-4,"totalMs":5},
+                 {"type":"API","cle":"POST /api/clients","nombre":1,"totalMs":99999999,"maxMs":99999999}]
+                """;
+        envoyer(agent, post("/api/support/rum"), mesures).andExpect(jsonPath("$.actif").value(true));
+        envoyer(agent, post("/api/support/rum"), "[{\"type\":\"API\",\"cle\":\"GET /api/factures/7\",\"nombre\":1,\"totalMs\":1000,\"maxMs\":1000,\"nb1s\":1}]");
+        // Une ligne par tranche, utilisateur et cle normalisee ; durees bornees a 10 minutes
+        assertThat(jdbc.queryForList("select concat(type_mesure, ' ', cle, ' ', nombre, ' ', total_ms, ' ', max_ms, ' ', nb_1s, ' ', echecs) "
+                + "from crm_support_rum order by type_mesure, cle", String.class))
+                .containsExactly("API GET /api/factures/{id} 5 6000 3200 3 1", "API POST /api/clients 1 600000 600000 0 0",
+                        "ECRAN Factures 2 1800 1200 1 0");
+
+        mvc.perform(get("/api/support/experience").session(agent)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/support/experience").param("heures", "6").session(admin))
+                .andExpect(jsonPath("$.actif").value(true))
+                .andExpect(jsonPath("$.resume[?(@.cle == 'API')].nombre").value(6))
+                .andExpect(jsonPath("$.appels[0].cle").value("POST /api/clients"))
+                .andExpect(jsonPath("$.appels[1].moyenneMs").value(1200))
+                .andExpect(jsonPath("$.appels[1].part1s").value(60.0))
+                .andExpect(jsonPath("$.echecs", hasSize(1)))
+                .andExpect(jsonPath("$.ecrans[0].cle").value("Factures"))
+                .andExpect(jsonPath("$.utilisateurs[0].utilisateur").value("Test it-agent"))
+                .andExpect(jsonPath("$.utilisateurs[0].ecrans").value(2))
+                .andExpect(jsonPath("$.serie", hasSize(1)));
+        mvc.perform(get("/api/support/sante").session(admin))
+                .andExpect(jsonPath("$[?(@.code == 'EXPERIENCE')].detail", hasItem(containsString("6 appel(s)"))));
+
+        // Desactivee : le navigateur est prie de cesser, rien n'est enregistre
+        jdbc.update("update crm_parametre set valeur = 'NON' where cle = 'support.rum_actif'");
+        envoyer(agent, post("/api/support/rum"), "[{\"type\":\"ECRAN\",\"cle\":\"Clients\",\"nombre\":1,\"totalMs\":10}]")
+                .andExpect(jsonPath("$.actif").value(false));
+        jdbc.update("update crm_parametre set valeur = 'OUI' where cle = 'support.rum_actif'");
+        assertThat(jdbc.queryForObject("select count(*) from crm_support_rum where cle = 'Clients'", Integer.class)).isZero();
+
+        // Purge selon la retention
+        jdbc.update("update crm_support_rum set tranche = tranche - interval 20 day where type_mesure = 'ECRAN'");
+        assertThat(supportExperienceService.purger()).isEqualTo(1);
+    }
+
+    @Test
+    void leDossierDeDiagnosticSExporteEnZip() throws Exception {
+        envoyer(agent, post("/api/support/erreurs/navigateur"), "{\"type\":\"TypeError\",\"message\":\"a; b \\\"c\\\"\"}");
+        mvc.perform(get("/api/support/diagnostic/export").session(agent)).andExpect(status().isForbidden());
+        byte[] zip = mvc.perform(get("/api/support/diagnostic/export").session(admin))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", containsString("diagnostic-crm-")))
+                .andReturn().getResponse().getContentAsByteArray();
+        Map<String, String> fichiers = new java.util.LinkedHashMap<>();
+        try (ZipInputStream entree = new ZipInputStream(new ByteArrayInputStream(zip), StandardCharsets.UTF_8)) {
+            for (ZipEntry e = entree.getNextEntry(); e != null; e = entree.getNextEntry()) {
+                fichiers.put(e.getName(), new String(entree.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        assertThat(fichiers).containsKeys("info.txt", "erreurs.csv", "tickets.csv", "experience.csv");
+        assertThat(fichiers.get("info.txt")).contains("Base de données : OK");
+        assertThat(fichiers.get("erreurs.csv")).startsWith("﻿Origine;").contains("NAVIGATEUR;TypeError;\"a; b \"\"c\"\"\"");
+        assertThat(jdbc.queryForList("select action from crm_journal_action where action = 'SUPPORT_EXPORT'", String.class)).hasSize(1);
+    }
+
+    private String nomAdmin() {
+        return jdbc.queryForObject("select nom_complet from crm_utilisateur where login = 'admin'", String.class);
     }
 
     private ResultActions envoyer(MockHttpSession session, MockHttpServletRequestBuilder requete, String json) throws Exception {

@@ -29,4 +29,7 @@ public class EnvoiMasseApercuDTO {
     private String exemple;
     private boolean horsPlage;
     private String plageHoraire;
+    private List<PieceJointeDTO> piecesJointes;
+    /** Variables propres aux campagnes (promotion, information, facture...) : leur ligne ne part pas. */
+    private List<String> variablesRetirees;
 }

@@ -52,6 +52,9 @@ class CampagneMarketingIT extends IntegrationBase {
     @Autowired
     SuiviEnvoiService suiviEnvoiService;
 
+    @Autowired
+    ci.ubipharm.crm.rest.service.PieceJointeService pieceJointeService;
+
     private MockHttpSession admin;
     private MockHttpSession charge;
     private Long liste;
@@ -115,8 +118,12 @@ class CampagneMarketingIT extends IntegrationBase {
         when(passerelle.envoyerTexte(eq(NUMERO_MARKETING), anyString(), anyString()))
                 .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WM-1").build(),
                         ResultatEnvoiDTO.builder().succes(true).identifiant("WM-2").build());
+        // « Envoyer maintenant » par son auteur sur le second message, hors de son tour ; le lot envoie l'autre
+        Long second = jdbc.queryForObject("select max(id) from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER'", Long.class, campagne);
+        envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(jsonPath("$.statut").value("ENVOYE"));
+        envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(status().isBadRequest());
         assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
-        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiWhatsappService.envoyerLot()).isZero();
         assertThat(jdbc.queryForList("select numero_destinataire from crm_campagne_message where campagne_id = ? and statut = 'ENVOYE' order by id",
                 String.class, campagne)).containsExactly("2250700000001", "2250700000002");
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))
@@ -361,6 +368,20 @@ class CampagneMarketingIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/campagnes/" + campagne + "/recapitulatif").session(charge))
                 .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros,\nretard sur Tournée Yopougon Nord.\n"
                         + "Nouvelle estimation de livraison : 15 h\nDirection " + agence));
+
+        // La banniere de la charte part en tete de l'information sans affiche, sauf si le parametre l'ecarte
+        assertThat(pieceJointeService.piecesDeCampagne(campagne)).isEmpty();
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+        mvc.perform(multipart("/api/charte/banniere").file(new MockMultipartFile("fichier", "banniere.svg", "image/svg+xml",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".getBytes())).session(admin).with(csrf()))
+                .andExpect(jsonPath("$.message").value("La bannière doit être une image PNG ou JPEG : elle part dans les messages WhatsApp."));
+        mvc.perform(multipart("/api/charte/banniere").file(new MockMultipartFile("fichier", "banniere.png", "image/png", png)).session(admin).with(csrf()))
+                .andExpect(jsonPath("$.banniereNom").value("banniere.png"));
+        assertThat(pieceJointeService.piecesDeCampagne(campagne)).extracting(FichierDTO::getNom).containsExactly("banniere.png");
+        jdbc.update("update crm_parametre set valeur = 'NON' where cle = 'marketing.banniere_informations'");
+        assertThat(pieceJointeService.piecesDeCampagne(campagne)).isEmpty();
+        jdbc.update("update crm_parametre set valeur = 'OUI' where cle = 'marketing.banniere_informations'");
+        jdbc.update("update crm_charte_fichier set actif = false where code = 'BANNIERE'");
 
         mvc.perform(get("/api/marketing/informations").session(charge))
                 .andExpect(jsonPath("$[0].nbCampagnes").value(1)).andExpect(jsonPath("$[0].derniereCampagne").value("Retard camion"));

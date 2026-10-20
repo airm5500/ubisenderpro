@@ -20,3 +20,5 @@
 @media (max-width: 860px) { .discussions { grid-template-columns: 1fr; } .liste-d { border-right: 0; } }
 .nouvelle-d { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; }
 .choix-clients { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px; }
+.saisie-zone { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.modele-d { width: 150px; height: 44px; }

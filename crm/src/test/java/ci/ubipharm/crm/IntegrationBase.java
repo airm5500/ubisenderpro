@@ -54,6 +54,7 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_session_whatsapp");
         jdbc.update("update crm_compte_meta set jeton_acces = null, secret_application = null, version_api = 'v21.0', modifie_par = null");
         jdbc.update("delete from crm_message_sortant");
+        jdbc.update("delete from crm_envoi_masse_piece_jointe");
         jdbc.update("delete from crm_envoi_masse");
         jdbc.update("delete from crm_campagne_message");
         jdbc.update("delete from crm_fournisseur_sms where code <> 'LETEXTO'");
@@ -87,9 +88,10 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_import_ligne");
         jdbc.update("delete from crm_import");
         jdbc.update("delete from crm_import_modele");
+        jdbc.update("delete from crm_support_erreur");
         jdbc.update("delete from crm_support_message");
         jdbc.update("delete from crm_support_ticket");
-        jdbc.update("delete from crm_support_erreur");
+        jdbc.update("delete from crm_support_rum");
         jdbc.update("delete from crm_support_faq where question like 'IT %'");
         jdbc.update("update crm_support_faq set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_journal_action");

@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 
 export interface Charte {
   nom: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; logoVersion: number | null; logoNom: string | null;
-  iconeVersion: number | null; iconeNom: string | null; siteWeb: string | null; canalDefaut: string; modeEnvoiDefaut: string;
+  iconeVersion: number | null; iconeNom: string | null; banniereVersion: number | null; banniereNom: string | null; siteWeb: string | null; canalDefaut: string; modeEnvoiDefaut: string;
 }
 
 /** Nom, couleurs, logo et icone choisis dans les Parametres ; lus avant la connexion et appliques a toute l'application. */
