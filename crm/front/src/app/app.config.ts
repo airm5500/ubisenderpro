@@ -1,4 +1,4 @@
-import { ApplicationConfig, ErrorHandler, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, LOCALE_ID, inject, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withInterceptors, withXsrfConfiguration } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { registerLocaleData } from '@angular/common';
@@ -11,6 +11,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { routes } from './app.routes';
 import { intercepteurErreurs } from './core/intercepteur';
 import { ErreursNavigateur } from './core/erreurs-navigateur';
+import { Mesures, intercepteurMesures } from './core/mesures';
 
 registerLocaleData(localeFr);
 
@@ -31,7 +32,9 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: ErreursNavigateur },
     provideRouter(routes, withComponentInputBinding()),
     // Spring Security (csrf.spa) : cookie XSRF-TOKEN, en-tete X-XSRF-TOKEN
-    provideHttpClient(withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }), withInterceptors([intercepteurErreurs])),
+    provideHttpClient(withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }), withInterceptors([intercepteurMesures, intercepteurErreurs])),
+    // Experience utilisateur : temps d'ouverture des ecrans et duree des appels, envoyes au centre de support
+    provideAppInitializer(() => inject(Mesures).demarrer()),
     providePrimeNG({
       theme: { preset: Charte, options: { darkModeSelector: false } },
       translation: {

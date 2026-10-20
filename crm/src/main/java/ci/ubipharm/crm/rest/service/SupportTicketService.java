@@ -29,6 +29,15 @@ public interface SupportTicketService {
     /** Confie le ticket a un titulaire du droit Support, ou le retire (utilisateurId vide). */
     SupportTicketDTO affecter(Long id, Long utilisateurId);
 
+    /**
+     * Ticket INCIDENT rattache a une erreur du diagnostic, ouvert par le systeme (auteurId null) ou par l'utilisateur donne ;
+     * la priorite est HAUTE. Appele dans la transaction de l'appelant ; renvoie l'identifiant du ticket.
+     */
+    Long ouvrirPourErreur(Long erreurId, String sujet, String contenu, Long auteurId);
+
+    /** L'erreur d'un ticket resolu est survenue de nouveau : le ticket est rouvert, avec une ligne systeme dans sa conversation. */
+    void rouvrirPourErreur(Long ticketId, long occurrences);
+
     /** Utilisateurs actifs titulaires du droit Support. */
     List<SupportIntervenantDTO> intervenants();
 }
