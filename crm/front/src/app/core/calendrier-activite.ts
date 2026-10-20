@@ -156,12 +156,8 @@ export class CalendrierActivite {
   protected icone(type: string): string { return TYPES[type]?.icone ?? 'pi-circle'; }
   protected teinte(type: string): string { return TYPES[type]?.teinte ?? 'bleu'; }
 
-  /** Texte court d'une pastille : le nombre pour un cumul, le nom pour une campagne, une promotion ou un evenement. */
-  protected court(a: ActiviteCalendrier): string {
-    if (a.type === 'ENCAISSEMENT' && a.montant !== null) return new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(a.montant);
-    if (a.nombre !== null) return String(a.nombre);
-    return a.libelle.replace(/^(Lancement|Programmée) : |^(Début|Fin) de la promotion /, '');
-  }
+  /** Texte court d'une pastille. */
+  protected court(a: ActiviteCalendrier): string { return texteCourt(a); }
 
   private charger(mois: Date, filtres: Record<string, string | number | null>): void {
     const [du, au] = bornes(mois);
@@ -174,12 +170,12 @@ export class CalendrierActivite {
   }
 }
 
-function premierDuMois(d: Date): Date {
+export function premierDuMois(d: Date): Date {
   return new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1));
 }
 
 /** Du lundi de la premiere semaine au dimanche de la derniere. */
-function bornes(mois: Date): [Date, Date] {
+export function bornes(mois: Date): [Date, Date] {
   const du = new Date(mois);
   du.setUTCDate(1 - (du.getUTCDay() + 6) % 7);
   const au = new Date(Date.UTC(mois.getUTCFullYear(), mois.getUTCMonth() + 1, 0));
@@ -187,6 +183,13 @@ function bornes(mois: Date): [Date, Date] {
   return [du, au];
 }
 
-function iso(d: Date): string {
+export function iso(d: Date): string {
   return d.toISOString().substring(0, 10);
+}
+
+/** Texte court d'une pastille : le montant ou le nombre pour un cumul, le nom pour une campagne, une promotion ou un evenement. */
+export function texteCourt(a: ActiviteCalendrier): string {
+  if (a.type === 'ENCAISSEMENT' && a.montant !== null) return new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(a.montant);
+  if (a.nombre !== null) return String(a.nombre);
+  return a.libelle.replace(/^(Lancement|Programmée) : |^(Début|Fin) de la promotion /, '');
 }

@@ -589,20 +589,31 @@ public class TableauBordServiceImpl implements TableauBordService {
         }
         // Evenements : chaque jour couvert ; un evenement annuel revient a la meme date chaque annee
         for (Tuple t : lignes(f, "select e.nom as nom, e.date_debut as debut, e.date_fin as fin, e.annuel as annuel from crm_evenement e where e.statut = 'ACTIF'")) {
-            LocalDate debutEv = date(t.get("debut"));
-            LocalDate finEv = t.get("fin") == null ? debutEv : date(t.get("fin"));
             boolean annuel = t.get("annuel") instanceof Boolean b ? b : ((Number) t.get("annuel")).intValue() != 0;
-            for (int an = annuel ? debut.getYear() - 1 : debutEv.getYear(); an <= (annuel ? fin.getYear() : debutEv.getYear()); an++) {
-                long decalage = an - debutEv.getYear();
-                for (LocalDate d = debutEv.plusYears(decalage); !d.isAfter(finEv.plusYears(decalage)) && !d.isAfter(fin); d = d.plusDays(1)) {
-                    if (!d.isBefore(debut)) {
-                        activites.add(ActiviteCalendrierDTO.builder().date(d).type("EVENEMENT").libelle(t.get("nom", String.class))
-                                .lien("/marketing/evenements").build());
-                    }
-                }
+            for (LocalDate d : joursEvenement(date(t.get("debut")), t.get("fin") == null ? null : date(t.get("fin")), annuel, debut, fin)) {
+                activites.add(ActiviteCalendrierDTO.builder().date(d).type("EVENEMENT").libelle(t.get("nom", String.class))
+                        .lien("/marketing/evenements").build());
             }
         }
         return trier(activites);
+    }
+
+    /** Jours de la periode couverts par un evenement (fin absente = un seul jour), repete chaque annee s'il est annuel. */
+    static List<LocalDate> joursEvenement(LocalDate debutEv, LocalDate finEv, boolean annuel, LocalDate debut, LocalDate fin) {
+        LocalDate dernier = finEv == null ? debutEv : finEv;
+        List<LocalDate> jours = new ArrayList<>();
+        // Un evenement annuel commence au plus tot l'annee precedant la periode (cas d'un evenement a cheval sur deux annees)
+        int premiereAnnee = annuel ? debut.getYear() - 1 : debutEv.getYear();
+        int derniereAnnee = annuel ? fin.getYear() : debutEv.getYear();
+        for (int an = premiereAnnee; an <= derniereAnnee; an++) {
+            long decalage = an - debutEv.getYear();
+            for (LocalDate d = debutEv.plusYears(decalage); !d.isAfter(dernier.plusYears(decalage)) && !d.isAfter(fin); d = d.plusDays(1)) {
+                if (!d.isBefore(debut) && !jours.contains(d)) {
+                    jours.add(d);
+                }
+            }
+        }
+        return jours;
     }
 
     /** Messages des campagnes du module envoyes chaque jour (avec les lus), et ceux en echec. */
@@ -650,7 +661,7 @@ public class TableauBordServiceImpl implements TableauBordService {
         return activites;
     }
 
-    private static String pluriel(long n, String un, String plusieurs) {
+    static String pluriel(long n, String un, String plusieurs) {
         return n + " " + (n > 1 ? plusieurs : un);
     }
 
@@ -660,7 +671,7 @@ public class TableauBordServiceImpl implements TableauBordService {
     }
 
     /** Le calendrier montre un mois, avec les jours des semaines qui le bordent. */
-    private static void verifierPeriodeCalendrier(LocalDate debut, LocalDate fin) {
+    static void verifierPeriodeCalendrier(LocalDate debut, LocalDate fin) {
         if (debut.isAfter(fin)) {
             throw new ErreurMetierException("Le début de la période doit précéder sa fin.");
         }

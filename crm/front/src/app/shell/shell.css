@@ -21,6 +21,8 @@ main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 :host(.repliable) .chevron { display: inline-block; }
 .fermee .chevron { transform: rotate(-90deg); }
 .fermee .liens { grid-template-rows: 0fr; }
+/* Fermee : rien ne depasse de la marge de clip, une fois l'animation finie */
+.fermee .liens > div { visibility: hidden; transition: visibility 0s .25s; }
 @media (prefers-reduced-motion: reduce) { .liens, .chevron { transition: none; } }
 .nv { display: block; padding: 8px 12px; border-radius: 8px; color: #B8C7D3; text-decoration: none; font-size: 14px; font-weight: 500; }
 .nv:hover { color: #fff; background: rgba(255,255,255,.06); }

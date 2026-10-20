@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { Auth } from '../core/auth';
 import { CharteService } from '../core/charte';
 import { ModuleCourant } from '../core/module-courant';
+import { apresClic, sectionOuverte } from '../core/menu-sections';
 
 @Component({
   selector: 'app-shell',
@@ -26,7 +27,7 @@ export class Shell {
 
   /** Sections du menu repliables (Parametres > Charte) : une seule ouverte a la fois. */
   protected readonly repliable = computed(() => this.charte.charte()?.menuRepliable === true);
-  /** Section ouverte par un clic ; null = celle de l'ecran affiche, '' = aucune. */
+  /** Section ouverte par un clic (voir menu-sections). */
   private readonly ouverte = signal<string | null>(null);
 
   constructor() {
@@ -35,12 +36,10 @@ export class Shell {
   }
 
   protected estOuverte(cle: string, active: boolean): boolean {
-    if (!this.repliable()) return true;
-    const o = this.ouverte();
-    return o === null ? active : o === cle;
+    return sectionOuverte(this.repliable(), this.ouverte(), cle, active);
   }
 
   protected basculer(cle: string, active: boolean): void {
-    if (this.repliable()) this.ouverte.set(this.estOuverte(cle, active) ? '' : cle);
+    this.ouverte.set(apresClic(this.repliable(), this.ouverte(), cle, active));
   }
 }
