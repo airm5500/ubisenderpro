@@ -8,12 +8,14 @@ import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
 import { Agent, Evolution, TableauBord } from '../../core/modeles';
 import { Courbe, Serie } from '../../core/courbe';
+import { DialogModule } from 'primeng/dialog';
+import { CalendrierActivite } from '../../core/calendrier-activite';
 import { JourPipe, MontantPipe, aujourdhui } from '../../core/format';
 
 /** Tableau de bord du recouvrement : l'agent voit son portefeuille, la direction d'agence ses agences, la direction tout. */
 @Component({
   selector: 'app-tableau-bord',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, JourPipe, MontantPipe, Courbe],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink, JourPipe, MontantPipe, Courbe, DialogModule, CalendrierActivite],
   templateUrl: './tableau-bord.html'
 })
 export class TableauBordPage implements OnInit {
@@ -25,6 +27,7 @@ export class TableauBordPage implements OnInit {
   protected readonly tb = signal<TableauBord | null>(null);
   protected readonly erreur = signal<string | null>(null);
   protected readonly evolution = signal<Evolution | null>(null);
+  protected readonly calendrier = signal(false);
   protected readonly seriesRelances: Serie[] = [
     { libelle: 'Envoyées', valeur: p => p.envoyes, teinte: 'bleu' },
     { libelle: 'Distribuées', valeur: p => p.distribues, teinte: 'bleu-clair' },
@@ -75,6 +78,14 @@ export class TableauBordPage implements OnInit {
       next: ev => this.evolution.set(ev),
       error: () => this.evolution.set(null)
     });
+  }
+
+  /** Jour choisi dans le calendrier : le tableau de bord se recalcule sur ce seul jour. */
+  voirJour(jour: string): void {
+    this.filtres.du = jour;
+    this.filtres.au = jour;
+    this.calendrier.set(false);
+    this.charger();
   }
 
   protected pc(v: number | null): string {

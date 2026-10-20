@@ -4,12 +4,14 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
 import { Evolution, TableauBordMarketing } from '../../core/modeles';
 import { Courbe, Serie } from '../../core/courbe';
+import { DialogModule } from 'primeng/dialog';
+import { CalendrierActivite } from '../../core/calendrier-activite';
 import { JourPipe, LIBELLES, MontantPipe, aujourdhui } from '../../core/format';
 
 /** Tableau de bord du marketing : campagnes, messages par canal, reponses et desabonnements de la periode. */
 @Component({
   selector: 'app-tableau-bord-marketing',
-  imports: [FormsModule, RouterLink, JourPipe, MontantPipe, Courbe],
+  imports: [FormsModule, RouterLink, JourPipe, MontantPipe, Courbe, DialogModule, CalendrierActivite],
   templateUrl: './tableau-bord-marketing.html'
 })
 export class TableauBordMarketingPage implements OnInit {
@@ -20,6 +22,7 @@ export class TableauBordMarketingPage implements OnInit {
   protected readonly tb = signal<TableauBordMarketing | null>(null);
   protected readonly erreur = signal<string | null>(null);
   protected readonly evolution = signal<Evolution | null>(null);
+  protected readonly calendrier = signal(false);
   protected readonly seriesMessages: Serie[] = [
     { libelle: 'Messages envoyés', valeur: p => p.envoyes, teinte: 'bleu' },
     { libelle: 'Messages lus', valeur: p => p.lus, teinte: 'vert' }
@@ -56,6 +59,14 @@ export class TableauBordMarketingPage implements OnInit {
       next: ev => this.evolution.set(ev),
       error: () => this.evolution.set(null)
     });
+  }
+
+  /** Jour choisi dans le calendrier : le tableau de bord se recalcule sur ce seul jour. */
+  voirJour(jour: string): void {
+    this.filtres.du = jour;
+    this.filtres.au = jour;
+    this.calendrier.set(false);
+    this.charger();
   }
 
   protected pc(v: number | null): string {

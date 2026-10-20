@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 export interface Charte {
-  nom: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; logoVersion: number | null; logoNom: string | null;
+  nom: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; menuRepliable: boolean; logoVersion: number | null; logoNom: string | null;
   iconeVersion: number | null; iconeNom: string | null; banniereVersion: number | null; banniereNom: string | null; siteWeb: string | null; canalDefaut: string; modeEnvoiDefaut: string;
 }
 

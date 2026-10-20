@@ -21,6 +21,8 @@ public class CharteDTO {
     private String theme;
     private String couleurFond;
     private String couleurSurvol;
+    /** Sections du menu de gauche repliables, une seule ouverte a la fois. */
+    private boolean menuRepliable;
     /** Depot du logo affiche, null = logo livre avec l'application ; sert aussi a contourner le cache du navigateur. */
     private Long logoVersion;
     private String logoNom;

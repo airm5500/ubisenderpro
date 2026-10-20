@@ -1,4 +1,5 @@
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -11,7 +12,7 @@ import { EnvoyerMaintenant } from '../../core/envoyer-maintenant';
 /** Tous les messages partis : relances, promotions, discussions et envois en masse, sur tous les canaux. */
 @Component({
   selector: 'app-historique-envois',
-  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe, TooltipModule, EnvoyerMaintenant],
+  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe, TooltipModule, DialogModule, EnvoyerMaintenant],
   templateUrl: './historique-envois.html'
 })
 export class HistoriqueEnvois implements OnInit {
@@ -23,6 +24,8 @@ export class HistoriqueEnvois implements OnInit {
   criteres = { du: avant(30), au: '', origine: '', canal: '', statut: '', q: '' };
   protected readonly page = signal<Page<EnvoiHistorique> | null>(null);
   protected readonly ouvert = signal<string | null>(null);
+  /** Message affiche en entier dans la fenetre de visualisation. */
+  protected readonly visualise = signal<EnvoiHistorique | null>(null);
   protected readonly evolution = signal<Evolution | null>(null);
   protected readonly seriesEnvois: Serie[] = [
     { libelle: 'Envoyés', valeur: p => p.envoyes, teinte: 'bleu' },

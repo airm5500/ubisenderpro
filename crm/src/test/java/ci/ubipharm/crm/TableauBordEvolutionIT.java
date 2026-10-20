@@ -1,5 +1,7 @@
 package ci.ubipharm.crm;
 
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -127,6 +129,50 @@ class TableauBordEvolutionIT extends IntegrationBase {
         mvc.perform(get("/api/historique-envois/evolution").param("du", "2024-01-01").session(admin))
                 .andExpect(jsonPath("$.pas").value("SEMAINE"))
                 .andExpect(jsonPath("$.du").value(aujourdhui.minusDays(365).toString()));
+    }
+
+    @Test
+    void calendrierRecouvrementJourParJourEtPerimetre() throws Exception {
+        String du = aujourdhui.minusDays(9).toString();
+        String au = aujourdhui.plusDays(9).toString();
+        mvc.perform(get("/api/recouvrement/tableau-de-bord/calendrier").param("du", du).param("au", au).session(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.type == 'RELANCES')].date").value(contains(aujourdhui.minusDays(1).toString())))
+                .andExpect(jsonPath("$[?(@.type == 'RELANCES')].nombre").value(contains(3)))
+                .andExpect(jsonPath("$[?(@.type == 'RELANCES')].libelle").value(contains("3 relances envoyées, 1 lu")))
+                .andExpect(jsonPath("$[?(@.type == 'ECHECS')].nombre").value(contains(1)))
+                .andExpect(jsonPath("$[?(@.type == 'ENCAISSEMENT')].date").value(contains(aujourdhui.minusDays(3).toString())))
+                .andExpect(jsonPath("$[?(@.type == 'ENCAISSEMENT')].montant").value(contains(30000.0)))
+                .andExpect(jsonPath("$[?(@.type == 'ECHEANCE')].date").value(contains(aujourdhui.minusDays(5).toString())))
+                .andExpect(jsonPath("$[?(@.type == 'ECHEANCE')].montant").value(contains(10000.0)))
+                // La reponse a une promotion ne compte pas dans le recouvrement
+                .andExpect(jsonPath("$[?(@.type == 'REPONSES')]").value(empty()));
+        mvc.perform(get("/api/recouvrement/tableau-de-bord/calendrier").param("du", du).param("au", au).session(agent))
+                .andExpect(jsonPath("$[?(@.type == 'RELANCES')].nombre").value(contains(2)))
+                .andExpect(jsonPath("$[?(@.type == 'ECHECS')]").value(empty()));
+        // Mois en cours par defaut ; 62 jours au plus
+        mvc.perform(get("/api/recouvrement/tableau-de-bord/calendrier").session(admin)).andExpect(status().isOk());
+        mvc.perform(get("/api/recouvrement/tableau-de-bord/calendrier").param("du", "2026-01-01").param("au", "2026-04-01").session(admin))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void calendrierMarketingAvecPromotionsEtEvenementsAnnuels() throws Exception {
+        Long adminId = id("crm_utilisateur", "login", "admin");
+        jdbc.update("insert into crm_promotion (code, nom, date_debut, date_fin, statut, cree_par, created_at) values ('IT-CAL', 'Promo calendrier', ?, ?, 'ACTIVE', ?, utc_timestamp())",
+                aujourdhui.minusDays(2), aujourdhui.plusDays(30), adminId);
+        jdbc.update("insert into crm_evenement (nom, nature, date_debut, annuel, created_at) values ('IT anniversaire', 'AUTRE', ?, true, utc_timestamp())",
+                aujourdhui.plusDays(3).minusYears(2));
+        mvc.perform(get("/api/marketing/tableau-de-bord/calendrier").param("du", aujourdhui.minusDays(9).toString())
+                .param("au", aujourdhui.plusDays(9).toString()).session(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.type == 'MESSAGES')].nombre").value(contains(1)))
+                .andExpect(jsonPath("$[?(@.type == 'REPONSES')].nombre").value(contains(1)))
+                .andExpect(jsonPath("$[?(@.type == 'DESABONNEMENTS')].nombre").value(contains(1)))
+                .andExpect(jsonPath("$[?(@.type == 'PROMOTION_DEBUT')].date").value(contains(aujourdhui.minusDays(2).toString())))
+                .andExpect(jsonPath("$[?(@.type == 'PROMOTION_FIN')]").value(empty()))
+                .andExpect(jsonPath("$[?(@.libelle == 'IT anniversaire')].date").value(contains(aujourdhui.plusDays(3).toString())));
+        mvc.perform(get("/api/marketing/tableau-de-bord/calendrier").session(agent)).andExpect(status().isForbidden());
     }
 
     private Long client(String code) {

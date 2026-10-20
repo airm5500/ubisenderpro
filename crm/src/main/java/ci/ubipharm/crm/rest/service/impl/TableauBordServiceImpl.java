@@ -21,6 +21,7 @@ import ci.ubipharm.crm.rest.service.ParametreService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.TableauBordService;
+import ci.ubipharm.crm.rest.service.dto.ActiviteCalendrierDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneResumeDTO;
 import ci.ubipharm.crm.rest.service.dto.EvolutionDTO;
 import ci.ubipharm.crm.rest.service.dto.IndicateursDTO;
@@ -479,6 +480,206 @@ public class TableauBordServiceImpl implements TableauBordService {
         return evolution(f, debut, fin, pas, sql, null);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActiviteCalendrierDTO> calendrierRecouvrement(LocalDate du, LocalDate au, Long agenceId, Long agentId) {
+        LocalDate jour = LocalDate.now(ZoneOffset.UTC);
+        LocalDate debut = du == null ? jour.withDayOfMonth(1) : du;
+        LocalDate fin = au == null ? debut.withDayOfMonth(debut.lengthOfMonth()) : au;
+        verifierPeriodeCalendrier(debut, fin);
+        Filtre f = filtre(perimetreService.perimetreCourant(), portefeuilleService.agentsGeres(), agenceId, agentId, debut, fin, jour);
+        f.parametres().put("debutJour", debut);
+        f.parametres().put("auJour", fin);
+        List<ActiviteCalendrierDTO> activites = new ArrayList<>();
+        envois(activites, f, "RECOUVREMENT", "RELANCES", "relance envoyée", "relances envoyées");
+        campagnes(activites, f, "RECOUVREMENT", "/campagnes/");
+        for (Tuple t : lignes(f, """
+                select date(s.created_at) as jour,
+                       coalesce(sum(case when s.nouveau_solde < s.ancien_solde then s.ancien_solde - greatest(s.nouveau_solde, 0) end), 0) as encaisse,
+                       count(distinct case when s.nouveau_solde < s.ancien_solde then s.facture_id end) as factures
+                from crm_facture_solde s join crm_facture f on f.id = s.facture_id and f.nature = 'FACTURE'
+                join crm_client c on c.id = f.client_id""" + AFFECTATION + """
+
+                where s.created_at >= :du and s.created_at < :fin and""" + f.clients() + " group by 1")) {
+            long factures = nombre(t, "factures");
+            if (factures > 0) {
+                activites.add(activite(t, "ENCAISSEMENT", "Encaissé sur " + pluriel(factures, "facture", "factures"), factures, montant(t, "encaisse"), "/factures"));
+            }
+        }
+        for (Tuple t : lignes(f, """
+                select date(s.created_at) as jour, count(*) as nombre
+                from crm_facture_suivi s join crm_facture f on f.id = s.facture_id join crm_client c on c.id = f.client_id""" + AFFECTATION + """
+
+                where s.suivi = 'PROMESSE' and s.created_at >= :du and s.created_at < :fin and""" + f.clients() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "PROMESSE", pluriel(n, "promesse de paiement prise", "promesses de paiement prises"), n, null, "/factures"));
+        }
+        for (Tuple t : lignes(f, """
+                select f.suivi_date as jour, count(*) as nombre, coalesce(sum(coalesce(f.suivi_montant, f.solde)), 0) as montant
+                from crm_facture f join crm_client c on c.id = f.client_id""" + AFFECTATION + """
+
+                where f.nature = 'FACTURE' and f.solde > 0 and f.suivi = 'PROMESSE' and f.suivi_date between :debutJour and :auJour
+                  and""" + f.clients() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "PROMESSE_ECHEANCE", pluriel(n, "promesse à échéance", "promesses à échéance"), n, montant(t, "montant"), "/factures"));
+        }
+        for (Tuple t : lignes(f, """
+                select f.date_echeance as jour, count(*) as nombre, coalesce(sum(f.solde), 0) as montant
+                from crm_facture f join crm_client c on c.id = f.client_id""" + AFFECTATION + """
+
+                where f.nature = 'FACTURE' and f.solde > 0 and f.date_echeance between :debutJour and :auJour and""" + f.clients() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "ECHEANCE", pluriel(n, "facture à échéance", "factures à échéance"), n, montant(t, "montant"), "/factures"));
+        }
+        for (Tuple t : lignes(f, """
+                select date(r.recu_le) as jour, count(*) as nombre
+                from crm_message_recu r join crm_client c on c.id = r.client_id""" + AFFECTATION + """
+
+                where r.recu_le >= :du and r.recu_le < :fin and not exists (select 1 from crm_campagne_message x
+                      join crm_campagne y on y.id = x.campagne_id where x.id = r.campagne_message_id and y.module = 'MARKETING')
+                  and""" + f.clients() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "REPONSES", pluriel(n, "réponse de client", "réponses de clients"), n, null, "/reponses"));
+        }
+        return trier(activites);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActiviteCalendrierDTO> calendrierMarketing(LocalDate du, LocalDate au) {
+        LocalDate jour = LocalDate.now(ZoneOffset.UTC);
+        LocalDate debut = du == null ? jour.withDayOfMonth(1) : du;
+        LocalDate fin = au == null ? debut.withDayOfMonth(debut.lengthOfMonth()) : au;
+        verifierPeriodeCalendrier(debut, fin);
+        Filtre f = filtre(perimetreService.perimetreCourant(), null, null, null, debut, fin, jour);
+        f.parametres().put("debutJour", debut);
+        f.parametres().put("auJour", fin);
+        List<ActiviteCalendrierDTO> activites = new ArrayList<>();
+        envois(activites, f, "MARKETING", "MESSAGES", "message envoyé", "messages envoyés");
+        campagnes(activites, f, "MARKETING", "/marketing/campagnes/");
+        for (Tuple t : lignes(f, """
+                select date(r.recu_le) as jour, count(*) as nombre
+                from crm_message_recu r join crm_campagne_message m on m.id = r.campagne_message_id
+                join crm_campagne cp on cp.id = m.campagne_id and cp.module = 'MARKETING' join crm_client c on c.id = r.client_id
+                where r.recu_le >= :du and r.recu_le < :fin and""" + f.messages() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "REPONSES", pluriel(n, "réponse à une campagne", "réponses aux campagnes"), n, null, "/discussions"));
+        }
+        for (Tuple t : lignes(f, """
+                select date(c.desabonne_marketing_le) as jour, count(*) as nombre from crm_client c
+                where c.desabonne_marketing_le >= :du and c.desabonne_marketing_le < :fin and""" + f.clients() + " group by 1")) {
+            long n = nombre(t, "nombre");
+            activites.add(activite(t, "DESABONNEMENTS", pluriel(n, "désabonnement (STOP)", "désabonnements (STOP)"), n, null, null));
+        }
+        for (Tuple t : lignes(f, """
+                select p.id as id, p.nom as nom, p.date_debut as debut, p.date_fin as fin from crm_promotion p
+                where p.statut not in ('BROUILLON', 'ARCHIVEE')
+                  and (p.date_debut between :debutJour and :auJour or p.date_fin between :debutJour and :auJour)""")) {
+            String lien = "/marketing/promotions/" + ((Number) t.get("id")).longValue();
+            LocalDate debutPromo = date(t.get("debut"));
+            LocalDate finPromo = date(t.get("fin"));
+            if (!debutPromo.isBefore(debut) && !debutPromo.isAfter(fin)) {
+                activites.add(ActiviteCalendrierDTO.builder().date(debutPromo).type("PROMOTION_DEBUT")
+                        .libelle("Début de la promotion " + t.get("nom", String.class)).lien(lien).build());
+            }
+            if (!finPromo.isBefore(debut) && !finPromo.isAfter(fin)) {
+                activites.add(ActiviteCalendrierDTO.builder().date(finPromo).type("PROMOTION_FIN")
+                        .libelle("Fin de la promotion " + t.get("nom", String.class)).lien(lien).build());
+            }
+        }
+        // Evenements : chaque jour couvert ; un evenement annuel revient a la meme date chaque annee
+        for (Tuple t : lignes(f, "select e.nom as nom, e.date_debut as debut, e.date_fin as fin, e.annuel as annuel from crm_evenement e where e.statut = 'ACTIF'")) {
+            boolean annuel = t.get("annuel") instanceof Boolean b ? b : ((Number) t.get("annuel")).intValue() != 0;
+            for (LocalDate d : joursEvenement(date(t.get("debut")), t.get("fin") == null ? null : date(t.get("fin")), annuel, debut, fin)) {
+                activites.add(ActiviteCalendrierDTO.builder().date(d).type("EVENEMENT").libelle(t.get("nom", String.class))
+                        .lien("/marketing/evenements").build());
+            }
+        }
+        return trier(activites);
+    }
+
+    /** Jours de la periode couverts par un evenement (fin absente = un seul jour), repete chaque annee s'il est annuel. */
+    static List<LocalDate> joursEvenement(LocalDate debutEv, LocalDate finEv, boolean annuel, LocalDate debut, LocalDate fin) {
+        LocalDate dernier = finEv == null ? debutEv : finEv;
+        List<LocalDate> jours = new ArrayList<>();
+        // Un evenement annuel commence au plus tot l'annee precedant la periode (cas d'un evenement a cheval sur deux annees)
+        int premiereAnnee = annuel ? debut.getYear() - 1 : debutEv.getYear();
+        int derniereAnnee = annuel ? fin.getYear() : debutEv.getYear();
+        for (int an = premiereAnnee; an <= derniereAnnee; an++) {
+            long decalage = an - debutEv.getYear();
+            for (LocalDate d = debutEv.plusYears(decalage); !d.isAfter(dernier.plusYears(decalage)) && !d.isAfter(fin); d = d.plusDays(1)) {
+                if (!d.isBefore(debut) && !jours.contains(d)) {
+                    jours.add(d);
+                }
+            }
+        }
+        return jours;
+    }
+
+    /** Messages des campagnes du module envoyes chaque jour (avec les lus), et ceux en echec. */
+    private void envois(List<ActiviteCalendrierDTO> activites, Filtre f, String module, String type, String un, String plusieurs) {
+        for (Tuple t : lignes(f, """
+                select date(coalesce(m.envoye_le, m.updated_at)) as jour, coalesce(sum(m.statut in %s), 0) as envoyes,
+                       coalesce(sum(m.statut = 'LU'), 0) as lus, coalesce(sum(m.statut = 'ECHEC'), 0) as echecs
+                from crm_campagne_message m join crm_campagne cp on cp.id = m.campagne_id and cp.module = '%s'
+                join crm_client c on c.id = m.client_id
+                where m.statut in %s and coalesce(m.envoye_le, m.updated_at) >= :du and coalesce(m.envoye_le, m.updated_at) < :fin and%s
+                group by 1""".formatted(ENVOYES, module, TENTES, f.messages()))) {
+            long envoyes = nombre(t, "envoyes");
+            long echecs = nombre(t, "echecs");
+            if (envoyes > 0) {
+                activites.add(activite(t, type, pluriel(envoyes, un, plusieurs) + ", " + nombre(t, "lus") + " lu" + (nombre(t, "lus") > 1 ? "s" : ""),
+                        envoyes, null, "/historique-envois"));
+            }
+            if (echecs > 0) {
+                activites.add(activite(t, "ECHECS", pluriel(echecs, "envoi en échec", "envois en échec"), echecs, null, "/historique-envois"));
+            }
+        }
+    }
+
+    /** Campagnes du module lancees ce jour-la, et celles validees qui partiront a leur date d'execution. */
+    private void campagnes(List<ActiviteCalendrierDTO> activites, Filtre f, String module, String lien) {
+        for (Tuple t : lignes(f, """
+                select cp.id as id, cp.nom as nom, date(cp.lance_le) as jour, 'CAMPAGNE' as type from crm_campagne cp
+                where cp.module = '%s' and cp.lance_le >= :du and cp.lance_le < :fin and%s
+                union all
+                select cp.id, cp.nom, date(cp.date_execution), 'CAMPAGNE_PROGRAMMEE' from crm_campagne cp
+                where cp.module = '%s' and cp.statut = 'VALIDEE' and cp.date_execution >= :du and cp.date_execution < :fin and%s
+                """.formatted(module, f.campagnes(), module, f.campagnes()))) {
+            String type = t.get("type", String.class);
+            activites.add(activite(t, type, ("CAMPAGNE".equals(type) ? "Lancement : " : "Programmée : ") + t.get("nom", String.class), null, null,
+                    lien + ((Number) t.get("id")).longValue()));
+        }
+    }
+
+    private static ActiviteCalendrierDTO activite(Tuple t, String type, String libelle, Long nombre, BigDecimal montant, String lien) {
+        return ActiviteCalendrierDTO.builder().date(date(t.get("jour"))).type(type).libelle(libelle).nombre(nombre).montant(montant).lien(lien).build();
+    }
+
+    private static List<ActiviteCalendrierDTO> trier(List<ActiviteCalendrierDTO> activites) {
+        activites.sort(Comparator.comparing(ActiviteCalendrierDTO::getDate));
+        return activites;
+    }
+
+    static String pluriel(long n, String un, String plusieurs) {
+        return n + " " + (n > 1 ? plusieurs : un);
+    }
+
+    private static LocalDate date(Object valeur) {
+        return valeur instanceof java.sql.Date sql ? sql.toLocalDate() : valeur instanceof LocalDateTime dt ? dt.toLocalDate()
+                : valeur instanceof LocalDate d ? d : LocalDate.parse(valeur.toString().substring(0, 10));
+    }
+
+    /** Le calendrier montre un mois, avec les jours des semaines qui le bordent. */
+    static void verifierPeriodeCalendrier(LocalDate debut, LocalDate fin) {
+        if (debut.isAfter(fin)) {
+            throw new ErreurMetierException("Le début de la période doit précéder sa fin.");
+        }
+        if (ChronoUnit.DAYS.between(debut, fin) > 62) {
+            throw new ErreurMetierException("Le calendrier couvre au plus 62 jours.");
+        }
+    }
+
     /** Un point par jour jusqu'a 60 jours, par semaine (a partir du premier jour de la periode) au-dela. */
     private static int pas(LocalDate debut, LocalDate fin, Filtre f) {
         long jours = ChronoUnit.DAYS.between(debut, fin) + 1;
@@ -512,10 +713,8 @@ public class TableauBordServiceImpl implements TableauBordService {
     }
 
     PointEvolutionDTO mapTupleToDto(Tuple tuple) {
-        Object date = tuple.get("date");
         return PointEvolutionDTO.builder()
-                .date(date instanceof java.sql.Date sql ? sql.toLocalDate() : date instanceof LocalDateTime dt ? dt.toLocalDate()
-                        : LocalDate.parse(date.toString().substring(0, 10)))
+                .date(date(tuple.get("date")))
                 .envoyes(nombre(tuple, "envoyes"))
                 .distribues(nombre(tuple, "distribues"))
                 .lus(nombre(tuple, "lus"))

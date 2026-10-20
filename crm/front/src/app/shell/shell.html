@@ -32,62 +32,90 @@
     @if (auth.recouvrement() && !surMarketing()) {
 
     @if (auth.peut('MA_JOURNEE', 'TABLEAU_BORD')) {
-      <div class="gl">Mon activité</div>
-      @if (auth.peut('MA_JOURNEE')) { <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a> }
-      @if (auth.peut('TABLEAU_BORD')) { <a class="nv" routerLink="/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
+      <div class="section" routerLinkActive #sActivite="routerLinkActive" [class.fermee]="!estOuverte('sActivite', sActivite.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sActivite', sActivite.isActive) : null" (click)="basculer('sActivite', sActivite.isActive)">Mon activité<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sActivite', sActivite.isActive) ? null : ''"><div>
+          @if (auth.peut('MA_JOURNEE')) { <a class="nv" routerLink="/ma-journee" routerLinkActive="on">Ma journée</a> }
+          @if (auth.peut('TABLEAU_BORD')) { <a class="nv" routerLink="/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
+        </div></div>
+      </div>
     }
     @if (auth.peut('FACTURES', 'CLIENTS', 'IMPORTS', 'PORTEFEUILLES')) {
-      <div class="gl">Créances</div>
-      @if (auth.peut('FACTURES')) { <a class="nv" routerLink="/factures" routerLinkActive="on">Factures</a> }
-      @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">{{ auth.portefeuillePersonnel() ? 'Mes clients' : 'Clients' }}</a> }
-      @if (auth.peut('IMPORTS')) { <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a> }
-      @if (auth.peut('PORTEFEUILLES')) { <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a> }
+      <div class="section" routerLinkActive #sCreances="routerLinkActive" [class.fermee]="!estOuverte('sCreances', sCreances.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sCreances', sCreances.isActive) : null" (click)="basculer('sCreances', sCreances.isActive)">Créances<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sCreances', sCreances.isActive) ? null : ''"><div>
+          @if (auth.peut('FACTURES')) { <a class="nv" routerLink="/factures" routerLinkActive="on">Factures</a> }
+          @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">{{ auth.portefeuillePersonnel() ? 'Mes clients' : 'Clients' }}</a> }
+          @if (auth.peut('IMPORTS')) { <a class="nv" routerLink="/imports" routerLinkActive="on">Imports</a> }
+          @if (auth.peut('PORTEFEUILLES')) { <a class="nv" routerLink="/portefeuilles" routerLinkActive="on">Portefeuilles agents</a> }
+        </div></div>
+      </div>
     }
     @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER', 'DELAIS_RELANCE')) {
-      <div class="gl">Relances</div>
-      @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a> }
-      @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a> }
-      @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on">Délais de relance</a> }
+      <div class="section" routerLinkActive #sRelances="routerLinkActive" [class.fermee]="!estOuverte('sRelances', sRelances.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sRelances', sRelances.isActive) : null" (click)="basculer('sRelances', sRelances.isActive)">Relances<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sRelances', sRelances.isActive) ? null : ''"><div>
+          @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on">Campagnes</a> }
+          @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on">Modèles de messages</a> }
+          @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on">Délais de relance</a> }
+        </div></div>
+      </div>
     }
     @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS', 'DISCUSSIONS', 'HISTORIQUE_ENVOIS', 'ENVOI_MASSE')) {
-      <div class="gl">Échanges</div>
-      @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
-      @if (auth.peut('REPONSES')) { <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a> }
-      @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
-      @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
-      @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
-        <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
-      }
+      <div class="section" routerLinkActive #sEchanges="routerLinkActive" [class.fermee]="!estOuverte('sEchanges', sEchanges.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sEchanges', sEchanges.isActive) : null" (click)="basculer('sEchanges', sEchanges.isActive)">Échanges<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sEchanges', sEchanges.isActive) ? null : ''"><div>
+          @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
+          @if (auth.peut('REPONSES')) { <a class="nv" routerLink="/reponses" routerLinkActive="on">Réponses des clients</a> }
+          @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
+          @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
+          @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
+            <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+          }
+        </div></div>
+      </div>
     }
     } @else {
-      <div class="gl">Marketing</div>
-      <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
-      @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
-      @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on">Campagnes promotionnelles</a> }
-      @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
-      @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }
-      @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on">Promotions</a> }
-      @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
-      @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a> }
-      @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on">Informations clients</a> }
-      @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on">Calendrier des événements</a> }
-      @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
-      @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
-      @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
-      @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
+      <div class="section" routerLinkActive #sMarketing="routerLinkActive" [class.fermee]="!estOuverte('sMarketing', sMarketing.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sMarketing', sMarketing.isActive) : null" (click)="basculer('sMarketing', sMarketing.isActive)">Marketing<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sMarketing', sMarketing.isActive) ? null : ''"><div>
+          <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
+          @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on">Tableau de bord</a> }
+          @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on">Campagnes promotionnelles</a> }
+          @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
+          @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }
+          @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on">Promotions</a> }
+          @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
+          @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a> }
+          @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on">Informations clients</a> }
+          @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on">Calendrier des événements</a> }
+          @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
+          @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
+          @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
+          @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
+        </div></div>
+      </div>
     }
     <!-- Administration : la meme dans les deux modules -->
     @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'REFERENTIELS', 'FOURNISSEURS_SMS', 'AGENCES', 'JOURNAL')) {
-      <div class="gl">Administration</div>
-      @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a> }
-      @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on">Rôles et droits</a> }
-      @if (auth.peut('JOURNAL')) { <a class="nv" routerLink="/journal" routerLinkActive="on">Journal des actions</a> }
-      <!-- Agences et fournisseurs SMS se tiennent dans les Parametres -->
-      @if (auth.peut('PARAMETRES', 'REFERENTIELS', 'AGENCES', 'FOURNISSEURS_SMS')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
+      <div class="section" routerLinkActive #sAdmin="routerLinkActive" [class.fermee]="!estOuverte('sAdmin', sAdmin.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sAdmin', sAdmin.isActive) : null" (click)="basculer('sAdmin', sAdmin.isActive)">Administration<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sAdmin', sAdmin.isActive) ? null : ''"><div>
+          @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on">Utilisateurs et habilitations</a> }
+          @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on">Rôles et droits</a> }
+          @if (auth.peut('JOURNAL')) { <a class="nv" routerLink="/journal" routerLinkActive="on">Journal des actions</a> }
+          <!-- Agences et fournisseurs SMS se tiennent dans les Parametres -->
+          @if (auth.peut('PARAMETRES', 'REFERENTIELS', 'AGENCES', 'FOURNISSEURS_SMS')) { <a class="nv" routerLink="/parametres" routerLinkActive="on">Paramètres</a> }
+        </div></div>
+      </div>
     }
     <!-- Centre de support : ouvert a tout utilisateur connecte -->
-    <div class="gl">Aide</div>
-    <a class="nv" routerLink="/support" routerLinkActive="on">Centre de support</a>
+    <div class="section" routerLinkActive #sAide="routerLinkActive" [class.fermee]="!estOuverte('sAide', sAide.isActive)">
+      <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sAide', sAide.isActive) : null" (click)="basculer('sAide', sAide.isActive)">Aide<i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+      <div class="liens" [attr.inert]="estOuverte('sAide', sAide.isActive) ? null : ''"><div>
+        <a class="nv" routerLink="/support" routerLinkActive="on">Centre de support</a>
+      </div></div>
+    </div>
     }
 
     <div class="profil">
