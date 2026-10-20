@@ -394,7 +394,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
             List<Map<String, Object>> messages = jdbc.queryForList("""
                     select s.id, s.envoi_masse_id, s.numero_expediteur, s.numero_destinataire, s.contenu, s.tentatives
                     from crm_message_sortant s join crm_envoi_masse e on e.id = s.envoi_masse_id
-                    where """ + (id == null ? """
+                    where\s""" + (id == null ? """
                     s.numero_expediteur = :numero and (e.depart_le is null or e.depart_le <= utc_timestamp())""" : "s.id = :id") + """
                      and s.statut = 'A_ENVOYER' and e.statut = 'EN_COURS'
                     order by e.created_at, s.id limit 1 for update

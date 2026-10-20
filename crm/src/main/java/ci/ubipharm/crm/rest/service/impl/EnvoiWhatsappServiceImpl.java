@@ -220,7 +220,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
                            m.parametres, mo.nom, mo.meta_modele, mo.meta_langue, mo.meta_entete
                     from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
                     join crm_modele_message mo on mo.id = c.modele_id
-                    where """ + (id == null ? "m.numero_expediteur = :numero" : "m.id = :id and m.canal = 'WHATSAPP'") + """
+                    where\s""" + (id == null ? "m.numero_expediteur = :numero" : "m.id = :id and m.canal = 'WHATSAPP'") + """
                      and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
                     order by c.lance_le, m.id limit 1 for update
                     """, id == null ? Map.of("numero", numero) : Map.of("id", id), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4),

@@ -43,7 +43,7 @@
 
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th></tr></thead>
       <tbody>
         @for (e of page()?.elements; track e.cle) {
           <tr class="cliquable" (click)="basculer(e)">
@@ -53,17 +53,17 @@
             <td>@if (e.clientId) { <a class="ref" [routerLink]="['/clients', e.clientId]" (click)="$event.stopPropagation()">{{ e.clientNom }}</a> }
               <div [class.second]="!!e.clientId">{{ e.canal === 'EMAIL' ? e.destinataire : ((e.destinataire | telephone) || '—') }}</div></td>
             <td>{{ e.utilisateurNom || '—' }}@if (e.expediteur && e.canal === 'WHATSAPP') { <div class="second">{{ e.expediteur | telephone }}</div> }</td>
-            <td style="max-width: 380px">
+            <td style="max-width: 300px">
               @if (ouvert() === e.cle) { <div style="white-space: pre-wrap">{{ e.contenu }}</div> }
               @else { <div class="second" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ e.contenu }}</div> }
             </td>
             <td class="nw"><span [pTooltip]="e.statut === 'A_ENVOYER' ? 'En attente : les messages partent dans la plage d\'envoi du canal (Paramètres), au rythme des relances, campagnes en premier.' : ''" tooltipPosition="top" [class.attente]="e.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[e.statut]"></span>{{ L.statutMessage[e.statut] ?? e.statut }}@if (e.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>
+              <app-envoyer-maintenant [cle]="e.cle" [statut]="e.statut" (envoye)="rechercher()" />
               @if (e.motif) { <div class="second" style="white-space: normal; max-width: 220px">{{ e.motif }}</div> }
               @if (e.luLe) { <div class="second">lu le {{ e.luLe | jour: true }}</div> } @else if (e.distribueLe) { <div class="second">distribué le {{ e.distribueLe | jour: true }}</div> }</td>
-            <td class="nw"><app-envoyer-maintenant [cle]="e.cle" [statut]="e.statut" (envoye)="rechercher()" /></td>
           </tr>
         } @empty {
-          <tr><td colspan="8" class="vide">{{ page() ? 'Aucun envoi ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          <tr><td colspan="7" class="vide">{{ page() ? 'Aucun envoi ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>
