@@ -18,7 +18,7 @@ public class SupportErreurDTO {
 
     private Long id;
     private String signature;
-    /** SERVEUR ou NAVIGATEUR. */
+    /** SERVEUR, NAVIGATEUR, LENTEUR ou SURVEILLANCE. */
     private String origine;
     private String type;
     private String message;
@@ -31,4 +31,7 @@ public class SupportErreurDTO {
     private boolean traite;
     private String traitePar;
     private LocalDateTime traiteLe;
+    /** Ticket rattache (ouvert automatiquement ou a la main) et son statut. */
+    private Long ticketId;
+    private String ticketStatut;
 }

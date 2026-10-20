@@ -87,9 +87,10 @@ abstract class IntegrationBase {
         jdbc.update("delete from crm_import_ligne");
         jdbc.update("delete from crm_import");
         jdbc.update("delete from crm_import_modele");
+        jdbc.update("delete from crm_support_erreur");
         jdbc.update("delete from crm_support_message");
         jdbc.update("delete from crm_support_ticket");
-        jdbc.update("delete from crm_support_erreur");
+        jdbc.update("delete from crm_support_rum");
         jdbc.update("delete from crm_support_faq where question like 'IT %'");
         jdbc.update("update crm_support_faq set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_journal_action");
