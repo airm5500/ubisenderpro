@@ -204,6 +204,15 @@ class EchangesIT extends IntegrationBase {
         envoyer(charge, post("/api/envois-masse/" + envoi + "/relance-echecs"), "")
                 .andExpect(jsonPath("$.statut").value("EN_COURS")).andExpect(jsonPath("$.nbEnAttente").value(1));
         envoyer(charge, post("/api/envois-masse/" + envoi + "/relance-echecs"), "").andExpect(status().isBadRequest());
+
+        // « Envoyer maintenant » : l'echec remis en attente part aussitot, puis le bouton n'a plus d'effet
+        when(passerelle.envoyerFichier(eq(NUMERO), eq("2250700000009"), any(), anyString()))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("F-2").build());
+        Long attente = jdbc.queryForObject("select id from crm_message_sortant where envoi_masse_id = ? and statut = 'A_ENVOYER'", Long.class, envoi);
+        envoyer(charge, post("/api/envois/S" + attente + "/immediat"), "").andExpect(jsonPath("$.statut").value("ENVOYE"));
+        envoyer(charge, post("/api/envois/S" + attente + "/immediat"), "").andExpect(status().isBadRequest());
+        envoyer(charge, post("/api/envois/X1/immediat"), "").andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where action = 'ENVOI_IMMEDIAT' and entite_id = ?", Integer.class, attente)).isEqualTo(1);
     }
 
     @Test

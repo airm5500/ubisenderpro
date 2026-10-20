@@ -389,6 +389,7 @@ tr.inactif td { color: var(--gris, #6B7C88); }
 .bi .pi { font-size: 15px; }
 .bi:hover, a.bi:hover { background: var(--survol); color: var(--bleu); }
 .bi:focus-visible { outline: 2px solid var(--vert); outline-offset: 1px; }
+.bi:disabled, .bi:disabled:hover { opacity: .35; background: transparent; cursor: not-allowed; }
 .bi.bi-danger, a.bi.bi-danger { color: var(--alerte); }
 .bi.bi-danger:hover { background: #FBEDE7; color: var(--alerte); }
 .bi.bi-plein { background: var(--vert); color: var(--bleu); }

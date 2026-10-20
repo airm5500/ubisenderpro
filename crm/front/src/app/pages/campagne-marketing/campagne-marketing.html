@@ -117,7 +117,8 @@
                   @if (m.luLe) {<div class="second">lu le {{ m.luLe | jour: true }}</div>}
                   @else if (m.distribueLe) {<div class="second">distribué le {{ m.distribueLe | jour: true }}</div>}
                   @else if (m.envoyeLe) {<div class="second">envoyé le {{ m.envoyeLe | jour: true }}</div>}</td>
-                <td class="nw">@if (m.contenu) { <button type="button" class="bi" pTooltip="Voir le message" tooltipPosition="top" aria-label="Voir le message" (click)="ouvert.set(m)"><i class="pi pi-eye"></i></button> }</td>
+                <td class="nw"><span class="actions-ligne">@if (m.contenu) { <button type="button" class="bi" pTooltip="Voir le message" tooltipPosition="top" aria-label="Voir le message" (click)="ouvert.set(m)"><i class="pi pi-eye"></i></button> }
+                  @if (m.id && c.statut === 'EN_COURS') { <app-envoyer-maintenant [cle]="'C' + m.id" [statut]="m.statut" (envoye)="charger()" /> }</span></td>
               </tr>
             } @empty {
               <tr><td colspan="4" class="vide">{{ page() ? 'Aucun message ici.' : 'Chargement…' }}</td></tr>

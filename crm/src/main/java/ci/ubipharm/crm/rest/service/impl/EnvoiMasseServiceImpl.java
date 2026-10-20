@@ -270,7 +270,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
             if (!cadence.peutEnvoyer(numero)) {
                 continue;
             }
-            Map<String, Object> message = reserver(numero);
+            Map<String, Object> message = reserver(numero, null);
             if (message == null) {
                 continue;
             }
@@ -375,15 +375,30 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
                 """, Map.of()));
     }
 
-    private Map<String, Object> reserver(String numero) {
+    @Override
+    public boolean envoyerMaintenant(Long messageId) {
+        Map<String, Object> message = reserver(null, messageId);
+        if (message == null) {
+            return false;
+        }
+        String numero = (String) message.get("numero_expediteur");
+        ResultatEnvoiDTO resultat = envoyer(numero, (String) message.get("numero_destinataire"), (String) message.get("contenu"),
+                pieceJointeService.piecesDEnvoiMasse(((Number) message.get("envoi_masse_id")).longValue()));
+        transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
+        cadence.envoye(numero);
+        return resultat.isSucces();
+    }
+
+    private Map<String, Object> reserver(String numero, Long id) {
         return transaction.execute(statut -> {
             List<Map<String, Object>> messages = jdbc.queryForList("""
-                    select s.id, s.envoi_masse_id, s.numero_destinataire, s.contenu, s.tentatives
+                    select s.id, s.envoi_masse_id, s.numero_expediteur, s.numero_destinataire, s.contenu, s.tentatives
                     from crm_message_sortant s join crm_envoi_masse e on e.id = s.envoi_masse_id
-                    where s.numero_expediteur = :numero and s.statut = 'A_ENVOYER' and e.statut = 'EN_COURS'
-                      and (e.depart_le is null or e.depart_le <= utc_timestamp())
+                    where """ + (id == null ? """
+                    s.numero_expediteur = :numero and (e.depart_le is null or e.depart_le <= utc_timestamp())""" : "s.id = :id") + """
+                     and s.statut = 'A_ENVOYER' and e.statut = 'EN_COURS'
                     order by e.created_at, s.id limit 1 for update
-                    """, Map.of("numero", numero));
+                    """, id == null ? Map.of("numero", numero) : Map.of("id", id));
             if (messages.isEmpty()) {
                 return null;
             }

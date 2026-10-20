@@ -158,13 +158,14 @@
       </label>
       <div class="defile" style="max-height: 360px">
         <table class="t">
-          <thead><tr><th>Numéro</th><th>Nom</th><th>Statut</th><th>Envoyé le</th></tr></thead>
+          <thead><tr><th>Numéro</th><th>Nom</th><th>Statut</th><th>Envoyé le</th><th></th></tr></thead>
           <tbody>
             @for (d of destinataires()?.elements; track d.id) {
               <tr><td class="nw">{{ d.numero | telephone }}</td><td>{{ d.nom || '—' }}</td>
                 <td><span [pTooltip]="d.statut === 'A_ENVOYER' ? 'En attente : les envois en masse partent entre ' + e.plageHoraire + ' (heure d\'Abidjan), au rythme des relances, après les campagnes.' : ''" tooltipPosition="top" [class.attente]="d.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[d.statut]"></span>{{ L.statutMessage[d.statut] ?? d.statut }}@if (d.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>@if (d.motif) { <div class="second">{{ d.motif }}</div> }</td>
-                <td class="nw">{{ d.envoyeLe | jour: true }}</td></tr>
-            } @empty { <tr><td colspan="4" class="vide">Aucun destinataire.</td></tr> }
+                <td class="nw">{{ d.envoyeLe | jour: true }}</td>
+                <td>@if (d.id && e.statut === 'EN_COURS') { <app-envoyer-maintenant [cle]="'S' + d.id" [statut]="d.statut" (envoye)="chargerDestinataires()" /> }</td></tr>
+            } @empty { <tr><td colspan="5" class="vide">Aucun destinataire.</td></tr> }
           </tbody>
         </table>
       </div>

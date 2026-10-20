@@ -66,7 +66,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             if (!cadence.peutEnvoyer(numero)) {
                 continue;
             }
-            Message message = reserver(numero);
+            Message message = reserver(numero, null);
             if (message == null) {
                 continue;
             }
@@ -76,6 +76,18 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
             envoyes++;
         }
         return envoyes;
+    }
+
+    @Override
+    public boolean envoyerMaintenant(Long messageId) {
+        Message message = reserver(null, messageId);
+        if (message == null) {
+            return false;
+        }
+        ResultatEnvoiDTO resultat = envoyer(message.numeroExpediteur(), phoneNumberIdMeta(message.numeroExpediteur()), message);
+        transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
+        cadence.envoye(message.numeroExpediteur());
+        return resultat.isSucces();
     }
 
     /**
@@ -200,17 +212,18 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
         });
     }
 
-    /** Passe le plus ancien message en attente du numero a ENVOI ; null si un autre passage l'a pris. */
-    private Message reserver(String numero) {
+    /** Passe le plus ancien message en attente du numero (ou ce message-ci) a ENVOI ; null si un autre passage l'a pris. */
+    private Message reserver(String numero, Long id) {
         return transaction.execute(statut -> {
             List<Message> messages = jdbc.query("""
                     select m.id, m.campagne_id, m.facture_id, m.numero_expediteur, m.numero_destinataire, m.contenu, m.tentatives,
                            m.parametres, mo.nom, mo.meta_modele, mo.meta_langue, mo.meta_entete
                     from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
                     join crm_modele_message mo on mo.id = c.modele_id
-                    where m.numero_expediteur = :numero and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
+                    where """ + (id == null ? "m.numero_expediteur = :numero" : "m.id = :id and m.canal = 'WHATSAPP'") + """
+                     and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
                     order by c.lance_le, m.id limit 1 for update
-                    """, Map.of("numero", numero), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4),
+                    """, id == null ? Map.of("numero", numero) : Map.of("id", id), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4),
                     rs.getString(5), rs.getString(6), rs.getInt(7), rs.getString(8), rs.getString(9), rs.getString(10), rs.getString(11),
                     rs.getString(12)));
             if (messages.isEmpty()) {

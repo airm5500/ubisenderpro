@@ -23,6 +23,8 @@ export class PromotionDetail implements OnInit {
   protected readonly S = STATUTS_PROMOTION;
 
   readonly id = input.required<string>();
+  /** Arrivee juste apres la creation : la saisie du premier produit s'ouvre d'office. */
+  readonly nouvelle = input<string>();
   protected readonly promotion = signal<Promotion | null>(null);
   protected readonly lignes = signal<PromotionProduit[]>([]);
   protected readonly saisie = signal(false);
@@ -32,13 +34,16 @@ export class PromotionDetail implements OnInit {
   protected readonly modifiable = computed(() => this.auth.peut('PROMOTIONS_GERER') && this.promotion()?.statut !== 'ARCHIVEE');
 
   ngOnInit(): void {
-    this.charger();
+    this.charger(!!this.nouvelle());
   }
 
-  charger(): void {
+  charger(premierProduit = false): void {
     this.api.get<Promotion>(`/api/marketing/promotions/${this.id()}`).subscribe(p => this.promotion.set(p));
     this.api.get<PromotionProduit[]>(`/api/marketing/promotions/${this.id()}/produits`, { avecRetires: this.avecRetires })
-      .subscribe(l => this.lignes.set(l));
+      .subscribe(l => {
+        this.lignes.set(l);
+        if (premierProduit && !l.length && this.auth.peut('PROMOTIONS_GERER')) this.ajouter();
+      });
   }
 
   basculerRetires(): void {

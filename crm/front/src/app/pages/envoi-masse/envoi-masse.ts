@@ -7,6 +7,7 @@ import { Auth } from '../../core/auth';
 import { DestinataireMasse, EnvoiMasse, EnvoiMasseApercu, ListeDiffusion, ModeleMessage, Page, PieceJointe, Variable } from '../../core/modeles';
 import { ClientChoisi, SelecteurClients } from '../../core/selecteur-clients';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
+import { EnvoyerMaintenant } from '../../core/envoyer-maintenant';
 
 interface References { listes: ListeDiffusion[]; modeles: ModeleMessage[]; variables: Variable[]; }
 interface LectureFichier { valides: DestinataireMasse[]; invalides: DestinataireMasse[]; }
@@ -18,7 +19,7 @@ interface LectureFichier { valides: DestinataireMasse[]; invalides: Destinataire
  */
 @Component({
   selector: 'app-envoi-masse',
-  imports: [FormsModule, JourPipe, TelephonePipe, TooltipModule, SelecteurClients],
+  imports: [FormsModule, JourPipe, TelephonePipe, TooltipModule, SelecteurClients, EnvoyerMaintenant],
   templateUrl: './envoi-masse.html'
 })
 export class EnvoiMassePage implements OnInit {

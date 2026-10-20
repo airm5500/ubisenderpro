@@ -118,8 +118,12 @@ class CampagneMarketingIT extends IntegrationBase {
         when(passerelle.envoyerTexte(eq(NUMERO_MARKETING), anyString(), anyString()))
                 .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WM-1").build(),
                         ResultatEnvoiDTO.builder().succes(true).identifiant("WM-2").build());
+        // « Envoyer maintenant » par son auteur sur le second message, hors de son tour ; le lot envoie l'autre
+        Long second = jdbc.queryForObject("select max(id) from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER'", Long.class, campagne);
+        envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(jsonPath("$.statut").value("ENVOYE"));
+        envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(status().isBadRequest());
         assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
-        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiWhatsappService.envoyerLot()).isZero();
         assertThat(jdbc.queryForList("select numero_destinataire from crm_campagne_message where campagne_id = ? and statut = 'ENVOYE' order by id",
                 String.class, campagne)).containsExactly("2250700000001", "2250700000002");
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))

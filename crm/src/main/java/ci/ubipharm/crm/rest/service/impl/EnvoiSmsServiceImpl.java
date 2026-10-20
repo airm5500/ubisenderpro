@@ -73,7 +73,7 @@ public class EnvoiSmsServiceImpl implements EnvoiSmsService {
         if (envoyesAujourdhui() >= parametreService.entier("sms.envoi.plafond_jour", 2000)) {
             return 0;
         }
-        Message message = reserver();
+        Message message = reserver(null);
         if (message == null) {
             return 0;
         }
@@ -84,6 +84,21 @@ public class EnvoiSmsServiceImpl implements EnvoiSmsService {
                 : Duration.ofSeconds(parametreService.entier("sms.envoi.delai_secondes", 1));
         prochainEnvoi.set(Instant.now().plus(attente));
         return reponse.reussie() ? 1 : 0;
+    }
+
+    @Override
+    public boolean envoyerMaintenant(Long messageId) {
+        Configuration fournisseur = passerelle.parDefaut();
+        if (fournisseur == null || !fournisseur.pret()) {
+            throw new ci.ubipharm.crm.socle.erreur.ErreurMetierException("Aucun fournisseur SMS prêt : renseignez sa clé dans Paramètres > Fournisseurs SMS.");
+        }
+        Message message = reserver(messageId);
+        if (message == null) {
+            return false;
+        }
+        Reponse reponse = passerelle.envoyer(fournisseur, message.numero(), message.contenu(), "CRM-" + message.id());
+        transaction.executeWithoutResult(statut -> enregistrer(fournisseur, message, reponse));
+        return reponse.reussie();
     }
 
     @Override
@@ -164,15 +179,16 @@ public class EnvoiSmsServiceImpl implements EnvoiSmsService {
                 .build();
     }
 
-    /** Passe le plus ancien SMS en attente a ENVOI ; null s'il n'y en a pas. */
-    private Message reserver() {
+    /** Passe le plus ancien SMS en attente (ou celui-ci) a ENVOI ; null s'il n'y en a pas. */
+    private Message reserver(Long id) {
         return transaction.execute(statut -> {
             List<Message> messages = jdbc.query("""
                     select m.id, m.campagne_id, m.facture_id, m.numero_destinataire, m.contenu, m.tentatives
                     from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
-                    where m.canal = 'SMS' and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'
+                    where m.canal = 'SMS' and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS'""" + (id == null ? "" : " and m.id = :id") + """
+
                     order by c.lance_le, m.id limit 1 for update
-                    """, Map.of(), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getInt(6)));
+                    """, id == null ? Map.of() : Map.of("id", id), (rs, i) -> new Message(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getInt(6)));
             if (messages.isEmpty()) {
                 return null;
             }
