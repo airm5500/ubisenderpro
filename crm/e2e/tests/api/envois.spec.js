@@ -123,3 +123,12 @@ test.describe('charte et promotions', () => {
     await charge.fermer();
   });
 });
+
+test.describe('discussions', () => {
+  test('le reglage « directeur : seulement son module » existe, desactive par defaut', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const reglage = (await json(await admin.get('api/parametres'))).find(p => p.cle === 'discussions.directeur_module_seul');
+    expect(reglage).toMatchObject({ valeur: 'NON', typeValeur: 'OUI_NON', categorie: 'WHATSAPP' });
+    await admin.fermer();
+  });
+});

@@ -275,6 +275,26 @@ class EchangesIT extends IntegrationBase {
                 .andExpect(jsonPath("$.message", containsString("Aucun numéro WhatsApp")));
     }
 
+    @Test
+    void unDirecteurNeVoitQueLesDiscussionsDeSonModuleSiLeParametreLeDemande() throws Exception {
+        when(passerelle.envoyerTexte(NUMERO, "2250700000001", "Bonjour"))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("D-1").build());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0700000001\",\"contenu\":\"Bonjour\"}").andExpect(status().isOk());
+        creerUtilisateur("it-dir-rec", "DIR_AGENCE", "RECOUVREMENT", 1L);
+        creerUtilisateur("it-dir-mkt", "DIR_AGENCE", "MARKETING", 1L);
+        MockHttpSession recouvrement = connecter("it-dir-rec", MOT_DE_PASSE_ADMIN);
+        MockHttpSession marketing = connecter("it-dir-mkt", MOT_DE_PASSE_ADMIN);
+
+        // Par defaut : toutes les discussions de ses agences, quel que soit le module de l'agent
+        mvc.perform(get("/api/discussions").session(recouvrement)).andExpect(jsonPath("$.total").value(1));
+        mvc.perform(get("/api/discussions").session(marketing)).andExpect(jsonPath("$.total").value(1));
+        jdbc.update("update crm_parametre set valeur = 'OUI' where cle = 'discussions.directeur_module_seul'");
+        mvc.perform(get("/api/discussions").session(recouvrement)).andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/api/discussions/messages").param("numeroAgent", NUMERO).param("numeroClient", "2250700000001").session(recouvrement)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/discussions").session(marketing)).andExpect(jsonPath("$.total").value(1));
+        mvc.perform(get("/api/discussions").session(admin)).andExpect(jsonPath("$.total").value(1));
+    }
+
     private ResultActions envoyer(MockHttpSession session, MockHttpServletRequestBuilder requete, String json) throws Exception {
         return mvc.perform(requete.session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json));
     }

@@ -57,3 +57,11 @@ test('un envoi en masse se verifie, part, et chaque ligne en attente a son bouto
   await expect(page.locator('app-envoyer-maintenant button').first()).toBeVisible();
   expect(incidents).toEqual([]);
 });
+
+test('le reglage des discussions du directeur apparait dans Parametres', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('parametres');
+  await page.getByText('WhatsApp', { exact: true }).first().click().catch(() => {});
+  await expect(page.getByText('Un directeur d\'agence ne voit que les discussions des agents de son module')).toBeVisible();
+  expect(incidents).toEqual([]);
+});

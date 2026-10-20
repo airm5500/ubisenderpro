@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -360,16 +361,43 @@ public class DiscussionServiceImpl implements DiscussionService {
     private String perimetre(Map<String, Object> parametres) {
         List<Long> agentsGeres = portefeuilleService.agentsGeres();
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
-        if (agentsGeres != null) {
+        // Le droit PERIMETRE_AGENCES est du Recouvrement : un directeur du seul Marketing voit aussi ses agences
+        if (agentsGeres != null && !directeur(perimetre.getUtilisateurId())) {
             parametres.put("agentsGeres", agentsGeres);
             return " where u.id in (:agentsGeres)";
         }
         if (!perimetre.isVisionGlobale()) {
             parametres.put("agences", perimetre.getAgenceIds().isEmpty() ? List.of(0L) : perimetre.getAgenceIds());
             parametres.put("moi", perimetre.getUtilisateurId());
-            return " where (c.agence_id in (:agences) or u.id = :moi)";
+            return " where (c.agence_id in (:agences) or u.id = :moi)" + moduleDuDirecteur(perimetre.getUtilisateurId());
         }
         return " where 1 = 1";
+    }
+
+    private boolean directeur(Long moi) {
+        return ((Number) em.createNativeQuery("""
+                select count(*) from crm_habilitation h join crm_role r on r.id = h.role_id
+                where h.utilisateur_id = :moi and h.actif and r.code in ('DIR_AGENCE', 'DIR_COMMERCIAL', 'DIR_RECOUVREMENT', 'DG', 'ADMIN')
+                """).setParameter("moi", moi).getSingleResult()).longValue() > 0;
+    }
+
+    /**
+     * Parametre discussions.directeur_module_seul : un directeur d'agence ne voit, hors des siennes, que les discussions
+     * des agents qui ont un role dans un module ou il est directeur. Un numero d'agent sans compte reste visible.
+     */
+    private String moduleDuDirecteur(Long moi) {
+        if (!parametreService.oui("discussions.directeur_module_seul", false)) {
+            return "";
+        }
+        List<?> modules = em.createNativeQuery("""
+                select coalesce(h.module_id, 0) from crm_habilitation h join crm_role r on r.id = h.role_id
+                where h.utilisateur_id = :moi and h.actif and r.code = 'DIR_AGENCE'
+                """).setParameter("moi", moi).getResultList();
+        if (modules.isEmpty() || modules.stream().anyMatch(m -> ((Number) m).longValue() == 0)) {
+            return "";
+        }
+        return " and (u.id is null or u.id = %d or exists (select 1 from crm_habilitation ha where ha.utilisateur_id = u.id and ha.actif and (ha.module_id is null or ha.module_id in (%s))))"
+                .formatted(moi, modules.stream().map(m -> String.valueOf(((Number) m).longValue())).collect(Collectors.joining(",")));
     }
 
     private void verifierAcces(String numeroAgent, String numeroClient) {
