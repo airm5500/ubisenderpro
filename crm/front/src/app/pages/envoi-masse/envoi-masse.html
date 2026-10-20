@@ -2,7 +2,8 @@
   <div class="entete">
     <div>
       <h1>Envoi WhatsApp en masse</h1>
-      <p class="sous-titre">Un même message envoyé depuis votre numéro WhatsApp à des numéros collés ou aux clients d'une liste de diffusion.
+      <p class="sous-titre">Un même message, écrit ou tiré d'un modèle, avec ses variables et ses pièces jointes, envoyé depuis votre numéro WhatsApp
+        à des clients choisis, à une liste de diffusion, à un fichier importé ou à des numéros collés.
         Les messages partent au rythme des relances, après elles ; les désabonnés (STOP) et les clients désactivés sont écartés.</p>
     </div>
     <div class="actions"><button class="bp" type="button" (click)="nouveau()"><i class="pi pi-plus"></i> Nouvel envoi</button></div>
@@ -10,33 +11,96 @@
 
   @if (saisie()) {
     <section class="bloc">
-      <h2 class="h2">Nouvel envoi</h2>
+      <div class="titre"><h2 class="h2">Nouvel envoi</h2></div>
       <div class="grille">
         <label class="f large">Nom de l'envoi<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Nouvel arrivage de novembre"></label>
+        <label class="f large">Modèle de message (facultatif)
+          <select class="sel" name="modeleId" [ngModel]="formulaire.modeleId" (ngModelChange)="choisirModele($event)">
+            <option [ngValue]="null">Aucun : j'écris le message</option>
+            @for (g of groupesModeles(); track g.type) {
+              <optgroup [label]="L.typeCampagne[g.type] ?? g.type">
+                @for (m of g.modeles; track m.id) { <option [ngValue]="m.id">{{ m.nom }}</option> }
+              </optgroup>
+            }
+          </select>
+          <span class="second">Le texte du modèle remplace le message ci-dessous ; vous pouvez ensuite le modifier.</span>
+        </label>
+        <div class="f large">Variables <span class="discret">(cliquez pour insérer)</span>
+          <div class="chips">@for (v of references().variables; track v.code) { <button type="button" class="var" [title]="v.libelle" (click)="inserer(v.code)">{{ v.code }}</button> }</div>
+        </div>
         <label class="f large">Message
-          <textarea class="sel" name="contenu" rows="5" [(ngModel)]="formulaire.contenu" (ngModelChange)="modifie()"></textarea>
-          <span class="second">{{ '{' }}nom{{ '}' }} est remplacé par le nom saisi à côté du numéro, ou par le nom du client.</span>
+          <textarea #zone class="sel" name="contenu" rows="7" [(ngModel)]="formulaire.contenu" (ngModelChange)="modifie()"></textarea>
+          <span class="second">Les variables se remplissent avec la fiche du client ; pour un numéro hors base, {{ '{' }}nom{{ '}' }} et {{ '{' }}nom_pharmacie{{ '}' }} prennent le nom saisi à côté du numéro.</span>
         </label>
-        <label class="f large">Numéros (un par ligne ; le nom peut suivre après un point-virgule ou une tabulation, comme un copier-coller d'Excel)
-          <textarea class="sel" name="numeros" rows="6" [(ngModel)]="formulaire.numeros" (ngModelChange)="modifie()"
-                    placeholder="07 08 09 10 11;Dr Kouassi&#10;05 06 07 08 09"></textarea>
-        </label>
-        @if (listes().length) {
-          <label class="f">Et/ou une liste de diffusion
-            <select class="sel" name="listeId" [(ngModel)]="formulaire.listeId" (ngModelChange)="modifie()">
-              <option [ngValue]="null">Aucune</option>
-              @for (l of listes(); track l.id) { <option [ngValue]="l.id">{{ l.nom }}</option> }
-            </select>
-          </label>
-        }
+        <div class="f large">Pièces jointes (images JPEG ou PNG, PDF, Excel ou Word)
+          @for (p of pieces(); track p.id; let i = $index) {
+            <span class="ligne-piece"><i class="pi" [class.pi-image]="p.typeMime.startsWith('image/')" [class.pi-file]="!p.typeMime.startsWith('image/')"></i>
+              {{ p.nomFichier }} <span class="discret">{{ (p.taille / 1024).toFixed(0) }} Ko{{ i === 0 && p.typeMime.startsWith('image/') ? ' · porte le message en légende' : '' }}</span>
+              <button class="bi" type="button" pTooltip="Retirer" tooltipPosition="top" aria-label="Retirer" (click)="retirerPiece(p.id)"><i class="pi pi-times"></i></button></span>
+          }
+          <label class="bs petit" style="align-self: flex-start"><i class="pi pi-paperclip"></i> {{ depot() ? 'Dépôt…' : 'Ajouter un fichier' }}
+            <input type="file" hidden multiple accept="image/jpeg,image/png,application/pdf,.xlsx,.docx" (change)="deposer($any($event.target))"></label>
+        </div>
       </div>
+
+      <h3 class="h">Destinataires</h3>
+      <div class="actions" style="flex-wrap: wrap">
+        <button class="bs petit" type="button" (click)="selecteur.set(true)"><i class="pi pi-users"></i> Choisir des clients</button>
+        <label class="bs petit"><i class="pi pi-upload"></i> Importer un fichier (.xlsx, .csv)
+          <input type="file" hidden accept=".xlsx,.xls,.csv" (change)="importer($any($event.target))"></label>
+        <label class="f" style="min-width: 260px; margin: 0">
+          <select class="sel" name="listeId" [(ngModel)]="formulaire.listeId" (ngModelChange)="modifie()" aria-label="Liste de diffusion">
+            <option [ngValue]="null">Liste de diffusion : aucune</option>
+            @for (l of references().listes; track l.id) { <option [ngValue]="l.id">{{ l.nom }} · {{ l.nbJoignables }} joignable(s)</option> }
+          </select>
+        </label>
+      </div>
+      @if (!references().listes.length) { <p class="discret" style="margin: 4px 0 0">Aucune liste de diffusion active : créez-en dans Marketing &gt; Listes de diffusion.</p> }
+      @if (clients().length) {
+        <div class="f large">{{ clients().length }} client(s) choisi(s) : tous leurs numéros WhatsApp actifs reçoivent le message
+          <div class="chips">@for (c of clients(); track c.id) {
+            <span class="tag">{{ c.raisonSociale }} <button class="bi" type="button" [attr.aria-label]="'Retirer ' + c.raisonSociale" (click)="retirerClient(c.id)"><i class="pi pi-times"></i></button></span>
+          }</div>
+        </div>
+      }
+      <label class="f large">Numéros (un par ligne ; le nom peut suivre après un point-virgule ou une tabulation, comme un copier-coller d'Excel)
+        <textarea class="sel" name="numeros" rows="5" [(ngModel)]="formulaire.numeros" (ngModelChange)="modifie()"
+                  placeholder="07 08 09 10 11;Dr Kouassi&#10;05 06 07 08 09"></textarea>
+      </label>
+      @if (aCorriger().length) {
+        <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ aCorriger().length }} ligne(s) du fichier non reconnue(s) : corrigez le numéro puis réintégrez-les.</span></div>
+        <div class="defile" style="max-height: 220px">
+          <table class="t">
+            <thead><tr><th>Numéro</th><th>Nom</th><th>Motif</th></tr></thead>
+            <tbody>@for (d of aCorriger(); track $index) {
+              <tr><td><input class="sel" [name]="'corr' + $index" [(ngModel)]="d.saisi" aria-label="Numéro corrigé"></td><td>{{ d.nom || '—' }}</td><td>{{ d.motif }}</td></tr>
+            }</tbody>
+          </table>
+        </div>
+        <div class="actions"><button class="bs petit" type="button" (click)="reintegrer()">Réintégrer les lignes corrigées</button>
+          <button class="bs petit" type="button" (click)="aCorriger.set([])">Les ignorer</button></div>
+      }
+
+      <h3 class="h">Départ</h3>
+      <div class="actions" style="flex-wrap: wrap; align-items: center">
+        <label class="droit"><input type="radio" name="programme" [value]="false" [(ngModel)]="programme" (ngModelChange)="modifie()"> Dès maintenant</label>
+        <label class="droit"><input type="radio" name="programme" [value]="true" [(ngModel)]="programme" (ngModelChange)="modifie()"> À partir du</label>
+        @if (programme) { <input class="sel" type="datetime-local" name="departLe" [(ngModel)]="formulaire.departLe" (ngModelChange)="modifie()" aria-label="Date et heure de départ" style="max-width: 240px"> }
+      </div>
+      <p class="discret" style="margin: 0">Heure d'Abidjan. Le débit et la plage horaire sont ceux de Paramètres &gt; WhatsApp.</p>
+
       @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
       @if (apercu(); as a) {
         <div class="kvs bandeau">
           <div class="kv"><span>Destinataires retenus</span><strong>{{ a.nbRetenus }}</strong></div>
           <div class="kv"><span>Écartés</span><strong>{{ a.exclus.length }}</strong></div>
+          <div class="kv"><span>Pièces jointes</span><strong>{{ a.piecesJointes?.length ?? 0 }}</strong></div>
         </div>
-        @if (a.horsPlage) { <div class="info"><i class="pi pi-clock"></i><span>Il est hors de la plage des envois en masse (entre {{ a.plageHoraire }}, heure d'Abidjan) : les messages partiront à son ouverture. Cette plage se règle dans Paramètres > WhatsApp.</span></div> }
+        @if (a.horsPlage && !programme) { <div class="info"><i class="pi pi-clock"></i><span>Il est hors de la plage des envois en masse (entre {{ a.plageHoraire }}, heure d'Abidjan) : les messages partiront à son ouverture. Cette plage se règle dans Paramètres > WhatsApp.</span></div> }
+        @if (a.variablesRetirees?.length) {
+          <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ces variables ne se remplissent que dans une campagne : leur ligne ne partira pas.
+            @for (v of a.variablesRetirees; track v) { <span class="tag">{{ v }}</span> }</span></div>
+        }
         @if (a.exemple) { <div class="info"><i class="pi pi-whatsapp"></i><span style="white-space: pre-wrap">{{ a.exemple }}</span></div> }
         @if (a.exclus.length) {
           <div class="defile" style="max-height: 220px">
@@ -49,11 +113,12 @@
       }
       <div class="actions" style="justify-content: flex-end">
         <button class="bs" type="button" (click)="saisie.set(false)">Annuler</button>
-        <button class="bs" type="button" (click)="verifier()" [disabled]="enCours() || !formulaire.contenu.trim() || (!formulaire.numeros.trim() && !formulaire.listeId)">Vérifier les destinataires</button>
-        <button class="bp" type="button" (click)="envoyer()" [disabled]="enCours() || !apercu() || !apercu()!.nbRetenus || !formulaire.nom.trim()">
-          Envoyer à {{ apercu()?.nbRetenus ?? 0 }} destinataire(s)</button>
+        <button class="bs" type="button" (click)="verifier()" [disabled]="enCours() || !formulaire.contenu.trim() || !aDesDestinataires()">Vérifier les destinataires</button>
+        <button class="bp" type="button" (click)="envoyer()" [disabled]="enCours() || !apercu() || !apercu()!.nbRetenus || !formulaire.nom.trim() || (programme && !formulaire.departLe)">
+          {{ programme ? 'Programmer' : 'Envoyer' }} à {{ apercu()?.nbRetenus ?? 0 }} destinataire(s)</button>
       </div>
     </section>
+    <app-selecteur-clients [(ouvert)]="selecteur" [deja]="clients()" (choisir)="ajouterClients($event)" />
   }
 
   @if (detail(); as e) {
@@ -64,6 +129,7 @@
             {{ e.annulePar ? ' · annulé par ' + e.annulePar : '' }}</span></div>
         <div class="actions">
           <button class="bs petit" type="button" (click)="chargerDestinataires()"><i class="pi pi-refresh"></i> Actualiser</button>
+          @if (e.nbEchecs && e.statut !== 'ANNULE') { <button class="bs petit" type="button" (click)="relancerEchecs(e)"><i class="pi pi-replay"></i> Renvoyer les {{ e.nbEchecs }} échec(s)</button> }
           @if (e.statut === 'EN_COURS') { <button class="bd petit" type="button" (click)="annuler(e)">Annuler l'envoi</button> }
         </div>
       </div>
@@ -78,7 +144,12 @@
         <div class="kv"><span>Échecs</span><strong>{{ e.nbEchecs }}</strong></div>
         <div class="kv"><span>Écartés</span><strong>{{ e.nbExclus }}</strong></div>
       </div>
+      @if (e.departLe && e.statut === 'EN_COURS' && e.nbEnAttente) { <div class="info"><i class="pi pi-calendar"></i><span>Départ programmé le {{ e.departLe | jour: true }} (heure d'Abidjan).</span></div> }
       <div class="info"><i class="pi pi-comment"></i><span style="white-space: pre-wrap">{{ e.contenu }}</span></div>
+      @if (e.modeleNom || e.piecesJointes?.length) {
+        <p class="discret" style="margin: 0">@if (e.modeleNom) { Modèle de départ : {{ e.modeleNom }}. }
+          @for (p of e.piecesJointes; track p.id) { <a [href]="'/api/envois-masse/' + e.id + '/pieces-jointes/' + p.id" target="_blank" rel="noopener"><i class="pi pi-paperclip"></i> {{ p.nomFichier }}</a> }</p>
+      }
       <label class="f" style="max-width: 260px">Statut
         <select class="sel" name="filtreStatut" [(ngModel)]="filtreStatut" (ngModelChange)="chargerDestinataires()">
           <option value="">Tous</option>

@@ -1,5 +1,19 @@
 package ci.ubipharm.crm.rest;
 
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
+import ci.ubipharm.crm.rest.service.dto.LectureDestinatairesDTO;
+import ci.ubipharm.crm.rest.service.dto.PieceJointeDTO;
+import ci.ubipharm.crm.rest.service.dto.ReferencesEnvoiMasseDTO;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,6 +60,35 @@ public class EnvoiMasseRessource {
     @PostMapping
     public EnvoiMasseApercuDTO creer(@Valid @RequestBody EnvoiMasseDemandeDTO demande) {
         return envoiMasseService.creer(demande);
+    }
+
+    @GetMapping("/references")
+    public ReferencesEnvoiMasseDTO references() {
+        return envoiMasseService.references();
+    }
+
+    @PostMapping(value = "/lecture-fichier", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public LectureDestinatairesDTO lireFichier(@RequestPart("fichier") MultipartFile fichier) {
+        return envoiMasseService.lireFichier(fichier);
+    }
+
+    @PostMapping(value = "/pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PieceJointeDTO deposerPieceJointe(@RequestPart("fichier") MultipartFile fichier) {
+        return envoiMasseService.deposerPieceJointe(fichier);
+    }
+
+    @GetMapping("/{id}/pieces-jointes/{pieceId}")
+    public ResponseEntity<byte[]> pieceJointe(@PathVariable Long id, @PathVariable Long pieceId) {
+        FichierDTO fichier = envoiMasseService.pieceJointe(id, pieceId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(fichier.getNom(), StandardCharsets.UTF_8).build().toString())
+                .contentType(MediaType.parseMediaType(fichier.getTypeContenu()))
+                .body(fichier.getContenu());
+    }
+
+    @PostMapping("/{id}/relance-echecs")
+    public EnvoiMasseDTO relancerEchecs(@PathVariable Long id) {
+        return envoiMasseService.relancerEchecs(id);
     }
 
     @PostMapping("/{id}/annulation")

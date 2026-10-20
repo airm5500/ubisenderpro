@@ -43,4 +43,8 @@ public class EnvoiMasseDTO {
     private boolean horsPlage;
     /** Plage d'envoi, par ex. « 8 h et 18 h » (heure d'Abidjan). */
     private String plageHoraire;
+    private Long modeleId;
+    private String modeleNom;
+    private LocalDateTime departLe;
+    private List<PieceJointeDTO> piecesJointes;
 }

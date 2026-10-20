@@ -64,6 +64,37 @@ public class PieceJointeServiceImpl implements PieceJointeService {
     }
 
     @Override
+    @Transactional
+    public PieceJointeDTO deposerDocument(MultipartFile fichier) {
+        if (fichier == null || fichier.isEmpty()) {
+            throw new ErreurMetierException("Choisissez le fichier à joindre.");
+        }
+        String nom = fichier.getOriginalFilename() == null || fichier.getOriginalFilename().isBlank() ? "piece-jointe" : fichier.getOriginalFilename();
+        nom = nom.replaceAll(".*[\\\\/]", "").replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (nom.length() > 200) {
+            nom = nom.substring(nom.length() - 200);
+        }
+        String type = typeReel(fichier);
+        if (type == null) {
+            type = typeBureautique(fichier, nom);
+        }
+        if (type == null) {
+            throw new ErreurMetierException("La pièce jointe doit être une image JPEG ou PNG, un PDF, un fichier Excel (.xlsx) ou Word (.docx).");
+        }
+        int maxKo = parametreService.entier("marketing.affiche_taille_max_ko", 5000);
+        if (fichier.getSize() > maxKo * 1024L) {
+            throw new ErreurMetierException(nom + " dépasse " + maxKo + " Ko : réduisez-le avant de le joindre.");
+        }
+        try {
+            Long id = inserer("DOCUMENT", nom, type, fichier.getBytes(), utilisateurCourantService.utilisateur().getId());
+            journalActionService.enregistrer("PIECE_JOINTE_DEPOT", "crm_piece_jointe", id, "Pièce jointe " + nom + " (" + fichier.getSize() / 1024 + " Ko)");
+            return decrire(id);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PieceJointeDTO decrire(Long id) {
         List<PieceJointeDTO> pieces = jdbc.query("select id, nature, nom_fichier, type_mime, taille from crm_piece_jointe where id = :id",
@@ -116,6 +147,16 @@ public class PieceJointeServiceImpl implements PieceJointeService {
         return pieces;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<FichierDTO> piecesDEnvoiMasse(Long envoiMasseId) {
+        return jdbc.query("""
+                select p.nom_fichier, p.type_mime, p.contenu from crm_envoi_masse_piece_jointe e join crm_piece_jointe p on p.id = e.piece_jointe_id
+                where e.envoi_masse_id = :id order by e.ordre
+                """, Map.of("id", envoiMasseId),
+                (rs, i) -> FichierDTO.builder().nom(rs.getString(1)).typeContenu(rs.getString(2)).contenu(rs.getBytes(3)).build());
+    }
+
     private Long inserer(String nature, String nom, String type, byte[] contenu, Long creePar) {
         KeyHolder cle = new GeneratedKeyHolder();
         jdbc.update("""
@@ -123,7 +164,11 @@ public class PieceJointeServiceImpl implements PieceJointeService {
                 values (:nature, :nom, :type, :taille, :contenu, :creePar, utc_timestamp())
                 """, new MapSqlParameterSource().addValue("nature", nature).addValue("nom", nom).addValue("type", type)
                 .addValue("taille", contenu.length).addValue("contenu", contenu).addValue("creePar", creePar), cle, new String[] {"id"});
-        archivageService.archiver("AFFICHE".equals(nature) ? "affiches" : "listes-produits", nom, contenu);
+        archivageService.archiver(switch (nature) {
+            case "AFFICHE" -> "affiches";
+            case "DOCUMENT" -> "pieces-jointes";
+            default -> "listes-produits";
+        }, nom, contenu);
         return cle.getKey().longValue();
     }
 
@@ -144,5 +189,20 @@ public class PieceJointeServiceImpl implements PieceJointeService {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /** Excel ou Word : une archive ZIP dont le nom porte l'extension. */
+    private static String typeBureautique(MultipartFile fichier, String nom) {
+        try {
+            byte[] debut = fichier.getInputStream().readNBytes(4);
+            if (debut.length < 4 || debut[0] != 'P' || debut[1] != 'K' || debut[2] != 3 || debut[3] != 4) {
+                return null;
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        String n = nom.toLowerCase(java.util.Locale.ROOT);
+        return n.endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : n.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : null;
     }
 }

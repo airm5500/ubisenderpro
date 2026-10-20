@@ -2,11 +2,15 @@ package ci.ubipharm.crm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -28,6 +33,7 @@ import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.EvenementAccuseDTO;
 import ci.ubipharm.crm.rest.service.dto.EvenementMessageDTO;
+import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
 
 /** Envoi WhatsApp en masse, discussions, historique des envois, historique d'un compte. */
@@ -134,6 +140,70 @@ class EchangesIT extends IntegrationBase {
                 .andReturn().getResponse().getContentAsString(), "$.envoi.id")).longValue();
         envoyer(charge, post("/api/envois-masse/" + second + "/annulation"), "").andExpect(jsonPath("$.statut").value("ANNULE"));
         assertThat(envoiMasseService.envoyerLot()).isZero();
+    }
+
+    @Test
+    void lEnvoiEnMassePartDUnModeleAvecSesVariablesSesPiecesJointesEtDesClientsChoisis() throws Exception {
+        Long modele = idDe(envoyer(admin, post("/api/marketing/modeles"), """
+                {"nom":"Arrivage","typeCampagne":"PROMOTION","contenu":"Bonjour *{nom_pharmacie}* ({code_client}),\\nnouvel arrivage.\\nPromo : {promotion_nom}\\n{expediteur_nom}"}"""));
+        mvc.perform(get("/api/envois-masse/references").session(charge))
+                .andExpect(jsonPath("$.modeles[?(@.id == %d)].nom".formatted(modele)).value("Arrivage"))
+                .andExpect(jsonPath("$.variables[*].code").value(org.hamcrest.Matchers.hasItems("nom", "nom_pharmacie", "code_client")))
+                .andExpect(jsonPath("$.variables[*].code").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("promotion_nom"))));
+
+        // Fichier de destinataires : lu, rien n'est enregistre ; une ligne sans numero est a corriger
+        mvc.perform(multipart("/api/envois-masse/lecture-fichier").file(new MockMultipartFile("fichier", "dest.csv", "text/csv",
+                        "Téléphone;Nom\n0700000009;Dr Kouassi\nabc;Dr Faux\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))).session(charge).with(csrf()))
+                .andExpect(jsonPath("$.valides[0].numero").value("2250700000009")).andExpect(jsonPath("$.valides[0].nom").value("Dr Kouassi"))
+                .andExpect(jsonPath("$.invalides[0].saisi").value("abc"));
+
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+        Long image = idDe(mvc.perform(multipart("/api/envois-masse/pieces-jointes").file(new MockMultipartFile("fichier", "arrivage.png", "image/png", png))
+                .session(charge).with(csrf())));
+        Long pdf = idDe(mvc.perform(multipart("/api/envois-masse/pieces-jointes").file(new MockMultipartFile("fichier", "tarifs.pdf", "application/pdf",
+                "%PDF-1.4 test".getBytes())).session(charge).with(csrf())));
+        mvc.perform(multipart("/api/envois-masse/pieces-jointes").file(new MockMultipartFile("fichier", "x.exe", "application/octet-stream", "MZ".getBytes()))
+                .session(charge).with(csrf())).andExpect(status().isBadRequest());
+
+        Long client = jdbc.queryForObject("select id from crm_client where code = 'E-1'", Long.class);
+        String corps = """
+                {"nom":"Arrivage","modeleId":%d,"contenu":"Bonjour *{nom_pharmacie}* ({code_client}),\\nnouvel arrivage.\\nPromo : {promotion_nom}\\n{expediteur_nom}",
+                 "clientIds":[%d],"numeros":"0700000009;Dr Kouassi","pieceJointeIds":[%d,%d]%s}""";
+        envoyer(charge, post("/api/envois-masse"), corps.formatted(modele, client, image, pdf, ",\"apercu\":true"))
+                .andExpect(jsonPath("$.nbRetenus").value(2))
+                .andExpect(jsonPath("$.variablesRetirees[0]").value("promotion_nom"))
+                .andExpect(jsonPath("$.piecesJointes[*].nomFichier").value(org.hamcrest.Matchers.contains("arrivage.png", "tarifs.pdf")))
+                .andExpect(jsonPath("$.exemple").value("Bonjour *Dr Kouassi* (),\nnouvel arrivage.\nTest it-marketing"));
+
+        // Depart programme : rien ne part avant l'heure
+        Long envoi = ((Number) JsonPath.read(envoyer(charge, post("/api/envois-masse"),
+                corps.formatted(modele, client, image, pdf, ",\"departLe\":\"" + java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusHours(2).withNano(0) + "\""))
+                .andExpect(jsonPath("$.envoi.modeleNom").value("Arrivage")).andExpect(jsonPath("$.envoi.departLe").isNotEmpty())
+                .andReturn().getResponse().getContentAsString(), "$.envoi.id")).longValue();
+        assertThat(envoiMasseService.envoyerLot()).isZero();
+        assertThat(jdbc.queryForObject("select contenu from crm_message_sortant where numero_destinataire = '2250700000001'", String.class))
+                .isEqualTo("Bonjour *Pharmacie Un* (E-1),\nnouvel arrivage.\nTest it-marketing");
+
+        // A l'heure : l'image porte le texte en legende, le PDF suit ; un echec se renvoie
+        jdbc.update("update crm_envoi_masse set depart_le = utc_timestamp() - interval 1 minute where id = ?", envoi);
+        when(passerelle.envoyerFichier(eq(NUMERO), anyString(), any(), any()))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("F-1").build());
+        when(passerelle.envoyerFichier(eq(NUMERO), eq("2250700000009"), any(), anyString()))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(false).erreur("Numéro inconnu de WhatsApp").build());
+        assertThat(envoiMasseService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiMasseService.envoyerLot()).isEqualTo(1);
+        org.mockito.ArgumentCaptor<FichierDTO> fichiers = org.mockito.ArgumentCaptor.forClass(FichierDTO.class);
+        verify(passerelle, org.mockito.Mockito.times(2)).envoyerFichier(eq(NUMERO), eq("2250700000001"), fichiers.capture(), any());
+        assertThat(fichiers.getAllValues()).extracting(FichierDTO::getNom).containsExactly("arrivage.png", "tarifs.pdf");
+        verify(passerelle, never()).envoyerTexte(anyString(), anyString(), anyString());
+        mvc.perform(get("/api/envois-masse/" + envoi).session(charge))
+                .andExpect(jsonPath("$.statut").value("TERMINE")).andExpect(jsonPath("$.nbEchecs").value(1))
+                .andExpect(jsonPath("$.piecesJointes.length()").value(2));
+        mvc.perform(get("/api/envois-masse/" + envoi + "/pieces-jointes/" + pdf).session(charge)).andExpect(status().isOk())
+                .andExpect(content().contentType("application/pdf"));
+        envoyer(charge, post("/api/envois-masse/" + envoi + "/relance-echecs"), "")
+                .andExpect(jsonPath("$.statut").value("EN_COURS")).andExpect(jsonPath("$.nbEnAttente").value(1));
+        envoyer(charge, post("/api/envois-masse/" + envoi + "/relance-echecs"), "").andExpect(status().isBadRequest());
     }
 
     @Test
