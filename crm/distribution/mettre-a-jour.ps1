@@ -69,8 +69,12 @@ $commit = (& git -C $Crm rev-parse --short HEAD) 2>$null
 Etape 'Interface Angular'
 $env:PATH = $node.FullName + [IO.Path]::PathSeparator + $env:PATH
 $front = Join-Path $Crm 'front'
-if (-not (Test-Path (Join-Path $front 'node_modules'))) {
+# Dependances reinstallees des que package-lock.json a change depuis la derniere installation (nouvelle bibliotheque)
+$verrou = Join-Path $front 'package-lock.json'
+$installe = Join-Path $front 'node_modules\.verrou-installe.json'
+if (-not (Identique $verrou $installe)) {
     Lancer (Join-Path $node.FullName 'npm.cmd') @('ci', '--no-audit', '--no-fund') $front
+    Copy-Item $verrou $installe -Force
 }
 Lancer (Join-Path $node.FullName 'npx.cmd') @('ng', 'build') $front
 
