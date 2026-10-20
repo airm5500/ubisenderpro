@@ -425,9 +425,11 @@ tr.inactif td { color: var(--gris, #6B7C88); }
    Aide et guidage (maquette validee le 20/10/2026 : 1B, 2B, 3C) ; le reste dans shell/guidage.css.
    ===================================================================== */
 /* 2B : « ? » pose a cote du titre de chaque ecran */
-.entete h1.aide-titre, main h1.aide-titre { display: inline-block; }
+/* Le bloc du titre passe en grille : titre et « ? » sur la meme ligne, le reste (sous-titre…) en dessous */
+:has(> h1.aide-titre + .aide-q) { display: grid !important; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; }
+:has(> h1.aide-titre + .aide-q) > :not(h1.aide-titre, .aide-q) { grid-column: 1 / -1; }
 .aide-q {
-  display: inline-grid; place-items: center; vertical-align: top; margin: 4px 0 0 10px; width: 24px; height: 24px; padding: 0;
+  display: inline-grid; place-items: center; justify-self: start; margin: 0; width: 26px; height: 26px; padding: 0; flex: none;
   border: 2px solid var(--vert); border-radius: 50%; background: transparent; color: var(--bleu);
   font: inherit; font-size: 13px; font-weight: 800; line-height: 1; cursor: pointer; transition: background .15s, color .15s;
 }

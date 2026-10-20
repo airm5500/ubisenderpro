@@ -34,7 +34,7 @@ export class Guidage implements OnInit {
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
   private readonly zone = inject(NgZone);
-  private readonly hote = inject(ElementRef<HTMLElement>);
+  private readonly hote: ElementRef<HTMLElement> = inject(ElementRef);
   private readonly detruit = inject(DestroyRef);
 
   /** Chemin de la route affichee (« campagnes/:id ») : cle des textes de l'ecran. */
@@ -55,7 +55,7 @@ export class Guidage implements OnInit {
   private cible: HTMLElement | null = null;
   private minuterie: ReturnType<typeof setTimeout> | undefined;
   private minuterieCoche: ReturnType<typeof setTimeout> | undefined;
-  private dernierClic: { el: HTMLElement; quand: number } | null = null;
+  private dernierClic: { el: HTMLElement; rect: DOMRect; quand: number } | null = null;
   private observateur: MutationObserver | null = null;
 
   constructor() {
@@ -233,7 +233,7 @@ export class Guidage implements OnInit {
       return;
     }
     const bouton = cible.closest<HTMLElement>(BOUTONS);
-    if (bouton) this.dernierClic = { el: bouton, quand: Date.now() };
+    if (bouton) this.dernierClic = { el: bouton, rect: bouton.getBoundingClientRect(), quand: Date.now() };
     const validation = cible.closest<HTMLButtonElement>(VALIDATION);
     if (validation && !validation.disabled) this.verifierObligatoires(validation);
   }
@@ -251,8 +251,9 @@ export class Guidage implements OnInit {
   /** Champ nomme par le serveur (« lignes[0].montant » : montant), cherche dans la fenetre ouverte, sinon l'ecran. */
   private trouverChamp(nom: string): HTMLElement | null {
     const simple = nom.split('.').pop()!.replace(/\[\d+\]/g, '');
-    const fenetres = document.querySelectorAll('.p-dialog');
-    const zone = fenetres.length ? fenetres[fenetres.length - 1] : document.querySelector('main');
+    const fenetres = [...document.querySelectorAll<HTMLElement>('.p-dialog')].filter(f => f.offsetParent !== null);
+    const zone: Element | null = fenetres.length ? fenetres[fenetres.length - 1]
+      : this.panneau() && this.edition() ? this.hote.nativeElement.querySelector('.aide-panneau') : document.querySelector('main');
     if (!zone) return null;
     const echappe = CSS.escape(simple);
     return zone.querySelector<HTMLElement>(`[name="${echappe}"], #${echappe}, [formcontrolname="${echappe}"]`);
@@ -280,13 +281,14 @@ export class Guidage implements OnInit {
     if (cible.nextElementSibling?.classList.contains('aide-champ-msg')) cible.nextElementSibling.remove();
   }
 
-  /** Reussite annoncee juste apres un clic : une coche se dessine a cote du bouton, s'il est encore a l'ecran. */
+  /** Reussite annoncee juste apres un clic : une coche se dessine a cote du bouton (a sa place s'il a disparu avec sa fenetre). */
   private surMessage(m: ToastMessageOptions | ToastMessageOptions[]): void {
     const succes = (Array.isArray(m) ? m : [m]).some(x => x?.severity === 'success');
     const clic = this.dernierClic;
     if (!succes || !clic || !this.aide.actif() || Date.now() - clic.quand > 15000) return;
-    const r = clic.el.isConnected ? clic.el.getBoundingClientRect() : null;
-    if (!r || !r.width) return;
+    const actuel = clic.el.isConnected ? clic.el.getBoundingClientRect() : null;
+    const r = actuel?.width ? actuel : clic.rect;
+    if (!r.width) return;
     clearTimeout(this.minuterieCoche);
     this.coche.set(null);
     setTimeout(() => {
