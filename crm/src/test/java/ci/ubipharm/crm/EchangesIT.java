@@ -248,6 +248,18 @@ class EchangesIT extends IntegrationBase {
                 .andExpect(jsonPath("$.elements[0].peutRepondre").value(true));
         envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"123\",\"contenu\":\"Test\"}")
                 .andExpect(jsonPath("$.message", containsString("n'est pas un numéro WhatsApp valide")));
+
+        // Modele : les variables du client se remplissent a l'envoi ; une image jointe porte le texte en legende
+        mvc.perform(get("/api/discussions/modeles").session(charge)).andExpect(status().isOk());
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+        Long image = idDe(mvc.perform(multipart("/api/discussions/pieces-jointes").file(new MockMultipartFile("fichier", "promo.png", "image/png", png))
+                .session(charge).with(csrf())));
+        when(passerelle.envoyerFichier(eq(NUMERO), eq("2250700000001"), any(), eq("Bonjour Pharmacie Un (E-1)")))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("N-2").build());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0700000001\",\"contenu\":\"Bonjour {nom_pharmacie} ({code_client})\",\"pieceJointeIds\":[%d]}"
+                .formatted(image)).andExpect(status().isOk()).andExpect(jsonPath("$.contenu").value("Bonjour Pharmacie Un (E-1)"));
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0700000001\",\"contenu\":\"Solde {solde}\"}")
+                .andExpect(jsonPath("$.message", containsString("Remplacez {solde}")));
         // L'administrateur de test n'a pas de numero relie
         jdbc.update("update crm_utilisateur set numero_whatsapp = null where login = 'admin'");
         envoyer(admin, post("/api/discussions"), "{\"numeroClient\":\"0700000007\",\"contenu\":\"Test\"}")

@@ -2,7 +2,10 @@ package ci.ubipharm.crm.rest;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +17,8 @@ import ci.ubipharm.crm.rest.service.DiscussionService;
 import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.ModeleMessageDTO;
+import ci.ubipharm.crm.rest.service.dto.PieceJointeDTO;
 import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
 import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
@@ -47,6 +52,16 @@ public class DiscussionRessource {
     @PostMapping
     public MessageDiscussionDTO demarrer(@Valid @RequestBody NouvelleDiscussionDTO demande) {
         return discussionService.demarrer(demande);
+    }
+
+    @GetMapping("/modeles")
+    public List<ModeleMessageDTO> modeles() {
+        return discussionService.modeles();
+    }
+
+    @PostMapping(value = "/pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PieceJointeDTO deposerPieceJointe(@RequestPart("fichier") MultipartFile fichier) {
+        return discussionService.deposerPieceJointe(fichier);
     }
 
     @PostMapping("/messages")
