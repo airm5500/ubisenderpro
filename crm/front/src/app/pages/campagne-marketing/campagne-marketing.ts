@@ -9,13 +9,14 @@ import { Auth } from '../../core/auth';
 import { CampagneMarketing, MessageCampagne, Page, RecapitulatifMarketing } from '../../core/modeles';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 import { CampagneMarketingFormulaire } from '../campagnes-marketing/campagne-marketing-formulaire';
+import { EnvoyerMaintenant } from '../../core/envoyer-maintenant';
 
 type Action = 'rejet' | 'annulation' | null;
 
 /** Controle avant validation, puis suivi des envois d'une campagne promotionnelle. */
 @Component({
   selector: 'app-campagne-marketing',
-  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire, EnvoyerMaintenant],
   templateUrl: './campagne-marketing.html'
 })
 export class CampagneMarketingSuivi implements OnInit, OnDestroy {

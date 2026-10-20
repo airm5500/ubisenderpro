@@ -33,6 +33,6 @@ export class Promotions implements OnInit {
   }
 
   creee(p: Promotion): void {
-    this.router.navigate(['/marketing/promotions', p.id]);
+    this.router.navigate(['/marketing/promotions', p.id], { queryParams: { nouvelle: 1 } });
   }
 }

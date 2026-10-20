@@ -7,11 +7,12 @@ import { Api } from '../../core/api';
 import { EnvoiHistorique, Evolution, Page } from '../../core/modeles';
 import { Courbe, Serie } from '../../core/courbe';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
+import { EnvoyerMaintenant } from '../../core/envoyer-maintenant';
 
 /** Tous les messages partis : relances, promotions, discussions et envois en masse, sur tous les canaux. */
 @Component({
   selector: 'app-historique-envois',
-  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe, TooltipModule, DialogModule],
+  imports: [FormsModule, RouterLink, JourPipe, TelephonePipe, Courbe, TooltipModule, DialogModule, EnvoyerMaintenant],
   templateUrl: './historique-envois.html'
 })
 export class HistoriqueEnvois implements OnInit {
