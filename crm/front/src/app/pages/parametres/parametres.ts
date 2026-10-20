@@ -9,10 +9,13 @@ import { Auth } from '../../core/auth';
 import { ReferentielsListe, TypeReferentiel } from '../referentiels/referentiels';
 import { Agences } from '../agences/agences';
 import { FournisseursSms } from '../fournisseurs-sms/fournisseurs-sms';
+import { AideTextes } from './aide-textes';
+import { AideService } from '../../core/aide';
 
 const CATEGORIES: [string, string, string][] = [
   ['GENERAL', 'Général', "Nom de l'application, adresse publique HTTPS du CRM et coordonnées de l'entreprise citées dans les messages."],
   ['CHARTE', 'Charte', "Logo, icône de l'onglet du navigateur et couleurs de l'application."],
+  ['AIDE', 'Aide et guidage', "Infobulles détaillées des boutons, panneau « ? » de chaque écran et retours animés pendant la saisie."],
   ['ENVOI', "Mode d'envoi", "Canal et mode WhatsApp proposés d'office."],
   ['ARCHIVAGE', 'Archivage', 'Copie des documents reçus et produits (imports, rejets, exports, affiches, listes de produits) sur le serveur.'],
   ['CAMPAGNE', 'Campagnes', 'Fenêtre par défaut des relances avant échéance.'],
@@ -28,7 +31,7 @@ const CATEGORIES: [string, string, string][] = [
 
 /** Regroupement des categories dans la liste de gauche, comme les referentiels. */
 const GROUPES: [string, string[]][] = [
-  ['Entreprise', ['GENERAL', 'CHARTE', 'ARCHIVAGE']],
+  ['Entreprise', ['GENERAL', 'CHARTE', 'AIDE', 'ARCHIVAGE']],
   ['Envois', ['ENVOI', 'CAMPAGNE', 'WHATSAPP', 'EMAIL', 'SMS', 'FOURNISSEURS_SMS', 'MARKETING']],
   ['Sécurité et système', ['SECURITE', 'IMPORT', 'SUPPORT']]
 ];
@@ -46,13 +49,14 @@ const REFERENTIELS: [string, string, string][] = [
 /** Parametres de l'application, par categorie ; seuls ceux qui ont change sont envoyes. */
 @Component({
   selector: 'app-parametres',
-  imports: [FormsModule, JourPipe, ReferentielsListe, Agences, FournisseursSms],
+  imports: [FormsModule, JourPipe, ReferentielsListe, Agences, FournisseursSms, AideTextes],
   templateUrl: './parametres.html'
 })
 export class Parametres implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly charteService = inject(CharteService);
+  private readonly aide = inject(AideService);
   protected readonly auth = inject(Auth);
   protected readonly referentiels = REFERENTIELS;
 
@@ -142,8 +146,9 @@ export class Parametres implements OnInit {
 
   private remplir(liste: Parametre[]): void {
     if (this.parametres().length) {
-      // Couleurs, nom et mode par defaut s'appliquent sans recharger la page
+      // Couleurs, nom, mode par defaut et guidage s'appliquent sans recharger la page
       this.charteService.charger();
+      this.aide.charger();
     }
     this.parametres.set(liste);
     this.saisies = Object.fromEntries(liste.map(p => [p.cle, p.valeur ?? '']));

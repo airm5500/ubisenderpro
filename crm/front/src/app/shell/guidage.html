@@ -1,0 +1,63 @@
+@if (bulle(); as b) {
+  <div id="aide-bulle" class="aide-bulle" role="tooltip" [class.dessous]="b.dessous" [style.top.px]="b.haut" [style.left.px]="b.gauche">
+    <b>{{ b.titre }}</b>
+    @if (b.texte) { <span>{{ b.texte }}</span> }
+    @if (b.grise) { <span class="aide-grise">{{ b.grise }}</span> }
+  </div>
+}
+
+@if (coche(); as c) {
+  <svg class="aide-coche" [style.top.px]="c.haut" [style.left.px]="c.gauche" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
+    <circle cx="14" cy="14" r="13" fill="var(--vert)"/>
+    <path d="M8 14.5l4 4 8-9" fill="none" stroke="var(--bleu)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+}
+
+<aside id="aide-panneau" class="aide-panneau" [class.ouvert]="panneau()" [attr.aria-hidden]="!panneau()" [attr.inert]="panneau() ? null : ''"
+       role="complementary" aria-labelledby="aide-panneau-titre">
+  <div class="aide-tete">
+    <h2 id="aide-panneau-titre" tabindex="-1">{{ page().titre }}</h2>
+    <button type="button" class="aide-fermer" aria-label="Fermer l'aide" (click)="fermerPanneau()"><i class="pi pi-times"></i></button>
+  </div>
+
+  @if (!edition()) {
+    <div class="aide-corps">
+      @for (bl of blocs(); track $index) {
+        @switch (bl.type) {
+          @case ('ol') { <ol>@for (l of bl.lignes; track $index) { <li>{{ l }}</li> }</ol> }
+          @case ('ul') { <ul>@for (l of bl.lignes; track $index) { <li>{{ l }}</li> }</ul> }
+          @default { <p>{{ bl.texte }}</p> }
+        }
+      }
+      @if (auth.peut('PARAMETRES')) {
+        <a class="aide-lien" (click)="modifierTexte()">{{ pageConnue() ? 'Modifier ce texte' : 'Écrire l\'aide de cet écran' }}</a>
+      }
+    </div>
+  } @else {
+    <form class="aide-corps aide-edition" (ngSubmit)="enregistrerTexte()">
+      <label>Titre<input class="sel" name="titre" [(ngModel)]="titreSaisi" required maxlength="150"></label>
+      <label>Texte
+        <textarea class="sel" name="texte" rows="12" [(ngModel)]="texteSaisi" required maxlength="4000"></textarea>
+      </label>
+      <p class="discret">Une ligne « 1. … » commence une liste numérotée, « - … » une liste à puces, une ligne vide un nouveau paragraphe.</p>
+      <div class="actions">
+        @if (pageReecrite()) { <button type="button" class="bs" (click)="retablirTexte()">Revenir au texte d'origine</button> }
+        <button type="button" class="bs" (click)="edition.set(false)">Annuler</button>
+        <button type="submit" class="bp">Enregistrer</button>
+      </div>
+    </form>
+  }
+
+  <div class="aide-pied">
+    <label class="aide-interrupteur">
+      <input type="checkbox" [checked]="aide.guidageUtilisateur()" [disabled]="!aide.guidageEntreprise()"
+             (change)="aide.changerPreference($any($event.target).checked)">
+      Infobulles détaillées et animations de saisie
+    </label>
+    @if (!aide.guidageEntreprise()) {
+      <p class="discret">Coupées pour toute l'entreprise dans Paramètres &gt; Aide et guidage.</p>
+    } @else {
+      <p class="discret">Ce choix ne concerne que vous.</p>
+    }
+  </div>
+</aside>

@@ -106,6 +106,7 @@
         <button class="bp" (click)="enregistrer()" [disabled]="!modifies()">Enregistrer{{ modifies() ? ' (' + modifies() + ')' : '' }}</button>
       </div>
       }
+      @if (categorie() === 'AIDE') { <app-aide-textes /> }
     </div>
   </div>
 </div>

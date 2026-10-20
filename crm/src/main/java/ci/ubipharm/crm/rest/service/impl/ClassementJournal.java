@@ -156,6 +156,7 @@ final class ClassementJournal {
             "SEGMENT_", "segment",
             "VARIABLE_", "variable de message",
             "CHARTE_", "logo ou icône",
+            "PARAMETRE_AIDE_", "texte d'aide",
             "DELEGATION_", "délégation",
             "SUPPORT_FAQ_", "question de la FAQ",
             "SUPPORT_TICKET_", "ticket",

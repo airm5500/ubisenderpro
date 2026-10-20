@@ -1,0 +1,50 @@
+<div style="display: flex; flex-direction: column; gap: 12px">
+  <div><h3 class="h2" style="font-size: 16px">Textes d'aide</h3>
+    <p class="sous-titre" style="margin: 4px 0 0">Le « ? » de chaque écran ouvre son panneau d'aide ; chaque bouton montre sa bulle au survol.
+      Réécrivez un texte pour l'adapter à vos usages ; « Revenir au texte d'origine » remet celui livré avec l'application.</p></div>
+  <div class="filtres" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+    <div role="tablist" aria-label="Type de texte" class="onglets">
+      <button class="tab" role="tab" [class.tabon]="type() === 'PAGE'" [attr.aria-selected]="type() === 'PAGE'" (click)="type.set('PAGE')">Écrans</button>
+      <button class="tab" role="tab" [class.tabon]="type() === 'BOUTON'" [attr.aria-selected]="type() === 'BOUTON'" (click)="type.set('BOUTON')">Boutons</button>
+    </div>
+    <input class="sel" name="rechercheAide" aria-label="Chercher un texte d'aide" placeholder="Chercher un écran, un bouton, un mot…"
+           [ngModel]="recherche()" (ngModelChange)="recherche.set($event)" style="flex: 1; min-width: 220px">
+  </div>
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Écran</th>@if (type() === 'BOUTON') { <th>Bouton</th> }<th>Texte</th><th>Modifié</th><th></th></tr></thead>
+      <tbody>
+        @for (l of lignes(); track l.cle) {
+          <tr>
+            <td><strong>{{ l.ecran }}</strong></td>
+            @if (type() === 'BOUTON') { <td>{{ l.libelle }}</td> }
+            <td><div><strong>{{ l.titre }}</strong></div><div class="second" style="max-width: 520px; white-space: normal">{{ l.texte }}</div></td>
+            <td>@if (l.reecrit) { <div>{{ l.modifieLe | jour }}</div><div class="second">{{ l.modifiePar }}</div> } @else { <span class="second">Texte d'origine</span> }</td>
+            <td class="nw"><span class="actions-ligne">
+              <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(l)"><i class="pi pi-pencil"></i></button>
+              @if (l.reecrit) { <button type="button" class="bi" pTooltip="Revenir au texte d'origine" tooltipPosition="top" aria-label="Revenir au texte d'origine" (click)="retablir(l)"><i class="pi pi-undo"></i></button> }
+            </span></td>
+          </tr>
+        } @empty {
+          <tr><td [attr.colspan]="type() === 'BOUTON' ? 5 : 4" class="vide">Aucun texte ne correspond.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p-dialog [header]="cible()?.type === 'PAGE' ? 'Aide de l\'écran ' + cible()?.ecran : 'Bulle du bouton ' + cible()?.libelle"
+          [visible]="!!cible()" (visibleChange)="!$event && cible.set(null)" [modal]="true" [style]="{ width: '600px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">Titre<input class="sel" name="titre" [(ngModel)]="titreSaisi" maxlength="150" required></label>
+    <label class="f">Texte
+      <textarea class="sel" name="texte" [(ngModel)]="texteSaisi" [rows]="cible()?.type === 'PAGE' ? 12 : 4" maxlength="4000" required></textarea></label>
+    @if (cible()?.type === 'PAGE') {
+      <p class="discret">Une ligne « 1. … » commence une liste numérotée, « - … » une liste à puces, une ligne vide un nouveau paragraphe.</p>
+    }
+    <div class="pied">
+      <button class="bs" type="button" (click)="cible.set(null)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

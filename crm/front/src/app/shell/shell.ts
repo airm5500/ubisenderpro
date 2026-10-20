@@ -3,10 +3,11 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../core/auth';
 import { CharteService } from '../core/charte';
 import { ModuleCourant } from '../core/module-courant';
+import { Guidage } from './guidage';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Guidage],
   templateUrl: './shell.html',
   styleUrl: './shell.css'
 })
