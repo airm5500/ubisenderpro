@@ -55,4 +55,4 @@ echo "2. E2E API                     : ${RESULTAT[2]}"
 echo "3. E2E interface               : ${RESULTAT[3]}"
 echo "4. Integration                 : ${RESULTAT[4]}"
 echo "5. UI/UX et saisies            : ${RESULTAT[5]}"
-grep -q "en echec" <<< "${RESULTAT[*]}" && exit 1 || exit 0
+grep -Eq "(^|[^0-9])[1-9][0-9]* en echec|\(echec\)" <<< "${RESULTAT[*]}" && exit 1 || exit 0
