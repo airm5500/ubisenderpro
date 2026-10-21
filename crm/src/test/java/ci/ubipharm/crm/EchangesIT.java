@@ -276,6 +276,25 @@ class EchangesIT extends IntegrationBase {
     }
 
     @Test
+    void uneReponseDepuisLAncienNumeroAHuitChiffresRejointLeFilDuNumeroADix() throws Exception {
+        when(passerelle.envoyerTexte(NUMERO, "2250700000001", "Bonjour"))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("A-1").build());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0700000001\",\"contenu\":\"Bonjour\"}").andExpect(status().isOk());
+        // Le compte WhatsApp du client garde son identifiant d'avant 2021 : 225 + 8 chiffres
+        evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("A-R1").from("22500000001").name("Pharmacie Un")
+                .type("TEXTE").text("Bien recu").build());
+        mvc.perform(get("/api/discussions").session(charge))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.elements[0].numeroClient").value("2250700000001"))
+                .andExpect(jsonPath("$.elements[0].clientNom").value("Pharmacie Un"));
+        mvc.perform(get("/api/discussions/messages").param("numeroAgent", NUMERO).param("numeroClient", "2250700000001").session(charge))
+                .andExpect(jsonPath("$.length()").value(2));
+        // Sans numero a 10 chiffres correspondant, le numero recu est garde tel quel
+        evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("A-R2").from("22512345678").type("TEXTE").text("Inconnu").build());
+        assertThat(jdbc.queryForObject("select numero_client from crm_message_recu where identifiant_whatsapp = 'A-R2'", String.class)).isEqualTo("22512345678");
+    }
+
+    @Test
     void unDirecteurNeVoitQueLesDiscussionsDeSonModuleSiLeParametreLeDemande() throws Exception {
         when(passerelle.envoyerTexte(NUMERO, "2250700000001", "Bonjour"))
                 .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("D-1").build());

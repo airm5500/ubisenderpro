@@ -93,7 +93,7 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
         if (e.getSessionId() == null || e.getId() == null || e.getFrom() == null) {
             return;
         }
-        String numeroClient = e.getFrom().replaceAll("\\D", "");
+        String numeroClient = numeroAuFormatActuel(e.getSessionId(), e.getFrom().replaceAll("\\D", ""));
         List<Long> clients = jdbc.queryForList("""
                 select ct.client_id from crm_contact ct join crm_client c on c.id = ct.client_id
                 where ct.numero_whatsapp = :numero and ct.statut = 'ACTIF' and c.statut = 'ACTIF'
@@ -136,6 +136,23 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
                 .addValue("identifiant", relances.getFirst().get("identifiant_whatsapp"));
         lu(p);
         avancerFacture(p, "REPONSE_RECUE", AVANT_REPONSE);
+    }
+
+    /**
+     * Un compte WhatsApp ouvert avant le passage a 10 chiffres (2021) repond souvent depuis son ancien identifiant :
+     * 225 + 8 chiffres (22501020304 pour le 07 01 02 03 04). Il est ramene au numero a 10 chiffres que le CRM connait
+     * (contact actif, ou numero ecrit par cet agent) quand un seul lui correspond ; sinon le numero recu est garde.
+     */
+    private String numeroAuFormatActuel(String agent, String numero) {
+        if (!numero.matches("225\\d{8}")) {
+            return numero;
+        }
+        List<String> candidats = jdbc.queryForList("""
+                select numero_whatsapp from crm_contact where numero_whatsapp like :motif and statut = 'ACTIF'
+                union select numero_destinataire from crm_message_sortant where numero_expediteur = :agent and numero_destinataire like :motif
+                union select numero_destinataire from crm_campagne_message where numero_expediteur = :agent and numero_destinataire like :motif
+                """, Map.of("motif", "225__" + numero.substring(3), "agent", agent == null ? "" : agent), String.class);
+        return candidats.size() == 1 ? candidats.getFirst() : numero;
     }
 
     @Override

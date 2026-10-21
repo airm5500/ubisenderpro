@@ -65,3 +65,12 @@ test('le reglage des discussions du directeur apparait dans Parametres', async (
   await expect(page.getByText('Un directeur d\'agence ne voit que les discussions des agents de son module')).toBeVisible();
   expect(incidents).toEqual([]);
 });
+
+test('sur un grand ecran (27 pouces), les pages occupent toute la largeur', async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1440 });
+  await seConnecterEn(page, LOGIN);
+  await page.goto('tableau-de-bord');
+  const largeur = await page.locator('.page').first().evaluate(e => e.getBoundingClientRect().width);
+  const menu = await page.locator('nav').first().evaluate(e => e.getBoundingClientRect().width);
+  expect(largeur).toBeGreaterThan(2560 - menu - 40);
+});
