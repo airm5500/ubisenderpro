@@ -51,6 +51,7 @@ abstract class IntegrationBase {
     /** Vide les donnees de test en gardant l'administrateur et les referentiels. */
     void reinitialiser() {
         jdbc.update("delete from crm_message_recu");
+        jdbc.update("delete from crm_compte_whatsapp");
         jdbc.update("delete from crm_session_whatsapp");
         jdbc.update("update crm_compte_meta set jeton_acces = null, secret_application = null, version_api = 'v21.0', modifie_par = null");
         jdbc.update("delete from crm_message_sortant");

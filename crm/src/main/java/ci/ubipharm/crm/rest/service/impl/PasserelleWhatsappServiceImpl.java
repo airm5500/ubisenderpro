@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
+import ci.ubipharm.crm.rest.service.CompteWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
@@ -30,9 +31,11 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
     };
 
     private final RestClient client;
+    private final CompteWhatsappService comptes;
 
     public PasserelleWhatsappServiceImpl(@Value("${crm.whatsapp.url:http://localhost:3000}") String url,
-            @Value("${crm.whatsapp.jeton:}") String jeton) {
+            @Value("${crm.whatsapp.jeton:}") String jeton, CompteWhatsappService comptes) {
+        this.comptes = comptes;
         JdkClientHttpRequestFactory fabrique = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         fabrique.setReadTimeout(Duration.ofSeconds(60));
@@ -56,7 +59,7 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
 
     @Override
     public ResultatEnvoiDTO envoyerTexte(String numero, String destinataire, String texte) {
-        return envoyer(numero, "/sessions/{id}/send", Map.of("to", destinataire, "text", texte));
+        return envoyer(numero, destinataire, "/sessions/{id}/send", Map.of("to", destinataire, "text", texte));
     }
 
     @Override
@@ -70,7 +73,7 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
         if (legende != null) {
             corps.put("caption", legende);
         }
-        return envoyer(numero, "/sessions/{id}/send-media", corps);
+        return envoyer(numero, destinataire, "/sessions/{id}/send-media", corps);
     }
 
     @Override
@@ -100,12 +103,15 @@ public class PasserelleWhatsappServiceImpl implements PasserelleWhatsappService 
         }
     }
 
-    private ResultatEnvoiDTO envoyer(String numero, String chemin, Map<String, Object> corps) {
+    private ResultatEnvoiDTO envoyer(String numero, String destinataire, String chemin, Map<String, Object> corps) {
         try {
             Map<String, Object> reponse = client.post().uri(chemin, numero)
                     .body(corps)
                     .retrieve().body(REPONSE);
             if (reponse != null && Boolean.TRUE.equals(reponse.get("success"))) {
+                if (reponse.get("waNumber") != null) {
+                    comptes.retenir(numero, destinataire, String.valueOf(reponse.get("waNumber")));
+                }
                 return ResultatEnvoiDTO.builder().succes(true).identifiant((String) reponse.get("id")).build();
             }
             String erreur = reponse == null ? null : (String) reponse.get("erreur");

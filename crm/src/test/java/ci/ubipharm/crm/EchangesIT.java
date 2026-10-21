@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import com.jayway.jsonpath.JsonPath;
 
+import ci.ubipharm.crm.rest.service.CompteWhatsappService;
 import ci.ubipharm.crm.rest.service.EnvoiMasseService;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
@@ -49,6 +50,9 @@ class EchangesIT extends IntegrationBase {
 
     @Autowired
     EvenementWhatsappService evenementWhatsappService;
+
+    @Autowired
+    CompteWhatsappService compteWhatsappService;
 
     private MockHttpSession admin;
     private MockHttpSession charge;
@@ -292,6 +296,29 @@ class EchangesIT extends IntegrationBase {
         // Sans numero a 10 chiffres correspondant, le numero recu est garde tel quel
         evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("A-R2").from("22512345678").type("TEXTE").text("Inconnu").build());
         assertThat(jdbc.queryForObject("select numero_client from crm_message_recu where identifiant_whatsapp = 'A-R2'", String.class)).isEqualTo("22512345678");
+    }
+
+    @Test
+    void leCompteWhatsappApprisALEnvoiDepartageLesNumerosAuxMemesHuitDerniersChiffres() throws Exception {
+        when(passerelle.envoyerTexte(eq(NUMERO), anyString(), eq("Bonjour")))
+                .thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("C-1").build());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0700000001\",\"contenu\":\"Bonjour\"}").andExpect(status().isOk());
+        envoyer(charge, post("/api/discussions"), "{\"numeroClient\":\"0100000001\",\"contenu\":\"Bonjour\"}").andExpect(status().isOk());
+        // Deux numeros se terminent par 00000001 : sans indication de WhatsApp, la reponse garde le numero recu
+        evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("C-R1").from("22500000001").type("TEXTE").text("Qui ?").build());
+        assertThat(jdbc.queryForObject("select numero_client from crm_message_recu where identifiant_whatsapp = 'C-R1'", String.class)).isEqualTo("22500000001");
+
+        // A l'envoi, WhatsApp a indique que le 07 00 00 00 01 est recu par le compte 225 00 00 00 01
+        compteWhatsappService.retenir(NUMERO, "2250700000001", "22500000001");
+        compteWhatsappService.retenir(NUMERO, "2250100000002", "2250100000002");
+        assertThat(jdbc.queryForObject("select count(*) from crm_compte_whatsapp", Integer.class)).isEqualTo(1);
+        evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("C-R2").from("22500000001").type("TEXTE").text("Bien recu").build());
+        assertThat(jdbc.queryForObject("select numero_client from crm_message_recu where identifiant_whatsapp = 'C-R2'", String.class)).isEqualTo("2250700000001");
+
+        // Le compte change de mains : la derniere indication de WhatsApp l'emporte
+        compteWhatsappService.retenir(NUMERO, "2250100000001", "22500000001");
+        evenementWhatsappService.message(EvenementMessageDTO.builder().sessionId(NUMERO).id("C-R3").from("22500000001").type("TEXTE").text("Merci").build());
+        assertThat(jdbc.queryForObject("select numero_client from crm_message_recu where identifiant_whatsapp = 'C-R3'", String.class)).isEqualTo("2250100000001");
     }
 
     @Test

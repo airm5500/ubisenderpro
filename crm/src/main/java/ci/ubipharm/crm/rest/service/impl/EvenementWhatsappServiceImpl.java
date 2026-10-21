@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.CompteWhatsappService;
 import ci.ubipharm.crm.rest.service.DesabonnementService;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
 import ci.ubipharm.crm.rest.service.SuiviEnvoiService;
@@ -33,10 +35,12 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
     private final NamedParameterJdbcTemplate jdbc;
     private final DesabonnementService desabonnementService;
     private final SuiviEnvoiService suiviEnvoi;
+    private final CompteWhatsappService comptes;
     private final byte[] jeton;
 
     public EvenementWhatsappServiceImpl(NamedParameterJdbcTemplate jdbc, DesabonnementService desabonnementService, SuiviEnvoiService suiviEnvoi,
-                                        @Value("${crm.whatsapp.jeton:}") String jeton) {
+                                        CompteWhatsappService comptes, @Value("${crm.whatsapp.jeton:}") String jeton) {
+        this.comptes = comptes;
         this.jdbc = jdbc;
         this.desabonnementService = desabonnementService;
         this.suiviEnvoi = suiviEnvoi;
@@ -142,8 +146,13 @@ public class EvenementWhatsappServiceImpl implements EvenementWhatsappService {
      * Un compte WhatsApp ouvert avant le passage a 10 chiffres (2021) repond souvent depuis son ancien identifiant :
      * 225 + 8 chiffres (22501020304 pour le 07 01 02 03 04). Il est ramene au numero a 10 chiffres que le CRM connait
      * (contact actif, ou numero ecrit par cet agent) quand un seul lui correspond ; sinon le numero recu est garde.
+     * Le compte appris a l'envoi (WhatsApp indique qui recoit le message) prime : il est certain.
      */
     private String numeroAuFormatActuel(String agent, String numero) {
+        Optional<String> appris = comptes.numeroDuCompte(numero);
+        if (appris.isPresent()) {
+            return appris.get();
+        }
         if (!numero.matches("225\\d{8}")) {
             return numero;
         }
