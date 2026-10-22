@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -35,9 +35,33 @@ export class Shell {
   /** Section ouverte par un clic (voir menu-sections). */
   private readonly ouverte = signal<string | null>(null);
 
+  private readonly menuDefile = viewChild<ElementRef<HTMLElement>>('menuDefile');
+  private readonly menuContenu = viewChild<ElementRef<HTMLElement>>('menuContenu');
+  /** Vrai tant qu'il reste du menu sous la partie visible : le fondu et la fleche s'affichent. */
+  protected readonly suiteMenu = signal(false);
+
   constructor() {
+    // Le menu change de hauteur quand une section s'ouvre, que la fenetre change de taille ou que les droits arrivent
+    const destruction = inject(DestroyRef);
+    afterNextRender(() => {
+      const observateur = new ResizeObserver(() => this.mesurerMenu());
+      for (const el of [this.menuDefile(), this.menuContenu()]) if (el) observateur.observe(el.nativeElement);
+      destruction.onDestroy(() => observateur.disconnect());
+      this.mesurerMenu();
+    });
     // Apres chaque navigation, la section de l'ecran affiche redevient celle qui est ouverte
     inject(Router).events.pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed()).subscribe(() => this.ouverte.set(null));
+  }
+
+  protected mesurerMenu(): void {
+    const m = this.menuDefile()?.nativeElement;
+    this.suiteMenu.set(!!m && m.scrollTop + m.clientHeight < m.scrollHeight - 2);
+  }
+
+  /** La fleche fait descendre le menu d'une demi-hauteur. */
+  protected defilerMenu(): void {
+    const m = this.menuDefile()?.nativeElement;
+    m?.scrollBy({ top: m.clientHeight * 0.6, behavior: 'smooth' });
   }
 
   protected estOuverte(cle: string, active: boolean): boolean {

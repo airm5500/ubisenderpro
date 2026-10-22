@@ -135,3 +135,28 @@ test('survoler un lien du menu ne fait jamais apparaitre d ascenseur horizontal'
     }
   }
 });
+
+test('le choix du module reste fixe, et une fleche signale la suite du menu jusqu en bas', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 620 });
+  await seConnecter(page);
+  const modules = page.locator('nav .modules');
+  const menu = page.locator('.menu-defile');
+  const fleche = page.getByRole('button', { name: 'Voir la suite du menu' });
+  // Le selecteur n'est plus dans la partie qui defile
+  await expect(modules).toBeVisible();
+  expect(await menu.locator('.modules').count()).toBe(0);
+  const avant = await modules.boundingBox();
+  // Aucune barre visible : la largeur utile du menu est toute sa largeur
+  expect(await menu.evaluate(m => getComputedStyle(m).scrollbarWidth)).toBe('none');
+  await expect(fleche).toHaveCSS('opacity', '1');
+  // La fleche rebondit en continu : on la clique sans attendre qu'elle soit immobile
+  await fleche.click({ force: true });
+  await page.waitForTimeout(600);
+  expect(await menu.evaluate(m => m.scrollTop)).toBeGreaterThan(0);
+  expect((await modules.boundingBox()).y).toBe(avant.y);
+  await menu.evaluate(m => m.scrollTo({ top: m.scrollHeight }));
+  await expect(fleche).toHaveCSS('opacity', '0');
+  // Les donnees de la partie droite gardent une barre fine et verte (style A)
+  expect(await page.locator('main').evaluate(m => getComputedStyle(m).scrollbarWidth)).toBe('thin');
+  expect(await page.locator('main').evaluate(m => getComputedStyle(m).scrollbarColor)).toContain('rgb(81, 215, 142)');
+});

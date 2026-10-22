@@ -17,19 +17,23 @@
       }
       <div><div class="nom" [attr.aria-label]="nomEntreprise()">@for (l of lettres(); track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
     </div>
-    <!-- Seul le menu defile : la marque en haut et le bloc de deconnexion en bas restent fixes -->
-    <div class="menu-defile">
+    <!-- Le choix du module reste fixe en haut (Airman, 22/10/2026) : seul le menu en dessous defile -->
+    @if (!auth.utilisateur()?.motDePasseProvisoire) {
+      <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
+      @if (auth.recouvrement() && auth.marketing()) {
+        <div role="group" aria-label="Module" class="modules">
+          <a class="md" [class.mdon]="!surMarketing()" routerLink="/" (click)="module.choisir('RECOUVREMENT')">Recouvrement</a>
+          <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing" (click)="module.choisir('MARKETING')">Marketing</a>
+        </div>
+      } @else {
+        <div class="module-seul">{{ auth.recouvrement() ? 'Recouvrement' : 'Marketing' }}</div>
+      }
+    }
+    <!-- Seul le menu defile, sans barre : un fondu et une fleche signalent la suite (style D, Airman 22/10/2026) -->
+    <div class="menu-cadre" [class.fin]="!suiteMenu()">
+    <div class="menu-defile" #menuDefile (scroll)="mesurerMenu()"><div class="menu-contenu" #menuContenu>
     <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
     @if (!auth.utilisateur()?.motDePasseProvisoire) {
-    <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
-    @if (auth.recouvrement() && auth.marketing()) {
-      <div role="group" aria-label="Module" class="modules">
-        <a class="md" [class.mdon]="!surMarketing()" routerLink="/" (click)="module.choisir('RECOUVREMENT')">Recouvrement</a>
-        <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing" (click)="module.choisir('MARKETING')">Marketing</a>
-      </div>
-    } @else {
-      <div class="module-seul">{{ auth.recouvrement() ? 'Recouvrement' : 'Marketing' }}</div>
-    }
 
     @if (auth.recouvrement() && !surMarketing()) {
 
@@ -125,7 +129,8 @@
       </div></div>
     </div>
     }
-
+    </div></div>
+    <button type="button" class="menu-suite" tabindex="-1" aria-label="Voir la suite du menu" (click)="defilerMenu()"><i class="pi pi-angle-double-down" aria-hidden="true"></i></button>
     </div>
     <div class="profil">
       <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>

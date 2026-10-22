@@ -475,7 +475,21 @@ html[data-guidage="oui"] .etapes .st.courant .stn { animation: aide-pulse 1.6s e
 @media (max-width: 900px) { .redaction { grid-template-columns: 1fr; } .redaction-variables { position: static; max-height: 240px; } }
 
 /* Menu de gauche : seule la liste des ecrans defile, la marque et le bloc de deconnexion restent fixes */
-.menu-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px; }
+/* Style D retenu par Airman le 22/10/2026 : aucune barre ; un fondu et une fleche verte signalent la suite, et s'effacent en bas du menu */
+.menu-cadre { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.menu-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; scrollbar-width: none; }
+.menu-defile::-webkit-scrollbar { display: none; }
+.menu-contenu { display: flex; flex-direction: column; gap: 2px; }
+.menu-cadre::after { content: ""; position: absolute; left: -6px; right: -6px; bottom: 0; height: 56px; pointer-events: none;
+  background: linear-gradient(rgba(5, 37, 61, 0), var(--bleu) 85%); transition: opacity .2s; }
+.menu-suite { position: absolute; left: 50%; bottom: 6px; z-index: 1; width: 32px; height: 32px; margin-left: -16px; border: 2px solid #fff; border-radius: 50%;
+  background: var(--vert); color: var(--bleu); display: grid; place-items: center; cursor: pointer; padding: 0;
+  box-shadow: 0 0 0 4px rgba(81, 215, 142, .25), 0 4px 10px rgba(0, 0, 0, .35); animation: menu-rebond 1.6s ease-in-out infinite; transition: opacity .2s; }
+.menu-suite .pi { font-size: 15px; font-weight: 900; }
+.menu-suite:hover { background: #fff; }
+.menu-cadre.fin::after, .menu-cadre.fin .menu-suite { opacity: 0; pointer-events: none; }
+@keyframes menu-rebond { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) { .menu-suite { animation: none; } }
 
 /* Icones du menu (remarque 6 du 22/10/2026) : devant chaque rubrique et chaque lien ; celle de la rubrique reste visible quand elle est repliee */
 nav .glt { display: inline-flex; align-items: center; gap: 8px; }
@@ -502,3 +516,7 @@ nav .nv.on .ic, nav .nv:hover .ic { opacity: 1; color: var(--vert); }
 .type-campagne:hover { border-color: var(--vert); }
 .type-campagne.on { border-color: var(--bleu); box-shadow: inset 0 0 0 1px var(--bleu); }
 @media (max-width: 900px) { .campagne-saisie { grid-template-columns: 1fr; } .apercu-campagne { position: static; } }
+
+/* Barres de defilement des donnees (style A retenu par Airman le 22/10) : fines et vertes, sans rail.
+   Le menu de gauche garde son style sans barre (.menu-defile, plus specifique). */
+* { scrollbar-width: thin; scrollbar-color: var(--vert) transparent; }
