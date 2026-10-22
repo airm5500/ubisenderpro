@@ -1,0 +1,192 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Modèles de messages</h1>
+      <p class="sous-titre">Les variables s'écrivent entre accolades, par exemple {{ '{' }}nom_pharmacie{{ '}' }}, et sont remplacées pour chaque
+        {{ marketing() ? 'client' : 'facture' }} à l'envoi.</p>
+    </div>
+    @if (peutGerer()) {
+      <div class="actions">
+        @if (vue() === 'modeles') {
+          <label class="bs" style="cursor: pointer">Importer un modèle Word<input type="file" accept=".docx" hidden (change)="importerWord($event)"></label>
+          <button class="ba" (click)="nouveau()">Nouveau modèle</button>
+        }
+        @else { <button class="ba" (click)="ouvrirVariable('nouvelle')">Nouvelle variable</button> }
+      </div>
+    }
+  </div>
+
+  @if (peutVariables()) {
+    <div role="tablist" class="onglets">
+      <button class="tab" [class.tabon]="vue() === 'modeles'" role="tab" (click)="vue.set('modeles')">Modèles</button>
+      <button class="tab" [class.tabon]="vue() === 'variables'" role="tab" (click)="vue.set('variables')">Variables<span class="cnt">{{ variables().length }}</span></button>
+    </div>
+  }
+
+  @if (vue() === 'modeles') {
+    <div class="cote">
+      <div class="liste-g">
+        @for (g of parType(); track g.code) {
+          <div class="grp">{{ g.libelle }}</div>
+          @for (m of g.modeles; track m.id) {
+            <button class="it" [class.iton]="choisi()?.id === m.id && !enEdition()" (click)="choisir(m)">
+              <strong>{{ m.nom }}</strong><span class="second">{{ L.canal[m.canal] }} · modifié le {{ (m.updatedAt || m.createdAt) | jour }}{{ m.modifiePar || m.creePar ? ' par ' + (m.modifiePar || m.creePar) : '' }}</span>
+            </button>
+          }
+        } @empty {
+          <p class="discret" style="padding: 14px">{{ archives() ? 'Aucun modèle archivé.' : 'Aucun modèle actif pour l\'instant.' }}</p>
+        }
+        <a style="padding: 14px; font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux modèles actifs' : 'Voir les modèles archivés' }}</a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
+        @if (choisi(); as m) {
+          <div class="entete">
+            <div><h2 class="h2">{{ m.nom }}</h2><span class="discret">{{ L.typeCampagne[m.typeCampagne] }}{{ m.typeInformation ? ' · ' + L.typeInformation[m.typeInformation] : '' }} · {{ L.canal[m.canal] }}{{ m.statut === 'ARCHIVE' ? ' · archivé' : '' }}</span></div>
+            <div class="actions">
+              <button class="bs petit" (click)="exporterWord(m)">Exporter en Word</button>
+              @if (peutGerer() && m.statut === 'ACTIF') { <button class="bs petit" (click)="modifier(m)">Modifier</button><button class="bd petit" (click)="archiver(m)">Archiver</button> }
+              @if (peutGerer() && m.statut === 'ARCHIVE') { <button class="bp petit" (click)="reactiver(m)">Réactiver</button> }
+            </div>
+          </div>
+          @if (m.variables.length) {
+            <div class="chips">@for (v of m.variables; track v) { <span class="tag">{{ '{' + v + '}' }}</span> }</div>
+          }
+        }
+
+        @if (choisi() && !enEdition()) {
+          <ng-container [ngTemplateOutlet]="apercuTpl" />
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Variable</th><th>Libellé</th><th>Source</th><th>Exemple</th><th></th></tr></thead>
+        <tbody>
+          @for (v of variables(); track v.id) {
+            <tr><td><span class="tag">{{ '{' + v.code + '}' }}</span></td><td>{{ v.libelle }}</td><td>{{ libelleSource(v.source) }}</td><td>{{ v.exemple }}</td>
+              <td class="nw"><span class="actions-ligne"><button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="ouvrirVariable(v)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="archiverVariable(v)"><i class="pi pi-inbox"></i></button></span></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="discret">Une colonne ajoutée aux clients ou aux factures devient une variable sans développement : choisissez-la comme source.</p>
+  }
+</div>
+
+<p-dialog [header]="fenetreVariable() === 'nouvelle' ? 'Nouvelle variable' : 'Modifier la variable'" [visible]="fenetreVariable() !== null" (visibleChange)="!$event && fenetreVariable.set(null)" [modal]="true" [style]="{ width: '520px' }">
+  <form class="formulaire" (ngSubmit)="enregistrerVariable()">
+    <label class="f">Code, en minuscules sans accent<input class="sel" name="code" [(ngModel)]="variable.code" placeholder="Ex. ville"></label>
+    <label class="f">Libellé<input class="sel" name="libelle" [(ngModel)]="variable.libelle"></label>
+    <label class="f">Source
+      <select class="sel" name="source" [(ngModel)]="variable.source">
+        <option value="" disabled>Choisir un champ</option>
+        @for (s of sources(); track s.source) { <option [value]="s.source">{{ s.libelle }}</option> }
+      </select>
+    </label>
+    <label class="f">Exemple affiché dans les aperçus<input class="sel" name="exemple" [(ngModel)]="variable.exemple"></label>
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetreVariable.set(null)">Annuler</button>
+      <button class="bp" type="submit">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Ecriture d'un modele : les variables a gauche (un clic les insere), le message et son apercu a droite -->
+<p-dialog [header]="choisi() ? 'Modifier « ' + choisi()!.nom + ' »' : 'Nouveau modèle'" [visible]="enEdition()" (visibleChange)="!$event && enEdition.set(false)"
+          [modal]="true" [style]="{ width: '1180px', maxWidth: '96vw' }" [contentStyle]="{ padding: '0 20px 20px' }">
+  @if (enEdition()) {
+  <div class="redaction">
+    <aside class="redaction-variables" aria-label="Variables disponibles">
+      <div class="lbl">Variables <span class="discret">· un clic l'insère au curseur</span></div>
+      <input class="sel" [(ngModel)]="filtreVariables" placeholder="Chercher une variable" aria-label="Chercher une variable">
+      <div class="redaction-liste">
+        @for (v of insertablesFiltrees(); track v.id) {
+          <button type="button" class="redaction-var" (click)="inserer(v.code)"><code>{{ '{' + v.code + '}' }}</code><span>{{ v.libelle }}</span></button>
+        } @empty { <p class="discret">Aucune variable ne correspond.</p> }
+      </div>
+    </aside>
+    <div class="redaction-corps">
+          @for (a of avertissementsWord(); track a) { <div class="avert">{{ a }}</div> }
+      <div class="grille">
+        <label class="f large">Nom<input class="sel" [(ngModel)]="edition.nom" [placeholder]="marketing() ? 'Ex. Promotion du mois' : 'Ex. Après échéance · Normal'"></label>
+        <label class="f">{{ marketing() ? 'Usage' : 'Type de relance' }}
+          <select class="sel" [(ngModel)]="edition.typeCampagne">@for (t of types(); track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select>
+        </label>
+        @if (edition.typeCampagne === 'INFORMATION') {
+          <label class="f">Proposé d'office pour
+            <select class="sel" [(ngModel)]="edition.typeInformation">
+              <option value="">Tout type d'information</option>
+              @for (t of typesInformation; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
+            </select>
+          </label>
+        }
+      </div>
+      <div class="f">Canal d'envoi
+        <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
+          <label class="opt" [class.optn]="edition.canal === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">WhatsApp, depuis {{ marketing() ? 'le numéro de qui prépare la campagne' : "le numéro de l'agent" }}</label>
+          <label class="opt" [class.optn]="edition.canal === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">E-mail, {{ marketing() ? 'qui prépare la campagne' : "l'agent" }} en adresse de réponse</label>
+          <label class="opt" [class.optn]="edition.canal === 'SMS'"><input type="radio" name="canal" value="SMS" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">SMS, au nom de {{ charte.nomEntreprise() }}, sans réponse</label>
+        </div>
+      </div>
+      @if (edition.canal === 'EMAIL') {
+        <label class="f">Objet de l'e-mail<input class="sel" [(ngModel)]="edition.objet" (ngModelChange)="objet.set($event)" maxlength="200" [placeholder]="marketing() ? 'Ex. Offre du mois pour {nom_pharmacie}' : 'Ex. Facture {reference_facture} échue'"></label>
+      }
+      <label class="f">Message<textarea #zone class="sel" [style.min-height]="edition.canal === 'SMS' ? '110px' : '200px'" [(ngModel)]="edition.contenu" (ngModelChange)="contenu.set($event)" [attr.maxlength]="edition.canal === 'SMS' ? 612 : null"></textarea></label>
+      @if (edition.canal === 'SMS') {
+        <p class="discret" style="margin: -6px 0 0">Le client ne peut pas répondre à un SMS : indiquez plutôt {{ marketing() ? 'votre numéro avec la variable {expediteur_numero}' : 'le numéro de son agent avec la variable {agent_numero}' }}.</p>
+      }
+      @if (edition.canal === 'WHATSAPP') {
+        <details class="f">
+          <summary>API officielle Meta (facultatif) @if (edition.metaModele) { · {{ edition.metaModele }} }</summary>
+          <p class="discret">Pour un numéro passé à l'API officielle : hors des 24 h qui suivent une réponse du client, seul le modèle approuvé par Meta part.
+            Ses paramètres reprennent les variables de ce message, dans l'ordre :
+            @for (v of ordreMeta(); track v) { <span class="tag">{{ v }}</span> }
+            @if (!ordreMeta().length) { aucun paramètre. }</p>
+          <div class="grille">
+            <label class="f">Nom du modèle approuvé<input class="sel" [(ngModel)]="edition.metaModele" placeholder="Ex. relance_apres_echeance"></label>
+            <label class="f">Langue<input class="sel" [(ngModel)]="edition.metaLangue" placeholder="fr"></label>
+            <label class="f">En-tête du modèle
+              <select class="sel" [(ngModel)]="edition.metaEntete">
+                <option value="AUCUN">Aucun</option><option value="IMAGE">Image (affiche ou logo joint)</option><option value="DOCUMENT">Document joint</option>
+              </select>
+            </label>
+          </div>
+        </details>
+      }
+      <ng-container [ngTemplateOutlet]="apercuTpl" />
+      <div class="pied">
+        <button class="bs" (click)="enEdition.set(false)">Annuler</button>
+        <button class="bp" (click)="enregistrer()" [disabled]="!edition.nom.trim() || !edition.contenu.trim() || (edition.canal === 'EMAIL' && !edition.objet.trim())">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+  }
+</p-dialog>
+
+<ng-template #apercuTpl>
+          <div class="lbl">Aperçu avec les valeurs d'exemple</div>
+          @if (canalApercu() === 'EMAIL') {
+            <div class="courriel">
+              <div class="ent">
+                <span>De <strong>{{ charte.nomEntreprise() }} - {{ marketing() ? 'Marketing' : 'Recouvrement' }}</strong> · répondre {{ marketing() ? 'à qui prépare la campagne' : "à l'agent du client" }}</span>
+                <span class="objet">@for (p of apercuObjet(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</span>
+              </div>
+              <div class="corps">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>
+            </div>
+          } @else if (canalApercu() === 'SMS') {
+            <div class="fil-sms">
+              <div class="exp">{{ expediteurSms() }}</div>
+              <div class="bulle">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>
+              @if (comptageSms(); as n) {
+                <div class="compte" [class.retard]="n.sms > 2">{{ n.caracteres }} caractères · {{ n.sms }} SMS{{ n.unicode ? ' (caractères spéciaux : 70 par SMS)' : '' }}</div>
+              }
+            </div>
+          } @else {
+            <div class="fil-wa">
+              <div class="out">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}<span class="meta">09:30</span></div>
+            </div>
+          }
+          @if (apercuInconnues()) { <p class="avert" style="margin: 0">Une variable surlignée en rouge n'existe pas : le modèle sera refusé à l'enregistrement.</p> }
+</ng-template>

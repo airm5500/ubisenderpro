@@ -1,0 +1,87 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Rôles et droits</h1>
+      <p class="sous-titre">Cochez, pour chaque rôle, les écrans et les actions qu'il ouvre ; le rôle s'attribue ensuite par module dans Utilisateurs et habilitations.
+        Un rôle n'est jamais supprimé : il est désactivé.</p>
+    </div>
+    <button class="bp" type="button" (click)="nouveau()"><i class="pi pi-plus"></i> Nouveau rôle</button>
+  </div>
+
+  <section class="bloc">
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Rôle</th><th>Droits</th><th>Agences</th><th>Comptes actifs</th><th>Modifié</th><th>Statut</th><th></th></tr></thead>
+        <tbody>
+          @for (r of roles(); track r.id) {
+            <tr>
+              <td><a class="ref" (click)="modifier(r)">{{ r.libelle }}</a>@if (r.description) { <div class="second">{{ r.description }}</div> }</td>
+              <td [title]="libellesDroits(r)">{{ resume(r) }}</td>
+              <td class="nw">{{ r.visionGlobale ? 'Toutes' : 'Les siennes' }}</td>
+              <td class="nw">{{ r.nbUtilisateurs }}</td>
+              <td class="nw">@if (r.modifieLe) { {{ r.modifieLe | jour: true }}<div class="second">{{ r.modifiePar }}</div> } @else { — }</td>
+              <td class="nw">
+                <span class="etat-compte"><span class="dot" [style.background]="r.actif ? '#51D78E' : '#D64545'"></span>{{ r.actif ? 'Actif' : 'Désactivé' }}</span>
+              </td>
+              <td class="nw"><span class="actions-ligne">
+                <button type="button" class="bi" pTooltip="Modifier le rôle" tooltipPosition="top" aria-label="Modifier le rôle" (click)="modifier(r)"><i class="pi pi-pencil"></i></button>
+                @if (r.actif && r.code !== 'ADMIN') { <button type="button" class="bi bi-danger" pTooltip="Désactiver le rôle" tooltipPosition="top" aria-label="Désactiver le rôle" (click)="desactiver(r)"><i class="pi pi-ban"></i></button> }
+                @if (!r.actif) { <button type="button" class="bi" pTooltip="Réactiver le rôle" tooltipPosition="top" aria-label="Réactiver le rôle" (click)="reactiver(r)"><i class="pi pi-replay"></i></button> }</span>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="vide">{{ roles() ? 'Aucun rôle.' : 'Chargement…' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<p-dialog [header]="cible ? 'Modifier le rôle' : 'Nouveau rôle'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '820px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Nom du rôle<input class="sel" name="libelle" [(ngModel)]="formulaire.libelle" placeholder="Ex. Administrateur sans SMS" required></label>
+      @if (!cible) {
+        <label class="f">Partir du rôle
+          <select class="sel" name="modele" [(ngModel)]="formulaire.modele" (ngModelChange)="partirDe($event)">
+            <option [ngValue]="null">Aucun (tout décoché)</option>
+            @for (r of roles(); track r.id) { <option [ngValue]="r.id">{{ r.libelle }}</option> }
+          </select>
+        </label>
+      }
+      <label class="f large">Description<input class="sel" name="description" [(ngModel)]="formulaire.description" placeholder="Ce que fait la personne qui a ce rôle"></label>
+    </div>
+    <label class="case"><input type="checkbox" name="visionGlobale" [(ngModel)]="formulaire.visionGlobale">Voit toutes les agences (sinon les agences rattachées au compte)</label>
+
+    <div class="sous-sec">Écrans et actions</div>
+    <p class="discret" style="margin: 0">Les droits du Recouvrement ne valent que pour un rôle attribué sur ce module (ou sur tous les modules) ;
+      l'administration et les imports de clients valent quel que soit le module.</p>
+    <div>
+      @for (g of groupes(); track g.titre) {
+        <div class="droits-groupe">
+          <label class="case"><input type="checkbox" [checked]="toutCoche(g)" [indeterminate]="partiel(g)" (change)="basculerGroupe(g)">{{ g.titre }}</label>
+          <div class="droits-liste">
+            @for (d of g.droits; track d.code) {
+              <label class="droit" [class.verrou]="verrouille(d.code)">
+                <input type="checkbox" [checked]="formulaire.droits.has(d.code)" [disabled]="verrouille(d.code)" (change)="basculer(d.code)">
+                <span>{{ d.libelle }}<span class="discret">{{ verrouille(d.code) ? 'Toujours coché pour l\'administrateur' : d.description }}</span></span>
+              </label>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (changeDroits() && cible!.nbUtilisateurs > 0) {
+      <div class="info"><i class="pi pi-info-circle"></i>
+        <span>{{ cible!.nbUtilisateurs }} compte{{ cible!.nbUtilisateurs > 1 ? 's ont' : ' a' }} ce rôle : {{ cible!.nbUtilisateurs > 1 ? 'ils devront' : 'il devra' }} se reconnecter
+          pour prendre les nouveaux droits{{ estMonRole() ? ', vous compris' : '' }}.</span></div>
+    }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.libelle.trim() || formulaire.droits.size === 0">{{ cible ? 'Enregistrer' : 'Créer le rôle' }}</button>
+    </div>
+  </form>
+</p-dialog>

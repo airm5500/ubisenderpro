@@ -1,0 +1,42 @@
+# =====================================================================
+# Configuration du CRM UBIPHARM propre a ce poste.
+# Ce fichier reste dans le dossier donnees : une mise a jour de
+# l'application ne le remplace pas. Apres une modification, redemarrez le
+# service "UBIPHARM CRM" (services.msc).
+# =====================================================================
+
+spring:
+  datasource:
+    url: jdbc:mariadb://localhost:3306/ubicrm
+    username: ubicrm
+    # Mot de passe de l'utilisateur MariaDB cree a l'installation (guide, etape 1)
+    password: "A_RENSEIGNER"
+
+  # Serveur d'envoi des e-mails de relance. Tant que ce bloc reste en
+  # commentaire, le canal e-mail est signale "non configure" et rien ne part.
+  # Pour l'activer, retirez les # en debut de ligne et renseignez les valeurs.
+  #mail:
+  #  host: smtp.exemple.ci
+  #  port: 587
+  #  username: relances@ubipharm.ci
+  #  password: "..."
+  #  properties:
+  #    mail.smtp.auth: true
+  #    mail.smtp.starttls.enable: true
+
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        # Le CRM est servi derriere l'adresse HTTPS publique : le cookie de
+        # session ne circule qu'en HTTPS. Pour un acces en HTTP simple sur le
+        # reseau interne (http://nom-du-poste:8080), mettez false.
+        secure: true
+
+crm:
+  whatsapp:
+    # Compagnon WhatsApp (service "UBIPHARM CRM - WhatsApp") ; le jeton est
+    # le meme que WA_WEB_TOKEN dans wa-web.env, genere a l'installation.
+    url: http://localhost:3000
+    jeton: "__JETON_WA_WEB__"

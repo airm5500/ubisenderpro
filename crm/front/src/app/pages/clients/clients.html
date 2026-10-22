@@ -1,0 +1,126 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>{{ auth.portefeuillePersonnel() && !surMarketing() ? 'Mes clients' : 'Clients' }}</h1>
+      <p class="sous-titre">{{ surMarketing() ? 'Les pharmacies de toutes les agences.' : auth.portefeuillePersonnel()
+        ? 'Les clients de votre portefeuille, et ceux des agents que vous remplacez.'
+        : 'Les pharmacies de vos agences, avec leur agent de recouvrement et leur solde dû.' }}</p>
+    </div>
+    @if (auth.peut('IMPORTS') || auth.peut('CLIENTS_GERER')) {
+      <div class="actions">
+        @if (auth.peut('CLIENTS_GERER')) { <button class="bs" type="button" (click)="verifier(false)">Vérifier des numéros</button> }
+        @if (auth.peut('IMPORTS')) { <a class="bs" routerLink="/imports/nouveau" [queryParams]="{ type: 'clients' }">Importer des clients</a> }
+        @if (auth.peut('CLIENTS_GERER')) { <button class="bp" type="button" (click)="creation.set(true)">Nouveau client</button> }
+      </div>
+    }
+  </div>
+
+  <form class="filtres" (ngSubmit)="rechercher()">
+    <div class="grille">
+      <label class="f large">Pharmacie, pharmacien, code ou n° WhatsApp
+        <input class="sel" name="q" [(ngModel)]="criteres.q" placeholder="Ex. Sainte Rita, 41100231, 0708…">
+      </label>
+      <label class="f">Statut
+        <select class="sel" name="statut" [(ngModel)]="criteres.statut" (ngModelChange)="rechercher()">
+          <option value="ACTIF">Clients actifs</option>
+          <option value="INACTIF">Clients désactivés</option>
+        </select>
+      </label>
+      @if (auth.voitAgents() || surMarketing()) {
+        <label class="f">Agence
+          <select class="sel" name="agenceId" [(ngModel)]="criteres.agenceId">
+            <option [ngValue]="null">Toutes</option>
+            @for (a of ref.agences | async; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+          </select>
+        </label>
+      }
+      @if (auth.voitAgents() && !surMarketing()) {
+        <label class="f">Agent
+          <select class="sel" name="agentId" [(ngModel)]="criteres.agentId">
+            <option [ngValue]="null">Tous</option>
+            @for (a of agents | async; track a.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> }
+          </select>
+        </label>
+      }
+    </div>
+    <div class="pied-filtres" style="justify-content: space-between">
+      <div class="actions">
+        @if (!surMarketing()) { <label class="case"><input type="checkbox" name="avecSolde" [(ngModel)]="criteres.avecSolde">Avec un solde dû</label> }
+        @if (auth.voitAgents() && !surMarketing()) {
+          <label class="case"><input type="checkbox" name="sansAgent" [(ngModel)]="criteres.sansAgent">Sans agent</label>
+        }
+      </div>
+      <button class="bp" type="submit">Rechercher</button>
+    </div>
+  </form>
+
+  @if (selection().size) {
+    <div class="barre-selection">
+      <span><strong>{{ selection().size }} client{{ selection().size > 1 ? 's' : '' }} sélectionné{{ selection().size > 1 ? 's' : '' }}</strong></span>
+      <div class="actions">
+        <button class="ba" type="button" (click)="miseAJour.set(true)">Mise à jour sélective</button>
+        <button class="bs" type="button" (click)="verifier(true)">Vérifier les numéros</button>
+        <button class="bs" type="button" (click)="ouvrirDesactivation()">Désactiver</button>
+      </div>
+    </div>
+  }
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr>
+        @if (auth.peut('CLIENTS_GERER') && criteres.statut === 'ACTIF') {
+          <th><input type="checkbox" aria-label="Tout sélectionner" [checked]="selection().size > 0 && selection().size === page()?.elements?.length"
+                     (change)="toutBasculer($any($event.target).checked)"></th>
+        }
+        <th>Pharmacie</th><th>Pharmacien</th><th>Agence</th><th>Segment</th><th>WhatsApp</th>
+        @if (!surMarketing()) { <th>Agent</th><th class="n">Factures ouvertes</th><th class="n">Solde dû</th><th class="n">Retard max</th> }</tr></thead>
+      <tbody>
+        @for (c of page()?.elements; track c.clientId) {
+          <tr class="cliquable" [class.inactif]="criteres.statut === 'INACTIF'" (click)="router.navigate(['/clients', c.clientId])">
+            @if (auth.peut('CLIENTS_GERER') && criteres.statut === 'ACTIF') {
+              <td (click)="$event.stopPropagation()"><input type="checkbox" [attr.aria-label]="'Sélectionner ' + c.raisonSociale"
+                  [checked]="selection().has(c.clientId)" (change)="basculer(c.clientId)"></td>
+            }
+            <td><a class="ref" [routerLink]="['/clients', c.clientId]">{{ c.raisonSociale }}</a><div class="second">{{ c.code }}</div></td>
+            <td>{{ c.nomPharmacien || '—' }}</td>
+            <td>{{ c.agenceLibelle }}</td>
+            <td>@if (c.segmentationLibelle) { <app-badge-segment [badge]="c.segmentationBadge" [libelle]="c.segmentationLibelle" /> } @else { — }</td>
+            <td class="nw">{{ (c.numeroPrincipal | telephone) || '—' }}</td>
+            @if (!surMarketing()) {
+              <td>{{ c.agentNom || 'Sans agent' }}</td>
+              <td class="n">{{ c.nbFacturesOuvertes }}</td>
+              <td class="n" style="font-weight: 700">{{ c.totalSolde | montant }}</td>
+              <td class="n">@if (c.retardMax > 0) {<span class="retard">{{ c.retardMax }} j</span>} @else {—}</td>
+            }
+          </tr>
+        } @empty {
+          <tr><td colspan="10" class="vide">{{ page() ? 'Aucun client ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (page(); as p) {
+    <div class="pagination">
+      <span>{{ p.total }} client{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+      <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+        <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+    </div>
+  }
+</div>
+
+@if (auth.peut('CLIENTS_GERER')) {
+  <app-client-formulaire [(ouvert)]="creation" (enregistre)="router.navigate(['/clients', $event.id])" />
+  <app-mise-a-jour-selective [(ouvert)]="miseAJour" [clientIds]="ids()" [agenceIds]="agencesSelection()" (enregistre)="rechercher()" />
+  <app-verification-numeros [(ouvert)]="verification" [clientIds]="aVerifier()" />
+  <p-dialog header="Désactiver des clients" [visible]="desactivation()" (visibleChange)="!$event && desactivation.set(false)" [modal]="true" [style]="{ width: '520px' }">
+    <form class="formulaire" (ngSubmit)="desactiver()">
+      <p class="discret">Les {{ selection().size }} client(s) ne recevront plus aucun message (relances, campagnes). Rien n'est supprimé : vous les retrouvez dans « Clients désactivés » et pouvez les réactiver.</p>
+      <label class="f large">Motif<input class="sel" name="motif" [(ngModel)]="motif" placeholder="Ex. Pharmacie fermée, doublon" required></label>
+      @if (erreurDesactivation()) { <div class="erreur">{{ erreurDesactivation() }}</div> }
+      <div class="pied">
+        <button class="bs" type="button" (click)="desactivation.set(false)">Annuler</button>
+        <button class="bp" type="submit" [disabled]="!motif.trim()">Désactiver</button>
+      </div>
+    </form>
+  </p-dialog>
+}

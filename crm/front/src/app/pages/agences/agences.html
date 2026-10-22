@@ -1,0 +1,53 @@
+<div [class.page]="!integre()">
+  <div class="entete">
+    <div>
+      @if (integre()) { <h2 class="h2">Agences</h2> } @else { <h1>Agences</h1> }
+      <p class="sous-titre">Les agences du réseau {{ charte.nomEntreprise() }}. Le code d'import est celui des fichiers de clients et de factures, s'il diffère du code.
+        Une agence n'est jamais supprimée : archivée, elle sort des listes de choix et garde son historique.</p>
+    </div>
+    @if (!archives()) { <div class="actions"><button class="ba" type="button" (click)="nouvelle()">Nouvelle agence</button></div> }
+  </div>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Agence</th><th>Code</th><th>Code d'import</th><th class="n">Clients actifs</th><th class="n">Utilisateurs</th><th>Modifié</th><th></th></tr></thead>
+      <tbody>
+        @for (a of agences(); track a.id) {
+          <tr>
+            <td><strong>{{ a.libelle }}</strong></td>
+            <td>{{ a.code }}</td>
+            <td>{{ a.codeImport ?? '—' }}</td>
+            <td class="n">{{ a.nbClients }}</td>
+            <td class="n">{{ a.nbUtilisateurs }}</td>
+            <td><div>{{ a.modifieLe | jour }}</div><div class="second">{{ a.modifiePar ?? 'Livrée avec la plateforme' }}</div></td>
+            <td class="nw">
+              <span class="actions-ligne">@if (a.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(a)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(a, 'archivage')"><i class="pi pi-inbox"></i></button> }
+              @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(a, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="vide">{{ !agences() ? 'Chargement…' : archives() ? 'Aucune agence archivée.' : 'Aucune agence.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="discret">Pour ouvrir une agence : créez-la ici, rattachez-y ses utilisateurs dans Utilisateurs et habilitations, ses clients par l'import
+    ou la fiche client, puis réglez au besoin ses délais de relance.</p>
+  <a style="font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux agences actives' : 'Voir les agences archivées' }}</a>
+</div>
+
+<p-dialog [header]="cible() ? 'Modifier l\'agence' : 'Nouvelle agence'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '520px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">Nom<input class="sel" name="libelle" [(ngModel)]="edition.libelle" placeholder="Ex. San-Pédro" required></label>
+    <div class="grille">
+      <label class="f">Code<input class="sel" name="code" [(ngModel)]="edition.code" placeholder="Ex. SPE" maxlength="30" required></label>
+      <label class="f">Code d'import (facultatif)<input class="sel" name="codeImport" [(ngModel)]="edition.codeImport" placeholder="Ex. S" maxlength="30"></label>
+    </div>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !edition.code.trim() || !edition.libelle.trim()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

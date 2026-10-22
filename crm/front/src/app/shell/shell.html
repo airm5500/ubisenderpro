@@ -1,0 +1,149 @@
+<div class="cadre">
+  <nav aria-label="Navigation principale">
+    <div class="marque">
+      <!-- Logo livre : dessine en ligne pour que l'animation du theme anime le U et le point ; logo depose : anime en bloc -->
+      @if (charte.charte()?.logoVersion) {
+        <img class="logo logo-perso" [src]="charte.logo()" alt="" width="44" height="44" style="object-fit: contain">
+      } @else {
+        <svg class="logo" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+          <defs><clipPath id="logo-cadre"><rect width="64" height="64" rx="14"/></clipPath>
+            <linearGradient id="logo-reflet" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+          <rect width="64" height="64" rx="14" fill="#0B3A5C"/>
+          <path class="logo-u" d="M18 16v18a14 14 0 0 0 28 0V16" fill="none" stroke="var(--vert)" stroke-width="7" stroke-linecap="round"/>
+          <circle class="logo-onde" cx="46" cy="48" r="5" fill="none" stroke="var(--vert)" stroke-width="2"/>
+          <circle class="logo-point" cx="46" cy="48" r="5" fill="#fff"/>
+          <g clip-path="url(#logo-cadre)"><rect class="logo-lueur" x="0" y="-10" width="24" height="84" fill="url(#logo-reflet)" transform="rotate(20)"/></g>
+        </svg>
+      }
+      <div><div class="nom" [attr.aria-label]="nomEntreprise()">@for (l of lettres(); track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
+    </div>
+    <!-- Le choix du module reste fixe en haut (Airman, 22/10/2026) : seul le menu en dessous defile -->
+    @if (!auth.utilisateur()?.motDePasseProvisoire) {
+      <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
+      @if (auth.recouvrement() && auth.marketing()) {
+        <div role="group" aria-label="Module" class="modules">
+          <a class="md" [class.mdon]="!surMarketing()" routerLink="/" (click)="module.choisir('RECOUVREMENT')">Recouvrement</a>
+          <a class="md" [class.mdon]="surMarketing()" routerLink="/marketing" (click)="module.choisir('MARKETING')">Marketing</a>
+        </div>
+      } @else {
+        <div class="module-seul">{{ auth.recouvrement() ? 'Recouvrement' : 'Marketing' }}</div>
+      }
+    }
+    <!-- Seul le menu defile, sans barre : un fondu et une fleche signalent la suite (style D, Airman 22/10/2026) -->
+    <div class="menu-cadre" [class.fin]="!suiteMenu()">
+    <div class="menu-defile" #menuDefile (scroll)="mesurerMenu()"><div class="menu-contenu" #menuContenu>
+    <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
+    @if (!auth.utilisateur()?.motDePasseProvisoire) {
+
+    @if (auth.recouvrement() && !surMarketing()) {
+
+    @if (auth.peut('MA_JOURNEE', 'TABLEAU_BORD')) {
+      <div class="section" routerLinkActive #sActivite="routerLinkActive" [class.fermee]="!estOuverte('sActivite', sActivite.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sActivite', sActivite.isActive) : null" (click)="basculer('sActivite', sActivite.isActive)"><span class="glt"><i class="pi pi-user ic" aria-hidden="true"></i>Mon activité</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sActivite', sActivite.isActive) ? null : ''"><div>
+          @if (auth.peut('MA_JOURNEE')) { <a class="nv" routerLink="/ma-journee" routerLinkActive="on"><i class="pi pi-sun ic" aria-hidden="true"></i>Ma journée</a> }
+          @if (auth.peut('TABLEAU_BORD')) { <a class="nv" routerLink="/tableau-de-bord" routerLinkActive="on"><i class="pi pi-chart-bar ic" aria-hidden="true"></i>Tableau de bord</a> }
+        </div></div>
+      </div>
+    }
+    @if (auth.peut('FACTURES', 'CLIENTS', 'IMPORTS', 'PORTEFEUILLES')) {
+      <div class="section" routerLinkActive #sCreances="routerLinkActive" [class.fermee]="!estOuverte('sCreances', sCreances.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sCreances', sCreances.isActive) : null" (click)="basculer('sCreances', sCreances.isActive)"><span class="glt"><i class="pi pi-wallet ic" aria-hidden="true"></i>Créances</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sCreances', sCreances.isActive) ? null : ''"><div>
+          @if (auth.peut('FACTURES')) { <a class="nv" routerLink="/factures" routerLinkActive="on"><i class="pi pi-file ic" aria-hidden="true"></i>Factures</a> }
+          @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on"><i class="pi pi-users ic" aria-hidden="true"></i>{{ auth.portefeuillePersonnel() ? 'Mes clients' : 'Clients' }}</a> }
+          @if (auth.peut('IMPORTS')) { <a class="nv" routerLink="/imports" routerLinkActive="on"><i class="pi pi-upload ic" aria-hidden="true"></i>Imports</a> }
+          @if (auth.peut('PORTEFEUILLES')) { <a class="nv" routerLink="/portefeuilles" routerLinkActive="on"><i class="pi pi-briefcase ic" aria-hidden="true"></i>Portefeuilles agents</a> }
+        </div></div>
+      </div>
+    }
+    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER', 'DELAIS_RELANCE', 'LISTES_RELANCES')) {
+      <div class="section" routerLinkActive #sRelances="routerLinkActive" [class.fermee]="!estOuverte('sRelances', sRelances.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sRelances', sRelances.isActive) : null" (click)="basculer('sRelances', sRelances.isActive)"><span class="glt"><i class="pi pi-bell ic" aria-hidden="true"></i>Relances</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sRelances', sRelances.isActive) ? null : ''"><div>
+          @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on"><i class="pi pi-megaphone ic" aria-hidden="true"></i>Campagnes</a> }
+          @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on"><i class="pi pi-file-edit ic" aria-hidden="true"></i>Modèles de messages</a> }
+          @if (auth.peut('LISTES_RELANCES')) { <a class="nv" routerLink="/relances/listes" routerLinkActive="on"><i class="pi pi-list ic" aria-hidden="true"></i>Listes de diffusion</a> }
+          @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on"><i class="pi pi-clock ic" aria-hidden="true"></i>Délais de relance</a> }
+        </div></div>
+      </div>
+    }
+    @if (auth.peut('REPONSES', 'NUMEROS', 'NUMEROS_TOUS', 'DISCUSSIONS', 'HISTORIQUE_ENVOIS', 'ENVOI_MASSE')) {
+      <div class="section" routerLinkActive #sEchanges="routerLinkActive" [class.fermee]="!estOuverte('sEchanges', sEchanges.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sEchanges', sEchanges.isActive) : null" (click)="basculer('sEchanges', sEchanges.isActive)"><span class="glt"><i class="pi pi-comments ic" aria-hidden="true"></i>Échanges</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sEchanges', sEchanges.isActive) ? null : ''"><div>
+          @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on"><i class="pi pi-comments ic" aria-hidden="true"></i>Discussions</a> }
+          @if (auth.peut('REPONSES')) { <a class="nv" routerLink="/reponses" routerLinkActive="on"><i class="pi pi-reply ic" aria-hidden="true"></i>Réponses des clients</a> }
+          @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on"><i class="pi pi-send ic" aria-hidden="true"></i>Envoi WhatsApp en masse</a> }
+          @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on"><i class="pi pi-history ic" aria-hidden="true"></i>Historique des envois</a> }
+          @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
+            <a class="nv" routerLink="/numeros" routerLinkActive="on"><i class="pi pi-whatsapp ic" aria-hidden="true"></i>Numéros WhatsApp</a>
+          }
+        </div></div>
+      </div>
+    }
+    } @else {
+      <div class="section" routerLinkActive #sActiviteM="routerLinkActive" [routerLinkActiveOptions]="{ exact: true }" [class.fermee]="!estOuverte('sActiviteM', sActiviteM.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sActiviteM', sActiviteM.isActive) : null" (click)="basculer('sActiviteM', sActiviteM.isActive)"><span class="glt"><i class="pi pi-user ic" aria-hidden="true"></i>Mon activité</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sActiviteM', sActiviteM.isActive) ? null : ''"><div>
+          <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }"><i class="pi pi-sun ic" aria-hidden="true"></i>Ma journée</a>
+          @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on"><i class="pi pi-chart-bar ic" aria-hidden="true"></i>Tableau de bord</a> }
+        </div></div>
+      </div>
+      <div class="section" routerLinkActive #sMarketing="routerLinkActive" [class.fermee]="!estOuverte('sMarketing', sMarketing.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sMarketing', sMarketing.isActive) : null" (click)="basculer('sMarketing', sMarketing.isActive)"><span class="glt"><i class="pi pi-shopping-bag ic" aria-hidden="true"></i>Marketing</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sMarketing', sMarketing.isActive) ? null : ''"><div>
+          @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on"><i class="pi pi-megaphone ic" aria-hidden="true"></i>Campagnes</a> }
+          @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on"><i class="pi pi-list ic" aria-hidden="true"></i>Listes de diffusion</a> }
+          @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on"><i class="pi pi-box ic" aria-hidden="true"></i>Catalogue des produits</a> }
+          @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on"><i class="pi pi-percentage ic" aria-hidden="true"></i>Promotions</a> }
+          @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on"><i class="pi pi-file-edit ic" aria-hidden="true"></i>Modèles de messages</a> }
+          @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on"><i class="pi pi-users ic" aria-hidden="true"></i>Clients</a> }
+          @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on"><i class="pi pi-id-card ic" aria-hidden="true"></i>Informations clients</a> }
+          @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on"><i class="pi pi-calendar ic" aria-hidden="true"></i>Calendrier des événements</a> }
+          @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on"><i class="pi pi-comments ic" aria-hidden="true"></i>Discussions</a> }
+          @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on"><i class="pi pi-send ic" aria-hidden="true"></i>Envoi WhatsApp en masse</a> }
+          @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on"><i class="pi pi-history ic" aria-hidden="true"></i>Historique des envois</a> }
+          @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on"><i class="pi pi-whatsapp ic" aria-hidden="true"></i>Numéros WhatsApp</a> }
+        </div></div>
+      </div>
+    }
+    <!-- Administration : la meme dans les deux modules -->
+    @if (auth.peut('UTILISATEURS', 'ROLES', 'PARAMETRES', 'REFERENTIELS', 'FOURNISSEURS_SMS', 'AGENCES', 'JOURNAL')) {
+      <div class="section" routerLinkActive #sAdmin="routerLinkActive" [class.fermee]="!estOuverte('sAdmin', sAdmin.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sAdmin', sAdmin.isActive) : null" (click)="basculer('sAdmin', sAdmin.isActive)"><span class="glt"><i class="pi pi-sliders-h ic" aria-hidden="true"></i>Administration</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sAdmin', sAdmin.isActive) ? null : ''"><div>
+          @if (auth.peut('UTILISATEURS')) { <a class="nv" routerLink="/utilisateurs" routerLinkActive="on"><i class="pi pi-user-edit ic" aria-hidden="true"></i>Utilisateurs et habilitations</a> }
+          @if (auth.peut('ROLES')) { <a class="nv" routerLink="/roles" routerLinkActive="on"><i class="pi pi-shield ic" aria-hidden="true"></i>Rôles et droits</a> }
+          @if (auth.peut('JOURNAL')) { <a class="nv" routerLink="/journal" routerLinkActive="on"><i class="pi pi-book ic" aria-hidden="true"></i>Journal des actions</a> }
+          <!-- Agences et fournisseurs SMS se tiennent dans les Parametres -->
+          @if (auth.peut('PARAMETRES', 'REFERENTIELS', 'AGENCES', 'FOURNISSEURS_SMS')) { <a class="nv" routerLink="/parametres" routerLinkActive="on"><i class="pi pi-cog ic" aria-hidden="true"></i>Paramètres</a> }
+        </div></div>
+      </div>
+    }
+    <!-- Centre de support : ouvert a tout utilisateur connecte -->
+    <div class="section" routerLinkActive #sAide="routerLinkActive" [class.fermee]="!estOuverte('sAide', sAide.isActive)">
+      <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sAide', sAide.isActive) : null" (click)="basculer('sAide', sAide.isActive)"><span class="glt"><i class="pi pi-question-circle ic" aria-hidden="true"></i>Aide</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+      <div class="liens" [attr.inert]="estOuverte('sAide', sAide.isActive) ? null : ''"><div>
+        <a class="nv" routerLink="/support" routerLinkActive="on"><i class="pi pi-question-circle ic" aria-hidden="true"></i>Centre de support</a>
+      </div></div>
+    </div>
+    }
+    </div></div>
+    <button type="button" class="menu-suite" tabindex="-1" aria-label="Voir la suite du menu" (click)="defilerMenu()"><i class="pi pi-angle-double-down" aria-hidden="true"></i></button>
+    </div>
+    <div class="profil">
+      <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>
+      <div class="sous">{{ auth.libelleProfil() }}</div>
+      <a class="sortie" routerLink="/mot-de-passe"><i class="pi pi-key"></i> Mon mot de passe</a>
+      <button type="button" class="sortie" (click)="auth.deconnecter()"><i class="pi pi-sign-out"></i> Se déconnecter</button>
+    </div>
+  </nav>
+  <main>
+    <router-outlet />
+  </main>
+  <!-- Bulles des boutons, « ? » de chaque ecran et retours animes de saisie -->
+  <app-guidage />
+  <!-- Saisie d'une campagne de relance en fenetre, chargee a la premiere ouverture -->
+  @defer (when fenetreCampagne.demande()) { <app-fenetre-campagne /> }
+</div>

@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${CRM_DB_URL_TEST:jdbc:mariadb://localhost:3306/ubicrm_test}
+    username: ${CRM_DB_USER:ubicrm}
+    password: ${CRM_DB_PASSWORD:ubicrm}
+  flyway:
+    clean-disabled: false
+  # Serveur SMTP en memoire demarre par EmailIT (GreenMail)
+  mail:
+    host: localhost
+    port: 3025
+    username: crm@ubipharm.ci
+    password: secret
+
+# Les tests demarrent les campagnes et les envois eux-memes
+crm:
+  campagnes:
+    planificateur: false
+  whatsapp:
+    envoi: false
+    jeton: jeton-de-test
+  email:
+    envoi: false
+  sms:
+    envoi: false
+  # La surveillance du serveur (temoin d'arret brutal, releves) se teste a part
+  support:
+    surveillance: false

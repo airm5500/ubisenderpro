@@ -1,0 +1,181 @@
+<div class="page">
+  <a class="retour" [routerLink]="config().retour">← {{ config().libelleRetour }}</a>
+  <div class="entete">
+    <div>
+      <h1>Importer des {{ libelleType() }}</h1>
+      <p class="sous-titre">
+        @if (fichier) { Fichier « {{ fichier.name }} »{{ apercu() ? ' · ' + apercu()!.nbLignes + ' lignes' : '' }} · }
+        L'import ajoute et met à jour, il ne remplace rien.
+      </p>
+    </div>
+  </div>
+
+  <ol class="etapes" aria-label="Étapes">
+    @for (e of etapes; track e; let i = $index) {
+      <li class="st" [class.fait]="i < etape()" [class.courant]="i === etape()" [attr.aria-current]="i === etape() ? 'step' : null">
+        <span class="stn">@if (i < etape()) {<i class="pi pi-check"></i>} @else {{{ i + 1 }}}</span>{{ e }}
+      </li>
+    }
+  </ol>
+
+  @switch (etape()) {
+    @case (0) {
+      <div class="grille-etape">
+        <label class="depot" [class.survol]="survol()" (dragover)="$event.preventDefault(); survol.set(true)" (dragleave)="survol.set(false)" (drop)="deposer($event)">
+          <i class="pi pi-upload" style="font-size: 28px; color: var(--bleu)"></i>
+          <strong style="color: var(--bleu); font-size: 16px">{{ occupe() ? 'Lecture du fichier…' : 'Déposez le fichier ici ou cliquez pour le choisir' }}</strong>
+          <span>Excel (.xlsx, .xls) ou CSV, 10 Mo et 20 000 lignes au plus.</span>
+          <input type="file" accept=".xlsx,.xls,.csv" hidden (change)="choisir($any($event.target).files?.[0])">
+        </label>
+        <div class="aide">
+          <label class="f">Modèle de colonnes enregistré
+            <select class="sel" [(ngModel)]="modeleId">
+              <option [ngValue]="null">Reconnaître les colonnes automatiquement</option>
+              @for (m of modeles(); track m.id) { <option [ngValue]="m.id">{{ m.nom }}</option> }
+            </select>
+          </label>
+          <p class="discret">Les en-têtes sont reconnus sans tenir compte des accents ni des majuscules. Vous pourrez corriger la correspondance à l'étape suivante.</p>
+          <button class="bs" type="button" (click)="exemplaire()"><i class="pi pi-download"></i>Télécharger un fichier exemple</button>
+        </div>
+      </div>
+    }
+
+    @case (1) {
+      @if (apercu(); as a) {
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Correspondance des colonnes</h2>
+            <span class="discret">{{ a.colonnes.length }} colonnes lues dans le fichier</span></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Champ attendu</th><th>Colonne du fichier</th><th>Exemples lus</th></tr></thead>
+              <tbody>
+                @for (c of a.champs; track c.code) {
+                  <tr>
+                    <td><strong>{{ c.libelle }}</strong>@if (c.obligatoire) {<span class="retard"> · obligatoire</span>}
+                      @if (c.exemple) {<div class="second">Ex. {{ c.exemple }}</div>}</td>
+                    <td style="min-width: 240px">
+                      <select class="sel" [ngModel]="correspondanceDe(c.code)" (ngModelChange)="correspondance[c.code] = $event">
+                        <option value="">Non importé</option>
+                        @for (col of a.colonnes; track col.cle) { <option [value]="col.cle">{{ col.libelle }}</option> }
+                      </select>
+                    </td>
+                    <td class="second">{{ exemples(correspondanceDe(c.code)) || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+        @if (manquants().length) {
+          <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Champs obligatoires sans colonne : {{ manquants().join(', ') }}.</span></div>
+        }
+        <div class="pied-etape">
+          <div class="actions">
+            <input class="sel" style="width: 260px" placeholder="Nom du modèle, ex. Extraction Sage" [(ngModel)]="nomModele">
+            <button class="bs" type="button" (click)="enregistrerModele()" [disabled]="!nomModele.trim()">Enregistrer ce modèle</button>
+          </div>
+          <div class="actions">
+            <button class="bs" type="button" (click)="etape.set(0)">Changer de fichier</button>
+            <button class="bp" type="button" (click)="simuler()" [disabled]="occupe() || manquants().length > 0">{{ occupe() ? 'Simulation…' : 'Lancer la simulation' }}</button>
+          </div>
+        </div>
+      }
+    }
+
+    @case (2) {
+      @if (simulation(); as s) {
+        <section class="chiffres" aria-label="Résultat de la simulation">
+          <div><span>{{ config().feminin ? 'Nouvelles' : 'Nouveaux' }} {{ libelleType() }}</span><strong>{{ s.nbCreations }}</strong><span>seront ajouté{{ accord() }}s</span></div>
+          <div><span>Déjà connu{{ accord() }}s, avec écarts</span><strong>{{ s.nbMisesAJour }}</strong><span>à mettre à jour ou non, au choix</span></div>
+          <div><span>Identiques</span><strong>{{ s.nbIdentiques }}</strong><span>rien à faire</span></div>
+          <div><span>Lignes rejetées</span><strong>{{ s.nbRejets }}</strong><span>non importées, corrigeables</span></div>
+        </section>
+
+        @if (misesAJour().length) {
+          <section class="bloc">
+            <div class="titre"><h2 class="h2"><span class="maj">{{ libelleType() }}</span> déjà connu{{ accord() }}s</h2>
+              <label class="case"><input type="checkbox" [checked]="cochees().size === misesAJour().length" (change)="toutCocher($any($event.target).checked)">Tout mettre à jour</label></div>
+            <div class="defile">
+              <table class="t">
+                <thead><tr><th>Mettre à jour</th><th>{{ config().cle }}</th><th>Champ modifié</th><th>Valeur actuelle</th><th>Valeur du fichier</th></tr></thead>
+                <tbody>
+                  @for (l of misesAJour(); track l.id) {
+                    @for (e of ecarts(l); track $index; let premier = $first; let nb = $count) {
+                      <tr>
+                        @if (premier) {
+                          <td [attr.rowspan]="nb"><input type="checkbox" [attr.aria-label]="'Mettre à jour ' + l.cle" [checked]="cochees().has(l.cle)" (change)="basculer(l.cle)"></td>
+                          <td [attr.rowspan]="nb" class="nw"><strong>{{ l.cle }}</strong><div class="second">ligne {{ l.numeroLigne }}</div></td>
+                        }
+                        <td>{{ e.champ }}</td><td class="old">{{ e.actuel }}</td><td class="new">{{ e.importe }}</td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
+        @if (rejets().length) {
+          <section class="bloc">
+            <div class="titre"><h2 class="h2">Lignes rejetées</h2><button class="bs petit" (click)="telechargerRejets()">Télécharger le rapport d'erreurs</button></div>
+            <div class="motifs">
+              @for (m of motifsRejet(); track m[0]) { <div class="mot"><span>{{ m[0] }}</span><strong>{{ m[1] }}</strong></div> }
+            </div>
+            <div class="defile">
+              <table class="t">
+                <thead><tr><th>Ligne</th><th>Clé</th><th>Motif</th><th></th></tr></thead>
+                <tbody>
+                  @for (l of rejets(); track l.id) {
+                    <tr><td>{{ l.numeroLigne }}</td><td>{{ l.cle || '—' }}</td><td>{{ l.message }}</td>
+                      <td class="nw"><button type="button" class="bi" pTooltip="Corriger la ligne" tooltipPosition="top" aria-label="Corriger la ligne" (click)="ouvrirCorrection(l)"><i class="pi pi-pencil"></i></button></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
+        <div class="pied-etape">
+          <p class="sous-titre">En validant, vous importez {{ s.nbCreations }} {{ libelleType() }} et mettez à jour {{ cochees().size }} {{ libelleType() }} connu{{ accord() }}s. Votre validation est enregistrée dans le journal d'audit.</p>
+          <div class="actions">
+            <button class="bs" type="button" (click)="abandonner()">Abandonner</button>
+            <button class="bp" type="button" (click)="valider()" [disabled]="occupe()">{{ occupe() ? 'Import…' : "Valider l'import" }}</button>
+          </div>
+        </div>
+      }
+    }
+
+    @case (3) {
+      @if (rapport(); as r) {
+        <div class="info"><i class="pi pi-check-circle"></i><span>Import validé{{ r.validePar ? ' par ' + r.validePar : '' }}.</span></div>
+        <section class="chiffres">
+          <div><span>Créés</span><strong>{{ r.nbCrees ?? 0 }}</strong></div>
+          <div><span>Mis à jour</span><strong>{{ r.nbMisAJour ?? 0 }}</strong></div>
+          <div><span>Ignorés</span><strong>{{ r.nbIgnores ?? 0 }}</strong></div>
+          <div><span>Rejetés</span><strong>{{ r.nbRejets }}</strong></div>
+        </section>
+        <div class="actions">
+          <a class="bp" [routerLink]="config().fin">{{ config().libelleFin }}</a>
+          <button class="bs" (click)="recommencer()">Importer un autre fichier</button>
+        </div>
+      }
+    }
+  }
+</div>
+
+<p-dialog header="Corriger la ligne" [visible]="ligneCorrigee() !== null" (visibleChange)="!$event && ligneCorrigee.set(null)" [modal]="true" [style]="{ width: '560px' }">
+  @if (ligneCorrigee(); as l) {
+    <div class="formulaire">
+      <div class="erreur"><span>Ligne {{ l.numeroLigne }} : {{ l.message }}</span></div>
+      @for (cle of Object.keys(valeursCorrigees); track cle) {
+        <label class="f">{{ cle }}<input class="sel" [(ngModel)]="valeursCorrigees[cle]"></label>
+      }
+      <p class="discret">Tout le fichier est réévalué après la correction.</p>
+      <div class="pied">
+        <button class="bs" type="button" (click)="ligneCorrigee.set(null)">Annuler</button>
+        <button class="bp" type="button" (click)="corriger()">Corriger et réévaluer</button>
+      </div>
+    </div>
+  }
+</p-dialog>

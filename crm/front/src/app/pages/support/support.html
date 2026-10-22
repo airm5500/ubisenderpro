@@ -1,0 +1,347 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Centre de support</h1>
+      <p class="sous-titre">Posez une question ou signalez un problème à l'équipe support, suivez la réponse dans la conversation du ticket
+        et consultez les réponses aux questions fréquentes.</p>
+    </div>
+    <div class="actions">
+      @if (onglet() === 'mes' || onglet() === 'tous') { <button class="ba" type="button" (click)="nouveau()">Nouveau ticket</button> }
+      @if (onglet() === 'sante') { <button class="bs" type="button" [disabled]="sondage()" (click)="sonder()">{{ sondage() ? 'Sondes en cours…' : 'Relancer les sondes' }}</button> }
+      @if (onglet() === 'diagnostic' || onglet() === 'sante') {
+        <button class="bs" type="button" pTooltip="Erreurs, tickets, santé, expérience des 24 dernières heures et fin du journal du serveur, à transmettre à l'éditeur" tooltipPosition="bottom" (click)="exporter()"><i class="pi pi-download"></i> Exporter le diagnostic</button>
+      }
+      @if (onglet() === 'experience') {
+        <select class="sel" style="width: 200px" aria-label="Période" [ngModel]="heures()" (ngModelChange)="choisirPeriode($event)">
+          @for (p of periodes; track p.heures) { <option [ngValue]="p.heures">{{ p.libelle }}</option> }
+        </select>
+        <button class="bs" type="button" (click)="chargerExperience()">Actualiser</button>
+      }
+      @if (onglet() === 'faq' && support() && !faqArchives()) { <button class="ba" type="button" (click)="nouvelleQuestion()">Nouvelle question</button> }
+    </div>
+  </div>
+
+  <div role="tablist" aria-label="Rubrique" class="onglets">
+    <button class="tab" [class.tabon]="onglet() === 'mes'" role="tab" [attr.aria-selected]="onglet() === 'mes'" (click)="choisir('mes')">Mes tickets</button>
+    @if (support()) {
+      <button class="tab" [class.tabon]="onglet() === 'tous'" role="tab" [attr.aria-selected]="onglet() === 'tous'" (click)="choisir('tous')">Tous les tickets</button>
+      <button class="tab" [class.tabon]="onglet() === 'diagnostic'" role="tab" [attr.aria-selected]="onglet() === 'diagnostic'" (click)="choisir('diagnostic')">Diagnostic</button>
+      <button class="tab" [class.tabon]="onglet() === 'sante'" role="tab" [attr.aria-selected]="onglet() === 'sante'" (click)="choisir('sante')">Santé</button>
+      <button class="tab" [class.tabon]="onglet() === 'experience'" role="tab" [attr.aria-selected]="onglet() === 'experience'" (click)="choisir('experience')">Expérience utilisateur</button>
+    }
+    <button class="tab" [class.tabon]="onglet() === 'faq'" role="tab" [attr.aria-selected]="onglet() === 'faq'" (click)="choisir('faq')">FAQ</button>
+  </div>
+
+  @switch (onglet()) {
+    @case ('diagnostic') {
+      <p class="discret">Erreurs inattendues du serveur et des navigateurs, requêtes lentes et alertes de la surveillance du serveur (mémoire,
+        connexions à la base, disque, WhatsApp Web, arrêt brutal), regroupées quand elles se répètent. Une erreur du serveur ou une alerte ouvre
+        un ticket automatiquement ; une erreur traitée revient dans la liste si elle survient de nouveau ; les lignes sans survenue depuis la durée
+        de conservation (Paramètres, Centre de support) sont retirées chaque nuit.</p>
+      <div class="actions">
+        <select class="sel" style="width: 220px" aria-label="Origine" [ngModel]="filtreOrigine()" (ngModelChange)="filtrerOrigine($event)">
+          <option value="">Toutes les origines</option>
+          @for (o of codesOrigine; track o) { <option [value]="o">{{ origines[o] }}</option> }
+        </select>
+      </div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Origine</th><th>Erreur</th><th class="n">Survenues</th><th>Dernière</th><th>Écran ou adresse</th><th>Utilisateur</th><th>Ticket</th><th></th></tr></thead>
+          <tbody>
+            @for (e of erreurs(); track e.id) {
+              <tr class="cliquable" (click)="erreurDetail.set(e)">
+                <td><span class="tag" [class.gris]="e.origine === 'NAVIGATEUR' || e.origine === 'LENTEUR'" [class.alerte]="e.origine === 'SURVEILLANCE'">{{ origines[e.origine] }}</span></td>
+                <td><strong class="mono">{{ e.type }}</strong><div class="second">{{ e.message ?? '—' }}</div></td>
+                <td class="n">{{ e.occurrences }}</td>
+                <td class="nw"><div>{{ e.derniereLe | jour: true }}</div><div class="second">depuis le {{ e.premiereLe | jour }}</div></td>
+                <td class="mono">{{ e.chemin ?? '—' }}</td>
+                <td>{{ e.utilisateur ?? '—' }}</td>
+                <td class="nw">
+                  @if (e.ticketId) { <a (click)="$event.stopPropagation(); voirTicket(e.ticketId)">n° {{ e.ticketId }}</a><div class="second">{{ statuts[e.ticketStatut ?? ''] }}</div> }
+                  @else { <span class="second">—</span> }
+                </td>
+                <td class="nw"><span class="actions-ligne">
+                  @if (!ticketActif(e)) { <button type="button" class="bi" pTooltip="Ouvrir un ticket pour cette erreur" tooltipPosition="top" aria-label="Ouvrir un ticket" (click)="$event.stopPropagation(); creerTicket(e)"><i class="pi pi-ticket"></i></button> }
+                  @if (e.traite) { <span class="second">Traitée par {{ e.traitePar }}</span> }
+                  @else { <button type="button" class="bi" pTooltip="Marquer comme traitée" tooltipPosition="top" aria-label="Marquer comme traitée" (click)="$event.stopPropagation(); traiter(e)"><i class="pi pi-check"></i></button> }
+                </span></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="8" class="vide">{{ !erreurs() ? 'Chargement…' : traitees() ? 'Aucune erreur traitée.' : 'Aucune erreur à traiter.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <a style="font-size: 13px" (click)="basculerTraitees()">{{ traitees() ? 'Revenir aux erreurs à traiter' : 'Voir les erreurs traitées' }}</a>
+    }
+
+    @case ('sante') {
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Sonde</th><th>État</th><th>Détail</th><th class="n">Durée</th></tr></thead>
+          <tbody>
+            @for (s of sondes(); track s.code) {
+              <tr>
+                <td><strong>{{ s.libelle }}</strong></td>
+                <td><span class="tag" [class.vert]="s.etat === 'OK'" [class.alerte]="s.etat === 'ALERTE'" [class.ko]="s.etat === 'KO'">{{ s.etat }}</span></td>
+                <td>{{ s.detail }}</td>
+                <td class="n">{{ s.dureeMs }} ms</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="vide">Sondes en cours…</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @case ('experience') {
+      <p class="discret">Temps réellement vécus dans les navigateurs : ouverture des écrans (du clic jusqu'à l'affichage complet) et durée des
+        appels au serveur. Chaque navigateur cumule ses mesures et les envoie une fois par minute ; seules l'adresse et la durée sont gardées,
+        {{ experience()?.actif === false ? 'mais la mesure est désactivée dans les Paramètres.' : 'pendant la durée de conservation fixée dans les Paramètres.' }}</p>
+      @if (experience(); as e) {
+        <div class="kvs">
+          <div class="kv"><span>Écrans ouverts</span><span>{{ resumeEcrans()?.nombre ?? 0 }}</span></div>
+          <div class="kv"><span>Ouverture moyenne</span><span>{{ resumeEcrans() ? resumeEcrans()!.moyenneMs + ' ms' : '—' }}</span></div>
+          <div class="kv"><span>Appels au serveur</span><span>{{ resumeAppels()?.nombre ?? 0 }}</span></div>
+          <div class="kv"><span>Appel moyen</span><span>{{ resumeAppels() ? resumeAppels()!.moyenneMs + ' ms' : '—' }}</span></div>
+          <div class="kv"><span>Appels de 3 s et plus</span><span [class.retard]="(resumeAppels()?.part3s ?? 0) >= 10">{{ resumeAppels() ? resumeAppels()!.part3s + ' %' : '—' }}</span></div>
+          <div class="kv"><span>Appels en échec</span><span>{{ resumeAppels()?.echecs ?? 0 }}</span></div>
+        </div>
+        @if (courbe(); as c) {
+          <section class="bloc"><div class="titre"><h2 class="h2">Évolution</h2></div>
+            <p-chart type="line" [data]="c" [options]="optionsCourbe" width="100%" height="240px" ariaLabel="Évolution des temps moyens" />
+          </section>
+        }
+        <section class="bloc"><div class="titre"><h2 class="h2">Écrans les plus lents à s'ouvrir</h2></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Écran</th><th class="n">Ouvertures</th><th class="n">Moyenne</th><th class="n">Pire</th><th class="n">≥ 1 s</th><th class="n">≥ 3 s</th></tr></thead>
+              <tbody>
+                @for (l of e.ecrans; track l.cle) {
+                  <tr><td><strong>{{ l.cle }}</strong></td><td class="n">{{ l.nombre }}</td><td class="n" [class.retard]="lent(l)">{{ l.moyenneMs }} ms</td>
+                    <td class="n">{{ l.maxMs }} ms</td><td class="n">{{ l.part1s }} %</td><td class="n">{{ l.part3s }} %</td></tr>
+                } @empty { <tr><td colspan="6" class="vide">Aucune mesure sur la période.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="bloc"><div class="titre"><h2 class="h2">Appels les plus lents</h2></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Appel</th><th class="n">Nombre</th><th class="n">Moyenne</th><th class="n">Pire</th><th class="n">≥ 1 s</th><th class="n">≥ 3 s</th><th class="n">Échecs</th></tr></thead>
+              <tbody>
+                @for (l of e.appels; track l.cle) {
+                  <tr><td class="mono">{{ l.cle }}</td><td class="n">{{ l.nombre }}</td><td class="n" [class.retard]="lent(l)">{{ l.moyenneMs }} ms</td>
+                    <td class="n">{{ l.maxMs }} ms</td><td class="n">{{ l.part1s }} %</td><td class="n">{{ l.part3s }} %</td><td class="n">{{ l.echecs }}</td></tr>
+                } @empty { <tr><td colspan="7" class="vide">Aucune mesure sur la période.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </section>
+        @if (e.echecs.length) {
+          <section class="bloc"><div class="titre"><h2 class="h2">Appels en échec</h2></div>
+            <div class="defile">
+              <table class="t">
+                <thead><tr><th>Appel</th><th class="n">Échecs</th><th class="n">Sur</th></tr></thead>
+                <tbody>
+                  @for (l of e.echecs; track l.cle) { <tr><td class="mono">{{ l.cle }}</td><td class="n">{{ l.echecs }}</td><td class="n">{{ l.nombre }}</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+        <section class="bloc"><div class="titre"><h2 class="h2">Par utilisateur</h2></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Utilisateur</th><th class="n">Écrans</th><th class="n">Ouverture moyenne</th><th class="n">Appels</th><th class="n">Appel moyen</th><th class="n">≥ 3 s</th><th class="n">Échecs</th><th>Dernière activité</th></tr></thead>
+              <tbody>
+                @for (u of e.utilisateurs; track u.utilisateur) {
+                  <tr><td><strong>{{ u.utilisateur }}</strong></td><td class="n">{{ u.ecrans }}</td><td class="n">{{ u.ecrans ? u.moyenneEcranMs + ' ms' : '—' }}</td>
+                    <td class="n">{{ u.appels }}</td><td class="n">{{ u.appels ? u.moyenneAppelMs + ' ms' : '—' }}</td><td class="n">{{ u.part3s }} %</td>
+                    <td class="n">{{ u.echecs }}</td><td class="nw">{{ u.derniereActivite | jour: true }}</td></tr>
+                } @empty { <tr><td colspan="8" class="vide">Aucune mesure sur la période.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      } @else {
+        <p class="vide discret">Chargement…</p>
+      }
+    }
+
+    @case ('faq') {
+      @for (g of faqParCategorie(); track g.categorie) {
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">{{ g.categorie }}</h2></div>
+          @for (f of g.questions; track f.id) {
+            <details class="faq">
+              <summary><strong>{{ f.question }}</strong></summary>
+              <p class="faq-reponse">{{ f.reponse }}</p>
+              @if (support()) {
+                <div class="second">
+                  Modifiée le {{ f.modifieLe | jour }}{{ f.modifiePar ? ' par ' + f.modifiePar : '' }} ·
+                  <span class="actions-ligne">@if (f.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier la question" tooltipPosition="top" aria-label="Modifier la question" (click)="modifierQuestion(f)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver la question" tooltipPosition="top" aria-label="Archiver la question" (click)="changerStatutQuestion(f, 'archivage')"><i class="pi pi-inbox"></i></button> }
+                  @else { <button type="button" class="bi" pTooltip="Réactiver la question" tooltipPosition="top" aria-label="Réactiver la question" (click)="changerStatutQuestion(f, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
+                </div>
+              }
+            </details>
+          }
+        </section>
+      } @empty {
+        <p class="vide discret">{{ !faq() ? 'Chargement…' : faqArchives() ? 'Aucune question archivée.' : 'Aucune question pour le moment.' }}</p>
+      }
+      @if (support()) {
+        <a style="font-size: 13px" (click)="basculerFaqArchives()">{{ faqArchives() ? 'Revenir aux questions actives' : 'Voir les questions archivées' }}</a>
+      }
+    }
+
+    @default {
+      <div class="actions">
+        <select class="sel" style="width: 220px" aria-label="Statut" [ngModel]="filtreStatut()" (ngModelChange)="filtrer($event)">
+          <option value="">Tous les statuts</option>
+          @for (c of codesStatut; track c) { <option [value]="c">{{ statuts[c] }}</option> }
+        </select>
+      </div>
+      <div class="defile">
+        <table class="t">
+          <thead>
+            <tr><th>N°</th><th>Sujet</th><th>Catégorie</th><th>Priorité</th><th>Statut</th>
+              @if (onglet() === 'tous') { <th>Demandeur</th> }<th>Pris en charge par</th><th class="n">Messages</th><th>Dernière activité</th></tr>
+          </thead>
+          <tbody>
+            @for (t of tickets(); track t.id) {
+              <tr class="cliquable" (click)="consulter(t)">
+                <td class="ref">{{ t.id }}</td>
+                <td><strong>{{ t.sujet }}</strong></td>
+                <td>{{ categories[t.categorie] }}</td>
+                <td><span [class.retard]="t.priorite === 'URGENTE'" [class.tag]="t.priorite === 'HAUTE'">{{ priorites[t.priorite] }}</span></td>
+                <td><span class="tag" [class.vert]="t.statut === 'RESOLU'" [class.gris]="t.statut === 'FERME'">{{ statuts[t.statut] }}</span></td>
+                @if (onglet() === 'tous') { <td>{{ t.auteur }}</td> }
+                <td>{{ t.assigne ?? '—' }}</td>
+                <td class="n">{{ t.nbMessages }}</td>
+                <td class="nw">{{ (t.dernierMessageLe ?? t.creeLe) | jour: true }}</td>
+              </tr>
+            } @empty {
+              <tr><td [attr.colspan]="onglet() === 'tous' ? 9 : 8" class="vide">{{ !tickets() ? 'Chargement…' : 'Aucun ticket.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="discret">Un ticket n'est jamais supprimé : une fois la réponse apportée, il est résolu puis fermé.</p>
+    }
+  }
+</div>
+
+<p-dialog header="Nouveau ticket" [visible]="nouveauOuvert()" (visibleChange)="!$event && nouveauOuvert.set(false)" [modal]="true" [style]="{ width: '620px' }">
+  <form class="formulaire" (ngSubmit)="ouvrirTicket()">
+    <label class="f">Sujet<input class="sel" name="sujet" [(ngModel)]="edition.sujet" maxlength="200" placeholder="Ex. L'import des factures s'arrête" required></label>
+    <div class="grille">
+      <label class="f">Catégorie
+        <select class="sel" name="categorie" [(ngModel)]="edition.categorie">
+          <option value="QUESTION">Question</option><option value="INCIDENT">Incident</option><option value="DEMANDE">Demande</option>
+        </select>
+      </label>
+      <label class="f">Priorité
+        <select class="sel" name="priorite" [(ngModel)]="edition.priorite">
+          <option value="NORMALE">Normale</option><option value="HAUTE">Haute</option><option value="URGENTE">Urgente</option>
+        </select>
+      </label>
+    </div>
+    <label class="f">Message<textarea class="sel" name="message" [(ngModel)]="edition.message" maxlength="10000"
+      placeholder="Ce que vous faisiez, ce que vous attendiez, ce qui s'est passé ; la référence de l'erreur si elle s'affiche." required></textarea></label>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="nouveauOuvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !edition.sujet.trim() || !edition.message.trim()">Ouvrir le ticket</button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog [header]="ticket() ? 'Ticket n° ' + ticket()!.id : ''" [visible]="!!ticket()" (visibleChange)="!$event && fermerTicket()" [modal]="true" [style]="{ width: '760px' }">
+  @if (ticket(); as t) {
+    <div class="formulaire">
+      <div>
+        <div class="h">{{ t.sujet }}</div>
+        <div class="second">{{ categories[t.categorie] }} · priorité {{ priorites[t.priorite] }} · ouvert par {{ t.auteur }} le {{ t.creeLe | jour: true }}
+          @if (t.erreurId && support()) { · <a (click)="voirErreur(t.erreurId)">voir l'erreur au diagnostic</a> }</div>
+      </div>
+      @if (support()) {
+        <div class="grille">
+          <label class="f">Statut
+            <select class="sel" [ngModel]="t.statut" (ngModelChange)="changerStatut($event)">
+              @for (c of codesStatut; track c) { <option [value]="c">{{ statuts[c] }}</option> }
+            </select>
+          </label>
+          <label class="f">Pris en charge par
+            <select class="sel" [ngModel]="t.assigneId" (ngModelChange)="affecter($event)" [disabled]="t.statut === 'FERME'">
+              <option [ngValue]="null">Personne</option>
+              @for (i of intervenants(); track i.id) { <option [ngValue]="i.id">{{ i.nomComplet }}</option> }
+            </select>
+          </label>
+        </div>
+      } @else {
+        <div><span class="tag" [class.vert]="t.statut === 'RESOLU'" [class.gris]="t.statut === 'FERME'">{{ statuts[t.statut] }}</span>
+          @if (t.assigne) { <span class="second"> · pris en charge par {{ t.assigne }}</span> }</div>
+      }
+      <div class="fil-wa" style="max-height: 380px; overflow-y: auto">
+        @for (m of t.messages; track m.id) {
+          @if (m.type === 'SYSTEME') {
+            <div class="discret" style="align-self: center">{{ m.contenu }} · {{ m.auteur }}, {{ m.creeLe | jour: true }}</div>
+          } @else {
+            <div [class.in]="m.support" [class.out]="!m.support">{{ m.contenu }}<span class="meta">{{ m.auteur }} · {{ m.creeLe | jour: true }}</span></div>
+          }
+        }
+      </div>
+      @if (t.statut !== 'FERME') {
+        <label class="f">Votre message<textarea class="sel" style="min-height: 90px" [(ngModel)]="reponse" maxlength="10000"></textarea></label>
+        <div class="pied">
+          <button class="bs" type="button" (click)="fermerTicket()">Fermer la fenêtre</button>
+          <button class="bp" type="button" [disabled]="enCours() || !reponse.trim()" (click)="repondre()">Envoyer</button>
+        </div>
+      } @else {
+        <div class="info"><i class="pi pi-lock"></i><span>Ce ticket est fermé. Pour une nouvelle demande, ouvrez un autre ticket.</span></div>
+      }
+    </div>
+  }
+</p-dialog>
+
+<p-dialog header="Détail de l'erreur" [visible]="!!erreurDetail()" (visibleChange)="!$event && erreurDetail.set(null)" [modal]="true" [style]="{ width: '860px' }">
+  @if (erreurDetail(); as e) {
+    <div class="formulaire">
+      <div class="kvs">
+        <div class="kv"><span>Type</span><span class="mono">{{ e.type }}</span></div>
+        <div class="kv"><span>Survenues</span><span>{{ e.occurrences }}</span></div>
+        <div class="kv"><span>Première</span><span>{{ e.premiereLe | jour: true }}</span></div>
+        <div class="kv"><span>Dernière</span><span>{{ e.derniereLe | jour: true }}</span></div>
+      </div>
+      <div class="kv"><span>Message</span><span>{{ e.message ?? '—' }}</span></div>
+      <div class="kv"><span>Écran ou adresse</span><span class="mono">{{ e.chemin ?? '—' }}</span></div>
+      <div class="kv"><span>Signature</span><span class="mono">{{ e.signature }}</span></div>
+      @if (e.ticketId) { <div class="kv"><span>Ticket</span><span><a (click)="voirTicket(e.ticketId)">n° {{ e.ticketId }}</a> · {{ statuts[e.ticketStatut ?? ''] }}</span></div> }
+      <pre class="brut" style="max-height: 320px; overflow: auto">{{ e.detail ?? 'Pas de détail technique.' }}</pre>
+      <div class="pied">
+        <button class="bs" type="button" (click)="erreurDetail.set(null)">Fermer</button>
+        @if (!ticketActif(e)) { <button class="bs" type="button" (click)="creerTicket(e)">Ouvrir un ticket</button> }
+        @if (!e.traite) { <button class="bp" type="button" (click)="traiter(e)">Marquer traitée</button> }
+      </div>
+    </div>
+  }
+</p-dialog>
+
+<p-dialog [header]="faqCible() ? 'Modifier la question' : 'Nouvelle question'" [visible]="faqOuvert()" (visibleChange)="!$event && faqOuvert.set(false)"
+          [modal]="true" [style]="{ width: '620px' }">
+  <form class="formulaire" (ngSubmit)="enregistrerQuestion()">
+    <div class="grille">
+      <label class="f large">Catégorie<input class="sel" name="categorie" [(ngModel)]="editionFaq.categorie" maxlength="100" placeholder="Ex. Factures" required></label>
+      <label class="f">Ordre (facultatif)<input class="sel" type="number" name="ordre" [(ngModel)]="editionFaq.ordre" min="0"></label>
+    </div>
+    <label class="f">Question<input class="sel" name="question" [(ngModel)]="editionFaq.question" maxlength="300" required></label>
+    <label class="f">Réponse<textarea class="sel" name="reponse" [(ngModel)]="editionFaq.reponse" maxlength="10000" required></textarea></label>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="faqOuvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !editionFaq.categorie.trim() || !editionFaq.question.trim() || !editionFaq.reponse.trim()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

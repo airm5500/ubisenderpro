@@ -1,0 +1,51 @@
+/* Aide et guidage (maquette validee le 20/10/2026 : 1B, 2B, 3C). Les champs signales et le « ? » sont dans styles.css. */
+
+/* 1B : bulle detaillee, au-dessus du bouton (ou dessous pres du haut de l'ecran) */
+.aide-bulle {
+  position: fixed; z-index: 3000; width: 260px; box-sizing: border-box; transform: translateY(-100%);
+  background: #fff; color: var(--texte); border: 1px solid var(--filet); border-top: 3px solid var(--vert); border-radius: 8px;
+  padding: 9px 12px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 22px rgba(5, 37, 61, .18);
+  display: flex; flex-direction: column; gap: 2px; pointer-events: none; animation: aide-bulle .15s ease-out;
+}
+.aide-bulle.dessous { transform: none; }
+.aide-bulle b { font-size: 13px; color: var(--bleu); }
+.aide-grise { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--filet); color: var(--texte-2); font-style: italic; }
+@keyframes aide-bulle { from { opacity: 0; margin-top: 4px; } }
+
+/* 2B : panneau qui glisse depuis la droite */
+.aide-panneau {
+  position: fixed; z-index: 2500; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); box-sizing: border-box;
+  background: #fff; border-left: 4px solid var(--vert); box-shadow: -10px 0 28px rgba(5, 37, 61, .18);
+  display: flex; flex-direction: column; transform: translateX(105%); visibility: hidden;
+  transition: transform .25s ease-out, visibility 0s .25s;
+}
+.aide-panneau.ouvert { transform: none; visibility: visible; transition: transform .25s ease-out; }
+.aide-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 12px; border-bottom: 1px solid var(--filet); }
+.aide-tete h2 { margin: 0; font-size: 18px; color: var(--bleu); outline: none; }
+.aide-fermer { border: 0; background: transparent; color: var(--texte-2); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+.aide-fermer:hover { background: var(--survol); color: var(--bleu); }
+.aide-corps { flex: 1; overflow-y: auto; padding: 16px 20px; font-size: 14px; line-height: 1.55; color: var(--texte); }
+.aide-corps p { margin: 0 0 10px; }
+.aide-corps :is(ol, ul) { margin: 0 0 12px; padding-left: 22px; }
+.aide-corps li { margin-bottom: 5px; }
+.aide-corps ol li::marker { color: var(--vert-texte, #157A47); font-weight: 800; }
+.aide-lien { display: inline-block; margin-top: 6px; font-weight: 700; color: var(--vert-texte, #157A47); cursor: pointer; }
+.aide-edition { display: flex; flex-direction: column; gap: 12px; }
+.aide-edition label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
+.aide-edition textarea { font: inherit; font-weight: 400; resize: vertical; }
+.aide-edition .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.aide-pied { padding: 12px 20px 16px; border-top: 1px solid var(--filet); background: var(--fond-doux, #F5F8FA); font-size: 13px; }
+.aide-pied p { margin: 4px 0 0 24px; }
+.aide-interrupteur { display: flex; gap: 8px; align-items: center; font-weight: 600; cursor: pointer; }
+.aide-interrupteur input { accent-color: var(--vert-texte, #157A47); width: 16px; height: 16px; }
+
+/* 3C : coche de reussite qui se dessine a cote du bouton */
+.aide-coche { position: fixed; z-index: 3000; pointer-events: none; animation: aide-coche-pop .3s cubic-bezier(.3, 1.6, .5, 1); }
+.aide-coche path { stroke-dasharray: 22; stroke-dashoffset: 22; animation: aide-coche-trace .45s .15s ease-out forwards; }
+@keyframes aide-coche-pop { from { transform: scale(.4); opacity: 0; } }
+@keyframes aide-coche-trace { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .aide-bulle, .aide-coche, .aide-coche path, .aide-panneau { animation: none !important; transition: none !important; }
+  .aide-coche path { stroke-dashoffset: 0; }
+}

@@ -1,0 +1,35 @@
+package ci.ubipharm.crm.rest.service.dto;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/** Une ligne du journal des actions. */
+@Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class ActionJournalDTO {
+    private Long id;
+    private String login;
+    private String utilisateurNom;
+    private String action;
+    private String entite;
+    private Long entiteId;
+    private String details;
+    private String adresseIp;
+    private LocalDateTime le;
+}

@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: ubipharm-crm
+  profiles:
+    default: dev
+  datasource:
+    url: ${CRM_DB_URL:jdbc:mariadb://localhost:3306/ubicrm}
+    username: ${CRM_DB_USER:ubicrm}
+    password: ${CRM_DB_PASSWORD:ubicrm}
+    # Connexions verifiees toutes les 2 min et renouvelees toutes les 10 min : apres une mise en veille du poste,
+    # les connexions mortes sont ecartees au lieu de bloquer les requetes 30 s
+    hikari:
+      keepalive-time: 120000
+      max-lifetime: 600000
+      connection-timeout: 10000
+      validation-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  jackson:
+    time-zone: UTC
+    deserialization:
+      # Un booleen absent du JSON vaut false au lieu de faire echouer la lecture
+      fail-on-null-for-primitives: false
+
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+  servlet:
+    session:
+      timeout: 60m
+      cookie:
+        http-only: true
+        same-site: strict
+        name: CRMSESSION
+
+crm:
+  whatsapp:
+    # Service compagnon wa-web (dossier wa-web/) ; le jeton est le meme que WA_WEB_TOKEN
+    url: ${CRM_WHATSAPP_URL:http://localhost:3000}
+    jeton: ${CRM_WHATSAPP_JETON:}
+  meta:
+    # API WhatsApp Cloud (numeros passes a l'API officielle) ; jeton et secret se reglent dans l'ecran Numeros WhatsApp
+    url: ${CRM_META_URL:https://graph.facebook.com}
+
+logging:
+  level:
+    root: INFO

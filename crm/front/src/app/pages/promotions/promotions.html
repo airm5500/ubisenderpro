@@ -1,0 +1,56 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Promotions</h1>
+      <p class="sous-titre">Une période et des produits du catalogue avec leur avantage : unités gratuites ou prix promotionnel.
+        Une campagne cite une promotion active ; elle se termine d'elle-même après sa date de fin.</p>
+    </div>
+    @if (auth.peut('PROMOTIONS_GERER')) {
+      <div class="actions">
+        <a class="bs" routerLink="/marketing/promotions/import">Importer des produits en promotion</a>
+        <button class="bp" type="button" (click)="saisie.set(true)"><i class="pi pi-plus"></i> Nouvelle promotion</button>
+      </div>
+    }
+  </div>
+
+  <form class="filtres" (ngSubmit)="charger()">
+    <div class="grille">
+      <label class="f large">Code ou nom<input class="sel" name="q" [(ngModel)]="criteres.q" placeholder="Ex. NOV26, novembre…"></label>
+      <label class="f">Statut
+        <select class="sel" name="statut" [(ngModel)]="criteres.statut">
+          <option value="EN_COURS">En cours</option>
+          <option value="PROGRAMMEE">Programmées</option>
+          <option value="ACTIVE">Actives</option>
+          <option value="SUSPENDUE">Désactivées</option>
+          <option value="TERMINEE">Terminées</option>
+          <option value="ARCHIVEE">Archivées</option>
+          <option value="TOUS">Toutes</option>
+        </select>
+      </label>
+    </div>
+    <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
+  </form>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Promotion</th><th>Période</th><th class="n">Produits</th><th>Responsable</th><th>Statut</th></tr></thead>
+      <tbody>
+        @for (p of promotions(); track p.id) {
+          <tr class="cliquable" (click)="router.navigate(['/marketing/promotions', p.id])">
+            <td><a class="ref" [routerLink]="['/marketing/promotions', p.id]">{{ p.nom }}</a><div class="second">{{ p.code }}</div></td>
+            <td class="nw">du {{ p.dateDebut | jour }} au {{ p.dateFin | jour }}</td>
+            <td class="n">{{ p.nbProduits }}</td>
+            <td>{{ p.creePar }}</td>
+            <td class="nw"><span class="etat-compte"><span class="dot" [style.background]="S[p.statut].couleur"></span>{{ S[p.statut].libelle }}</span></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="vide">{{ promotions() ? 'Aucune promotion pour ces critères.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (auth.peut('PROMOTIONS_GERER')) {
+  <app-promotion-formulaire [(ouvert)]="saisie" (enregistre)="creee($event)" />
+}

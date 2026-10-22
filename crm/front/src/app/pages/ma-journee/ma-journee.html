@@ -1,0 +1,70 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <p class="sous-titre">{{ dateDuJour }}</p>
+      <h1>Bonjour {{ prenom() }}</h1>
+      <p class="sous-titre">Votre portefeuille compte <strong>{{ nbClients() }} clients</strong> et <strong>{{ totaux().factures }} factures ouvertes</strong>,
+        pour <strong>{{ totaux().solde | montant }} FCFA</strong> restant dû, dont <strong>{{ nbEchues() }} factures échues</strong>.</p>
+    </div>
+    <button type="button" class="ba" (click)="fenetreCampagne.ouvrir()">Nouvelle campagne</button>
+  </div>
+
+  <section class="bloc">
+    <div class="titre"><h2 class="h2">À faire aujourd'hui</h2><span class="discret">{{ aFaire().length }} point{{ aFaire().length > 1 ? 's' : '' }}</span></div>
+    @for (t of aFaire(); track $index) {
+      <div class="td">
+        <span aria-hidden="true"><span class="pastille" [style.background]="t.couleur" style="display: block"></span></span>
+        <div><div class="titre-td">{{ t.titre }}</div><div class="detail-td">{{ t.detail }}</div></div>
+        <a class="bs petit" [routerLink]="t.lien">{{ t.action }}</a>
+      </div>
+    } @empty {
+      <p class="discret">Rien d'urgent : toutes vos factures échues sont programmées.</p>
+    }
+  </section>
+
+  <section class="bloc">
+    <div class="titre"><h2 class="h2">Échéances des deux prochaines semaines</h2>
+      <span class="discret">Nombre de factures par jour · <span class="dot" style="background: var(--vert)"></span>relance déjà programmée</span></div>
+    <div class="histo" role="img" aria-label="Nombre de factures arrivant à échéance chaque jour sur 14 jours">
+      @for (j of histogramme(); track j.iso) {
+        <div class="bar" [class.prog]="j.nb > 0 && j.programmees === j.nb"><span>{{ j.nb }}</span>@if (j.nb) {<div [style.height.px]="j.hauteur"></div>}</div>
+      }
+    </div>
+    <div class="histo-jours" aria-hidden="true">@for (j of histogramme(); track j.iso) {<span>{{ j.libelle }}</span>}</div>
+  </section>
+
+  <div class="deux-colonnes">
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Mes campagnes</h2><a routerLink="/campagnes">Toutes mes campagnes</a></div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Campagne</th><th>Statut</th><th>Exécution</th><th class="n">Messages</th></tr></thead>
+          <tbody>
+            @for (c of campagnes().slice(0, 5); track c.id) {
+              <tr>
+                <td><a class="ref" [routerLink]="['/campagnes', c.id]">{{ c.nom }}</a></td>
+                <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
+                <td class="nw">{{ c.dateExecution ? (c.dateExecution | jour: true) : 'Dès la validation' }}</td>
+                <td class="n">@if (c.statut === 'TERMINEE' || c.statut === 'EN_COURS') { {{ c.nbEnvoyes }} envoyés } @else { {{ c.nbMessages || '—' }} }</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="vide">Aucune campagne pour l'instant.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Mes relances récentes</h2></div>
+      <div class="sum"><span>Messages envoyés</span><strong>{{ resultats().envoyes }}</strong></div>
+      <div class="sum"><span>Échecs</span><strong>{{ resultats().echecs }}</strong></div>
+      @if (resultats().reussite !== null) {
+        <div class="sum"><span>Relances réussies</span><strong>{{ resultats().reussite }} %</strong></div>
+        <div class="jauge"><div [style.width.%]="resultats().reussite"></div></div>
+      }
+      <div class="sum"><span>Réponses reçues</span><strong>{{ resultats().reponses }}</strong></div>
+      <p class="discret">Vos chiffres seulement, sans classement entre agents.</p>
+    </section>
+  </div>
+</div>

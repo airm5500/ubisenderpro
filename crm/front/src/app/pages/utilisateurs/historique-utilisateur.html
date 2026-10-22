@@ -1,0 +1,62 @@
+<p-dialog [header]="'Historique de ' + (utilisateur()?.nomComplet ?? '')" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '980px' }">
+  <div role="tablist" class="onglets">
+    <button class="tab" [class.tabon]="vue() === 'connexions'" role="tab" (click)="afficher('connexions')">Connexions</button>
+    <button class="tab" [class.tabon]="vue() === 'actions'" role="tab" (click)="afficher('actions')">Journal des actions</button>
+  </div>
+  <form class="filtres" (ngSubmit)="rechercher()" style="margin-top: 12px">
+    <div class="grille">
+      <label class="f">Du<input class="sel" type="date" name="du" [(ngModel)]="criteres.du"></label>
+      <label class="f">Au<input class="sel" type="date" name="au" [(ngModel)]="criteres.au"></label>
+      @if (vue() === 'connexions') {
+        <label class="f">Résultat
+          <select class="sel" name="succes" [(ngModel)]="criteres.succes">
+            <option value="">Toutes</option><option value="true">Réussies</option><option value="false">Échouées</option>
+          </select>
+        </label>
+      } @else {
+        <label class="f">Action<input class="sel" name="action" [(ngModel)]="criteres.action" placeholder="Ex. CLIENT, CAMPAGNE_VALIDATION"></label>
+      }
+    </div>
+    <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
+  </form>
+  <div class="defile" style="max-height: 420px">
+    @if (vue() === 'connexions') {
+      <table class="t">
+        <thead><tr><th>Date</th><th>Résultat</th><th>Login saisi</th><th>Adresse IP</th><th>Navigateur</th></tr></thead>
+        <tbody>
+          @for (c of connexions()?.elements; track c.id) {
+            <tr>
+              <td class="nw">{{ c.le | jour: true }}</td>
+              <td class="nw">@if (c.succes) { <span class="etat-numero SUR_WHATSAPP">Réussie</span> } @else { <span class="etat-numero ABSENT">Échouée</span> }</td>
+              <td>{{ c.login }}</td>
+              <td class="nw">{{ c.adresseIp || '—' }}</td>
+              <td class="second" style="max-width: 360px">{{ c.navigateur || '—' }}</td>
+            </tr>
+          } @empty { <tr><td colspan="5" class="vide">Aucune connexion sur cette période.</td></tr> }
+        </tbody>
+      </table>
+    } @else {
+      <table class="t">
+        <thead><tr><th>Date</th><th>Action</th><th>Détail</th><th>Adresse IP</th></tr></thead>
+        <tbody>
+          @for (a of actions()?.elements; track a.id) {
+            <tr>
+              <td class="nw">{{ a.le | jour: true }}</td>
+              <td class="nw"><strong>{{ a.action }}</strong>@if (a.entite) { <div class="second">{{ a.entite }}{{ a.entiteId ? ' n° ' + a.entiteId : '' }}</div> }</td>
+              <td>{{ a.details || '—' }}</td>
+              <td class="nw">{{ a.adresseIp || '—' }}</td>
+            </tr>
+          } @empty { <tr><td colspan="4" class="vide">Aucune action sur cette période.</td></tr> }
+        </tbody>
+      </table>
+    }
+  </div>
+  @if (page(); as p) {
+    <div class="pagination">
+      <span>{{ p.total }} ligne{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+      <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+        <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+    </div>
+  }
+</p-dialog>

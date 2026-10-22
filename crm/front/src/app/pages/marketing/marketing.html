@@ -1,0 +1,98 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <p class="sous-titre">{{ dateDuJour }}</p>
+      <h1>Bonjour {{ prenom() }}</h1>
+      <p class="sous-titre">Votre journée Marketing : campagnes à valider et du jour, réponses des clients, promotions et événements à venir.</p>
+    </div>
+    @if (auth.peut('CAMPAGNES_MARKETING_PREPARER', 'CAMPAGNES_MARKETING_VALIDER')) {
+      <a class="ba" routerLink="/marketing/campagnes" [queryParams]="{ nouvelle: 1 }">Nouvelle campagne</a>
+    }
+  </div>
+
+  @if (auth.peut('CAMPAGNES_MARKETING')) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">À faire aujourd'hui</h2><span class="discret">{{ aFaire().length }} point{{ aFaire().length > 1 ? 's' : '' }}</span></div>
+      @for (t of aFaire(); track $index) {
+        <div class="td">
+          <span aria-hidden="true"><span class="pastille" [style.background]="t.couleur" style="display: block"></span></span>
+          <div><div class="titre-td">{{ t.titre }}</div><div class="detail-td">{{ t.detail }}</div></div>
+          <a class="bs petit" [routerLink]="t.lien">{{ t.action }}</a>
+        </div>
+      } @empty {
+        <p class="discret">Rien à valider ni à corriger pour l'instant.</p>
+      }
+    </section>
+
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Campagnes du jour</h2><a routerLink="/marketing/campagnes">Toutes les campagnes</a></div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Campagne</th><th>Statut</th><th>Envoi</th><th class="n">Envoyés</th><th class="n">Distribués</th><th class="n">Lus</th></tr></thead>
+          <tbody>
+            @for (c of duJour(); track c.id) {
+              <tr>
+                <td><a class="ref" [routerLink]="['/marketing/campagnes', c.id]">{{ c.nom }}</a><div class="second">{{ L.canal[c.canal] }} · {{ c.listeNom }}</div></td>
+                <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
+                <td class="nw">{{ c.lanceLe ? (c.lanceLe | jour: true) : c.dateExecution ? (c.dateExecution | jour: true) : '—' }}</td>
+                <td class="n">{{ c.nbEnvoyes }} / {{ c.nbMessages }}</td>
+                <td class="n">{{ c.nbDistribues }}<div class="second">{{ pc(c.nbDistribues, c.nbEnvoyes) }}</div></td>
+                <td class="n">{{ c.nbLus }}<div class="second">{{ pc(c.nbLus, c.nbDistribues) }}</div></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="vide">Aucune campagne en cours ni programmée aujourd'hui.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  @if (journee(); as j) {
+    @if (j.reponsesDuJour) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Réponses du jour</h2><span class="discret">{{ j.nbReponsesDuJour }} réponse{{ (j.nbReponsesDuJour ?? 0) > 1 ? 's' : '' }} aux campagnes</span></div>
+        <div class="defile">
+          <table class="t">
+            <thead><tr><th>Client</th><th>Message</th><th>Campagne</th><th>Reçu</th></tr></thead>
+            <tbody>
+              @for (r of j.reponsesDuJour; track $index) {
+                <tr>
+                  <td>@if (r.clientId) { <a class="ref" [routerLink]="['/clients', r.clientId]">{{ r.raisonSociale }}</a> } @else { {{ r.numeroClient }} }</td>
+                  <td>{{ r.contenu || '(pièce jointe)' }}</td>
+                  <td><a [routerLink]="['/marketing/campagnes', r.campagneId]">{{ r.campagneNom }}</a></td>
+                  <td class="nw">{{ r.recuLe | jour: true }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="vide">Pas encore de réponse aujourd'hui.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <div class="deux-colonnes">
+      @if (j.promotions) {
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Promotions qui commencent ou finissent</h2><a routerLink="/marketing/promotions">Promotions</a></div>
+          @for (p of j.promotions; track p.id) {
+            <div class="sum"><span>{{ p.nom }}</span><strong>{{ p.moment === 'COMMENCE' ? 'commence le ' + (p.dateDebut | jour) : 'finit le ' + (p.dateFin | jour) }}</strong></div>
+          } @empty {
+            <p class="discret">Aucune promotion ne commence ni ne finit dans les {{ j.horizonJours }} prochains jours.</p>
+          }
+        </section>
+      }
+      @if (j.evenements) {
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Événements à venir</h2><a routerLink="/marketing/evenements">Calendrier</a></div>
+          @for (e of j.evenements; track e.id) {
+            <div class="sum"><span>{{ e.nom }}<span class="discret"> · {{ L.natureEvenement[e.nature] ?? e.nature }}</span></span><strong>{{ e.prochaineDate | jour }}</strong></div>
+          } @empty {
+            <p class="discret">Aucun événement dans les {{ j.horizonJours }} prochains jours.</p>
+          }
+        </section>
+      }
+    </div>
+  }
+</div>

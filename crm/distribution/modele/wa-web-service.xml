@@ -1,0 +1,28 @@
+<!--
+  Service Windows du compagnon WhatsApp Web (WinSW 2.12), utilise par le CRM
+  pour envoyer les relances WhatsApp. Il lit sa configuration dans
+  donnees\wa-web.env et garde la session WhatsApp dans donnees\wa-web-sessions.
+-->
+<service>
+  <id>ubipharm-crm-whatsapp</id>
+  <name>UBIPHARM CRM - WhatsApp</name>
+  <description>Compagnon WhatsApp Web du CRM UBIPHARM (port 3000).</description>
+  <executable>%BASE%\node\node.exe</executable>
+  <arguments>"%BASE%\wa-web\server.js"</arguments>
+  <workingdirectory>%BASE%\wa-web</workingdirectory>
+  <env name="WA_WEB_ENV" value="%BASE%\..\donnees\wa-web.env"/>
+  <env name="WA_WEB_DATA" value="%BASE%\..\donnees\wa-web-sessions"/>
+  <env name="NODE_ENV" value="production"/>
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <!-- Ctrl+C a Node : les cles de chiffrement WhatsApp sont ecrites avant l'arret -->
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <stoptimeout>20 sec</stoptimeout>
+  <logpath>%BASE%\..\donnees\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

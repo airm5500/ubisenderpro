@@ -1,0 +1,45 @@
+package ci.ubipharm.crm.rest.service;
+
+import java.util.List;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import ci.ubipharm.crm.rest.service.dto.DiscussionCriteresDTO;
+import ci.ubipharm.crm.rest.service.dto.DiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.MessageDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.ModeleMessageDTO;
+import ci.ubipharm.crm.rest.service.dto.PieceJointeDTO;
+import ci.ubipharm.crm.rest.service.dto.NouvelleDiscussionDTO;
+import ci.ubipharm.crm.rest.service.dto.ReponseDiscussionDTO;
+import ci.ubipharm.crm.socle.dto.PageDTO;
+
+/**
+ * Discussions WhatsApp : pour un numero de l'entreprise et un numero de client, les messages partis (relances, promotions,
+ * envois en masse, reponses ecrites ici) et ceux du client, dans l'ordre. Meme perimetre que les reponses des clients.
+ */
+public interface DiscussionService {
+
+    PageDTO<DiscussionDTO> rechercher(DiscussionCriteresDTO criteres);
+
+    /** Modeles WhatsApp actifs proposes a l'ecriture : Marketing et messages libres du Recouvrement. */
+    List<ModeleMessageDTO> modeles();
+
+    /** Piece jointe deposee pour un message a venir. */
+    PieceJointeDTO deposerPieceJointe(MultipartFile fichier);
+
+    /** Les 200 derniers messages, du plus ancien au plus recent. */
+    List<MessageDiscussionDTO> fil(String numeroAgent, String numeroClient);
+
+    /**
+     * Envoie aussitot le message depuis le numero de la discussion : le sien ou celui d'un agent remplace. Refuse si le
+     * parametre discussions.reponse_active est a NON, ou, pour un numero passe a l'API Meta, hors des 24 h qui suivent un
+     * message du client.
+     */
+    MessageDiscussionDTO repondre(ReponseDiscussionDTO reponse);
+
+    /** Numeros depuis lesquels l'utilisateur peut ecrire : le sien d'abord, puis ceux des agents qu'il remplace. */
+    List<String> mesNumeros();
+
+    /** Ecrit a un client qui n'a pas encore de discussion (ou la reprend) : memes regles que la reponse. */
+    MessageDiscussionDTO demarrer(NouvelleDiscussionDTO demande);
+}

@@ -1,0 +1,38 @@
+/* Journal des actions (encapsulation None : tout est prefixe par journal-) */
+.journal-raccourcis { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.journal-raccourcis .journal-on { background: var(--bleu); color: #fff; border-color: var(--bleu); }
+.journal-filtre-client { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px;
+  background: #EEF2F5; font-size: 13px; }
+.journal-retirer { border: 0; background: transparent; cursor: pointer; color: inherit; padding: 2px 4px; }
+
+.journal-nature { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
+  background: #EEF2F5; color: #4A5B68; white-space: nowrap; }
+.journal-nature.n-CREATION { background: #E3F7EC; color: #157A47; }
+.journal-nature.n-MODIFICATION { background: color-mix(in srgb, var(--bleu) 10%, #fff); color: var(--bleu); }
+.journal-nature.n-DESACTIVATION { background: #FDECEC; color: #A32020; }
+.journal-nature.n-REACTIVATION { background: #E3F7EC; color: #157A47; }
+.journal-nature.n-CONNEXION { background: #EEF2F5; color: #4A5B68; }
+.journal-nature.n-ENVOI { background: #FFF3DD; color: #8A5A00; }
+
+.journal-detail { max-width: 420px; }
+.journal-court { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.journal-ev { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; }
+.journal-ev-titre { font-weight: 700; font-size: 14px; }
+.journal-ev-detail { font-size: 13px; color: var(--texte-2); overflow-wrap: anywhere; }
+
+.journal-impression { display: none; }
+
+@media print {
+  /* Seule la page imprimable reste : ni menu, ni filtres, ni tableau pagine */
+  body.impression-journal nav, body.impression-journal .journal-page { display: none !important; }
+  body.impression-journal .cadre, body.impression-journal main { display: block !important; height: auto !important; overflow: visible !important;
+    margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body.impression-journal .journal-impression { display: block; font-size: 10pt; color: #000; background: #fff; }
+  .journal-impression h1 { font-size: 15pt; margin: 0 0 4pt; }
+  .journal-impression p { margin: 0 0 4pt; }
+  .journal-impression table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+  .journal-impression th, .journal-impression td { border: 1px solid #999; padding: 3pt 4pt; text-align: left; vertical-align: top; }
+  .journal-impression th { background: #eee; }
+  .journal-impression tr { page-break-inside: avoid; }
+}

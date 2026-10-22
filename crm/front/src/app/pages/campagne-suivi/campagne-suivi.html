@@ -1,0 +1,154 @@
+<div class="page">
+  <a class="retour" routerLink="/campagnes">← Campagnes</a>
+  @if (campagne(); as c) {
+    <div class="entete">
+      <div>
+        <h1>{{ c.nom }}</h1>
+        <p class="sous-titre"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}
+          @if (c.statut === 'TERMINEE') { · exécutée du {{ c.lanceLe | jour: true }} au {{ c.termineLe | jour: true }} }
+          @if (c.statut === 'EN_COURS') { · démarrée le {{ c.lanceLe | jour: true }} }
+          @if (c.statut === 'VALIDEE') { · {{ c.nbExecutions ? 'prochain envoi' : 'envoi prévu' }} le {{ c.dateExecution | jour: true }} }
+          @if (c.statut === 'ANNULEE') { · par {{ c.annulePar }} le {{ c.annuleLe | jour: true }} : {{ c.motifAnnulation }} }
+        </p>
+      </div>
+      <div class="actions">
+        @if (c.statut === 'BROUILLON' && (estAuteur() || auth.peut('CAMPAGNES_VALIDER'))) {
+          <button type="button" class="bs" (click)="fenetreCampagne.ouvrir({ id: c.id })">Modifier</button>
+          <button class="bp" (click)="soumettre()">Soumettre à validation</button>
+        }
+        @if (c.statut === 'A_VALIDER' && auth.peut('CAMPAGNES_VALIDER')) {
+          <button class="bs" (click)="action.set('rejet')">Renvoyer pour modification</button>
+          <button class="ba" (click)="valider()">Valider</button>
+        }
+        @if (c.statut === 'VALIDEE' && auth.peut('CAMPAGNES_VALIDER')) { <button class="bp" (click)="lancer()">Lancer maintenant</button> }
+        @if ((['BROUILLON', 'A_VALIDER'].includes(c.statut) && (estAuteur() || auth.peut('CAMPAGNES_VALIDER'))) || (['VALIDEE', 'EN_COURS'].includes(c.statut) && auth.peut('CAMPAGNES_VALIDER'))) {
+          <button class="bd" (click)="action.set('annulation')">Annuler la campagne</button>
+        }
+      </div>
+    </div>
+
+    @if (c.statut === 'BROUILLON' && c.motifRejet) {
+      <div class="avert"><i class="pi pi-replay"></i><span>Renvoyée par {{ c.rejetePar }} : {{ c.motifRejet }}</span></div>
+    }
+
+    <div class="kvs" style="padding: 18px 0; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet)">
+      <div class="kv"><span>Type</span><strong>{{ L.typeCampagne[c.typeCampagne] }}</strong></div>
+      <div class="kv"><span>Modèle</span><strong>{{ c.modeleNom }} · {{ L.canal[c.canal] }}</strong></div>
+      @if (c.recurrence) {
+        <div class="kv"><span>Répétition</span><strong>{{ L.recurrence[c.recurrence] }} jusqu'au {{ c.finRecurrence | jour }} · {{ c.nbExecutions }} envoi{{ c.nbExecutions > 1 ? 's' : '' }} fait{{ c.nbExecutions > 1 ? 's' : '' }}</strong></div>
+      }
+      <div class="kv"><span>Créée le</span><strong>{{ c.createdAt | jour }} par {{ c.creePar }}</strong></div>
+      @if (c.validePar) { <div class="kv"><span>Validée par</span><strong>{{ c.validePar }}, {{ c.valideLe | jour }}</strong></div> }
+      <div class="kv"><span>Critères</span><strong>{{ resume(c.criteres).join(' · ') || 'Toutes les factures du type' }}</strong></div>
+    </div>
+
+    @if (avantValidation()) {
+      @if (recap(); as r) {
+        <section class="chiffres" aria-label="Récapitulatif">
+          <div><span>Clients</span><strong>{{ r.nbClients }}</strong></div>
+          <div><span>Factures · messages</span><strong>{{ r.nbMessages }}</strong><span>un message par facture</span></div>
+          <div><span>Montant visé</span><strong>{{ r.totalSolde | montant }}</strong><span>FCFA</span></div>
+          <div><span>Exclues</span><strong>{{ r.nbExclus }}</strong>@for (e of r.exclusions; track e.motif) {<span>{{ e.nb }} · {{ e.motif }}</span>}</div>
+        </section>
+        @if (r.agents.length) {
+          <section class="bloc">
+            <div class="titre"><h2 class="h2">{{ c.canal === 'EMAIL' ? 'Agents en adresse de réponse' : c.canal === 'SMS' ? 'Agents des clients' : "Numéros d'envoi" }}</h2></div>
+            @for (a of r.agents; track a.agentId) {
+              <div class="li"><span>{{ a.agentNom }}{{ c.canal !== 'WHATSAPP' ? '' : ' · ' + ((a.numeroExpediteur | telephone) || 'sans numéro') }}</span><strong>{{ a.nbMessages }} messages, {{ a.nbClients }} clients</strong></div>
+            }
+          </section>
+        }
+      }
+    } @else {
+      <section class="chiffres" aria-label="Résultat">
+        <div><span>Messages</span><strong>{{ c.nbMessages }}</strong><span>{{ c.nbClients }} clients · {{ c.nbFactures }} factures</span></div>
+        <div><span>Envoyés</span><strong>{{ c.nbEnvoyes }}</strong><span>{{ c.nbMessages ? (c.nbEnvoyes * 100 / c.nbMessages).toFixed(0) : 0 }} %</span></div>
+        <div><span>Échecs</span><strong>{{ c.nbEchecs }}</strong><span>la facture redevient à relancer</span></div>
+        <div><span>Exclues</span><strong>{{ c.nbExclus }}</strong></div>
+      </section>
+      @if (c.statut === 'EN_COURS') {
+        <div class="info"><i class="pi pi-clock"></i><span>{{ c.canal === 'EMAIL'
+          ? "Envoi en cours, les e-mails partent l'un après l'autre entre 8 h et 18 h."
+          : c.canal === 'SMS' ? "Envoi en cours, les SMS partent l'un après l'autre entre 8 h et 18 h ; le statut distribué arrive de l'opérateur."
+          : "Envoi en cours, un message toutes les 20 à 45 secondes par numéro d'agent, entre 8 h et 18 h." }} Cette page se met à jour toute seule.</span></div>
+      }
+    }
+
+    @if (!avantValidation()) { <app-analyse-campagne [url]="'/api/recouvrement/campagnes/' + c.id" [version]="c" /> }
+
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">{{ avantValidation() ? 'Messages générés' : 'Messages' }}</h2>
+        <form class="actions" (ngSubmit)="rechercher()"><input class="sel petit" style="width: 240px" name="q" [(ngModel)]="q" placeholder="Client ou référence"></form></div>
+      <div role="tablist" class="onglets">
+        @for (f of filtres(); track f.code) {
+          <button class="tab" [class.tabon]="filtre() === f.code" role="tab" (click)="choisirFiltre(f.code)">{{ f.libelle }}</button>
+        }
+      </div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Client</th><th>Facture</th><th class="n">Solde</th><th>{{ c.canal === 'WHATSAPP' ? "Agent · numéro d'envoi" : 'Agent' }}</th><th>{{ c.canal === 'EMAIL' ? 'E-mail du client' : 'Numéro du client' }}</th><th>Statut</th><th></th></tr></thead>
+          <tbody>
+            @for (m of page()?.elements; track m.factureId) {
+              <tr>
+                <td><a class="ref" [routerLink]="['/clients', m.clientId]">{{ m.clientRaisonSociale }}</a><div class="second">{{ m.clientCode }}</div></td>
+                <td class="nw">{{ m.factureReference }}<div class="second">échéance {{ m.dateEcheance | jour }}</div></td>
+                <td class="n">{{ m.solde | montant }}</td>
+                <td>{{ m.agentNom || '—' }}<div class="second">{{ m.numeroExpediteur | telephone }}</div></td>
+                <td class="nw">{{ m.canal === 'EMAIL' ? (m.emailDestinataire || '—') : ((m.numeroDestinataire | telephone) || '—') }}</td>
+                <td><span class="dot" [style.background]="L.couleurMessage[m.statut]"></span>{{ L.statutMessage[m.statut] ?? m.statut }}
+                  @if (m.motif) {<div class="second">{{ m.motif }}</div>}
+                  @if (m.luLe) {<div class="second">lu le {{ m.luLe | jour: true }}</div>}
+                  @else if (m.distribueLe) {<div class="second">distribué le {{ m.distribueLe | jour: true }}</div>}
+                  @else if (m.envoyeLe) {<div class="second">envoyé le {{ m.envoyeLe | jour: true }}</div>}</td>
+                <td class="nw"><span class="actions-ligne">@if (m.contenu) { <button type="button" class="bi" pTooltip="Voir le message" tooltipPosition="top" aria-label="Voir le message" (click)="ouvert.set(m)"><i class="pi pi-eye"></i></button> }
+                  @if (m.id && c.statut === 'EN_COURS') { <app-envoyer-maintenant [cle]="'C' + m.id" [statut]="m.statut" (envoye)="charger()" /> }</span></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7" class="vide">{{ page() ? 'Aucun message ici.' : 'Chargement…' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (page(); as p) {
+        <div class="pagination">
+          <span>{{ p.total }} message{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+          <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+            <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+        </div>
+      }
+    </section>
+  } @else {
+    <p class="discret">Chargement…</p>
+  }
+</div>
+
+<p-dialog [header]="ouvert()?.clientRaisonSociale ?? ''" [visible]="ouvert() !== null" (visibleChange)="!$event && ouvert.set(null)" [modal]="true" [style]="{ width: '480px' }">
+  @if (ouvert(); as m) {
+    @if (m.canal === 'EMAIL') {
+      <div class="courriel">
+        <div class="ent">
+          <span>À <strong>{{ m.emailDestinataire }}</strong>{{ m.emailReponse ? ' · réponse à ' + m.emailReponse : '' }}</span>
+          <span class="objet">{{ m.objet }}</span>
+        </div>
+        <div class="corps">{{ m.contenu }}</div>
+      </div>
+    } @else if (m.canal === 'SMS') {
+      <div class="fil-sms"><div class="exp">{{ m.factureReference }} · vers {{ m.numeroDestinataire | telephone }}</div><div class="bulle">{{ m.contenu }}</div></div>
+    } @else {
+      <div class="fil-wa"><div class="out">{{ m.contenu }}<span class="meta">{{ m.factureReference }} · de {{ m.numeroExpediteur | telephone }} vers {{ m.numeroDestinataire | telephone }}</span></div></div>
+    }
+  }
+</p-dialog>
+
+<p-dialog [header]="action() === 'rejet' ? 'Renvoyer pour modification' : 'Annuler la campagne'" [visible]="action() !== null" (visibleChange)="!$event && action.set(null)" [modal]="true" [style]="{ width: '480px' }">
+  <form class="formulaire" (ngSubmit)="confirmerAction()">
+    <p class="sous-titre">{{ action() === 'rejet'
+      ? "La campagne redevient un brouillon ; son auteur voit votre motif."
+      : "Les messages pas encore envoyés sont annulés et leurs factures redeviennent à relancer. Les messages déjà partis restent dans l'historique." }}</p>
+    <label class="f">Motif<textarea class="sel" name="motif" [(ngModel)]="motif" style="min-height: 90px"></textarea></label>
+    <div class="pied">
+      <button class="bs" type="button" (click)="action.set(null)">Retour</button>
+      <button [class]="action() === 'rejet' ? 'bp' : 'bd'" type="submit" [disabled]="!motif.trim()">Confirmer</button>
+    </div>
+  </form>
+</p-dialog>

@@ -1,0 +1,61 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Campagnes</h1>
+      <p class="sous-titre">Promotions, informations et événements : une liste de diffusion, un modèle, une date. Le WhatsApp part du numéro de la personne qui prépare la campagne,
+        après validation par le directeur d'agence ou une personne habilitée.</p>
+    </div>
+    @if (auth.peut('CAMPAGNES_MARKETING_PREPARER', 'CAMPAGNES_MARKETING_VALIDER')) {
+      <button class="ba" type="button" (click)="saisie.set(true)">Nouvelle campagne</button>
+    }
+  </div>
+
+  <div role="tablist" aria-label="Statut" class="onglets">
+    @for (o of onglets; track o.statut) {
+      <button class="tab" [class.tabon]="onglet() === o.statut" role="tab" [attr.aria-selected]="onglet() === o.statut" (click)="choisirOnglet(o.statut)">
+        {{ o.libelle }}@if (compteurs()[o.statut || 'TOUTES'] !== undefined) {<span class="cnt">{{ compteurs()[o.statut || 'TOUTES'] }}</span>}
+      </button>
+    }
+  </div>
+
+  <form class="actions" (ngSubmit)="rechercher()">
+    <input class="sel" style="max-width: 360px" name="q" [(ngModel)]="q" placeholder="Rechercher une campagne" aria-label="Rechercher une campagne">
+    <button class="bs" type="submit">Rechercher</button>
+  </form>
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Campagne</th><th>Liste</th><th>Préparée par</th><th>Statut</th><th class="n">Clients</th><th class="n">Messages</th><th class="n">Distribués</th><th class="n">Lus</th><th class="n">Échecs</th><th>Envoi</th></tr></thead>
+      <tbody>
+        @for (c of page()?.elements; track c.id) {
+          <tr class="cliquable" [routerLink]="['/marketing/campagnes', c.id]">
+            <td><a class="ref" [routerLink]="['/marketing/campagnes', c.id]">{{ c.nom }}</a><div class="second">{{ L.canal[c.canal] }} · {{ c.modeleNom }}</div></td>
+            <td>{{ c.listeNom }}</td>
+            <td>{{ c.creePar }}</td>
+            <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
+            <td class="n">{{ c.nbClients || '—' }}</td>
+            <td class="n">@if (c.statut === 'EN_COURS' || c.statut === 'TERMINEE') { {{ c.nbEnvoyes }} / {{ c.nbMessages }} } @else { {{ c.nbMessages || '—' }} }</td>
+            <td class="n">@if (c.nbEnvoyes) { {{ c.nbDistribues }}<div class="second">{{ pc(c.nbDistribues, c.nbEnvoyes) }}</div> } @else { — }</td>
+            <td class="n">@if (c.nbDistribues) { {{ c.nbLus }}<div class="second">{{ pc(c.nbLus, c.nbDistribues) }}</div> } @else { — }</td>
+            <td class="n">@if (c.nbEchecs) { {{ c.nbEchecs }}<div class="second">{{ pc(c.nbEchecs, c.nbEnvoyes + c.nbEchecs) }}</div> } @else { — }</td>
+            <td class="nw">{{ c.termineLe ? (c.termineLe | jour: true) : c.dateExecution ? (c.dateExecution | jour: true) : 'Dès la validation' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="10" class="vide">{{ page() ? 'Aucune campagne ici.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (page(); as p) {
+    @if (p.total > p.elements.length) {
+      <div class="pagination">
+        <span>{{ p.total }} campagnes · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+        <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+          <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+      </div>
+    }
+  }
+</div>
+
+@if (auth.peut('CAMPAGNES_MARKETING_PREPARER', 'CAMPAGNES_MARKETING_VALIDER')) {
+  <app-campagne-marketing-formulaire [(ouvert)]="saisie" [produitsInitiaux]="produitsAnnonces()" (enregistre)="creee($event)" />
+}

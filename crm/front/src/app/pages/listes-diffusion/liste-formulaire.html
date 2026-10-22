@@ -1,0 +1,76 @@
+<p-dialog [header]="liste() ? 'Modifier la liste' : 'Nouvelle liste de diffusion'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '820px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Nom de la liste<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Pharmacies Platinum d'Abidjan" required></label>
+      <label class="f large">Description<input class="sel" name="description" [(ngModel)]="formulaire.description" placeholder="À quoi sert cette liste"></label>
+    </div>
+
+    <label class="case"><input type="checkbox" name="parCriteres" [(ngModel)]="formulaire.parCriteres" (ngModelChange)="changer()">
+      Inclure les clients qui répondent aux critères (sinon, seulement les clients ajoutés à la main)</label>
+
+    @if (formulaire.parCriteres) {
+      <div class="sous-sec">Critères</div>
+      <p class="discret" style="margin: 0">Un critère laissé vide ne filtre pas. Les clients archivés et ceux hors de votre périmètre ne sont jamais inclus.</p>
+      <div class="f">Agences
+        <div class="droits-liste" style="padding-left: 0">
+          @for (a of ref.agences | async; track a.id) {
+            <label class="droit"><input type="checkbox" [checked]="formulaire.agenceIds.has(a.id)" (change)="basculer(formulaire.agenceIds, a.id, $any($event.target).checked)">{{ a.libelle }}</label>
+          }
+        </div>
+      </div>
+      <div class="f">Segments
+        <div class="droits-liste" style="padding-left: 0">
+          @for (s of segments | async; track s.code) {
+            <label class="droit"><input type="checkbox" [checked]="formulaire.segments.has(s.code)" (change)="basculer(formulaire.segments, s.code, $any($event.target).checked)">{{ s.libelle }}</label>
+          }
+        </div>
+      </div>
+      @if (valeurs | async; as v) {
+        <div class="grille">
+          <label class="f">Sous-agences
+            <select class="sel" #sa (change)="ajouter(formulaire.sousAgences, sa.value); sa.value = ''">
+              <option value="">Ajouter une sous-agence…</option>
+              @for (x of v.sousAgences; track x) { <option [value]="x">{{ x }}</option> }
+            </select>
+          </label>
+          <label class="f">Villes
+            <select class="sel" #vi (change)="ajouter(formulaire.villes, vi.value); vi.value = ''">
+              <option value="">Ajouter une ville…</option>
+              @for (x of v.villes; track x) { <option [value]="x">{{ x }}</option> }
+            </select>
+          </label>
+        </div>
+      }
+      @if (formulaire.sousAgences.length || formulaire.villes.length) {
+        <div class="chips">
+          @for (x of formulaire.sousAgences; track x) { <span class="chip">Sous-agence {{ x }}<button type="button" (click)="retirer(formulaire.sousAgences, x)" [attr.aria-label]="'Retirer ' + x">×</button></span> }
+          @for (x of formulaire.villes; track x) { <span class="chip">{{ x }}<button type="button" (click)="retirer(formulaire.villes, x)" [attr.aria-label]="'Retirer ' + x">×</button></span> }
+        </div>
+      }
+    }
+
+    <div class="sous-sec">Numéros qui reçoivent les campagnes</div>
+    <div class="droits-liste" style="padding-left: 0">
+      @for (n of FONCTIONS; track n.code) {
+        <label class="droit"><input type="checkbox" [checked]="formulaire.fonctions.has(n.code)" (change)="basculer(formulaire.fonctions, n.code, $any($event.target).checked)">{{ n.libelle }}</label>
+      }
+    </div>
+
+    @if (apercu(); as a) {
+      <div class="info"><i class="pi pi-users"></i>
+        <span>Avec ces critères : <b>{{ a.nbClients }}</b> client{{ a.nbClients > 1 ? 's' : '' }}, dont <b>{{ a.nbJoignables }}</b> joignable{{ a.nbJoignables > 1 ? 's' : '' }}.
+          @if (a.nbDesabonnes) { {{ a.nbDesabonnes }} désabonné{{ a.nbDesabonnes > 1 ? 's' : '' }}. }
+          @if (a.nbSansCoordonnees) { {{ a.nbSansCoordonnees }} sans numéro ni e-mail. }
+          @if (liste()?.nbAjouts || liste()?.nbExclusions) { Les ajouts et exclusions faits à la main s'y appliquent ensuite. }</span>
+      </div>
+    }
+
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !formulaire.nom.trim() || !formulaire.fonctions.size">
+        {{ liste() ? 'Enregistrer' : 'Créer la liste' }}</button>
+    </div>
+  </form>
+</p-dialog>

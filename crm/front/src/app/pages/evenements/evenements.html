@@ -1,0 +1,62 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Calendrier des événements</h1>
+      <p class="sous-titre">Fêtes, jours fériés et fermetures d'agence annoncés aux clients par des messages de courtoisie. Un événement annuel revient
+        chaque année à la même date ; les fêtes à date variable (Pâques, Ramadan, Tabaski…) se saisissent pour l'année.</p>
+    </div>
+    @if (!archives()) { <div class="actions"><button class="ba" type="button" (click)="nouveau()">Nouvel événement</button></div> }
+  </div>
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Événement</th><th>Nature</th><th>Prochaine date</th><th>Envoi proposé</th><th>Modifié</th><th></th></tr></thead>
+      <tbody>
+        @for (e of evenements(); track e.id) {
+          <tr>
+            <td><strong>{{ e.nom }}</strong>@if (e.annuel) { <div class="second">chaque année</div> }</td>
+            <td>{{ L.natureEvenement[e.nature] }}</td>
+            <td>
+              @if (e.prochaineDate) {
+                {{ e.prochaineDate | jour }}@if (e.prochaineFin && e.prochaineFin !== e.prochaineDate) { au {{ e.prochaineFin | jour }} }
+              } @else { <span class="discret">passé ({{ e.dateDebut | jour }})</span> }
+            </td>
+            <td>@if (e.envoiPropose) { {{ e.envoiPropose | jour: true }} } @else { <span class="discret">—</span> }</td>
+            <td><div>{{ e.modifieLe | jour }}</div><div class="second">{{ e.modifiePar ?? 'Livré avec la plateforme' }}</div></td>
+            <td class="nw">
+              <span class="actions-ligne">@if (e.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(e)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(e, 'archivage')"><i class="pi pi-inbox"></i></button> }
+              @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(e, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="vide">{{ archives() ? 'Aucun événement archivé.' : 'Aucun événement : ajoutez les fêtes et fermetures à annoncer.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="discret">Pour annoncer un événement, créez un modèle de type « Événement » qui cite {{ '{' }}evenement_nom{{ '}' }},
+    {{ '{' }}evenement_date{{ '}' }} ou {{ '{' }}evenement_fin{{ '}' }}, puis une campagne promotionnelle qui choisit l'événement. L'envoi proposé suit
+    les paramètres du Marketing (jours avant l'événement, heure).</p>
+  <a style="font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux événements actifs' : 'Voir les événements archivés' }}</a>
+</div>
+
+<p-dialog [header]="cible() ? 'Modifier l\'événement' : 'Nouvel événement'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '560px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">Nom<input class="sel" name="nom" [(ngModel)]="edition.nom" placeholder="Ex. Tabaski, Fermeture pour inventaire" required></label>
+    <div class="grille">
+      <label class="f">Nature
+        <select class="sel" name="nature" [(ngModel)]="edition.nature">@for (n of natures; track n[0]) { <option [value]="n[0]">{{ n[1] }}</option> }</select>
+      </label>
+      <span></span>
+      <label class="f">Premier jour<input class="sel" type="date" name="dateDebut" [(ngModel)]="edition.dateDebut" required></label>
+      <label class="f">Dernier jour (facultatif)<input class="sel" type="date" name="dateFin" [(ngModel)]="edition.dateFin"></label>
+    </div>
+    <label class="droit"><input type="checkbox" name="annuel" [(ngModel)]="edition.annuel"> Revient chaque année à la même date</label>
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !edition.nom.trim() || !edition.dateDebut">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

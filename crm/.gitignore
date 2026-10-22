@@ -1,0 +1,9 @@
+target/
+.idea/
+*.iml
+.vscode/
+nbproject/
+nb-configuration.xml
+logs/
+temoin-marche.properties*
+cle-chiffrement.key

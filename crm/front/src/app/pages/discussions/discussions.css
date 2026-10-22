@@ -1,0 +1,24 @@
+.discussions { display: grid; grid-template-columns: 340px 1fr; gap: 0; border: 1px solid var(--filet, #E3E8EC); border-radius: 12px; overflow: hidden; min-height: 620px; }
+.liste-d { border-right: 1px solid var(--filet, #E3E8EC); display: flex; flex-direction: column; min-width: 0; }
+.liste-d form { padding: 12px; border-bottom: 1px solid var(--filet, #E3E8EC); }
+.liste-d .items { overflow-y: auto; max-height: 640px; }
+.item-d { display: block; width: 100%; text-align: left; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--filet, #E3E8EC); background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.item-d:hover { background: #F5F8FA; }
+.item-d.on { background: #EAF3F9; }
+.item-d .ligne1 { display: flex; justify-content: space-between; gap: 8px; }
+.item-d .apercu { font-size: 13px; color: #5E6E7A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.fil-d { display: flex; flex-direction: column; min-width: 0; background: #F3F1EC; }
+.fil-d .tete { padding: 12px 18px; background: #fff; border-bottom: 1px solid var(--filet, #E3E8EC); display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.fil-d .corps { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 8px; max-height: 520px; }
+.bulle { max-width: 72%; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; box-shadow: 0 1px 1px rgba(0,0,0,.06); }
+.bulle.ENTRANT { align-self: flex-start; background: #fff; }
+.bulle.SORTANT { align-self: flex-end; background: #DCF5E6; }
+.bulle .meta { font-size: 11px; color: #5E6E7A; margin-top: 4px; white-space: normal; }
+.bulle .origine { font-size: 11px; font-weight: 700; color: #0B5C8E; margin-bottom: 2px; }
+.saisie-d { padding: 12px; background: #fff; border-top: 1px solid var(--filet, #E3E8EC); display: flex; gap: 10px; align-items: flex-end; }
+.saisie-d textarea { flex: 1; resize: vertical; min-height: 44px; }
+@media (max-width: 860px) { .discussions { grid-template-columns: 1fr; } .liste-d { border-right: 0; } }
+.nouvelle-d { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; }
+.choix-clients { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px; }
+.saisie-zone { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.modele-d { width: 150px; height: 44px; }

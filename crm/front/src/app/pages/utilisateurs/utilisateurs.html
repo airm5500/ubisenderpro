@@ -1,0 +1,166 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Utilisateurs et habilitations</h1>
+      <p class="sous-titre">Chaque compte reçoit un rôle par module. Un compte n'est jamais supprimé : il est désactivé et son historique reste.</p>
+    </div>
+    <button class="bp" type="button" (click)="nouveau()"><i class="pi pi-plus"></i> Nouveau compte</button>
+  </div>
+
+  <section class="bloc">
+    <form class="filtres" (ngSubmit)="rechercher()">
+      <div class="grille">
+        <label class="f large">Nom, identifiant, e-mail ou numéro<input class="sel" name="q" [(ngModel)]="criteres.q"></label>
+        <label class="f">Rôle
+          <select class="sel" name="roleCode" [(ngModel)]="criteres.roleCode">
+            <option value="">Tous</option>
+            @for (r of referentiel().roles; track r.code) { <option [value]="r.code">{{ r.libelle }}</option> }
+          </select>
+        </label>
+        <label class="f">Agence
+          <select class="sel" name="agenceId" [(ngModel)]="criteres.agenceId">
+            <option [ngValue]="null">Toutes</option>
+            @for (a of ref.agences | async; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+          </select>
+        </label>
+        <label class="f">Statut
+          <select class="sel" name="statut" [(ngModel)]="criteres.statut">
+            <option value="">Actifs et désactivés</option>
+            <option value="ACTIF">Actifs</option>
+            <option value="DESACTIVE">Désactivés</option>
+          </select>
+        </label>
+      </div>
+      <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
+    </form>
+
+    <div class="defile">
+      <table class="t">
+        <thead><tr><th>Utilisateur</th><th>Rôles</th><th>Agences</th><th>Numéro WhatsApp</th><th>Dernière connexion</th><th>Statut</th><th></th></tr></thead>
+        <tbody>
+          @for (u of page()?.elements; track u.id) {
+            <tr>
+              <td><a class="ref" (click)="modifier(u)">{{ u.nomComplet }}</a><div class="second">{{ u.login }}{{ u.email ? ' · ' + u.email : '' }}</div></td>
+              <td>
+                @for (h of u.habilitations; track $index) { <div>{{ libelleHabilitation(h) }}</div> } @empty { <span class="retard">Aucun rôle</span> }
+              </td>
+              <td>
+                @for (a of u.agences; track a.agenceId) { <div>{{ a.libelle }}</div> } @empty { — }
+              </td>
+              <td class="nw">{{ u.numeroWhatsapp ? (u.numeroWhatsapp | telephone) : '—' }}</td>
+              <td class="nw">{{ u.derniereConnexion ? (u.derniereConnexion | jour: true) : 'Jamais' }}</td>
+              <td class="nw">
+                <span class="etat-compte"><span class="dot" [style.background]="statuts[u.statut]?.couleur"></span>{{ statuts[u.statut]?.libelle ?? u.statut }}</span>
+                @if (u.motDePasseProvisoire) { <div class="second">Mot de passe provisoire</div> }
+                @if (u.statut === 'DESACTIVE' && u.echecsConnexion > 0) { <div class="second">{{ u.echecsConnexion }} échecs de connexion</div> }
+              </td>
+              <td class="nw"><span class="actions-ligne">
+                <button type="button" class="bi" pTooltip="Modifier l'utilisateur" tooltipPosition="top" aria-label="Modifier l'utilisateur" (click)="modifier(u)"><i class="pi pi-pencil"></i></button>
+                <button type="button" class="bi" pTooltip="Nouveau mot de passe" tooltipPosition="top" aria-label="Nouveau mot de passe" (click)="reinitialiser(u)"><i class="pi pi-key"></i></button>
+                <button type="button" class="bi" pTooltip="Historique des actions" tooltipPosition="top" aria-label="Historique des actions" (click)="voirHistorique(u)"><i class="pi pi-history"></i></button>
+                @if (u.statut === 'ACTIF') {
+                  @if (u.id !== auth.utilisateur()?.id) { <button type="button" class="bi bi-danger" pTooltip="Désactiver l'utilisateur" tooltipPosition="top" aria-label="Désactiver l'utilisateur" (click)="demanderDesactivation(u)"><i class="pi pi-ban"></i></button> }
+                } @else {
+                  <button type="button" class="bi" pTooltip="Réactiver l'utilisateur" tooltipPosition="top" aria-label="Réactiver l'utilisateur" (click)="reactiver(u)"><i class="pi pi-replay"></i></button>
+                }</span>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="vide">{{ page() ? 'Aucun compte ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (page(); as p) {
+      <div class="pagination">
+        <span>{{ p.total }} compte{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+        <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+          <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+      </div>
+    }
+  </section>
+</div>
+
+<p-dialog [header]="cible ? 'Modifier le compte' : 'Nouveau compte'" [visible]="fenetre() === 'compte'" (visibleChange)="!$event && fenetre.set(null)"
+          [modal]="true" [style]="{ width: '600px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Identifiant de connexion
+        <input class="sel" name="login" [(ngModel)]="formulaire.login" [disabled]="!!cible" placeholder="Ex. awa.kone" required>
+      </label>
+      <label class="f">Nom complet<input class="sel" name="nomComplet" [(ngModel)]="formulaire.nomComplet" required></label>
+      <label class="f">E-mail<input class="sel" type="email" name="email" [(ngModel)]="formulaire.email"></label>
+      <label class="f">Numéro WhatsApp professionnel<input class="sel" name="numeroWhatsapp" [(ngModel)]="formulaire.numeroWhatsapp" placeholder="Ex. 07 08 12 34 56"></label>
+    </div>
+
+    <div class="sous-sec">Rôles par module</div>
+    @for (h of formulaire.habilitations; track $index; let i = $index) {
+      <div class="hab">
+        <select class="sel" [name]="'module' + i" [(ngModel)]="h.moduleCode" (ngModelChange)="roleChoisi()" aria-label="Module">
+          @for (m of referentiel().modules; track m.code) { <option [value]="m.code">{{ m.libelle }}</option> }
+          <option value="">Tous les modules</option>
+        </select>
+        <select class="sel" [name]="'role' + i" [(ngModel)]="h.roleCode" (ngModelChange)="roleChoisi()" aria-label="Rôle" required>
+          <option value="" disabled>Choisir un rôle</option>
+          @for (r of referentiel().roles; track r.code) { <option [value]="r.code">{{ r.libelle }}</option> }
+        </select>
+        <button class="bs petit" type="button" (click)="retirerRole(i)" [disabled]="formulaire.habilitations.length === 1" aria-label="Retirer ce rôle"><i class="pi pi-times"></i></button>
+      </div>
+    }
+    @if (modulesLibres().length) {
+      <div><button class="bs petit" type="button" (click)="ajouterRole()"><i class="pi pi-plus"></i> Ajouter un rôle sur un autre module</button></div>
+    }
+    <p class="discret">Un agent du Recouvrement peut avoir un rôle différent en Marketing. « Tous les modules » est réservé à la direction générale et à l'administrateur.
+      Les écrans ouverts par chaque rôle se cochent dans @if (auth.peut('ROLES')) { <a routerLink="/roles" (click)="fenetre.set(null)">Rôles et droits</a> } @else { Rôles et droits }.</p>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+      <div class="sous-sec">Agences</div>
+      <span class="actions"><button class="bs petit" type="button" (click)="toutesLesAgences(true)">Tout cocher</button>
+        <button class="bs petit" type="button" (click)="toutesLesAgences(false)">Tout décocher</button></span>
+    </div>
+    @if (visionGlobale()) {
+      <div class="info"><i class="pi pi-info-circle"></i><span>Ce rôle voit toutes les agences. Les agences cochées servent seulement à le classer.</span></div>
+    }
+    <div class="actions">
+      @for (a of ref.agences | async; track a.id) {
+        <label class="case"><input type="checkbox" [checked]="formulaire.agenceIds.has(a.id)" (change)="basculerAgence(a.id)">{{ a.libelle }}</label>
+      }
+    </div>
+    @if (!cible) {
+      <p class="discret">Un mot de passe provisoire est créé et affiché une seule fois. La personne le remplace à sa première connexion.</p>
+    } @else {
+      <p class="discret">Si les rôles ou les agences changent, la personne devra se reconnecter pour en tenir compte.</p>
+    }
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetre.set(null)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours()">{{ cible ? 'Enregistrer' : 'Créer le compte' }}</button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog header="Mot de passe provisoire" [visible]="fenetre() === 'mot-de-passe'" (visibleChange)="!$event && fenetre.set(null)" [modal]="true" [style]="{ width: '560px', maxWidth: '96vw' }">
+  @if (provisoire; as c) {
+    <div class="formulaire">
+      <p class="sous-titre">Transmettez ce mot de passe à <strong>{{ c.utilisateur.nomComplet }}</strong> (identifiant <strong>{{ c.utilisateur.login }}</strong>).
+        Il ne sera plus affiché ensuite ; il devra être remplacé à la première connexion.</p>
+      <div class="mdp" style="font-size: 18px; letter-spacing: 1px; overflow-wrap: anywhere">{{ c.motDePasseProvisoire }}</div>
+      <div class="pied">
+        <button class="bs" type="button" (click)="copier()"><i class="pi pi-copy"></i> Copier</button>
+        <button class="bp" type="button" (click)="fenetre.set(null)">C'est noté</button>
+      </div>
+    </div>
+  }
+</p-dialog>
+
+<p-dialog header="Désactiver le compte" [visible]="fenetre() === 'desactivation'" (visibleChange)="!$event && fenetre.set(null)" [modal]="true" [style]="{ width: '480px' }">
+  <div class="formulaire">
+    <p class="sous-titre"><strong>{{ cible?.nomComplet }}</strong> ne pourra plus se connecter et sa session en cours est fermée.
+      Ses clients, campagnes et messages restent ; pensez à réaffecter son portefeuille.</p>
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetre.set(null)">Annuler</button>
+      <button class="bd" type="button" (click)="desactiver()">Désactiver</button>
+    </div>
+  </div>
+</p-dialog>
+
+<app-historique-utilisateur [(ouvert)]="historique" [utilisateur]="historiqueDe()" />

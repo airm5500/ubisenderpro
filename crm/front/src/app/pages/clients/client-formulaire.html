@@ -1,0 +1,83 @@
+<p-dialog [header]="client() ? 'Modifier le client' : 'Nouveau client'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '760px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <div class="grille">
+      <label class="f">Numéro de compte
+        <input class="sel" name="code" [(ngModel)]="formulaire.code" [disabled]="!!client()" placeholder="Ex. 41100231" required>
+      </label>
+      <label class="f">Pharmacie<input class="sel" name="raisonSociale" [(ngModel)]="formulaire.raisonSociale" placeholder="Ex. Pharmacie Sainte Rita" required></label>
+      <label class="f">Pharmacien titulaire<input class="sel" name="nomPharmacien" [(ngModel)]="formulaire.nomPharmacien"></label>
+      <label class="f">Agence
+        <select class="sel" name="agenceId" [(ngModel)]="formulaire.agenceId" (ngModelChange)="agenceChoisie()" required>
+          <option [ngValue]="null" disabled>Choisir…</option>
+          @for (a of ref.agences | async; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Sous-agence<input class="sel" name="sousAgence" [(ngModel)]="formulaire.sousAgence"></label>
+      <label class="f">Segment
+        <select class="sel" name="segmentation" [(ngModel)]="formulaire.segmentation">
+          <option value="">Aucun</option>
+          @for (s of segments | async; track s.code) { <option [value]="s.code">{{ s.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Date d'anniversaire<input class="sel" name="dateAnniversaire" type="date" [(ngModel)]="formulaire.dateAnniversaire"></label>
+      <label class="f">Région
+        <select class="sel" name="regionId" [(ngModel)]="formulaire.regionId">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (r of listes()['REGION']; track r.id) { <option [ngValue]="r.id">{{ r.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Ville
+        <select class="sel" name="villeId" [(ngModel)]="formulaire.villeId" (ngModelChange)="villeChoisie()">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (v of villes(); track v.id) { <option [ngValue]="v.id">{{ v.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">Commune
+        <select class="sel" name="communeId" [(ngModel)]="formulaire.communeId" (ngModelChange)="communeChoisie()">
+          <option [ngValue]="null">Non renseignée</option>
+          @for (c of communes(); track c.id) { <option [ngValue]="c.id">{{ c.libelle }}{{ formulaire.villeId ? '' : ' (' + c.parentLibelle + ')' }}</option> }
+        </select>
+      </label>
+      <label class="f">Tournée
+        <select class="sel" name="tourneeId" [(ngModel)]="formulaire.tourneeId" [disabled]="!formulaire.agenceId">
+          <option [ngValue]="null">{{ formulaire.agenceId ? (tournees().length ? 'Non renseignée' : 'Aucune tournée pour cette agence') : "Choisir d'abord l'agence" }}</option>
+          @for (t of tournees(); track t.id) { <option [ngValue]="t.id">{{ t.libelle }}</option> }
+        </select>
+      </label>
+      <label class="f">E-mail<input class="sel" name="email" type="email" [(ngModel)]="formulaire.email"></label>
+      <label class="f large">Adresse<input class="sel" name="adresse" [(ngModel)]="formulaire.adresse"></label>
+    </div>
+
+    <div class="sous-sec">Numéros WhatsApp</div>
+    <div class="grille">
+      @for (n of NUMEROS; track n.code) {
+        <label class="f">{{ n.libelle }}
+          <input class="sel" [name]="'numero-' + n.code" [(ngModel)]="formulaire.numeros[n.code]" placeholder="07 00 00 00 01" inputmode="tel">
+        </label>
+      }
+    </div>
+    @if (client()) {
+      <p class="discret" style="margin: 0">Un numéro remplacé ou effacé est archivé : les messages déjà échangés restent sur la fiche.</p>
+    }
+
+    <label class="f large">Commentaire<input class="sel" name="commentaire" [(ngModel)]="formulaire.commentaire"></label>
+
+    @if (!client() && auth.peut('PORTEFEUILLES_AFFECTER')) {
+      <label class="f">Agent de recouvrement
+        <select class="sel" name="agentId" [(ngModel)]="formulaire.agentId" [disabled]="!formulaire.agenceId">
+          <option [ngValue]="null">Plus tard</option>
+          @for (a of agents | async; track a.id) { <option [ngValue]="a.id">{{ a.nomComplet }}</option> }
+        </select>
+      </label>
+    }
+
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit"
+              [disabled]="enCours() || !formulaire.code.trim() || !formulaire.raisonSociale.trim() || !formulaire.agenceId">
+        {{ client() ? 'Enregistrer' : 'Créer le client' }}</button>
+    </div>
+  </form>
+</p-dialog>

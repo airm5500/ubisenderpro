@@ -1,0 +1,100 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Historique des envois</h1>
+      <p class="sous-titre">Tous les messages partis : relances, promotions, réponses écrites dans les discussions et envois en masse, par WhatsApp, e-mail ou SMS.</p>
+    </div>
+    <div class="actions"><button class="bs" type="button" (click)="exporter()"><i class="pi pi-download"></i> Exporter en CSV</button></div>
+  </div>
+
+  <form class="filtres" (ngSubmit)="rechercher()">
+    <div class="grille">
+      <label class="f">Du<input class="sel" type="date" name="du" [(ngModel)]="criteres.du"></label>
+      <label class="f">Au<input class="sel" type="date" name="au" [(ngModel)]="criteres.au"></label>
+      <label class="f">Origine
+        <select class="sel" name="origine" [(ngModel)]="criteres.origine">
+          <option value="">Toutes</option>
+          @for (o of origines; track o[0]) { <option [value]="o[0]">{{ o[1] }}</option> }
+        </select>
+      </label>
+      <label class="f">Canal
+        <select class="sel" name="canal" [(ngModel)]="criteres.canal">
+          <option value="">Tous</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option><option value="SMS">SMS</option>
+        </select>
+      </label>
+      <label class="f">Statut
+        <select class="sel" name="statut" [(ngModel)]="criteres.statut">
+          <option value="">Tous</option>
+          @for (s of statuts; track s[0]) { <option [value]="s[0]">{{ s[1] }}</option> }
+        </select>
+      </label>
+      <label class="f large">Destinataire ou client<input class="sel" name="q" [(ngModel)]="criteres.q" placeholder="Ex. 0708…, Sainte Rita, 41100231"></label>
+    </div>
+    <div class="pied-filtres"><button class="bp" type="submit">Rechercher</button></div>
+  </form>
+
+  @if (evolution(); as ev) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Envois @if (ev.pas === 'SEMAINE') { par semaine } @else { par jour }</h2>
+        <span class="discret">Du {{ ev.du | jour }} au {{ ev.au | jour }}, avec les filtres ci-dessus</span></div>
+      <app-courbe [points]="ev.points" [series]="seriesEnvois" [pas]="ev.pas" hauteur="220px" libelle="Messages envoyés, lus et en échec par jour" />
+    </section>
+  }
+
+  <div class="defile">
+    <table class="t">
+      <thead><tr><th>Date</th><th>Origine</th><th>Canal</th><th>Destinataire</th><th>Envoyé par</th><th>Message</th><th>Statut</th></tr></thead>
+      <tbody>
+        @for (e of page()?.elements; track e.cle) {
+          <tr class="cliquable" (click)="basculer(e)">
+            <td class="nw">{{ e.le | jour: true }}</td>
+            <td><strong>{{ L.origineEnvoi[e.origine] }}</strong>@if (e.source) { <div class="second">{{ e.source }}</div> }</td>
+            <td class="nw">{{ L.canal[e.canal] }}</td>
+            <td>@if (e.clientId) { <a class="ref" [routerLink]="['/clients', e.clientId]" (click)="$event.stopPropagation()">{{ e.clientNom }}</a> }
+              <div [class.second]="!!e.clientId">{{ e.canal === 'EMAIL' ? e.destinataire : ((e.destinataire | telephone) || '—') }}</div></td>
+            <td>{{ e.utilisateurNom || '—' }}@if (e.expediteur && e.canal === 'WHATSAPP') { <div class="second">{{ e.expediteur | telephone }}</div> }</td>
+            <td style="max-width: 300px">
+              @if (ouvert() === e.cle) { <div style="white-space: pre-wrap">{{ e.contenu }}</div> }
+              @else { <div class="second" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ e.contenu }}</div> }
+            </td>
+            <td class="nw"><span [pTooltip]="e.statut === 'A_ENVOYER' ? 'En attente : les messages partent dans la plage d\'envoi du canal (Paramètres), au rythme des relances, campagnes en premier.' : ''" tooltipPosition="top" [class.attente]="e.statut === 'A_ENVOYER'"><span class="dot" [style.background]="L.couleurMessage[e.statut]"></span>{{ L.statutMessage[e.statut] ?? e.statut }}@if (e.statut === 'A_ENVOYER') { <i class="pi pi-clock" aria-hidden="true"></i> }</span>
+              <span class="actions-ligne">@if (e.contenu) { <button type="button" class="bi" pTooltip="Voir le message" tooltipPosition="top" aria-label="Voir le message" (click)="$event.stopPropagation(); visualise.set(e)"><i class="pi pi-eye"></i></button> }
+                <app-envoyer-maintenant [cle]="e.cle" [statut]="e.statut" (envoye)="rechercher()" /></span>
+              @if (e.motif) { <div class="second" style="white-space: normal; max-width: 220px">{{ e.motif }}</div> }
+              @if (e.luLe) { <div class="second">lu le {{ e.luLe | jour: true }}</div> } @else if (e.distribueLe) { <div class="second">distribué le {{ e.distribueLe | jour: true }}</div> }</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="vide">{{ page() ? 'Aucun envoi ne correspond à ces critères.' : 'Chargement…' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (page(); as p) {
+    <div class="pagination">
+      <span>{{ p.total }} envoi{{ p.total > 1 ? 's' : '' }} · page {{ numero + 1 }} sur {{ nbPages() }}</span>
+      <div><button class="bs petit" (click)="allerA(-1)" [disabled]="numero === 0">Précédente</button>
+        <button class="bs petit" (click)="allerA(1)" [disabled]="numero + 1 >= nbPages()">Suivante</button></div>
+    </div>
+  }
+</div>
+
+<!-- Visualisation du message tel que le client l'a recu, selon le canal -->
+<p-dialog [header]="visualise()?.clientNom || 'Message envoyé'" [visible]="visualise() !== null" (visibleChange)="!$event && visualise.set(null)" [modal]="true" [style]="{ width: '520px' }">
+  @if (visualise(); as e) {
+    <p class="sous-titre" style="margin-top: 0">{{ L.origineEnvoi[e.origine] }}@if (e.source) { · {{ e.source }} } · {{ L.canal[e.canal] }} · {{ e.le | jour: true }}
+      @if (e.utilisateurNom) { · par {{ e.utilisateurNom }} }</p>
+    @if (e.canal === 'EMAIL') {
+      <div class="courriel">
+        <div class="ent"><span>À <strong>{{ e.destinataire }}</strong></span></div>
+        <div class="corps">{{ e.contenu }}</div>
+      </div>
+    } @else if (e.canal === 'SMS') {
+      <div class="fil-sms">@if (e.destinataire) { <div class="exp">vers {{ e.destinataire | telephone }}</div> }<div class="bulle">{{ e.contenu }}</div></div>
+    } @else {
+      <div class="fil-wa"><div class="out">{{ e.contenu }}<span class="meta">@if (e.expediteur) { de {{ e.expediteur | telephone }} } @if (e.destinataire) { vers {{ e.destinataire | telephone }} }</span></div></div>
+    }
+    <p class="second" style="margin: 12px 0 0"><span class="dot" [style.background]="L.couleurMessage[e.statut]"></span>{{ L.statutMessage[e.statut] ?? e.statut }}
+      @if (e.luLe) { · lu le {{ e.luLe | jour: true }} } @else if (e.distribueLe) { · distribué le {{ e.distribueLe | jour: true }} }
+      @if (e.motif) { · {{ e.motif }} }</p>
+  }
+</p-dialog>

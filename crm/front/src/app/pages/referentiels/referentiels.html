@@ -1,0 +1,100 @@
+<div style="display: flex; flex-direction: column; gap: 14px">
+  <div class="barre" style="display: flex; gap: 12px; align-items: center">
+    <input class="sel" style="max-width: 320px" placeholder="Rechercher" [ngModel]="filtre()" (ngModelChange)="filtre.set($event)" name="filtre">
+    <span class="discret">{{ visibles().length }} {{ noms()[0] }}{{ visibles().length > 1 ? 's' : '' }}{{ archives() ? ' archivée' + (visibles().length > 1 ? 's' : '') : '' }}</span>
+    <span style="flex: 1"></span>
+    @if (!archives()) { <button class="ba petit" type="button" (click)="nouvelle()">{{ noms()[1] }}</button> }
+  </div>
+  <div class="defile">
+    <table class="t">
+      <thead><tr>
+        <th>{{ type() === 'SEGMENT' ? 'Segment' : 'Libellé' }}</th>
+        @switch (type()) {
+          @case ('VILLE') { <th>Région</th> }
+          @case ('COMMUNE') { <th>Ville</th> }
+          @case ('TOURNEE') { <th>Agence</th><th>Code</th> }
+          @case ('SEGMENT') { <th>Code</th><th class="n">Ordre</th> }
+        }
+        <th class="n">Clients</th>@if (type() !== 'SEGMENT') { <th>Modifié</th> }<th></th>
+      </tr></thead>
+      <tbody>
+        @for (e of visibles(); track e.id) {
+          <tr>
+            <td>@if (type() === 'SEGMENT') { <app-badge-segment [badge]="segment(e).badge" [libelle]="e.libelle" /> } @else { <strong>{{ e.libelle }}</strong> }</td>
+            @switch (type()) {
+              @case ('VILLE') { <td>{{ ref(e).parentLibelle ?? '—' }}</td> }
+              @case ('COMMUNE') { <td>{{ ref(e).parentLibelle }}</td> }
+              @case ('TOURNEE') { <td>{{ ref(e).agenceLibelle }}</td><td>{{ e.code ?? '—' }}</td> }
+              @case ('SEGMENT') { <td>{{ e.code }}</td><td class="n">{{ segment(e).ordre }}</td> }
+            }
+            <td class="n">{{ e.nbClients }}</td>
+            @if (type() !== 'SEGMENT') {
+              <td><div>{{ ref(e).modifieLe | jour }}</div><div class="second">{{ ref(e).modifiePar ?? 'Livré' }}</div></td>
+            }
+            <td class="nw">
+              <span class="actions-ligne">@if (e.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(e)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="changerStatut(e, 'archivage')"><i class="pi pi-inbox"></i></button> }
+              @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="changerStatut(e, 'reactivation')"><i class="pi pi-replay"></i></button> }</span>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="vide">{{ !entrees() ? 'Chargement…' : 'Aucune entrée.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="discret" style="margin: 0">{{ noms()[2] }} Une entrée archivée reste sur les clients qui la portent mais ne se choisit plus.</p>
+  <a style="font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux entrées actives' : 'Voir les entrées archivées' }}</a>
+</div>
+
+<p-dialog [header]="cible() ? 'Modifier' : noms()[1]" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          [modal]="true" [style]="{ width: '560px' }">
+  <form class="formulaire" (ngSubmit)="enregistrer()">
+    <label class="f">{{ type() === 'SEGMENT' ? 'Nom du segment' : 'Libellé' }}<input class="sel" name="libelle" [(ngModel)]="edition.libelle" required maxlength="100"></label>
+    @switch (type()) {
+      @case ('VILLE') {
+        <label class="f">Région (facultatif)
+          <select class="sel" name="parentId" [(ngModel)]="edition.parentId">
+            <option [ngValue]="null">Sans région</option>
+            @for (p of parents(); track p.id) { <option [ngValue]="p.id">{{ p.libelle }}</option> }
+          </select></label>
+      }
+      @case ('COMMUNE') {
+        <label class="f">Ville
+          <select class="sel" name="parentId" [(ngModel)]="edition.parentId" required>
+            <option [ngValue]="null" disabled>Choisir la ville</option>
+            @for (p of parents(); track p.id) { <option [ngValue]="p.id">{{ p.libelle }}</option> }
+          </select></label>
+      }
+      @case ('TOURNEE') {
+        <div class="grille">
+          <label class="f">Agence
+            <select class="sel" name="agenceId" [(ngModel)]="edition.agenceId" required>
+              <option [ngValue]="null" disabled>Choisir l'agence</option>
+              @for (a of (listes.agences | async) ?? []; track a.id) { <option [ngValue]="a.id">{{ a.libelle }}</option> }
+            </select></label>
+          <label class="f">Code (facultatif)<input class="sel" name="code" [(ngModel)]="edition.code" maxlength="30"></label>
+        </div>
+      }
+      @case ('SEGMENT') {
+        <label class="f">Code des fichiers importés<input class="sel" name="code" [(ngModel)]="edition.code" maxlength="20" [disabled]="!!cible()" placeholder="Ex. G"></label>
+        <div class="f">Badge
+          <div class="choix-badges">
+            @for (b of badges; track b) {
+              <button type="button" [class.choisi]="edition.badge === b" (click)="edition.badge = b" [style.color]="edition.badge === b ? B[b].couleur : null">
+                <i class="pi" [class]="B[b].icone" [style.color]="B[b].couleur"></i>{{ B[b].libelle }}</button>
+            }
+          </div>
+        </div>
+        <div>Aperçu : <app-badge-segment [badge]="edition.badge" [libelle]="edition.libelle || 'Segment'" /></div>
+      }
+      @default {
+        <label class="f">Code (facultatif)<input class="sel" name="code" [(ngModel)]="edition.code" maxlength="30"></label>
+      }
+    }
+    @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+    <div class="pied">
+      <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="enCours() || !edition.libelle.trim()">Enregistrer</button>
+    </div>
+  </form>
+</p-dialog>

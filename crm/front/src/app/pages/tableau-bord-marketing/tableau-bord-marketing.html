@@ -1,0 +1,106 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Tableau de bord Marketing</h1>
+      @if (tb(); as t) {
+        <p class="sous-titre">Du {{ t.du | jour }} au {{ t.au | jour }} : <strong>{{ t.messagesEnvoyes }} messages envoyés</strong> à
+          <strong>{{ t.clientsTouches }} clients</strong>, <strong>{{ t.messagesLus }} lus</strong>, {{ t.reponses }} réponses et
+          {{ t.desabonnements }} désabonnement{{ t.desabonnements > 1 ? 's' : '' }}.</p>
+      }
+    </div>
+    <a class="ba" routerLink="/marketing/campagnes">Campagnes</a>
+  </div>
+
+  <form class="periode" (ngSubmit)="charger()" aria-label="Période">
+    <label class="f">Du<input class="sel" type="date" name="du" [(ngModel)]="filtres.du"></label>
+    <label class="f">au<input class="sel" type="date" name="au" [(ngModel)]="filtres.au"></label>
+    <button class="bp" type="submit">Actualiser</button>
+    <button class="bs" type="button" (click)="calendrier.set(true)"><i class="pi pi-calendar"></i> Calendrier</button>
+  </form>
+  @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+
+  @if (tb(); as t) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Audience</h2></div>
+      <div class="chiffres">
+        <div><strong>{{ t.clientsJoignables }}</strong><span>clients joignables sur WhatsApp, non désabonnés</span></div>
+        <div><strong>{{ t.listesActives }}</strong><span>listes de diffusion actives</span></div>
+        <div><strong>{{ t.promotionsEnCours }}</strong><span>promotions en cours aujourd'hui</span></div>
+        <div><strong>{{ t.desabonnements }}</strong><span>désabonnements sur la période</span></div>
+      </div>
+    </section>
+
+    <div class="deux-colonnes">
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Messages de la période</h2></div>
+        <div class="entonnoir">
+          @for (e of entonnoir(); track e.libelle) {
+            <div class="etage"><span>{{ e.libelle }}</span><div [class]="'barre ' + e.classe"><div [style.width.%]="e.largeur"></div></div><strong>{{ e.valeur }}</strong></div>
+          }
+        </div>
+        <div class="taux" style="margin-top: 12px">
+          <div><strong>{{ pc(t.tauxReussite) }}</strong><span>messages partis</span></div>
+          <div><strong>{{ pc(t.tauxLecture) }}</strong><span>messages lus (WhatsApp)</span></div>
+          <div><strong>{{ pc(t.tauxReponse) }}</strong><span>clients touchés qui ont répondu</span></div>
+        </div>
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Par canal</h2></div>
+        @for (c of t.parCanal; track c.code) {
+          <div class="sum"><span>{{ L.canal[c.code ?? ''] ?? c.code }}</span><strong>{{ c.nombre }} envoyés@if (c.code === 'WHATSAPP') { · {{ c.montant | montant }} lus }</strong></div>
+        } @empty { <p class="discret">Aucun message sur la période.</p> }
+        <h3 class="lbl" style="margin-top: 14px">Campagnes</h3>
+        <div class="sum"><span>En attente de validation</span><strong>{{ t.campagnesAValider }}</strong></div>
+        <div class="sum"><span>Programmées</span><strong>{{ t.campagnesProgrammees }}</strong></div>
+        <div class="sum"><span>En cours</span><strong>{{ t.campagnesEnCours }}</strong></div>
+        <div class="sum"><span>Exécutées sur la période</span><strong>{{ t.campagnesTerminees }}</strong></div>
+        <div class="sum"><span>Annulées sur la période</span><strong>{{ t.campagnesAnnulees }}</strong></div>
+      </section>
+    </div>
+
+    @if (evolution(); as ev) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Évolution des messages de campagnes</h2><span class="discret">@if (ev.pas === 'SEMAINE') { Par semaine } @else { Par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesMessages" [pas]="ev.pas" libelle="Messages de campagnes envoyés et lus sur la période" />
+      </section>
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Réponses et désabonnements</h2><span class="discret">@if (ev.pas === 'SEMAINE') { Par semaine } @else { Par jour }</span></div>
+        <app-courbe [points]="ev.points" [series]="seriesRetours" [pas]="ev.pas" libelle="Réponses reçues et désabonnements STOP sur la période" />
+      </section>
+    }
+
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Campagnes lancées sur la période</h2></div>
+      <div class="defile">
+        <table class="t">
+          <thead><tr><th>Campagne</th><th>Canal</th><th>Lancée le</th><th>Statut</th><th class="n">Envoyés</th><th class="n">Lus</th><th class="n">Réponses</th><th class="n">Échecs</th></tr></thead>
+          <tbody>
+            @for (c of t.campagnes; track c.id) {
+              <tr>
+                <td><a class="ref" [routerLink]="['/marketing/campagnes', c.id]">{{ c.nom }}</a></td>
+                <td>{{ L.canal[c.canal] ?? c.canal }}</td><td class="nw">{{ c.lanceLe | jour: true }}</td>
+                <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
+                <td class="n">{{ c.envoyes }}</td><td class="n">{{ c.lus }}</td><td class="n">{{ c.reponses }}</td>
+                <td class="n" [class.retard]="c.echecs > 0">{{ c.echecs }}</td>
+              </tr>
+            } @empty { <tr><td colspan="8" class="vide">Aucune campagne lancée sur la période.</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    @if (t.echecs.length) {
+      <section class="bloc">
+        <div class="titre"><h2 class="h2">Échecs d'envoi</h2></div>
+        @for (e of t.echecs; track e.libelle) { <div class="sum"><span>{{ e.libelle }}</span><strong class="retard">{{ e.nombre }}</strong></div> }
+      </section>
+    }
+  }
+</div>
+
+<!-- Calendrier d'activite, comme dans UbiSenderPro : campagnes, messages, promotions et evenements jour par jour -->
+<p-dialog header="Calendrier d'activité Marketing" [visible]="calendrier()" (visibleChange)="calendrier.set($event)" [modal]="true" [style]="{ width: '980px' }" [breakpoints]="{ '1020px': '96vw' }">
+  @if (calendrier()) {
+    <app-calendrier-activite url="/api/marketing/tableau-de-bord/calendrier" (jourChoisi)="voirJour($event)" />
+  }
+</p-dialog>

@@ -1,0 +1,127 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Discussions</h1>
+      <p class="sous-titre">Les échanges WhatsApp avec chaque client : messages partis (relances, promotions, envois en masse) et réponses reçues. Vous répondez depuis votre numéro.</p>
+    </div>
+    <div class="actions"><button class="bp" type="button" (click)="nouvelle()"><i class="pi pi-plus"></i> Nouvelle discussion</button></div>
+  </div>
+
+  @if (redaction()) {
+    <section class="bloc">
+      <div class="titre"><h2 class="h2">Nouvelle discussion</h2></div>
+      @if (!numeros().length) {
+        <div class="info"><i class="pi pi-info-circle"></i><span>Aucun numéro WhatsApp n'est relié à votre compte : l'administrateur le renseigne dans Utilisateurs, puis vous reliez le téléphone dans Numéros WhatsApp.</span></div>
+      } @else {
+        <form class="nouvelle-d" (ngSubmit)="demarrer()">
+          <div class="grille">
+            <label class="f large">Client
+              <input class="sel" name="qc" [(ngModel)]="qClient" (ngModelChange)="chercherClients()" placeholder="Pharmacie ou code, ou saisissez le numéro ci-contre" autocomplete="off">
+            </label>
+            <label class="f">Numéro WhatsApp du client<input class="sel" name="numeroClient" [(ngModel)]="redac.numeroClient" placeholder="07 08 09 10 11"></label>
+            @if (numeros().length > 1) {
+              <label class="f">Depuis le numéro
+                <select class="sel" name="numeroAgent" [(ngModel)]="redac.numeroAgent">
+                  @for (n of numeros(); track n; let premier = $first) { <option [ngValue]="n">{{ n | telephone }}{{ premier ? ' (le vôtre)' : ' (remplacement)' }}</option> }
+                </select>
+              </label>
+            }
+          </div>
+          @if (clientsTrouves().length) {
+            <div class="choix-clients">
+              @for (c of clientsTrouves(); track c.id) {
+                @for (n of numerosClient(c); track n) {
+                  <button type="button" class="it" [class.iton]="redac.numeroClient === n" (click)="choisirClient(c, n)">
+                    <strong>{{ c.raisonSociale }}</strong><span class="discret">{{ c.code }} · {{ n | telephone }}</span>
+                  </button>
+                }
+              }
+            </div>
+          }
+          @if (modeles().length) {
+            <label class="f">Modèle (facultatif)
+              <select class="sel" name="modeleRedac" (change)="redac.contenu = modeleTexte($any($event.target).value) || redac.contenu">
+                <option value="">Aucun</option>
+                @for (m of modeles(); track m.id) { <option [value]="m.id">{{ m.nom }}</option> }
+              </select>
+            </label>
+          }
+          <label class="f">Message<textarea class="sel" name="contenu" rows="4" [(ngModel)]="redac.contenu"></textarea>
+            <span class="second">Les variables du modèle se remplissent avec la fiche du client à l'envoi.</span></label>
+          <div class="chips">@for (p of piecesRedac(); track p.id) {
+              <span class="tag"><i class="pi" [class.pi-image]="p.typeMime.startsWith('image/')" [class.pi-file]="!p.typeMime.startsWith('image/')"></i> {{ p.nomFichier }}
+                <button class="bi" type="button" [attr.aria-label]="'Retirer ' + p.nomFichier" (click)="retirer(p.id, 'redac')"><i class="pi pi-times"></i></button></span>
+            }
+            <label class="bs petit"><i class="pi pi-paperclip"></i> {{ depot() ? 'Dépôt…' : 'Joindre un fichier' }}
+              <input type="file" hidden multiple accept="image/jpeg,image/png,application/pdf,.xlsx,.docx" (change)="deposer($any($event.target), 'redac')"></label>
+          </div>
+          @if (erreurRedac()) { <div class="erreur">{{ erreurRedac() }}</div> }
+          <div class="pied-filtres">
+            <button class="bs" type="button" (click)="redaction.set(false)">Annuler</button>
+            <button class="bp" type="submit" [disabled]="enCours() || !redac.numeroClient.trim() || !redac.contenu.trim()">{{ enCours() ? 'Envoi…' : 'Envoyer' }}</button>
+          </div>
+        </form>
+      }
+    </section>
+  }
+
+  <div class="discussions">
+    <div class="liste-d">
+      <form (ngSubmit)="rechercher()"><input class="sel" name="q" [(ngModel)]="q" placeholder="Pharmacie, code ou numéro" style="width: 100%"></form>
+      <div class="items">
+        @for (d of page()?.elements; track d.numeroAgent + d.numeroClient) {
+          <button type="button" class="item-d" [class.on]="choisie()?.numeroAgent === d.numeroAgent && choisie()?.numeroClient === d.numeroClient" (click)="ouvrir(d)">
+            <div class="ligne1"><strong>{{ d.clientNom || d.nomAffiche || (d.numeroClient | telephone) }}</strong><span class="second nw">{{ d.derniereActivite | jour }}</span></div>
+            <div class="second">{{ d.numeroClient | telephone }} · sur {{ d.agentNom || (d.numeroAgent | telephone) }}</div>
+            <div class="apercu">{{ d.dernierSens === 'SORTANT' ? 'Vous : ' : '' }}{{ d.dernierMessage || '[pièce jointe]' }}</div>
+          </button>
+        } @empty {
+          <p class="discret" style="padding: 14px">{{ page() ? 'Aucune discussion pour l\'instant.' : 'Chargement…' }}</p>
+        }
+      </div>
+    </div>
+
+    <div class="fil-d">
+      @if (choisie(); as d) {
+        <div class="tete">
+          <div><strong>{{ titre() }}</strong><div class="second">{{ d.numeroClient | telephone }} · numéro {{ d.numeroAgent | telephone }}{{ d.agentNom ? ' (' + d.agentNom + ')' : '' }}</div></div>
+          @if (d.clientId) { <a class="bs petit" [routerLink]="['/clients', d.clientId]">Fiche client</a> }
+        </div>
+        <div class="corps" #fil>
+          @for (m of messages(); track m.cle) {
+            <div class="bulle" [class]="'bulle ' + m.sens">
+              @if (m.sens === 'SORTANT') { <div class="origine">{{ L.origineEnvoi[m.origine] }}{{ m.source && m.origine !== 'DISCUSSION' ? ' · ' + m.source : '' }}</div> }
+              {{ m.contenu || '[' + m.type + ']' }}
+              <div class="meta">{{ m.le | jour: true }}{{ m.auteur ? ' · ' + m.auteur : '' }}{{ m.statut ? ' · ' + (L.statutMessage[m.statut] ?? m.statut) : '' }}{{ m.motif ? ' · ' + m.motif : '' }}</div>
+            </div>
+          }
+        </div>
+        @if (d.peutRepondre) {
+          <form class="saisie-d" (ngSubmit)="envoyer()">
+            <div class="saisie-zone">
+              @if (piecesReponse().length) { <div class="chips">@for (p of piecesReponse(); track p.id) {
+              <span class="tag"><i class="pi" [class.pi-image]="p.typeMime.startsWith('image/')" [class.pi-file]="!p.typeMime.startsWith('image/')"></i> {{ p.nomFichier }}
+                <button class="bi" type="button" [attr.aria-label]="'Retirer ' + p.nomFichier" (click)="retirer(p.id, 'reponse')"><i class="pi pi-times"></i></button></span>
+            }</div> }
+              <textarea class="sel" name="texte" rows="2" [(ngModel)]="texte" placeholder="Écrire une réponse…"></textarea>
+            </div>
+            @if (modeles().length) {
+              <select class="sel modele-d" name="modeleReponse" aria-label="Insérer un modèle" (change)="texte = modeleTexte($any($event.target).value) || texte; $any($event.target).value = ''">
+                <option value="">Modèle…</option>
+                @for (m of modeles(); track m.id) { <option [value]="m.id">{{ m.nom }}</option> }
+              </select>
+            }
+            <label class="bi" pTooltip="Joindre un fichier" tooltipPosition="top" aria-label="Joindre un fichier"><i class="pi pi-paperclip"></i>
+              <input type="file" hidden multiple accept="image/jpeg,image/png,application/pdf,.xlsx,.docx" (change)="deposer($any($event.target), 'reponse')"></label>
+            <button class="bp" type="submit" [disabled]="enCours() || !texte.trim()">{{ enCours() ? 'Envoi…' : 'Envoyer' }}</button>
+          </form>
+        } @else {
+          <div class="saisie-d"><span class="discret">Lecture seule : seul le titulaire du numéro, ou son remplaçant, répond depuis ce numéro.</span></div>
+        }
+        @if (erreur()) { <div class="erreur" style="margin: 0 12px 12px">{{ erreur() }}</div> }
+      } @else {
+        <p class="discret" style="padding: 24px">Choisissez une discussion.</p>
+      }
+    </div>
+  </div>
+</div>

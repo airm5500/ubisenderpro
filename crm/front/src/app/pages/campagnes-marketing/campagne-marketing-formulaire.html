@@ -1,0 +1,147 @@
+<p-dialog [header]="campagne() ? 'Modifier la campagne' : 'Nouvelle campagne'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '1120px', maxWidth: '96vw' }">
+  <div class="campagne-saisie">
+  <form class="formulaire" id="formulaire-campagne-marketing" (ngSubmit)="enregistrer()" (change)="actualiser()" (input)="actualiser()">
+    <div class="f">Type de campagne
+      <div class="types-campagne" role="radiogroup" aria-label="Type de campagne">
+        @for (t of TYPES; track t.code) {
+          <button type="button" role="radio" class="type-campagne" [class.on]="type() === t.code" [attr.aria-checked]="type() === t.code" (click)="choisirType(t.code)">
+            <strong>{{ t.libelle }}</strong><span>{{ t.detail }}</span></button>
+        }
+      </div>
+    </div>
+    <label class="f">Nom de la campagne<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Promotion de novembre" required></label>
+    <label class="f">Liste de diffusion
+      <select class="sel" name="listeId" [(ngModel)]="formulaire.listeId" required>
+        <option [ngValue]="null" disabled>Choisir…</option>
+        @for (l of listes(); track l.id) { <option [ngValue]="l.id">{{ l.nom }} · {{ l.nbJoignables }} joignable{{ l.nbJoignables > 1 ? 's' : '' }}</option> }
+      </select>
+    </label>
+    <label class="f">Modèle de message
+      <select class="sel" name="modeleId" [(ngModel)]="formulaire.modeleId" required>
+        <option [ngValue]="null" disabled>Choisir…</option>
+        @for (m of modelesDuType(); track m.id) { <option [ngValue]="m.id">{{ m.nom }} · {{ L.canal[m.canal] }}</option> }
+      </select>
+    </label>
+    @if (!modelesDuType().length) { <p class="discret" style="margin: 0">Aucun modèle de ce type : créez-en un dans Modèles de messages.</p> }
+    @if (type() === 'EVENEMENT') {
+      <label class="f">Événement annoncé
+        <select class="sel" name="evenementId" [ngModel]="formulaire.evenementId" (ngModelChange)="choisirEvenement($event)">
+          <option [ngValue]="null">Aucun</option>
+          @for (e of evenements(); track e.id) {
+            <option [ngValue]="e.id">{{ e.nom }} · {{ (e.prochaineDate ?? e.dateDebut) | jour }}{{ e.annuel ? ' · chaque année' : '' }}</option>
+          }
+        </select>
+      </label>
+      <p class="discret" style="margin: 0">Les variables {{ '{' }}evenement_nom{{ '}' }}, {{ '{' }}evenement_date{{ '}' }} et {{ '{' }}evenement_fin{{ '}' }}
+        se remplissent avec l'événement ; la date d'envoi proposée suit les paramètres du Marketing.
+        @if (evenementChoisi()?.annuel) { Événement annuel : choisissez « Chaque année » pour le renvoyer chaque année. }</p>
+    }
+    @if (type() === 'INFORMATION') {
+      <label class="f">Information annoncée
+        <select class="sel" name="informationId" [ngModel]="formulaire.informationId" (ngModelChange)="choisirInformation($event)">
+          <option [ngValue]="null">Aucune</option>
+          @for (i of informations(); track i.id) {
+            <option [ngValue]="i.id">{{ i.titre }} · {{ L.typeInformation[i.typeInformation] }}{{ i.priorite !== 'NORMALE' ? ' · ' + L.prioriteInformation[i.priorite] : '' }}</option>
+          }
+        </select>
+      </label>
+      <p class="discret" style="margin: 0">La tournée, l'heure estimée, la cause, le pharmacien de garde… se remplissent avec l'information ; une ligne dont le détail
+        n'est pas renseigné disparaît du message. Programmez la date et l'heure d'envoi ci-dessous.</p>
+    }
+    @if (type() === 'PROMOTION') {
+    <div class="f">Promotions citées
+      @for (p of promotions(); track p.id) {
+        <label class="droit"><input type="checkbox" [checked]="formulaire.promotionIds.has(p.id)" (change)="basculer(p.id, $any($event.target).checked)">
+          {{ p.code }} · {{ p.nom }} <span class="discret">jusqu'au {{ p.dateFin | jour }} · {{ p.nbProduits }} produit{{ p.nbProduits > 1 ? 's' : '' }}</span></label>
+      } @empty { <span class="discret">Aucune promotion active.</span> }
+    </div>
+    <p class="discret" style="margin: 0">Les variables {{ '{' }}promotion_nom{{ '}' }}, {{ '{' }}promotion_fin{{ '}' }} et {{ '{' }}produits_promotion{{ '}' }} du modèle se remplissent avec les promotions cochées.</p>
+    <div class="f">Produits de retour en stock annoncés
+      @for (p of produits(); track p.id) {
+        <label class="droit"><input type="checkbox" [checked]="formulaire.produitIds.has(p.id)" (change)="basculerProduit(p.id, $any($event.target).checked)">
+          {{ p.libelle }} <span class="discret">{{ p.detail }}</span></label>
+      } @empty { <span class="discret">Aucun produit remis en stock récemment : marquez-les dans le catalogue.</span> }
+    </div>
+    <p class="discret" style="margin: 0">La variable {{ '{' }}produits_disponibles{{ '}' }} liste les produits cochés. Si l'un repart en rupture avant l'envoi, la campagne est bloquée.</p>
+    }
+    <div class="f">Affiche (image JPEG ou PNG, ou PDF)
+      @if (formulaire.afficheId) {
+        <span style="display: flex; gap: 10px; align-items: center"><i class="pi pi-image"></i> {{ formulaire.afficheNom }}
+          <button class="bs petit" type="button" (click)="retirerAffiche()">Retirer</button></span>
+      } @else {
+        <input class="sel" type="file" accept="image/jpeg,image/png,application/pdf" (change)="deposer($any($event.target))" [disabled]="depot()">
+      }
+    </div>
+    <label class="droit"><input type="checkbox" name="joindreProduits" [(ngModel)]="formulaire.joindreProduits" [disabled]="!formulaire.promotionIds.size && !formulaire.produitIds.size">
+      Joindre la liste Excel des produits cochés (promotions et retours en stock)</label>
+    <p class="discret" style="margin: 0">Les pièces jointes partent par WhatsApp et par e-mail, pas par SMS. Une affiche en image porte le texte du message en légende.</p>
+    <label class="f">Date et heure d'envoi (heure d'Abidjan)
+      <input class="sel" type="datetime-local" name="dateExecution" [(ngModel)]="formulaire.dateExecution">
+    </label>
+    <p class="discret" style="margin: 0">« Programmer » envoie à cette date, « Envoyer dès la création » dès la validation. Rien ne part avant qu'une personne habilitée ait validé la campagne.</p>
+    <div class="grille">
+      <label class="f">Répétition
+        <select class="sel" name="recurrence" [(ngModel)]="formulaire.recurrence">
+          <option value="">Une seule fois</option>
+          <option value="QUOTIDIENNE">Chaque jour</option>
+          <option value="HEBDOMADAIRE">Chaque semaine</option>
+          <option value="MENSUELLE">Chaque mois</option>
+          <option value="ANNUELLE">Chaque année</option>
+        </select>
+      </label>
+      @if (formulaire.recurrence) {
+        <label class="f">Jusqu'au<input class="sel" type="date" name="finRecurrence" [(ngModel)]="formulaire.finRecurrence" required></label>
+      }
+    </div>
+    @if (formulaire.recurrence) {
+      <p class="discret" style="margin: 0">Validée une fois, la campagne repart seule avec la liste et les promotions du moment. Elle s'arrête d'elle-même si une promotion citée est terminée.</p>
+    }
+  </form>
+
+  <aside class="apercu-campagne" aria-label="Aperçu du message">
+    <div class="h2">Aperçu</div>
+    @if (apercu(); as a) {
+      <p class="discret" style="margin: 0">{{ a.nbClients }} client{{ a.nbClients > 1 ? 's' : '' }} · {{ a.nbMessages }} message{{ a.nbMessages > 1 ? 's' : '' }}
+        @if (a.nbExclus) { · {{ a.nbExclus }} écarté{{ a.nbExclus > 1 ? 's' : '' }} }</p>
+      @if (a.exemples[exemple()]; as m) {
+        @if (m.canal === 'EMAIL') {
+          <div class="courriel"><div class="ent"><span>À <strong>{{ m.emailDestinataire }}</strong></span><span class="objet">{{ m.objet }}</span></div>
+            <div class="corps">{{ m.contenu }}</div></div>
+        } @else if (m.canal === 'SMS') {
+          <div class="fil-sms"><div class="exp">vers {{ m.numeroDestinataire | telephone }}</div><div class="bulle">{{ m.contenu }}</div></div>
+        } @else {
+          <div class="fil-wa"><div class="out">{{ m.contenu }}<span class="meta">{{ m.clientRaisonSociale }} · {{ m.numeroDestinataire | telephone }}</span></div></div>
+        }
+        @if (formulaire.afficheId) { <p class="discret" style="margin: 0"><i class="pi pi-image"></i> Affiche jointe : {{ formulaire.afficheNom }}</p> }
+        @if (a.exemples.length > 1) {
+          <div class="actions">
+            <button type="button" class="bs petit" [disabled]="exemple() === 0" (click)="exemple.set(exemple() - 1)" aria-label="Client précédent"><i class="pi pi-chevron-left"></i></button>
+            <span class="discret">Client {{ exemple() + 1 }} sur {{ a.exemples.length }}</span>
+            <button type="button" class="bs petit" [disabled]="exemple() === a.exemples.length - 1" (click)="exemple.set(exemple() + 1)" aria-label="Client suivant"><i class="pi pi-chevron-right"></i></button>
+          </div>
+        }
+      } @else {
+        <p class="discret">Aucun client joignable dans cette liste.</p>
+      }
+    } @else if (erreurApercu(); as e) {
+      <p class="discret">{{ e }}</p>
+    } @else {
+      <p class="discret">Choisissez une liste et un modèle : le message s'affiche ici tel qu'un vrai client le recevra.</p>
+    }
+  </aside>
+  </div>
+
+  @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
+  <div class="pied">
+    <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>
+    @if (!campagne() || campagne()!.statut === 'BROUILLON') {
+      <button class="bs" type="button" [disabled]="enCours() || depot() || !pret()" (click)="enregistrer('BROUILLON')">Enregistrer en brouillon</button>
+      <button class="bp" type="button" [disabled]="enCours() || depot() || !pret() || !formulaire.dateExecution" (click)="enregistrer('PROGRAMMER')"
+              [attr.title]="formulaire.dateExecution ? null : 'Choisissez la date et l\'heure d\'envoi'">Programmer</button>
+      <button class="ba" type="button" [disabled]="enCours() || depot() || !pret()" (click)="enregistrer('IMMEDIAT')">Envoyer dès la création</button>
+    } @else {
+      <button class="bp" type="button" [disabled]="enCours() || depot() || !pret()" (click)="enregistrer()">Enregistrer</button>
+    }
+  </div>
+</p-dialog>

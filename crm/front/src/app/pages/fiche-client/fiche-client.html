@@ -1,0 +1,137 @@
+<div class="page">
+  <a class="retour" routerLink="/clients">← Retour aux clients</a>
+  @if (client(); as c) {
+    <div class="entete">
+      <div>
+        <h1 style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">{{ c.raisonSociale }}
+          <app-badge-segment [badge]="c.segmentationBadge" [libelle]="c.segmentationLibelle" /></h1>
+        <p class="sous-titre">{{ c.nomPharmacien ? c.nomPharmacien + ' · ' : '' }}{{ c.code }}{{ c.ville ? ' · ' + c.ville : '' }}</p>
+      </div>
+      <div class="actions">
+        @if (auth.peut('CLIENTS_GERER') && c.statut === 'ACTIF') {
+          <button class="bs" type="button" (click)="modification.set(true)">Modifier</button>
+          <button class="bs" type="button" (click)="verification.set(true)">Vérifier les numéros</button>
+          <button class="bs" type="button" (click)="ouvrirDesactivation()">Désactiver</button>
+        }
+        @if (auth.peut('CLIENTS_GERER') && c.statut === 'INACTIF') { <button class="bp" type="button" (click)="reactiver()">Réactiver</button> }
+        @if (auth.peut('FACTURES_GERER') && c.statut === 'ACTIF') { <button class="bs" type="button" (click)="saisieFacture.set(true)">Nouvelle facture</button> }
+        @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length && c.statut === 'ACTIF') {
+          <button type="button" class="ba" (click)="fenetreCampagne.ouvrir({ clients: '' + c.id })">Relancer ce client</button>
+        }
+      </div>
+    </div>
+
+    @if (c.statut === 'INACTIF') {
+      <div class="bandeau-inactif"><strong>Client désactivé</strong>{{ c.desactiveLe ? ' le ' + c.desactiveLe.substring(0, 10).split('-').reverse().join('/') : '' }}{{ c.desactivePar ? ' par ' + c.desactivePar : '' }}{{ c.desactiveMotif ? ' · ' + c.desactiveMotif : '' }}.
+        Il ne reçoit plus aucun message ; ses factures restent consultables.</div>
+    }
+    <div class="kvs bandeau">
+      <div class="kv"><span>Agence</span><strong>{{ c.agenceLibelle }}{{ c.sousAgence ? ' · ' + c.sousAgence : '' }}</strong></div>
+      @if (auth.peut('PORTEFEUILLES_AFFECTER')) {
+        <div class="kv"><span>Agent responsable</span><strong>{{ agentEnCours()?.agentNom ?? 'Sans agent' }}</strong>
+          @if (auth.peut('PORTEFEUILLES_AFFECTER')) { <a routerLink="/portefeuilles" [queryParams]="{ q: c.code }">Réaffecter</a> }</div>
+      }
+      <div class="kv"><span>WhatsApp principal</span><strong>{{ (c.numeroPrincipal | telephone) || 'Non renseigné' }}</strong></div>
+      <div class="kv"><span>Second numéro</span><strong>{{ (c.numeroSecondaire | telephone) || '—' }}</strong></div>
+      <div class="kv"><span>E-mail</span><strong>{{ c.email || '—' }}</strong></div>
+    </div>
+    <div class="kvs bandeau">
+      <div class="kv"><span>Région</span><strong>{{ c.region || '—' }}</strong></div>
+      <div class="kv"><span>Ville</span><strong>{{ c.ville || '—' }}</strong></div>
+      <div class="kv"><span>Commune</span><strong>{{ c.commune || '—' }}</strong></div>
+      <div class="kv"><span>Tournée</span><strong>{{ c.tournee || '—' }}</strong></div>
+      <div class="kv"><span>Anniversaire</span><strong>{{ c.dateAnniversaire ? (c.dateAnniversaire | jour) : '—' }}</strong></div>
+    </div>
+    @if (!c.numeroPrincipal) {
+      <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Ce client n'a pas de numéro WhatsApp : il sera exclu des campagnes tant qu'on ne l'aura pas complété (Modifier, ou un import).</span></div>
+    }
+    @if (c.commentaire) { <div class="info"><span>{{ c.commentaire }}</span></div> }
+
+    <div class="deux-colonnes">
+      <div class="colonne">
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Factures ouvertes</h2><span class="discret">{{ ouvertes().length }} facture{{ ouvertes().length > 1 ? 's' : '' }}</span></div>
+          <div class="defile">
+            <table class="t">
+              <thead><tr><th>Référence</th><th>Sous-type</th><th>Échéance</th><th class="n">Montant</th><th class="n">Solde dû</th><th>Statut</th></tr></thead>
+              <tbody>
+                @for (f of (voirSoldees() ? factures() : ouvertes()); track f.id) {
+                  <tr>
+                    <td class="nw"><strong>{{ f.reference }}</strong>@if (f.nature === 'AVOIR') {<div class="second">Avoir</div>}</td>
+                    <td>{{ f.sousTypeLibelle }}</td>
+                    <td class="nw">{{ f.dateEcheance | jour }}
+                      @if (f.statut !== 'SOLDEE' && f.joursRetard > 0) {<span class="retard"> J+{{ f.joursRetard }}</span>}</td>
+                    <td class="n">{{ f.montant | montant }}</td>
+                    <td class="n" style="font-weight: 700">{{ f.solde | montant }}</td>
+                    <td class="nw"><span class="dot" [style.background]="L.couleurFacture[f.statut]"></span>{{ L.statutFacture[f.statut] ?? f.statut }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="6" class="vide">Aucune facture ouverte.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (soldees().length) {
+            <a (click)="voirSoldees.set(!voirSoldees())">{{ voirSoldees() ? 'Masquer les factures soldées' : 'Afficher les ' + soldees().length + ' factures soldées' }}</a>
+          }
+        </section>
+
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Historique du client</h2>
+            <a routerLink="/reponses" [queryParams]="{ clientId: c.id }">Toutes ses réponses</a></div>
+          @for (e of historique(); track $index) {
+            <div class="ev">
+              <span class="evd" [style.background]="e.couleur"></span>
+              <div>
+                <div class="discret">{{ e.quand | jour: true }} · {{ e.qui }}</div>
+                <div class="ev-titre">{{ e.titre }}</div>
+                <div class="ev-detail">{{ e.detail }}</div>
+              </div>
+            </div>
+          } @empty {
+            <p class="discret">Aucune réponse ni changement d'agent enregistré pour l'instant.</p>
+          }
+        </section>
+
+        @if (auth.peut('JOURNAL')) {
+          <section class="bloc" appJournalFiche [clientId]="c.id" [libelle]="c.code + ' - ' + c.raisonSociale"></section>
+        }
+      </div>
+
+      <section class="restant">
+        <h2 class="lbl">Restant dû</h2>
+        <div class="total">{{ totalDu() | montant }} <span>FCFA</span></div>
+        @if (parSousType().length) {
+          <div class="repartition" role="img" aria-label="Répartition par sous-type de compte">
+            @for (s of parSousType(); track s.libelle) { <div [style.width.%]="s.part" [style.background]="s.couleur"></div> }
+          </div>
+          @for (s of parSousType(); track s.libelle) {
+            <div class="sum"><span><span class="dot" [style.background]="s.couleur"></span>{{ s.libelle }}</span><strong>{{ s.montant | montant }}</strong></div>
+          }
+        }
+      </section>
+    </div>
+  } @else {
+    <p class="discret">Chargement…</p>
+  }
+</div>
+
+@if (auth.peut('CLIENTS_GERER')) {
+  <app-client-formulaire [(ouvert)]="modification" [client]="client()" (enregistre)="client.set($event)" />
+  <app-verification-numeros [(ouvert)]="verification" [clientIds]="ids()" />
+  <p-dialog header="Désactiver ce client" [visible]="desactivation()" (visibleChange)="!$event && desactivation.set(false)" [modal]="true" [style]="{ width: '520px' }">
+    <form class="formulaire" (ngSubmit)="desactiver()">
+      <p class="discret">Le client ne recevra plus aucun message (relances, campagnes). Rien n'est supprimé et vous pourrez le réactiver.</p>
+      <label class="f large">Motif<input class="sel" name="motif" [(ngModel)]="motif" placeholder="Ex. Pharmacie fermée" required></label>
+      @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
+      <div class="pied">
+        <button class="bs" type="button" (click)="desactivation.set(false)">Annuler</button>
+        <button class="bp" type="submit" [disabled]="!motif.trim()">Désactiver</button>
+      </div>
+    </form>
+  </p-dialog>
+}
+
+@if (auth.peut('FACTURES_GERER')) {
+  <app-facture-formulaire [(ouvert)]="saisieFacture" [client]="client()" (enregistre)="chargerFactures()" />
+}

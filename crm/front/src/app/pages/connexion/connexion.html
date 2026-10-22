@@ -1,0 +1,50 @@
+<div class="ecran">
+  <section class="accroche">
+    <div class="marque">
+      <img [src]="charte.logo()" [class.logo-perso]="charte.charte()?.logoVersion" alt="" width="72" height="72" style="object-fit: contain">
+      <div>
+        <div class="nom">{{ charte.charte()?.nomEntreprise || 'UBIPHARM CI' }}</div>
+        <div class="sous">Relation client et recouvrement</div>
+      </div>
+    </div>
+    <div class="texte">
+      <h1>Chaque échéance suivie, chaque relance tracée.</h1>
+      <p>Préparez, validez et programmez les relances WhatsApp. Vos clients vous répondent sur votre WhatsApp professionnel habituel.</p>
+      <div class="fil" aria-hidden="true">
+        <div class="ligne">
+          <div class="fait"></div>
+          <span class="p" style="left: 0%"></span>
+          <span class="p" style="left: 23%"></span>
+          <span class="jour" style="left: 46%"></span>
+          <span class="p vide" style="left: 70%"></span>
+          <span class="p vide" style="left: 96%"></span>
+        </div>
+        <div class="reperes"><span>J-5</span><span>J-1</span><span class="blanc">Échéance</span><span>J+7</span><span class="droite">J+30</span></div>
+      </div>
+    </div>
+    <div class="mention">Plateforme interne · accès réservé au personnel habilité</div>
+  </section>
+
+  <section class="cote-form">
+    <form (ngSubmit)="connecter()" novalidate>
+      <div class="titre">
+        <h2>Connexion</h2>
+        <p>Utilisez votre identifiant personnel.</p>
+      </div>
+      <label class="fld">Identifiant<input type="text" name="login" [(ngModel)]="login" autocomplete="username" autofocus></label>
+      <label class="fld">Mot de passe<input type="password" name="motDePasse" [(ngModel)]="motDePasse" autocomplete="current-password"></label>
+      <div class="options">
+        <label class="case"><input type="checkbox" name="seSouvenir" [(ngModel)]="seSouvenir">Se souvenir de l'identifiant</label>
+        <a (click)="aideMotDePasse.set(!aideMotDePasse())">Mot de passe oublié ?</a>
+      </div>
+      @if (aideMotDePasse()) {
+        <div class="info">Demandez à l'administrateur de la plateforme de réinitialiser votre mot de passe.</div>
+      }
+      <button class="bp entrer" type="submit" [disabled]="enCours()">{{ enCours() ? 'Connexion…' : 'Se connecter' }}</button>
+      @if (erreur()) {
+        <div class="avert" role="alert"><i class="pi pi-exclamation-circle"></i><span>{{ erreur() }}</span></div>
+      }
+      <p class="note">Chaque connexion et déconnexion est journalisée.</p>
+    </form>
+  </section>
+</div>

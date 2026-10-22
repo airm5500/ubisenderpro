@@ -1,0 +1,113 @@
+<div class="page">
+  <div class="entete">
+    <div>
+      <h1>Paramètres</h1>
+      <p class="sous-titre">Réglages de l'application. Chaque changement prend effet tout de suite et reste tracé dans le journal.</p>
+    </div>
+  </div>
+
+  <div class="cote">
+    <div class="liste-g">
+      @for (g of groupes(); track g[0]; let premier = $first) {
+        <p class="lbl" [style.margin]="premier ? '0 12px 4px' : '14px 12px 4px'">{{ g[0] }}</p>
+        @for (c of g[1]; track c[0]) {
+          <button class="it" [class.iton]="categorie() === c[0]" (click)="categorie.set(c[0])"><strong>{{ c[1] }}</strong></button>
+        }
+      }
+      @if (auth.peut('REFERENTIELS', 'AGENCES')) {
+        <p class="lbl" style="margin: 14px 12px 4px">Référentiels</p>
+        @for (c of referentiels; track c[0]) {
+          @if (c[0] === 'AGENCES' ? auth.peut('AGENCES') : auth.peut('REFERENTIELS')) {
+            <button class="it" [class.iton]="categorie() === c[0]" (click)="categorie.set(c[0])"><strong>{{ c[1] }}</strong></button>
+          }
+        }
+      }
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
+      @if (courante(); as c) {
+        @if (c[0] !== 'AGENCES' && c[0] !== 'FOURNISSEURS_SMS') { <div><h2 class="h2">{{ c[1] }}</h2><p class="sous-titre" style="margin: 4px 0 0">{{ c[2] }}</p></div> }
+      }
+      @if (categorie() === 'AGENCES') { <app-agences [integre]="true" /> }
+      @else if (categorie() === 'FOURNISSEURS_SMS') { <app-fournisseurs-sms [integre]="true" /> }
+      @else if (estReferentiel()) { <app-referentiels [type]="typeReferentiel()" /> }
+      @if (categorie() === 'CHARTE') {
+        <div class="param">
+          <label>Logo de l'entreprise (PNG, JPEG ou SVG, 5 Mo au plus)
+            <span class="second">{{ charteService.charte()?.logoNom ?? "Logo livré avec l'application" }}</span></label>
+          <div class="champ">
+            <span class="apercu-logo" [class.clair]="charteService.charte()?.logoVersion"><img [src]="charteService.logo()" alt="Logo actuel" width="56" height="56"></span>
+            <label class="bs petit">Choisir un logo<input type="file" hidden accept=".png,.jpg,.jpeg,.svg" (change)="deposer('logo', $event)"></label>
+            @if (charteService.charte()?.logoVersion) { <a (click)="reinitialiser('logo')">Revenir au logo d'origine</a> }
+          </div>
+        </div>
+        <div class="param">
+          <label>Icône de l'onglet du navigateur (PNG, SVG ou ICO, carrée)
+            <span class="second">{{ charteService.charte()?.iconeNom ?? "Icône livrée avec l'application" }}</span></label>
+          <div class="champ">
+            <span class="apercu-logo" [class.clair]="charteService.charte()?.iconeVersion"><img [src]="charteService.charte()?.iconeVersion ? '/api/charte/icone?v=' + charteService.charte()?.iconeVersion : 'logo.svg'" alt="Icône actuelle" width="32" height="32"></span>
+            <label class="bs petit">Choisir une icône<input type="file" hidden accept=".png,.svg,.ico,.jpg,.jpeg" (change)="deposer('icone', $event)"></label>
+            @if (charteService.charte()?.iconeVersion) { <a (click)="reinitialiser('icone')">Revenir à l'icône d'origine</a> }
+          </div>
+        </div>
+        <div class="param">
+          <label>Bannière des messages d'information (PNG ou JPEG, large et peu haute, par exemple 1200 × 300)
+            <span class="second">{{ charteService.charte()?.banniereNom ?? "Aucune bannière : les informations partent sans image" }}</span></label>
+          <div class="champ">
+            @if (charteService.charte()?.banniereVersion; as v) { <span class="apercu-banniere"><img [src]="'/api/charte/banniere?v=' + v" alt="Bannière actuelle"></span> }
+            <label class="bs petit">Choisir une bannière<input type="file" hidden accept=".png,.jpg,.jpeg" (change)="deposer('banniere', $event)"></label>
+            @if (charteService.charte()?.banniereVersion) { <a (click)="reinitialiser('banniere')">Retirer la bannière</a> }
+          </div>
+        </div>
+      }
+      @for (p of liste(); track p.cle) {
+        <div class="param">
+          <label [for]="p.cle">{{ p.description }}
+            @if (p.modifiePar) { <span class="second">modifié le {{ p.modifieLe | jour }} par {{ p.modifiePar }}</span> }
+          </label>
+          <div class="champ">
+            @switch (p.typeValeur) {
+              @case ('HEURE') {
+                <input class="sel court" type="number" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" [min]="p.minimum ?? 0" [max]="p.maximum ?? 24"><span class="unite">h</span>
+              }
+              @case ('ENTIER') {
+                <input class="sel court" type="number" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" [min]="p.minimum" [max]="p.maximum">
+                @if (p.minimum !== null && p.maximum !== null) { <span class="unite">de {{ p.minimum }} à {{ p.maximum }}</span> }
+              }
+              @case ('COULEUR') {
+                <input type="color" [attr.aria-label]="p.description" [name]="p.cle + '-c'" [(ngModel)]="saisies[p.cle]">
+                <input class="sel court" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" maxlength="7">
+              }
+              @case ('EMAIL') { <input class="sel" type="email" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]"> }
+              @case ('URL') { <input class="sel" type="url" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="https://"> }
+              @case ('LIEN') {
+                <input class="sel" type="url" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="https://www.exemple.ci">
+                @if (p.valeur) { <a class="unite" [href]="p.valeur" target="_blank" rel="noopener">Ouvrir</a> }
+              }
+              @case ('CHOIX') {
+                <select class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]">
+                  @for (o of options(p); track o[0]) { <option [value]="o[0]">{{ o[1] }}</option> }
+                </select>
+              }
+              @case ('OUI_NON') {
+                <select class="sel court" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]">
+                  <option value="OUI">Oui</option><option value="NON">Non</option>
+                </select>
+              }
+              @case ('DOSSIER') { <input class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]" placeholder="C:\UBIPHARM-CRM\donnees\archives"> }
+              @default { <input class="sel" [id]="p.cle" [name]="p.cle" [(ngModel)]="saisies[p.cle]"> }
+            }
+          </div>
+        </div>
+      }
+      @if (liste().length) {
+      <div class="actions">
+        <button class="bs" (click)="annuler()" [disabled]="!modifies()">Annuler</button>
+        <button class="bp" (click)="enregistrer()" [disabled]="!modifies()">Enregistrer{{ modifies() ? ' (' + modifies() + ')' : '' }}</button>
+      </div>
+      }
+      @if (categorie() === 'AIDE') { <app-aide-textes /> }
+      @if (categorie() === 'WHATSAPP' && auth.peut('WHATSAPP_META')) { <app-compte-meta /> }
+    </div>
+  </div>
+</div>

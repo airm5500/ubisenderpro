@@ -1,0 +1,47 @@
+<p-dialog header="Vérifier des numéros WhatsApp" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '760px' }">
+  <div class="formulaire">
+    @if (clientIds().length) {
+      <p class="discret">Numéros des {{ clientIds().length }} client(s) sélectionné(s). Vous pouvez en ajouter d'autres ci-dessous.</p>
+    } @else {
+      <p class="discret">Collez les numéros, un par ligne ou séparés par des virgules. Le CRM contrôle le format, puis demande à WhatsApp lesquels ont un compte.</p>
+    }
+    <label class="f large">Numéros
+      <textarea class="sel" name="saisie" rows="4" [(ngModel)]="saisie" placeholder="07 08 09 10 11&#10;+225 05 06 07 08 09"></textarea>
+    </label>
+    <div class="pied" style="margin-top: 0">
+      <button class="bp" type="button" (click)="verifier()" [disabled]="enCours() || (!saisie.trim() && !clientIds().length)">
+        {{ enCours() ? 'Vérification…' : 'Vérifier' }}</button>
+    </div>
+    @if (erreur()) { <div class="erreur">{{ erreur() }}</div> }
+    @if (resultat(); as r) {
+      @if (r.avertissement) { <div class="avert">{{ r.avertissement }}</div> }
+      <div class="kvs bandeau">
+        <div class="kv"><span>Sur WhatsApp</span><strong>{{ r.surWhatsapp }}</strong></div>
+        <div class="kv"><span>Pas sur WhatsApp</span><strong>{{ r.absents }}</strong></div>
+        <div class="kv"><span>Format invalide</span><strong>{{ r.formatsInvalides }}</strong></div>
+        <div class="kv"><span>Non vérifiés</span><strong>{{ r.nonVerifies }}</strong></div>
+        <div class="kv"><span>Vérifié depuis</span><strong>{{ (r.sessionUtilisee | telephone) || 'Aucun numéro connecté' }}</strong></div>
+      </div>
+      <div class="defile" style="max-height: 320px">
+        <table class="t">
+          <thead><tr><th>Numéro</th><th>Client</th><th>Fonction</th><th>Résultat</th></tr></thead>
+          <tbody>
+            @for (l of r.resultats; track $index) {
+              <tr>
+                <td class="nw">{{ (l.numero | telephone) || l.saisi }}</td>
+                <td>{{ l.client || '—' }}</td>
+                <td>{{ FONCTIONS[l.fonction ?? ''] || '—' }}</td>
+                <td><span [class]="'etat-numero ' + l.resultat">{{ RESULTATS[l.resultat] }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pied">
+        <button class="bs" type="button" (click)="exporter()">Exporter en CSV</button>
+        <button class="bp" type="button" (click)="ouvert.set(false)">Fermer</button>
+      </div>
+    }
+  </div>
+</p-dialog>
