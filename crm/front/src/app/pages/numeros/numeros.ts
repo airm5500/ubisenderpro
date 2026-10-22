@@ -7,7 +7,7 @@ import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { CharteService } from '../../core/charte';
-import { CompteMeta, EtatSession, SessionAgent } from '../../core/modeles';
+import { EtatSession, SessionAgent } from '../../core/modeles';
 import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
 
 @Component({
@@ -31,19 +31,15 @@ export class Numeros implements OnInit, OnDestroy {
   protected readonly liaison = signal<SessionAgent | null>(null);
   protected readonly etat = signal<EtatSession | null>(null);
   /** API officielle : compte Meta et numero en cours de bascule. */
-  protected readonly compte = signal<CompteMeta | null>(null);
-  protected readonly parametresMeta = '{{1}}, {{2}}';
   protected readonly bascule = signal<SessionAgent | null>(null);
   protected readonly erreur = signal<string | null>(null);
   protected readonly enCours = signal(false);
   phoneNumberId = '';
-  edition = { jetonAcces: '', secretApplication: '', versionApi: 'v21.0' };
   private suivi: ReturnType<typeof setInterval> | null = null;
   private rafraichissement: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.charger();
-    if (this.auth.peut('WHATSAPP_META')) this.chargerCompte();
     this.rafraichissement = setInterval(() => this.charger(), 30000);
   }
 
@@ -104,30 +100,6 @@ export class Numeros implements OnInit, OnDestroy {
       this.messages.add({ severity: 'info', summary: 'Retour à WhatsApp Web', detail: `Scannez de nouveau le QR pour ${s.agentNom}.` });
       this.charger();
     });
-  }
-
-  enregistrerCompte(): void {
-    this.enCours.set(true);
-    this.api.put<CompteMeta>('/api/whatsapp/meta', this.edition).subscribe({
-      next: c => {
-        this.enCours.set(false);
-        this.compte.set(c);
-        this.edition = { jetonAcces: '', secretApplication: '', versionApi: c.versionApi };
-        this.messages.add({ severity: 'success', summary: 'Compte Meta enregistré' });
-      },
-      error: () => this.enCours.set(false)
-    });
-  }
-
-  renouvelerJeton(): void {
-    this.api.post<CompteMeta>('/api/whatsapp/meta/jeton-verification').subscribe(c => {
-      this.compte.set(c);
-      this.messages.add({ severity: 'info', summary: 'Jeton de vérification renouvelé', detail: 'Recopiez-le dans la configuration du webhook chez Meta.' });
-    });
-  }
-
-  private chargerCompte(): void {
-    this.api.get<CompteMeta>('/api/whatsapp/meta').subscribe(c => { this.compte.set(c); this.edition.versionApi = c.versionApi; });
   }
 
   fermer(): void {

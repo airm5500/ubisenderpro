@@ -107,6 +107,7 @@
       </div>
       }
       @if (categorie() === 'AIDE') { <app-aide-textes /> }
+      @if (categorie() === 'WHATSAPP' && auth.peut('WHATSAPP_META')) { <app-compte-meta /> }
     </div>
   </div>
 </div>

@@ -19,6 +19,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import ci.ubipharm.crm.rest.service.ChiffrementService;
 import ci.ubipharm.crm.rest.service.PasserelleMetaService;
 import ci.ubipharm.crm.rest.service.dto.FichierDTO;
 import ci.ubipharm.crm.rest.service.dto.ResultatEnvoiDTO;
@@ -39,18 +40,20 @@ public class PasserelleMetaServiceImpl implements PasserelleMetaService {
     private final RestClient client;
     private final NamedParameterJdbcTemplate jdbc;
     private final JsonMapper jsonMapper;
+    private final ChiffrementService chiffrementService;
 
     private record Compte(String jeton, String version) {
     }
 
     public PasserelleMetaServiceImpl(@Value("${crm.meta.url:https://graph.facebook.com}") String url, NamedParameterJdbcTemplate jdbc,
-                                     JsonMapper jsonMapper) {
+                                     JsonMapper jsonMapper, ChiffrementService chiffrementService) {
         JdkClientHttpRequestFactory fabrique = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
         fabrique.setReadTimeout(Duration.ofSeconds(60));
         this.client = RestClient.builder().baseUrl(url).requestFactory(fabrique).build();
         this.jdbc = jdbc;
         this.jsonMapper = jsonMapper;
+        this.chiffrementService = chiffrementService;
     }
 
     @Override
@@ -229,7 +232,7 @@ public class PasserelleMetaServiceImpl implements PasserelleMetaService {
 
     private Compte compte() {
         return jdbc.query("select jeton_acces, version_api from crm_compte_meta where id = 1", Map.of(),
-                (rs, i) -> new Compte(rs.getString(1) == null || rs.getString(1).isBlank() ? null : rs.getString(1), rs.getString(2)))
+                (rs, i) -> new Compte(rs.getString(1) == null || rs.getString(1).isBlank() ? null : chiffrementService.dechiffrer(rs.getString(1)), rs.getString(2)))
                 .stream().findFirst().orElse(new Compte(null, "v21.0"));
     }
 }

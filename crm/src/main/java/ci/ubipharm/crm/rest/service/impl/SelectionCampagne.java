@@ -378,7 +378,7 @@ class SelectionCampagne {
             case "calcul.jours_avant_echeance" -> String.valueOf(Math.max(-ecart, 0));
             case "calcul.agent_nom", "calcul.expediteur_nom" -> t.get("agentNom", String.class);
             case "calcul.agent_numero", "calcul.expediteur_numero" -> numeroLisible(t.get("agentNumero", String.class));
-            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise" -> valeurEntreprise(parametreService, source);
+            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise", "calcul.nom_entreprise" -> valeurEntreprise(parametreService, source);
             default -> {
                 String alias = aliasParSource.get(source);
                 yield alias == null ? "" : formater(t.get(alias));
@@ -386,8 +386,15 @@ class SelectionCampagne {
         };
     }
 
+    /** Variables tirees des Parametres de l'entreprise, remplies de la meme facon dans tous les envois. */
+    static final Set<String> SOURCES_ENTREPRISE = Set.of("calcul.site_entreprise", "calcul.lien_commande",
+            "calcul.telephone_entreprise", "calcul.nom_entreprise");
+
     /** Coordonnees de l'entreprise saisies dans les Parametres, vides tant qu'elles ne le sont pas. */
     static String valeurEntreprise(ParametreService parametreService, String source) {
+        if ("calcul.nom_entreprise".equals(source)) {
+            return parametreService.valeur("entreprise.nom", "UBIPHARM CI");
+        }
         return parametreService.valeur(switch (source) {
             case "calcul.site_entreprise" -> "entreprise.site_web";
             case "calcul.lien_commande" -> "entreprise.lien_commande";

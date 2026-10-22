@@ -6,6 +6,7 @@ import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
+import { CharteService } from '../../core/charte';
 import { Agence, Agent, Campagne, CampagneDemande, CriteresCampagne, EtatEmail, EtatSms, ModeleMessage, Recapitulatif, SousType } from '../../core/modeles';
 import { LIBELLES, MontantPipe, aujourdhui, compterSms, resumeCriteres, TelephonePipe } from '../../core/format';
 
@@ -22,6 +23,7 @@ export class CampagneEdition implements OnInit {
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
   private readonly ref = inject(Referentiels);
+  protected readonly charte = inject(CharteService);
   protected readonly L = LIBELLES;
   protected readonly segments = SEGMENTS;
   /** La promotion releve du Marketing : elle n'est proposee ici que pour une ancienne campagne deja de ce type. */

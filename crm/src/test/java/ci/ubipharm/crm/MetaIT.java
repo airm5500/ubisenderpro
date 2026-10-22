@@ -36,6 +36,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
+import ci.ubipharm.crm.rest.service.ChiffrementService;
 import ci.ubipharm.crm.rest.service.EnvoiWhatsappService;
 import ci.ubipharm.crm.rest.service.PasserelleMetaService;
 import ci.ubipharm.crm.rest.service.PasserelleWhatsappService;
@@ -55,6 +56,9 @@ class MetaIT extends IntegrationBase {
 
     @MockitoBean
     PasserelleWhatsappService waWeb;
+
+    @Autowired
+    ChiffrementService chiffrementService;
 
     @Autowired
     EnvoiWhatsappService envoiWhatsappService;
@@ -96,6 +100,14 @@ class MetaIT extends IntegrationBase {
                 .andExpect(jsonPath("$.secretRenseigne").value(true))
                 .andExpect(jsonPath("$.jetonAcces").doesNotExist());
         assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where details like '%EAAG%'", Long.class)).isZero();
+        // Jeton et secret chiffres en base (decision Q5 du 22/10/2026) ; un secret encore en clair l'est au demarrage
+        assertThat(jdbc.queryForObject("select jeton_acces from crm_compte_meta where id = 1", String.class)).startsWith("chiffre:v1:").doesNotContain("EAAG");
+        assertThat(jdbc.queryForObject("select secret_application from crm_compte_meta where id = 1", String.class)).startsWith("chiffre:v1:");
+        jdbc.update("update crm_compte_meta set jeton_acces = 'EAAG-ancien' where id = 1");
+        chiffrementService.chiffrerSecretsEnClair();
+        String ancien = jdbc.queryForObject("select jeton_acces from crm_compte_meta where id = 1", String.class);
+        assertThat(ancien).startsWith("chiffre:v1:");
+        assertThat(chiffrementService.dechiffrer(ancien)).isEqualTo("EAAG-ancien");
         // Un champ vide garde le jeton enregistre
         envoyer(admin, put("/api/whatsapp/meta"), "{\"jetonAcces\":\"\",\"versionApi\":\"v22.0\"}").andExpect(jsonPath("$.jetonRenseigne").value(true));
 

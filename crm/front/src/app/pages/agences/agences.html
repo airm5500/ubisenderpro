@@ -2,7 +2,7 @@
   <div class="entete">
     <div>
       @if (integre()) { <h2 class="h2">Agences</h2> } @else { <h1>Agences</h1> }
-      <p class="sous-titre">Les agences du réseau UBIPHARM CI. Le code d'import est celui des fichiers de clients et de factures, s'il diffère du code.
+      <p class="sous-titre">Les agences du réseau {{ charte.nomEntreprise() }}. Le code d'import est celui des fichiers de clients et de factures, s'il diffère du code.
         Une agence n'est jamais supprimée : archivée, elle sort des listes de choix et garde son historique.</p>
     </div>
     @if (!archives()) { <div class="actions"><button class="ba" type="button" (click)="nouvelle()">Nouvelle agence</button></div> }

@@ -182,6 +182,25 @@ class WhatsappIT extends IntegrationBase {
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.elements[0].contenu").value("Qui est-ce ?"));
         mvc.perform(get("/api/recouvrement/reponses/par-client").session(connecter("it-agent2", MOT_DE_PASSE_ADMIN))).andExpect(jsonPath("$.total").value(0));
+
+        // Analyse de la campagne (remarque 5 du 22/10/2026) : chiffres, taux et courbe du jour
+        mvc.perform(get("/api/recouvrement/campagnes/" + campagne + "/analyse").session(admin))
+                .andExpect(jsonPath("$.cibles").value(2))
+                .andExpect(jsonPath("$.envoyes").value(2))
+                .andExpect(jsonPath("$.distribues").value(2))
+                .andExpect(jsonPath("$.lus").value(1))
+                .andExpect(jsonPath("$.echecs").value(0))
+                .andExpect(jsonPath("$.reponses").value(2))
+                .andExpect(jsonPath("$.tauxDistribution").value(100.0))
+                .andExpect(jsonPath("$.tauxLecture").value(50.0))
+                .andExpect(jsonPath("$.tauxEchec").value(0.0))
+                .andExpect(jsonPath("$.courbe[0].envoyes").value(2))
+                .andExpect(jsonPath("$.courbe[0].lus").value(1));
+        mvc.perform(get("/api/recouvrement/campagnes").session(admin))
+                .andExpect(jsonPath("$.elements[0].nbDistribues").value(2))
+                .andExpect(jsonPath("$.elements[0].nbLus").value(1));
+        mvc.perform(get("/api/recouvrement/campagnes/" + campagne + "/analyse").session(connecter("it-agent2", MOT_DE_PASSE_ADMIN)))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test

@@ -21,9 +21,10 @@ export class Shell {
   protected readonly fenetreCampagne = inject(FenetreCampagne);
   protected readonly auth = inject(Auth);
   protected readonly charte = inject(CharteService);
-  protected readonly nomEntreprise = 'UBIPHARM CI';
+  /** Nom de l'entreprise choisi dans Parametres > Charte. */
+  protected readonly nomEntreprise = computed(() => this.charte.charte()?.nomEntreprise || 'UBIPHARM CI');
   /** Lettres du nom, pour l'apparition lettre a lettre du theme B. */
-  protected readonly lettres = [...this.nomEntreprise].map(c => c === ' ' ? '\u00a0' : c);
+  protected readonly lettres = computed(() => [...this.nomEntreprise()].map(c => c === ' ' ? '\u00a0' : c));
   protected readonly module = inject(ModuleCourant);
 
   /** Module affiche : celui choisi ou d'ou l'on vient ; un utilisateur du seul Marketing reste en Marketing. */

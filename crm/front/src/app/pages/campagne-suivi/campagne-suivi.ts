@@ -1,3 +1,4 @@
+import { AnalyseCampagneBloc } from '../../core/analyse-campagne';
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { TooltipModule } from 'primeng/tooltip';
@@ -15,7 +16,7 @@ type Action = 'rejet' | 'annulation' | null;
 
 @Component({
   selector: 'app-campagne-suivi',
-  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe, EnvoyerMaintenant],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, MontantPipe, TelephonePipe, EnvoyerMaintenant, AnalyseCampagneBloc],
   templateUrl: './campagne-suivi.html'
 })
 export class CampagneSuivi implements OnInit, OnDestroy {

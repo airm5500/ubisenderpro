@@ -76,7 +76,7 @@ abstract class IntegrationBase {
                 + "'promotion_nom', 'promotion_code', 'promotion_debut', 'promotion_fin', 'produits_promotion', 'produits_disponibles', "
                 + "'evenement_nom', 'evenement_date', 'evenement_fin', 'information_titre', 'information_message', 'agence_ou_tournee', 'tournee', "
                 + "'date_livraison', 'creneau', 'nouvelle_estimation_livraison', 'cause_retard', 'date_resolution', 'jour_ferie', 'date_garde', "
-                + "'heure_limite_commande', 'consignes_livraison', 'pharmacien_garde', 'telephone_pharmacien', 'direction_signataire', 'site_entreprise', 'lien_commande', 'telephone_entreprise')");
+                + "'heure_limite_commande', 'consignes_livraison', 'pharmacien_garde', 'telephone_pharmacien', 'direction_signataire', 'site_entreprise', 'lien_commande', 'telephone_entreprise', 'nom_entreprise')");
         jdbc.update("update crm_variable_message set statut = 'ACTIF'");
         jdbc.update("delete from crm_delegation");
         jdbc.update("delete from crm_affectation");

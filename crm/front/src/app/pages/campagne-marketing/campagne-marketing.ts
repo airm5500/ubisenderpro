@@ -1,4 +1,6 @@
+import { AnalyseCampagneBloc } from '../../core/analyse-campagne';
 import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { CharteService } from '../../core/charte';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -16,10 +18,11 @@ type Action = 'rejet' | 'annulation' | null;
 /** Controle avant validation, puis suivi des envois d'une campagne promotionnelle. */
 @Component({
   selector: 'app-campagne-marketing',
-  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire, EnvoyerMaintenant],
+  imports: [TooltipModule, FormsModule, RouterLink, DialogModule, JourPipe, TelephonePipe, CampagneMarketingFormulaire, EnvoyerMaintenant, AnalyseCampagneBloc],
   templateUrl: './campagne-marketing.html'
 })
 export class CampagneMarketingSuivi implements OnInit, OnDestroy {
+  protected readonly charte = inject(CharteService);
   private readonly api = inject(Api);
   private readonly messagesService = inject(MessageService);
   protected readonly auth = inject(Auth);

@@ -90,6 +90,13 @@ class EchangesIT extends IntegrationBase {
                 .andExpect(jsonPath("$.exclus[*].motif").value(org.hamcrest.Matchers.containsInAnyOrder("Désabonné (STOP)", "Client désactivé",
                         "Format invalide", "En double")));
         assertThat(jdbc.queryForObject("select count(*) from crm_envoi_masse", Integer.class)).isZero();
+        // {nom_entreprise} reprend le nom de Parametres > Charte (remarque 18 du 22/10/2026)
+        String equipe = "{\"nom\":\"Equipe\",\"contenu\":\"Toute l'equipe {nom_entreprise} vous remercie.\",\"numeros\":\"0700000001\",\"apercu\":true}";
+        envoyer(charge, post("/api/envois-masse"), equipe).andExpect(jsonPath("$.exemple").value("Toute l'equipe UBIPHARM CI vous remercie."));
+        jdbc.update("update crm_parametre set valeur = 'UBIPHARM SENEGAL' where cle = 'entreprise.nom'");
+        envoyer(charge, post("/api/envois-masse"), equipe).andExpect(jsonPath("$.exemple").value("Toute l'equipe UBIPHARM SENEGAL vous remercie."));
+        mvc.perform(get("/api/charte")).andExpect(jsonPath("$.nomEntreprise").value("UBIPHARM SENEGAL"));
+        jdbc.update("update crm_parametre set valeur = 'UBIPHARM CI' where cle = 'entreprise.nom'");
 
         Long envoi = ((Number) JsonPath.read(envoyer(charge, post("/api/envois-masse"),
                 "{\"nom\":\"Rappel\",\"contenu\":\"Bonjour {nom}, nouvel arrivage.\",\"numeros\":\"%s\"}".formatted(numeros.replace("\n", "\\n")))

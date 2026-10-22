@@ -156,3 +156,25 @@ test.describe('campagnes Marketing et reponses des clients', () => {
     await admin.fermer();
   });
 });
+
+test.describe('nom de l entreprise et compte Meta', () => {
+  test('{nom_entreprise} est une variable et la charte publique donne le nom', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const variables = await json(await admin.get('api/recouvrement/variables'));
+    expect(variables.find(v => v.code === 'nom_entreprise')).toMatchObject({ source: 'calcul.nom_entreprise' });
+    const anonyme = await Session.anonyme(baseURL);
+    expect(await json(await anonyme.get('api/charte'))).toMatchObject({ nomEntreprise: 'UBIPHARM CI' });
+    const modeles = await json(await admin.get('api/recouvrement/modeles-messages'));
+    expect(modeles.filter(m => /UBIPHARM/.test(m.contenu))).toEqual([]);
+    await anonyme.fermer();
+    await admin.fermer();
+  });
+
+  test('le jeton Meta ne revient jamais vers l ecran', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const compte = await json(await admin.get('api/whatsapp/meta'));
+    expect(compte.jetonAcces).toBeUndefined();
+    expect(compte.secretApplication).toBeUndefined();
+    await admin.fermer();
+  });
+});

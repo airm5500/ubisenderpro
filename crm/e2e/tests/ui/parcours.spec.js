@@ -211,3 +211,21 @@ test('creer ou modifier s ouvre en fenetre, par-dessus l ecran qui reste affiche
   await expect(page.getByRole('dialog', { name: 'Nouveau fournisseur' })).toBeVisible();
   expect(incidents).toEqual([]);
 });
+
+test('le compte Meta se regle dans Parametres > WhatsApp, plus dans Numeros WhatsApp', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('numeros');
+  await expect(page.getByRole('heading', { name: 'API WhatsApp officielle (Meta)' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Paramètres > WhatsApp' }).click();
+  await expect(page.getByRole('heading', { name: 'API WhatsApp officielle (Meta)' })).toBeVisible();
+  await expect(page.getByLabel("Jeton d'accès (utilisateur système)")).toHaveAttribute('type', 'password');
+  expect(incidents).toEqual([]);
+});
+
+test('le nom de l entreprise vient de Parametres > Charte', async ({ page }) => {
+  await seConnecterEn(page, LOGIN);
+  await page.goto('parametres');
+  await page.getByText('Charte', { exact: true }).first().click();
+  await expect(page.getByText(/Nom de l'entreprise, affiché dans le menu/)).toBeVisible();
+  await expect(page.locator('nav .nom')).toHaveAttribute('aria-label', 'UBIPHARM CI');
+});

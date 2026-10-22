@@ -72,6 +72,11 @@ export const LIBELLES = {
 };
 
 /** Date du jour au format ISO (heure d'Abidjan = UTC). */
+/** Part en pourcentage arrondi, « — » si le total est nul. */
+export function pourcent(part: number, total: number): string {
+  return total ? `${Math.round(part * 100 / total)} %` : '—';
+}
+
 export function aujourdhui(decalageJours = 0): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + decalageJours);

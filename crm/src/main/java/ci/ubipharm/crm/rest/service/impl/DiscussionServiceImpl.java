@@ -260,7 +260,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         .setParameter("id", perimetreService.perimetreCourant().getUtilisateurId()).getSingleResult();
             } else if ("calcul.expediteur_numero".equals(source)) {
                 valeur = SelectionCampagne.numeroLisible(agent);
-            } else if (Set.of("calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise").contains(source)) {
+            } else if (SelectionCampagne.SOURCES_ENTREPRISE.contains(source)) {
                 valeur = SelectionCampagne.valeurEntreprise(parametreService, source);
             }
             if (valeur == null) {

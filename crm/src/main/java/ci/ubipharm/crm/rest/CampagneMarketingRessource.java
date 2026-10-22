@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import ci.ubipharm.crm.rest.service.CampagneMarketingService;
+import ci.ubipharm.crm.rest.service.dto.AnalyseCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDemandeDTO;
@@ -41,6 +42,11 @@ public class CampagneMarketingRessource {
     @GetMapping("/{id}")
     public CampagneMarketingDTO consulter(@PathVariable Long id) {
         return campagneMarketingService.consulter(id);
+    }
+
+    @GetMapping("/{id}/analyse")
+    public AnalyseCampagneDTO analyse(@PathVariable Long id) {
+        return campagneMarketingService.analyse(id);
     }
 
     @GetMapping("/{id}/recapitulatif")

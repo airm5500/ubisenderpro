@@ -53,6 +53,9 @@ public class CampagneMarketingDTO {
     private int nbMessages;
     private int nbExclus;
     private int nbEnvoyes;
+    /** Pour les colonnes de la liste (remarque 5 du 22/10/2026) ; le detail est dans l'analyse. */
+    private int nbDistribues;
+    private int nbLus;
     private int nbEchecs;
     private Long creeParId;
     private String creePar;

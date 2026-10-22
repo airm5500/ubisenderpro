@@ -127,7 +127,7 @@
         <div class="opts" role="radiogroup" aria-label="Canal d'envoi">
           <label class="opt" [class.optn]="edition.canal === 'WHATSAPP'"><input type="radio" name="canal" value="WHATSAPP" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">WhatsApp, depuis {{ marketing() ? 'le numéro de qui prépare la campagne' : "le numéro de l'agent" }}</label>
           <label class="opt" [class.optn]="edition.canal === 'EMAIL'"><input type="radio" name="canal" value="EMAIL" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">E-mail, {{ marketing() ? 'qui prépare la campagne' : "l'agent" }} en adresse de réponse</label>
-          <label class="opt" [class.optn]="edition.canal === 'SMS'"><input type="radio" name="canal" value="SMS" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">SMS, au nom d'UBIPHARM, sans réponse</label>
+          <label class="opt" [class.optn]="edition.canal === 'SMS'"><input type="radio" name="canal" value="SMS" [(ngModel)]="edition.canal" (ngModelChange)="canalApercu.set($event)">SMS, au nom de {{ charte.nomEntreprise() }}, sans réponse</label>
         </div>
       </div>
       @if (edition.canal === 'EMAIL') {
@@ -170,7 +170,7 @@
           @if (canalApercu() === 'EMAIL') {
             <div class="courriel">
               <div class="ent">
-                <span>De <strong>UBIPHARM CI - {{ marketing() ? 'Marketing' : 'Recouvrement' }}</strong> · répondre {{ marketing() ? 'à qui prépare la campagne' : "à l'agent du client" }}</span>
+                <span>De <strong>{{ charte.nomEntreprise() }} - {{ marketing() ? 'Marketing' : 'Recouvrement' }}</strong> · répondre {{ marketing() ? 'à qui prépare la campagne' : "à l'agent du client" }}</span>
                 <span class="objet">@for (p of apercuObjet(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</span>
               </div>
               <div class="corps">@for (p of apercu(); track $index) {@if (p.variable) {<span class="v" [style.background]="p.inconnue ? '#FDECE7' : null" [style.color]="p.inconnue ? '#7E2A12' : null">{{ p.texte }}</span>} @else {{{ p.texte }}}}</div>

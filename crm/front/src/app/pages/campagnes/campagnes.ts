@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { CharteService } from '../../core/charte';
 import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -7,7 +8,7 @@ import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Campagne, Page, Recapitulatif } from '../../core/modeles';
-import { JourPipe, LIBELLES, MontantPipe, resumeCriteres, TelephonePipe } from '../../core/format';
+import { JourPipe, LIBELLES, MontantPipe, resumeCriteres, TelephonePipe, pourcent } from '../../core/format';
 
 interface Onglet { statut: string; libelle: string; }
 
@@ -17,12 +18,14 @@ interface Onglet { statut: string; libelle: string; }
   templateUrl: './campagnes.html'
 })
 export class Campagnes implements OnInit {
+  protected readonly charte = inject(CharteService);
   protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;
+  protected readonly pc = pourcent;
   protected readonly resume = resumeCriteres;
 
   protected readonly onglets: Onglet[] = [

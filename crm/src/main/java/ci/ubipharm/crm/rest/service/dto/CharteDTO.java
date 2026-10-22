@@ -15,6 +15,8 @@ import lombok.Setter;
 public class CharteDTO {
 
     private String nom;
+    /** Nom de l'entreprise, repris par la variable {nom_entreprise} et dans les ecrans. */
+    private String nomEntreprise;
     private String couleurPrincipale;
     private String couleurSecondaire;
     /** A, B ou C : habillage de la partie droite des ecrans. */

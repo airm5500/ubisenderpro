@@ -15,7 +15,7 @@
           <g clip-path="url(#logo-cadre)"><rect class="logo-lueur" x="0" y="-10" width="24" height="84" fill="url(#logo-reflet)" transform="rotate(20)"/></g>
         </svg>
       }
-      <div><div class="nom" [attr.aria-label]="nomEntreprise">@for (l of lettres; track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
+      <div><div class="nom" [attr.aria-label]="nomEntreprise()">@for (l of lettres(); track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
     </div>
     <!-- Seul le menu defile : la marque en haut et le bloc de deconnexion en bas restent fixes -->
     <div class="menu-defile">

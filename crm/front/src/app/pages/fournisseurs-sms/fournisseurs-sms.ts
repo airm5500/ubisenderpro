@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { CharteService } from '../../core/charte';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +24,7 @@ const VIDE: Edition = {
   templateUrl: './fournisseurs-sms.html'
 })
 export class FournisseursSms implements OnInit {
+  protected readonly charte = inject(CharteService);
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   /** Affiche dans les Parametres : pas de cadre de page ni de grand titre. */
@@ -38,7 +40,7 @@ export class FournisseursSms implements OnInit {
   protected readonly solde = signal<ResultatAppelSms | null>(null);
   protected readonly occupe = signal(false);
   edition: Edition = { ...VIDE };
-  test = { numero: '', message: 'Essai UBIPHARM CRM : ce SMS confirme le paramétrage du fournisseur.' };
+  test = { numero: '', message: 'Essai du CRM : ce SMS confirme le paramétrage du fournisseur.' };
 
   ngOnInit(): void {
     this.charger();

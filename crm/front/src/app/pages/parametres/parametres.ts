@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -10,6 +10,7 @@ import { ReferentielsListe, TypeReferentiel } from '../referentiels/referentiels
 import { Agences } from '../agences/agences';
 import { FournisseursSms } from '../fournisseurs-sms/fournisseurs-sms';
 import { AideTextes } from './aide-textes';
+import { CompteMetaConfig } from '../numeros/compte-meta';
 import { AideService } from '../../core/aide';
 
 const CATEGORIES: [string, string, string][] = [
@@ -49,7 +50,7 @@ const REFERENTIELS: [string, string, string][] = [
 /** Parametres de l'application, par categorie ; seuls ceux qui ont change sont envoyes. */
 @Component({
   selector: 'app-parametres',
-  imports: [FormsModule, JourPipe, ReferentielsListe, Agences, FournisseursSms, AideTextes],
+  imports: [FormsModule, JourPipe, ReferentielsListe, Agences, FournisseursSms, AideTextes, CompteMetaConfig],
   templateUrl: './parametres.html'
 })
 export class Parametres implements OnInit {
@@ -62,6 +63,8 @@ export class Parametres implements OnInit {
 
   protected readonly parametres = signal<Parametre[]>([]);
   protected readonly categorie = signal('GENERAL');
+  /** Categorie ouverte par un lien (?categorie=WHATSAPP depuis Numeros WhatsApp). */
+  readonly categorieDemandee = input<string>(undefined, { alias: 'categorie' });
   protected saisies: Record<string, string | number | null> = {};
 
   protected readonly categories = computed(() => CATEGORIES.filter(([code]) => this.disponible(code)));
@@ -75,7 +78,11 @@ export class Parametres implements OnInit {
 
   ngOnInit(): void {
     if (this.auth.peut('PARAMETRES')) {
-      this.api.get<Parametre[]>('/api/parametres').subscribe(p => this.remplir(p));
+      this.api.get<Parametre[]>('/api/parametres').subscribe(p => {
+        this.remplir(p);
+        const demandee = this.categorieDemandee();
+        if (demandee && this.disponible(demandee)) this.categorie.set(demandee);
+      });
     } else {
       this.categorie.set(this.auth.peut('FOURNISSEURS_SMS') ? 'FOURNISSEURS_SMS' : this.auth.peut('AGENCES') ? 'AGENCES' : 'REGION');
     }

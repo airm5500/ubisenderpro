@@ -50,7 +50,7 @@ public class ModeleMessageServiceImpl implements ModeleMessageService {
             "calcul.information_message", "calcul.agence_ou_tournee", "calcul.tournee", "calcul.date_livraison", "calcul.creneau",
             "calcul.nouvelle_estimation_livraison", "calcul.cause_retard", "calcul.date_resolution", "calcul.jour_ferie", "calcul.date_garde",
             "calcul.heure_limite_commande", "calcul.consignes_livraison", "calcul.pharmacien_garde", "calcul.telephone_pharmacien",
-            "calcul.direction_signataire", "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise");
+            "calcul.direction_signataire", "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise", "calcul.nom_entreprise");
 
     /** Variables remplies par l'information client qu'une campagne Marketing annonce. */
     static final Set<String> SOURCES_INFORMATION = Set.of("calcul.information_titre", "calcul.information_message", "calcul.agence_ou_tournee",

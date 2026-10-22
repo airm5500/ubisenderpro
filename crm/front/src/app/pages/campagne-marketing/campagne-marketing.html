@@ -69,7 +69,7 @@
         }
         <div><span>Exclus</span><strong>{{ r.nbExclus }}</strong>@for (e of r.exclusions; track e.motif) {<span>{{ e.nb }} · {{ e.motif }}</span>}</div>
         <div><span>{{ c.canal === 'EMAIL' ? 'Réponses à' : c.canal === 'SMS' ? 'Expéditeur' : 'Envoyé depuis' }}</span>
-          <strong style="font-size: 16px">{{ c.canal === 'SMS' ? "Nom d'UBIPHARM" : r.expediteur }}</strong>
+          <strong style="font-size: 16px">{{ c.canal === 'SMS' ? charte.nomEntreprise() : r.expediteur }}</strong>
           <span>{{ c.canal === 'EMAIL' ? (r.emailReponse || 'sans adresse') : c.canal === 'SMS' ? 'sans réponse possible' : ((r.numeroExpediteur | telephone) || 'sans numéro') }}</span></div>
       </section>
       @if (avantValidation() && r.exemples.length) {
@@ -95,6 +95,7 @@
         ? 'Envoi en cours, un message toutes les 20 à 45 secondes depuis le numéro de ' + c.creePar + ', aux heures permises.'
         : "Envoi en cours, l'un après l'autre aux heures permises." }} Cette page se met à jour toute seule.</span></div>
     }
+    @if (!avantValidation()) { <app-analyse-campagne [url]="'/api/marketing/campagnes/' + c.id" [version]="c" /> }
 
     <section class="bloc">
       <div class="titre"><h2 class="h2">{{ avantValidation() ? 'Messages générés' : 'Messages' }}</h2>

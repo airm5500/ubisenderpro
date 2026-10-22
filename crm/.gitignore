@@ -6,3 +6,4 @@ nbproject/
 nb-configuration.xml
 logs/
 temoin-marche.properties*
+cle-chiffrement.key

@@ -20,8 +20,10 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.AnalyseCampagneService;
 import ci.ubipharm.crm.rest.service.CampagneService;
 import ci.ubipharm.crm.rest.service.PortefeuilleService;
+import ci.ubipharm.crm.rest.service.dto.AnalyseCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.AgentCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneDTO;
@@ -62,7 +64,9 @@ public class CampagneServiceImpl implements CampagneService {
                    cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence, cp.debut_recurrence as debutRecurrence, cp.nb_executions as nbExecutions,
                    cp.statut as statut, cp.perimetre_agences as perimetreAgences, cp.perimetre_agents as perimetreAgents,
                    cp.nb_clients as nbClients, cp.nb_factures as nbFactures, cp.nb_messages as nbMessages, cp.nb_exclus as nbExclus,
-                   cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs, cp.cree_par as creeParId, uc.nom_complet as creePar,
+                   cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs,
+                   (select count(*) from crm_campagne_message dm where dm.campagne_id = cp.id and (dm.distribue_le is not null or dm.statut in ('DISTRIBUE', 'LU'))) as nbDistribues,
+                   (select count(*) from crm_campagne_message lm where lm.campagne_id = cp.id and (lm.lu_le is not null or lm.statut = 'LU')) as nbLus, cp.cree_par as creeParId, uc.nom_complet as creePar,
                    cp.created_at as createdAt, cp.soumise_le as soumiseLe, uv.nom_complet as validePar, cp.valide_le as valideLe,
                    cp.motif_rejet as motifRejet, ur.nom_complet as rejetePar, cp.lance_le as lanceLe, cp.termine_le as termineLe,
                    ua.nom_complet as annulePar, cp.annule_le as annuleLe, cp.motif_annulation as motifAnnulation
@@ -90,6 +94,7 @@ public class CampagneServiceImpl implements CampagneService {
             """;
 
     private final EntityManager em;
+    private final AnalyseCampagneService analyseCampagneService;
     private final NamedParameterJdbcTemplate jdbc;
     private final JsonMapper jsonMapper;
     private final SelectionCampagne selectionCampagne;
@@ -137,6 +142,13 @@ public class CampagneServiceImpl implements CampagneService {
                 .page(criteres.getPage())
                 .taille(criteres.getTaille())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AnalyseCampagneDTO analyse(Long id) {
+        consulter(id); // perimetre et droits du module
+        return analyseCampagneService.analyser(id);
     }
 
     @Override
@@ -659,6 +671,8 @@ public class CampagneServiceImpl implements CampagneService {
                 .nbMessages(((Number) tuple.get("nbMessages")).intValue())
                 .nbExclus(((Number) tuple.get("nbExclus")).intValue())
                 .nbEnvoyes(((Number) tuple.get("nbEnvoyes")).intValue())
+                .nbDistribues(((Number) tuple.get("nbDistribues")).intValue())
+                .nbLus(((Number) tuple.get("nbLus")).intValue())
                 .nbEchecs(((Number) tuple.get("nbEchecs")).intValue())
                 .creeParId(tuple.get("creeParId", Long.class))
                 .creePar(tuple.get("creePar", String.class))

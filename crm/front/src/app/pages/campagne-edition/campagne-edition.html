@@ -131,9 +131,9 @@
             <p class="discret">Validée une fois, la campagne repart seule à la même heure avec les factures du jour. Une facture déjà relancée avant ou le jour de l'échéance ne l'est pas une seconde fois ; après l'échéance, elle l'est à chaque envoi tant qu'elle n'est pas soldée.</p>
           }
           @if (canal() === 'EMAIL') {
-            <p class="discret">Les e-mails partent entre {{ etatEmail()?.heureDebut ?? 8 }} h et {{ etatEmail()?.heureFin ?? 18 }} h, heure d'Abidjan, depuis {{ etatEmail()?.expediteur || "l'adresse d'envoi d'UBIPHARM" }}, l'un après l'autre.</p>
+            <p class="discret">Les e-mails partent entre {{ etatEmail()?.heureDebut ?? 8 }} h et {{ etatEmail()?.heureFin ?? 18 }} h, heure d'Abidjan, depuis {{ etatEmail()?.expediteur || "l'adresse d'envoi de l'entreprise" }}, l'un après l'autre.</p>
           } @else if (canal() === 'SMS') {
-            <p class="discret">Les SMS partent entre {{ etatSms()?.heureDebut ?? 8 }} h et {{ etatSms()?.heureFin ?? 18 }} h, heure d'Abidjan, par {{ etatSms()?.fournisseur || 'le fournisseur SMS' }}, sous le nom {{ etatSms()?.expediteur || 'UBIPHARM' }}, l'un après l'autre.</p>
+            <p class="discret">Les SMS partent entre {{ etatSms()?.heureDebut ?? 8 }} h et {{ etatSms()?.heureFin ?? 18 }} h, heure d'Abidjan, par {{ etatSms()?.fournisseur || 'le fournisseur SMS' }}, sous le nom {{ etatSms()?.expediteur || charte.nomEntreprise() }}, l'un après l'autre.</p>
           } @else {
             <p class="discret">Les messages partent entre 8 h et 18 h, heure d'Abidjan, au rythme lent imposé par WhatsApp Web : 20 à 45 secondes entre deux messages d'un même numéro, 200 par jour au plus.</p>
           }
@@ -184,7 +184,7 @@
               </div>
             } @else if (m.canal === 'SMS') {
               <div class="fil-sms">
-                <div class="exp">{{ etatSms()?.expediteur || 'UBIPHARM' }} · vers {{ m.numeroDestinataire | telephone }}</div>
+                <div class="exp">{{ etatSms()?.expediteur || charte.nomEntreprise() }} · vers {{ m.numeroDestinataire | telephone }}</div>
                 <div class="bulle">{{ m.contenu }}</div>
                 @if (compter(m.contenu); as n) { <div class="compte" [class.retard]="n.sms > 2">{{ n.caracteres }} caractères · {{ n.sms }} SMS</div> }
               </div>

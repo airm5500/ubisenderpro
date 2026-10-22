@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service;
 
+import ci.ubipharm.crm.rest.service.dto.AnalyseCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneDemandeDTO;
@@ -43,4 +44,7 @@ public interface CampagneService {
 
     /** Demarre les campagnes validees dont la date d'execution est atteinte ; renvoie leur nombre. */
     int demarrerCampagnesEchues();
+
+    /** Chiffres, taux et courbe jour par jour d'une campagne visible de l'utilisateur. */
+    AnalyseCampagneDTO analyse(Long id);
 }

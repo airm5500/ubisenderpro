@@ -132,6 +132,11 @@ class CampagneMarketingIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))
                 .andExpect(jsonPath("$.statut").value("TERMINEE"))
                 .andExpect(jsonPath("$.nbEnvoyes").value(3));
+        mvc.perform(get("/api/marketing/campagnes/" + campagne + "/analyse").session(charge))
+                .andExpect(jsonPath("$.envoyes").value(3))
+                .andExpect(jsonPath("$.distribues").value(0))
+                .andExpect(jsonPath("$.tauxDistribution").value(0.0))
+                .andExpect(jsonPath("$.tauxLecture").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

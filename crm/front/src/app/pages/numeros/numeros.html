@@ -64,32 +64,8 @@
     <p class="discret">Les clients continuent de répondre sur ce WhatsApp ; une copie de leurs réponses arrive dans la fiche client.</p>
   </section>
 
-  @if (compte(); as c) {
-    <section class="bloc">
-      <div class="titre"><h2 class="h2">API WhatsApp officielle (Meta)</h2></div>
-      <p class="discret">Facultatif : WhatsApp Web reste le canal par défaut. Un numéro enregistré dans WhatsApp Manager passe à l'API officielle avec son
-        identifiant (Phone number ID). Hors des 24 h qui suivent une réponse du client, Meta n'accepte qu'un modèle approuvé : renseignez son nom
-        dans le modèle de message ; ses paramètres {{ parametresMeta }}… sont les variables du modèle, dans l'ordre.</p>
-      <form class="formulaire" (ngSubmit)="enregistrerCompte()">
-        <div class="grille">
-          <label class="f">Jeton d'accès (utilisateur système)
-            <input class="sel" type="password" name="jetonAcces" [(ngModel)]="edition.jetonAcces" autocomplete="off"
-                   [placeholder]="c.jetonRenseigne ? 'Enregistré : laissez vide pour le garder' : 'À coller depuis Meta Business'"></label>
-          <label class="f">Secret de l'application
-            <input class="sel" type="password" name="secretApplication" [(ngModel)]="edition.secretApplication" autocomplete="off"
-                   [placeholder]="c.secretRenseigne ? 'Enregistré : laissez vide pour le garder' : 'Signe les notifications de Meta'"></label>
-          <label class="f">Version de l'API<input class="sel" name="versionApi" [(ngModel)]="edition.versionApi"></label>
-          <div class="f">Webhook à déclarer chez Meta
-            <span><strong>{{ c.urlWebhook ?? 'Renseignez d\'abord l\'adresse publique du CRM dans les paramètres' }}</strong></span>
-            <span class="discret">Jeton de vérification : <strong>{{ c.jetonVerification }}</strong> · <a (click)="renouvelerJeton()">Renouveler</a></span>
-          </div>
-        </div>
-        <div class="pied">
-          @if (c.modifiePar) { <span class="discret">Modifié le {{ c.modifieLe | jour: true }} par {{ c.modifiePar }}</span> }
-          <button class="bp" type="submit" [disabled]="enCours()">Enregistrer le compte Meta</button>
-        </div>
-      </form>
-    </section>
+  @if (auth.peut('WHATSAPP_META')) {
+    <p class="discret">Le compte de l'API WhatsApp officielle (Meta) se règle dans <a routerLink="/parametres" [queryParams]="{ categorie: 'WHATSAPP' }">Paramètres &gt; WhatsApp</a>.</p>
   }
 </div>
 

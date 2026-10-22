@@ -42,6 +42,7 @@ public class CharteServiceImpl implements CharteService {
     public CharteDTO charte() {
         CharteDTO.CharteDTOBuilder charte = CharteDTO.builder()
                 .nom(parametreService.valeur("app.nom", "UBIPHARM CRM"))
+                .nomEntreprise(parametreService.valeur("entreprise.nom", "UBIPHARM CI"))
                 .couleurPrincipale(parametreService.valeur("charte.couleur_principale", "#05253D"))
                 .couleurSecondaire(parametreService.valeur("charte.couleur_secondaire", "#51D78E"))
                 .theme(parametreService.valeur("charte.theme", "A"))

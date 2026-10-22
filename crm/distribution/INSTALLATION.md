@@ -135,6 +135,11 @@ A sauvegarder chaque jour, hors du poste :
   "C:\Program Files\MariaDB 11.4\bin\mariadb-dump.exe" -u ubicrm -pMotDePasseBase --single-transaction --routines ubicrm > D:\Sauvegardes\ubicrm.sql
   ```
 - le dossier `C:\UBIPHARM-CRM\donnees` (configuration et session WhatsApp).
+  Il contient aussi `cle-chiffrement.key`, creee au premier demarrage : elle
+  chiffre en base le jeton et le secret du compte Meta. Sans elle, une base
+  restauree ne relit plus ces secrets et il faut les ressaisir dans
+  Parametres > WhatsApp. Gardez-la avec la sauvegarde de la base, mais pas
+  dans le meme fichier.
 
 ## 9. Mise a jour
 

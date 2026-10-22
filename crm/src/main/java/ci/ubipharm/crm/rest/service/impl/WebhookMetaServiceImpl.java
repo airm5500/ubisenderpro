@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 
+import ci.ubipharm.crm.rest.service.ChiffrementService;
 import ci.ubipharm.crm.rest.service.EvenementWhatsappService;
 import ci.ubipharm.crm.rest.service.WebhookMetaService;
 import ci.ubipharm.crm.rest.service.dto.EvenementAccuseDTO;
@@ -35,6 +36,7 @@ public class WebhookMetaServiceImpl implements WebhookMetaService {
     private final NamedParameterJdbcTemplate jdbc;
     private final EvenementWhatsappService evenementWhatsappService;
     private final JsonMapper jsonMapper;
+    private final ChiffrementService chiffrementService;
 
     @Override
     public String verifierAbonnement(String mode, String jeton, String defi) {
@@ -53,7 +55,11 @@ public class WebhookMetaServiceImpl implements WebhookMetaService {
         }
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secrets.getFirst().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String secret = chiffrementService.dechiffrer(secrets.getFirst());
+            if (secret == null) {
+                throw new BadCredentialsException("Secret d'application Meta illisible");
+            }
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] attendu = mac.doFinal(corps.getBytes(StandardCharsets.UTF_8));
             byte[] recu = HexFormat.of().parseHex(signature.substring("sha256=".length()));
             if (!MessageDigest.isEqual(attendu, recu)) {

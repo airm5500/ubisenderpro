@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { CharteService } from '../../core/charte';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
@@ -16,6 +17,7 @@ interface Edition { code: string; codeImport: string; libelle: string; }
   templateUrl: './agences.html'
 })
 export class Agences implements OnInit {
+  protected readonly charte = inject(CharteService);
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
 

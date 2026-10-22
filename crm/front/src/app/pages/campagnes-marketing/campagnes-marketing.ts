@@ -5,7 +5,7 @@ import { forkJoin } from 'rxjs';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { CampagneMarketing, Page } from '../../core/modeles';
-import { JourPipe, LIBELLES } from '../../core/format';
+import { JourPipe, LIBELLES, pourcent } from '../../core/format';
 import { CampagneMarketingFormulaire } from './campagne-marketing-formulaire';
 
 interface Onglet { statut: string; libelle: string; }
@@ -21,6 +21,7 @@ export class CampagnesMarketing implements OnInit {
   private readonly route = inject(ActivatedRoute);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;
+  protected readonly pc = pourcent;
 
   protected readonly onglets: Onglet[] = [
     { statut: 'A_VALIDER', libelle: 'À valider' }, { statut: 'VALIDEE', libelle: 'Programmées' }, { statut: 'EN_COURS', libelle: 'En cours' },

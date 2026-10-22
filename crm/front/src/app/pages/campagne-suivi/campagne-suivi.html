@@ -74,6 +74,8 @@
       }
     }
 
+    @if (!avantValidation()) { <app-analyse-campagne [url]="'/api/recouvrement/campagnes/' + c.id" [version]="c" /> }
+
     <section class="bloc">
       <div class="titre"><h2 class="h2">{{ avantValidation() ? 'Messages générés' : 'Messages' }}</h2>
         <form class="actions" (ngSubmit)="rechercher()"><input class="sel petit" style="width: 240px" name="q" [(ngModel)]="q" placeholder="Client ou référence"></form></div>

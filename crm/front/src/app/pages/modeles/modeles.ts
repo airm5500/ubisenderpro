@@ -23,7 +23,7 @@ export class Modeles implements OnInit {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
-  private readonly charte = inject(CharteService);
+  protected readonly charte = inject(CharteService);
   protected readonly L = LIBELLES;
 
   /** Donnee de route : les modeles des relances ou ceux des promotions du Marketing. */

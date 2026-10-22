@@ -204,7 +204,7 @@ export interface Campagne {
   id: number; nom: string; typeCampagne: string; modeleId: number; modeleNom: string; canal: string; criteres: CriteresCampagne;
   dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   statut: string; nbClients: number; nbFactures: number; nbMessages: number; nbExclus: number;
-  nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string; createdAt: string; soumiseLe: string | null;
+  nbEnvoyes: number; nbDistribues: number; nbLus: number; nbEchecs: number; creeParId: number; creePar: string; createdAt: string; soumiseLe: string | null;
   validePar: string | null; valideLe: string | null; motifRejet: string | null; rejetePar: string | null;
   lanceLe: string | null; termineLe: string | null; annulePar: string | null; annuleLe: string | null; motifAnnulation: string | null;
 }
@@ -291,7 +291,7 @@ export interface CampagneMarketing {
   informationId: number | null; informationTitre: string | null;
   canal: string; dateExecution: string | null; recurrence: string | null; finRecurrence: string | null; nbExecutions: number;
   afficheId: number | null; afficheNom: string | null; afficheType: string | null; joindreProduits: boolean; listeProduitsId: number | null;
-  statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbEchecs: number; creeParId: number; creePar: string;
+  statut: string; nbClients: number; nbMessages: number; nbExclus: number; nbEnvoyes: number; nbDistribues: number; nbLus: number; nbEchecs: number; creeParId: number; creePar: string;
   numeroExpediteur: string | null; agencesCibles: number[] | null; createdAt: string; soumiseLe: string | null; validePar: string | null;
   valideLe: string | null; motifRejet: string | null; rejetePar: string | null; lanceLe: string | null; termineLe: string | null;
   annulePar: string | null; annuleLe: string | null; motifAnnulation: string | null;
@@ -346,3 +346,9 @@ export interface EnvoiMasse {
 export interface DestinataireMasse { id: number | null; saisi: string | null; numero: string | null; nom: string | null; clientId: number | null; statut: string; motif: string | null; envoyeLe: string | null; }
 export interface EnvoiMasseApercu { envoi: EnvoiMasse | null; nbRetenus: number; exclus: DestinataireMasse[]; exemple: string | null; horsPlage: boolean; plageHoraire: string;
   piecesJointes: PieceJointe[] | null; variablesRetirees: string[] | null; }
+
+/** Analyse d'une campagne : chiffres, taux en % (null tant que la base est nulle) et suivi jour par jour. */
+export interface AnalyseCampagne {
+  cibles: number; envoyes: number; distribues: number; lus: number; echecs: number; enAttente: number; exclus: number; reponses: number;
+  tauxDistribution: number | null; tauxLecture: number | null; tauxEchec: number | null; tauxReponse: number | null; courbe: PointEvolution[];
+}

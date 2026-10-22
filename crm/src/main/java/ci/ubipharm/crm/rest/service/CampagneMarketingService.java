@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service;
 
+import ci.ubipharm.crm.rest.service.dto.AnalyseCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDemandeDTO;
@@ -38,4 +39,7 @@ public interface CampagneMarketingService {
     CampagneMarketingDTO annuler(Long id, MotifDTO motif);
 
     int demarrerCampagnesEchues();
+
+    /** Chiffres, taux et courbe jour par jour d'une campagne visible de l'utilisateur. */
+    AnalyseCampagneDTO analyse(Long id);
 }

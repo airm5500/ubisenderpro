@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.ChiffrementService;
 import ci.ubipharm.crm.rest.service.CompteMetaService;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ParametreService;
@@ -27,6 +28,7 @@ public class CompteMetaServiceImpl implements CompteMetaService {
     private final ParametreService parametreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
+    private final ChiffrementService chiffrementService;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,8 +57,9 @@ public class CompteMetaServiceImpl implements CompteMetaService {
     @Override
     @Transactional
     public CompteMetaDTO modifier(CompteMetaDemandeDTO demande) {
-        String jeton = vide(demande.getJetonAcces());
-        String secret = vide(demande.getSecretApplication());
+        // Chiffres en base (decision Q5 d'Airman du 22/10/2026) ; jamais relus vers l'ecran
+        String jeton = chiffrementService.chiffrer(vide(demande.getJetonAcces()));
+        String secret = chiffrementService.chiffrer(vide(demande.getSecretApplication()));
         em.createNativeQuery("""
                 update crm_compte_meta set jeton_acces = coalesce(:jeton, jeton_acces), secret_application = coalesce(:secret, secret_application),
                        version_api = :version, modifie_par = :par, updated_at = utc_timestamp()

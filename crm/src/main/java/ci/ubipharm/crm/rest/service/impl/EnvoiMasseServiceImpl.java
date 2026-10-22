@@ -68,7 +68,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
 
     /** Variables que l'envoi en masse sait remplir : colonnes du client et valeurs de l'entreprise ou de l'expediteur. */
     private static final Set<String> SOURCES_CALCULEES = Set.of("calcul.agence", "calcul.segment", "calcul.expediteur_nom", "calcul.expediteur_numero",
-            "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise");
+            "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise", "calcul.nom_entreprise");
     private static final Pattern COLONNE = Pattern.compile("[a-z][a-z0-9_]*");
     private static final int PIECES_MAX = 10;
     /** Au-dela, WhatsApp coupe la legende d'une image : le texte part alors a part. */
@@ -578,7 +578,7 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
                 switch (source) {
                     case "calcul.expediteur_nom" -> communes.put(code, auteur);
                     case "calcul.expediteur_numero" -> communes.put(code, SelectionCampagne.numeroLisible(expediteur));
-                    case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise" ->
+                    case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise", "calcul.nom_entreprise" ->
                         communes.put(code, SelectionCampagne.valeurEntreprise(parametreService, source));
                     default -> { }
                 }

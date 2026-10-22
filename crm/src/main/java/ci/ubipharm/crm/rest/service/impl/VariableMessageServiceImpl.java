@@ -69,6 +69,7 @@ public class VariableMessageServiceImpl implements VariableMessageService {
         SOURCES_CALCULEES.put("calcul.site_entreprise", "Site internet de l'entreprise (Paramètres, Général)");
         SOURCES_CALCULEES.put("calcul.lien_commande", "Lien de commande en ligne (Paramètres, Général)");
         SOURCES_CALCULEES.put("calcul.telephone_entreprise", "Téléphone de l'entreprise (Paramètres, Général)");
+        SOURCES_CALCULEES.put("calcul.nom_entreprise", "Nom de l'entreprise (Paramètres, Charte)");
     }
 
     /** Colonnes techniques jamais proposees. */

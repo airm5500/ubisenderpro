@@ -24,7 +24,7 @@
   </form>
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Campagne</th><th>Liste</th><th>Préparée par</th><th>Statut</th><th class="n">Clients</th><th class="n">Messages</th><th>Envoi</th></tr></thead>
+      <thead><tr><th>Campagne</th><th>Liste</th><th>Préparée par</th><th>Statut</th><th class="n">Clients</th><th class="n">Messages</th><th class="n">Distribués</th><th class="n">Lus</th><th class="n">Échecs</th><th>Envoi</th></tr></thead>
       <tbody>
         @for (c of page()?.elements; track c.id) {
           <tr class="cliquable" [routerLink]="['/marketing/campagnes', c.id]">
@@ -34,10 +34,13 @@
             <td class="nw"><span class="dot" [style.background]="L.couleurCampagne[c.statut]"></span>{{ L.statutCampagne[c.statut] }}</td>
             <td class="n">{{ c.nbClients || '—' }}</td>
             <td class="n">@if (c.statut === 'EN_COURS' || c.statut === 'TERMINEE') { {{ c.nbEnvoyes }} / {{ c.nbMessages }} } @else { {{ c.nbMessages || '—' }} }</td>
+            <td class="n">@if (c.nbEnvoyes) { {{ c.nbDistribues }}<div class="second">{{ pc(c.nbDistribues, c.nbEnvoyes) }}</div> } @else { — }</td>
+            <td class="n">@if (c.nbDistribues) { {{ c.nbLus }}<div class="second">{{ pc(c.nbLus, c.nbDistribues) }}</div> } @else { — }</td>
+            <td class="n">@if (c.nbEchecs) { {{ c.nbEchecs }}<div class="second">{{ pc(c.nbEchecs, c.nbEnvoyes + c.nbEchecs) }}</div> } @else { — }</td>
             <td class="nw">{{ c.termineLe ? (c.termineLe | jour: true) : c.dateExecution ? (c.dateExecution | jour: true) : 'Dès la validation' }}</td>
           </tr>
         } @empty {
-          <tr><td colspan="7" class="vide">{{ page() ? 'Aucune campagne ici.' : 'Chargement…' }}</td></tr>
+          <tr><td colspan="10" class="vide">{{ page() ? 'Aucune campagne ici.' : 'Chargement…' }}</td></tr>
         }
       </tbody>
     </table>

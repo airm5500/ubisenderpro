@@ -3,7 +3,7 @@
     <div class="marque">
       <img [src]="charte.logo()" [class.logo-perso]="charte.charte()?.logoVersion" alt="" width="72" height="72" style="object-fit: contain">
       <div>
-        <div class="nom">UBIPHARM CI</div>
+        <div class="nom">{{ charte.charte()?.nomEntreprise || 'UBIPHARM CI' }}</div>
         <div class="sous">Relation client et recouvrement</div>
       </div>
     </div>

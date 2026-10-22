@@ -23,6 +23,7 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ci.ubipharm.crm.rest.service.AnalyseCampagneService;
 import ci.ubipharm.crm.rest.service.CampagneMarketingService;
 import ci.ubipharm.crm.rest.service.EvenementService;
 import ci.ubipharm.crm.rest.service.InformationService;
@@ -35,6 +36,7 @@ import ci.ubipharm.crm.rest.service.ProduitService;
 import ci.ubipharm.crm.rest.service.PromotionService;
 import ci.ubipharm.crm.rest.service.UtilisateurCourantService;
 import ci.ubipharm.crm.rest.service.VariableMessageService;
+import ci.ubipharm.crm.rest.service.dto.AnalyseCampagneDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneCriteresDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDTO;
 import ci.ubipharm.crm.rest.service.dto.CampagneMarketingDemandeDTO;
@@ -83,7 +85,9 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                    cp.date_execution as dateExecution, cp.recurrence as recurrence, cp.fin_recurrence as finRecurrence,
                    cp.debut_recurrence as debutRecurrence, cp.nb_executions as nbExecutions, cp.statut as statut, cp.perimetre_agences as perimetreAgences,
                    cp.agences_cibles as agencesCibles, cp.nb_clients as nbClients, cp.nb_messages as nbMessages, cp.nb_exclus as nbExclus,
-                   cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs, cp.cree_par as creeParId, uc.nom_complet as creePar,
+                   cp.nb_envoyes as nbEnvoyes, cp.nb_echecs as nbEchecs,
+                   (select count(*) from crm_campagne_message dm where dm.campagne_id = cp.id and (dm.distribue_le is not null or dm.statut in ('DISTRIBUE', 'LU'))) as nbDistribues,
+                   (select count(*) from crm_campagne_message lm where lm.campagne_id = cp.id and (lm.lu_le is not null or lm.statut = 'LU')) as nbLus, cp.cree_par as creeParId, uc.nom_complet as creePar,
                    uc.numero_whatsapp as numeroExpediteur, uc.email as emailAuteur, uc.statut as statutAuteur,
                    cp.created_at as createdAt, cp.soumise_le as soumiseLe, uv.nom_complet as validePar, cp.valide_le as valideLe,
                    cp.motif_rejet as motifRejet, ur.nom_complet as rejetePar, cp.lance_le as lanceLe, cp.termine_le as termineLe,
@@ -112,6 +116,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             """;
 
     private final EntityManager em;
+    private final AnalyseCampagneService analyseCampagneService;
     private final NamedParameterJdbcTemplate jdbc;
     private final ListeDiffusionService listeDiffusionService;
     private final VariableMessageService variableMessageService;
@@ -168,6 +173,13 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .page(criteres.getPage())
                 .taille(criteres.getTaille())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AnalyseCampagneDTO analyse(Long id) {
+        consulter(id); // perimetre et droits du module
+        return analyseCampagneService.analyser(id);
     }
 
     @Override
@@ -681,7 +693,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             case "calcul.segment" -> t.get("segment", String.class);
             case "calcul.expediteur_nom" -> dto.getCreePar();
             case "calcul.expediteur_numero" -> SelectionCampagne.numeroLisible(dto.getNumeroExpediteur());
-            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise" ->
+            case "calcul.site_entreprise", "calcul.lien_commande", "calcul.telephone_entreprise", "calcul.nom_entreprise" ->
                 SelectionCampagne.valeurEntreprise(parametreService, source);
             default -> {
                 String alias = aliasParSource.get(source);
@@ -959,6 +971,8 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .nbMessages(((Number) tuple.get("nbMessages")).intValue())
                 .nbExclus(((Number) tuple.get("nbExclus")).intValue())
                 .nbEnvoyes(((Number) tuple.get("nbEnvoyes")).intValue())
+                .nbDistribues(((Number) tuple.get("nbDistribues")).intValue())
+                .nbLus(((Number) tuple.get("nbLus")).intValue())
                 .nbEchecs(((Number) tuple.get("nbEchecs")).intValue())
                 .creeParId(tuple.get("creeParId", Long.class))
                 .creePar(tuple.get("creePar", String.class))

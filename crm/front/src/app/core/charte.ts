@@ -1,8 +1,8 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 export interface Charte {
-  nom: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; menuRepliable: boolean; logoVersion: number | null; logoNom: string | null;
+  nom: string; nomEntreprise: string; couleurPrincipale: string; couleurSecondaire: string; theme: string; couleurFond: string; couleurSurvol: string; menuRepliable: boolean; logoVersion: number | null; logoNom: string | null;
   iconeVersion: number | null; iconeNom: string | null; banniereVersion: number | null; banniereNom: string | null; siteWeb: string | null; canalDefaut: string; modeEnvoiDefaut: string;
 }
 
@@ -12,6 +12,8 @@ export class CharteService {
   private readonly http = inject(HttpClient);
 
   readonly charte = signal<Charte | null>(null);
+  /** Nom de l'entreprise (Parametres > Charte), cite aussi par {nom_entreprise} dans les messages. */
+  readonly nomEntreprise = computed(() => this.charte()?.nomEntreprise || 'UBIPHARM CI');
 
   charger(): void {
     this.http.get<Charte>('/api/charte').subscribe(c => this.appliquer(c));
