@@ -229,3 +229,54 @@ test('le nom de l entreprise vient de Parametres > Charte', async ({ page }) => 
   await expect(page.getByText(/Nom de l'entreprise, affiché dans le menu/)).toBeVisible();
   await expect(page.locator('nav .nom')).toHaveAttribute('aria-label', 'UBIPHARM CI');
 });
+
+test('le Marketing arrive sur Ma journee, sous Mon activite', async ({ page }) => {
+  const incidents = await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('marketing');
+  await expect(page.getByRole('heading', { name: /^Bonjour/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Campagnes du jour' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Promotions qui commencent ou finissent' })).toBeVisible();
+  await expect(page.locator('nav').getByText('Mon activité')).toBeVisible();
+  await expect(page.locator('nav a.nv', { hasText: 'Ma journée' })).toHaveClass(/on/);
+  await expect(page.locator('nav a.nv', { hasText: 'Campagnes promotionnelles' })).toHaveCount(0);
+  expect(incidents).toEqual([]);
+});
+
+test('une campagne Marketing se cree par type, avec l apercu du message a droite', async ({ page }) => {
+  const incidents = await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('marketing/campagnes');
+  await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+  const fenetre = page.getByRole('dialog', { name: 'Nouvelle campagne' });
+  await expect(fenetre.getByRole('radio', { name: /Promotion/ })).toHaveAttribute('aria-checked', 'true');
+  await fenetre.getByRole('radio', { name: /Information/ }).click();
+  await expect(fenetre.getByText('Information annoncée')).toBeVisible();
+  await fenetre.getByRole('radio', { name: /Promotion/ }).click();
+  await expect(fenetre.getByText('Promotions citées')).toBeVisible();
+  await expect(fenetre.getByRole('button', { name: 'Programmer' })).toBeDisabled();
+  await expect(fenetre.getByRole('button', { name: 'Envoyer dès la création' })).toBeVisible();
+  await fenetre.locator('select[name=listeId]').selectOption({ index: 1 });
+  await fenetre.locator('select[name=modeleId]').selectOption({ index: 1 });
+  const apercu = fenetre.getByRole('complementary', { name: 'Aperçu du message' });
+  await expect(apercu.getByText(/\d+ clients? · \d+ messages?/)).toBeVisible();
+  expect(incidents).toEqual([]);
+});
+
+test('les listes des relances se rangent dans Relances', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.locator('nav a.md', { hasText: 'Recouvrement' }).click();
+  await expect(page.locator('nav a.nv[href="/relances/listes"]')).toBeAttached();
+  await page.goto('relances/listes');
+  await expect(page.getByRole('heading', { name: 'Listes de diffusion' })).toBeVisible();
+  await expect(page.getByText('Elles ne se voient pas depuis le Marketing.', { exact: false })).toBeVisible();
+  expect(incidents).toEqual([]);
+});
+
+test('une campagne lancee montre son analyse et la liste ses colonnes distribues et lus', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('marketing/campagnes');
+  await expect(page.getByRole('columnheader', { name: 'Distribués' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Lus' })).toBeVisible();
+  await page.goto('campagnes');
+  await expect(page.getByRole('columnheader', { name: 'Distribués' })).toBeVisible();
+  expect(incidents).toEqual([]);
+});

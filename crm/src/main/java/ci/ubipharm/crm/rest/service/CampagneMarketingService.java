@@ -25,6 +25,9 @@ public interface CampagneMarketingService {
     /** Calcule en direct tant que la campagne n'est pas validee. */
     RecapitulatifMarketingDTO recapitulatif(Long id);
 
+    /** Ce que donnerait la campagne en cours de saisie : comptes et message rendu pour de vrais clients de la liste, sans rien enregistrer. */
+    RecapitulatifMarketingDTO apercu(CampagneMarketingDemandeDTO demande);
+
     PageDTO<MessageCampagneDTO> messages(Long id, MessageCampagneCriteresDTO criteres);
 
     CampagneMarketingDTO soumettre(Long id);

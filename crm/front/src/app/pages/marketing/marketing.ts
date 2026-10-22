@@ -1,65 +1,74 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
-import { ModuleCourant } from '../../core/module-courant';
+import { CampagneMarketing, Evenement, Page } from '../../core/modeles';
+import { JourPipe, LIBELLES, aujourdhui, pourcent } from '../../core/format';
 
-/** Accueil du module Marketing : les ecrans en service et ceux qui arrivent. */
+interface ReponseDuJour { clientId: number | null; raisonSociale: string | null; numeroClient: string; contenu: string | null; recuLe: string; campagneId: number; campagneNom: string; }
+interface PromotionDuJour { id: number; nom: string; dateDebut: string; dateFin: string; statut: string; moment: 'COMMENCE' | 'FINIT'; }
+interface Journee { horizonJours: number; nbReponsesDuJour: number | null; reponsesDuJour: ReponseDuJour[] | null; promotions: PromotionDuJour[] | null; evenements: Evenement[] | null; }
+interface AFaire { titre: string; detail: string; action: string; lien: string; parametres?: Record<string, string>; couleur: string; }
+
+const VIDE: Page<CampagneMarketing> = { elements: [], total: 0, page: 0, taille: 0 };
+
+/** Ma journee Marketing, page d'arrivee du module (remarque 10 du 22/10/2026). */
 @Component({
-  selector: 'app-marketing',
-  imports: [RouterLink],
-  template: `
-    <div class="page">
-      <div class="entete"><div>
-        <h1>Marketing</h1>
-        <p class="sous-titre">Listes de diffusion, campagnes promotionnelles WhatsApp, e-mail et SMS, catalogue des produits et promotions.</p>
-      </div></div>
-      <div class="raccourcis">
-      @if (auth.peut('TABLEAU_BORD_MARKETING')) {
-        <a class="raccourci" routerLink="/marketing/tableau-de-bord">
-          <b>Tableau de bord <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">Campagnes, messages envoyés et lus par canal, réponses, désabonnements et promotions en cours.</span>
-        </a>
-      }
-      @if (auth.peut('CAMPAGNES_MARKETING')) {
-        <a class="raccourci" routerLink="/marketing/campagnes">
-          <b>Campagnes promotionnelles <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">WhatsApp, e-mail ou SMS vers une liste de diffusion, après validation par le directeur d'agence.</span>
-        </a>
-      }
-      @if (auth.peut('LISTES')) {
-        <a class="raccourci" routerLink="/marketing/listes">
-          <b>Listes de diffusion <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">Les clients visés par vos campagnes, par critères ou choisis un par un. Les clients qui répondent STOP sont écartés.</span>
-        </a>
-      }
-      @if (auth.peut('PRODUITS')) {
-        <a class="raccourci" routerLink="/marketing/catalogue">
-          <b>Catalogue des produits <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">Les produits à mettre en avant, importés depuis votre fichier Excel ou saisis à la main.</span>
-        </a>
-      }
-      @if (auth.peut('PROMOTIONS')) {
-        <a class="raccourci" routerLink="/marketing/promotions">
-          <b>Promotions <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">Produits du catalogue en unités gratuites ou à prix promotionnel, sur une période ; vos campagnes les citent.</span>
-        </a>
-      }
-      @if (auth.peut('CLIENTS')) {
-        <a class="raccourci" routerLink="/clients">
-          <b>Clients <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">La base clients commune : fiches, contacts WhatsApp, segments et désabonnements.</span>
-        </a>
-      }
-      @if (auth.peut('DISCUSSIONS')) {
-        <a class="raccourci" routerLink="/discussions">
-          <b>Discussions <i class="pi pi-arrow-right" aria-hidden="true"></i></b>
-          <span class="discret">Les échanges WhatsApp avec chaque client ; répondre ou écrire à un client depuis votre numéro.</span>
-        </a>
-      }
-      </div>
-    </div>`
+  selector: 'app-ma-journee-marketing',
+  imports: [RouterLink, JourPipe],
+  templateUrl: './marketing.html'
 })
-export class Marketing {
+export class MaJourneeMarketing implements OnInit {
+  private readonly api = inject(Api);
   protected readonly auth = inject(Auth);
-  protected readonly module = inject(ModuleCourant);
+  protected readonly L = LIBELLES;
+  protected readonly pc = pourcent;
+
+  protected readonly dateDuJour = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Abidjan' })
+    .format(new Date()).replace(/^./, c => c.toUpperCase());
+  protected readonly prenom = computed(() => (this.auth.utilisateur()?.nomComplet ?? '').split(' ')[0]);
+
+  protected readonly journee = signal<Journee | null>(null);
+  protected readonly aValider = signal<CampagneMarketing[]>([]);
+  protected readonly enCours = signal<CampagneMarketing[]>([]);
+  protected readonly programmees = signal<CampagneMarketing[]>([]);
+  protected readonly aCorriger = signal<CampagneMarketing[]>([]);
+
+  /** Campagnes en cours et celles programmees aujourd'hui. */
+  protected readonly duJour = computed(() => [...this.enCours(), ...this.programmees().filter(c => c.dateExecution?.slice(0, 10) === aujourdhui())]);
+
+  protected readonly aFaire = computed<AFaire[]>(() => {
+    const liste: AFaire[] = [];
+    const valideur = this.auth.peut('CAMPAGNES_MARKETING_VALIDER');
+    for (const c of this.aValider()) {
+      liste.push(valideur
+        ? { titre: `Campagne à valider · ${c.nom}`, detail: `Soumise par ${c.creePar}, ${c.nbClients} client${c.nbClients > 1 ? 's' : ''}.`, action: 'Examiner', lien: `/marketing/campagnes/${c.id}`, couleur: '#F4B740' }
+        : { titre: `En attente de validation · ${c.nom}`, detail: 'Elle partira dès qu\'un valideur l\'aura acceptée.', action: 'Voir', lien: `/marketing/campagnes/${c.id}`, couleur: '#9DB0BF' });
+    }
+    for (const c of this.aCorriger()) {
+      liste.push({ titre: `Campagne à corriger · ${c.nom}`, detail: `Renvoyée par ${c.rejetePar ?? 'le valideur'} : ${c.motifRejet}`,
+        action: 'Corriger', lien: `/marketing/campagnes/${c.id}`, couleur: '#C2410C' });
+    }
+    const n = this.journee()?.nbReponsesDuJour ?? 0;
+    if (n) {
+      liste.push({ titre: `${n} réponse${n > 1 ? 's' : ''} de clients aujourd'hui`, detail: 'Réponses aux campagnes Marketing, à lire dans les discussions.',
+        action: 'Lire', lien: '/discussions', couleur: '#51D78E' });
+    }
+    return liste;
+  });
+
+  ngOnInit(): void {
+    this.api.get<Journee>('/api/marketing/ma-journee').subscribe(j => this.journee.set(j));
+    if (!this.auth.peut('CAMPAGNES_MARKETING')) return;
+    const page = (statut: string) => this.api.get<Page<CampagneMarketing>>('/api/marketing/campagnes', { statut, page: 0, taille: 50 });
+    forkJoin({ aValider: page('A_VALIDER'), enCours: page('EN_COURS'), programmees: page('VALIDEE'),
+      brouillons: this.auth.peut('CAMPAGNES_MARKETING_PREPARER') ? page('BROUILLON') : of(VIDE) }).subscribe(r => {
+      this.aValider.set(r.aValider.elements);
+      this.enCours.set(r.enCours.elements);
+      this.programmees.set(r.programmees.elements);
+      const moi = this.auth.utilisateur()?.id;
+      this.aCorriger.set(r.brouillons.elements.filter(c => c.motifRejet && c.creeParId === moi));
+    });
+  }
 }

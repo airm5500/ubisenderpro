@@ -408,6 +408,24 @@ class CampagneMarketingIT extends IntegrationBase {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.startsWith("L'information « Camion en panne (copie) » n'est plus valable")));
     }
 
+    @Test
+    void lApercuMontreLeMessageDUnVraiClientEtLaCampagneSePeutSoumettreDesSaCreation() throws Exception {
+        // Remarque 13 du 22/10/2026 : aperçu à droite pendant la saisie, sans rien enregistrer
+        envoyer(charge, post("/api/marketing/campagnes/apercu"), "{\"listeId\":" + liste + ",\"modeleId\":" + modele + "}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nbClients").value(2))
+                .andExpect(jsonPath("$.nbMessages").value(3))
+                .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros, promotion de la semaine. Test it-marketing"));
+        envoyer(charge, post("/api/marketing/campagnes/apercu"), "{\"modeleId\":" + modele + "}").andExpect(status().isBadRequest());
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("select count(*) from crm_campagne", Integer.class)).isZero();
+
+        // « Envoyer dès la création » : la campagne part en validation sans passer par le brouillon
+        envoyer(charge, post("/api/marketing/campagnes"), "{\"nom\":\"Directe\",\"listeId\":" + liste + ",\"modeleId\":" + modele + ",\"soumettre\":true}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.statut").value("A_VALIDER")).andExpect(jsonPath("$.nbMessages").value(3));
+        // Sans la case, brouillon comme avant
+        envoyer(charge, post("/api/marketing/campagnes"), campagne("Brouillon", modele)).andExpect(jsonPath("$.statut").value("BROUILLON"));
+    }
+
     private String campagne(String nom, Long modeleId) {
         return "{\"nom\":\"" + nom + "\",\"listeId\":" + liste + ",\"modeleId\":" + modeleId + "}";
     }

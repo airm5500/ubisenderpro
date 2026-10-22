@@ -45,6 +45,8 @@ export class CampagnesMarketing implements OnInit {
       this.produitsAnnonces.set(produits.split(',').map(Number).filter(n => n > 0));
       this.saisie.set(true);
     }
+    // Depuis « Ma journée » : « Nouvelle campagne » ouvre directement la fenetre de creation
+    if (this.route.snapshot.queryParamMap.has('nouvelle')) this.saisie.set(true);
     const requetes = Object.fromEntries(this.onglets.map(o =>
       [o.statut || 'TOUTES', this.api.get<Page<CampagneMarketing>>('/api/marketing/campagnes', { statut: o.statut, page: 0, taille: 1 })]));
     forkJoin(requetes).subscribe(r => {

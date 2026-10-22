@@ -178,3 +178,47 @@ test.describe('nom de l entreprise et compte Meta', () => {
     await admin.fermer();
   });
 });
+
+test.describe('lot 3 : analyse, listes par module, journee et campagnes Marketing', () => {
+  test('chaque module a ses listes, invisibles depuis l autre', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const nom = 'E2E relances ' + suffixe();
+    const relances = await json(await admin.post('api/recouvrement/listes', { nom, parCriteres: false }));
+    expect(relances.module).toBe('RECOUVREMENT');
+    expect((await json(await admin.get('api/recouvrement/listes'))).map(l => l.id)).toContain(relances.id);
+    expect((await json(await admin.get('api/marketing/listes'))).map(l => l.id)).not.toContain(relances.id);
+    expect((await admin.get(`api/marketing/listes/${relances.id}`)).status()).toBe(404);
+    const charge = await Session.de(baseURL, jeu.comptes.chargeMarketing);
+    expect((await charge.get('api/recouvrement/listes')).status()).toBe(403);
+    await charge.fermer();
+    await admin.fermer();
+  });
+
+  test('ma journee Marketing et l apercu d une campagne en cours de saisie', async ({ baseURL }) => {
+    const charge = await Session.de(baseURL, jeu.comptes.chargeMarketing);
+    const journee = await json(await charge.get('api/marketing/ma-journee'));
+    expect(journee.horizonJours).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(journee.promotions)).toBe(true);
+    const liste = await json(await charge.post('api/marketing/listes', { nom: 'E2E apercu ' + suffixe(), parCriteres: false }));
+    await json(await charge.post(`api/marketing/listes/${liste.id}/clients`, { sens: 'AJOUT', clientIds: [jeu.clients.yop] }));
+    const modele = (await json(await charge.get('api/marketing/modeles'))).find(m => m.statut === 'ACTIF' && m.canal === 'WHATSAPP' && m.typeCampagne === 'PROMOTION');
+    const apercu = await json(await charge.post('api/marketing/campagnes/apercu', { listeId: liste.id, modeleId: modele.id }));
+    expect(apercu.nbClients).toBe(1);
+    expect(apercu.exemples[0].contenu).not.toMatch(/\{[a-z_]+\}/);
+    await charge.fermer();
+  });
+
+  test('l analyse d une campagne donne ses chiffres et sa courbe', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const page = await json(await admin.get('api/marketing/campagnes', { page: 0, taille: 1 }));
+    if (page.elements.length) {
+      const c = page.elements[0];
+      expect(c).toHaveProperty('nbDistribues');
+      expect(c).toHaveProperty('nbLus');
+      const analyse = await json(await admin.get(`api/marketing/campagnes/${c.id}/analyse`));
+      expect(analyse).toHaveProperty('tauxLecture');
+      expect(Array.isArray(analyse.courbe)).toBe(true);
+    }
+    await admin.fermer();
+  });
+});

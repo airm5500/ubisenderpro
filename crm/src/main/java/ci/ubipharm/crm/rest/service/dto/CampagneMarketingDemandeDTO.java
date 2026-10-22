@@ -55,4 +55,7 @@ public class CampagneMarketingDemandeDTO {
 
     /** Dernier jour ou la campagne peut repartir. */
     private java.time.LocalDate finRecurrence;
+
+    /** Soumettre a validation des l'enregistrement (« Programmer » ou « Envoyer des la creation »), sinon brouillon. */
+    private boolean soumettre;
 }

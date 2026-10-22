@@ -217,7 +217,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .executeUpdate();
         Long id = ((Number) em.createNativeQuery("select last_insert_id()").getSingleResult()).longValue();
         journalActionService.enregistrer("CAMPAGNE_MARKETING_CREATION", "crm_campagne", id, demande.getNom().trim());
-        return consulter(id);
+        return demande.isSoumettre() ? soumettre(id) : consulter(id);
     }
 
     @Override
@@ -253,7 +253,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .setParameter("id", id)
                 .executeUpdate();
         journalActionService.enregistrer("CAMPAGNE_MARKETING_MODIFICATION", "crm_campagne", id, demande.getNom().trim());
-        return consulter(id);
+        return demande.isSoumettre() && "BROUILLON".equals(campagne.getStatut()) ? soumettre(id) : consulter(id);
     }
 
     @Override
@@ -269,6 +269,51 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
                 .nbExclus(exclus.size())
                 .expediteur(campagne.dto().getCreePar())
                 .numeroExpediteur(campagne.dto().getNumeroExpediteur())
+                .emailReponse(campagne.emailAuteur())
+                .exclusions(exclus.stream().collect(Collectors.groupingBy(MessageCampagneDTO::getMotif, Collectors.counting()))
+                        .entrySet().stream()
+                        .map(e -> MotifExclusionDTO.builder().motif(e.getKey()).nb(e.getValue()).build())
+                        .sorted(Comparator.comparingLong(MotifExclusionDTO::getNb).reversed().thenComparing(MotifExclusionDTO::getMotif))
+                        .toList())
+                .exemples(envoyables.stream().limit(EXEMPLES).toList())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RecapitulatifMarketingDTO apercu(CampagneMarketingDemandeDTO demande) {
+        if (demande.getListeId() == null || demande.getModeleId() == null) {
+            throw new ErreurMetierException("Choisissez une liste et un modèle pour voir l'aperçu.");
+        }
+        @SuppressWarnings("unchecked")
+        List<Tuple> modeles = em.createNativeQuery("select canal, objet, contenu, statut, type_campagne as typeCampagne from crm_modele_message"
+                + " where id = :id and module = 'MARKETING'", Tuple.class).setParameter("id", demande.getModeleId()).getResultList();
+        if (modeles.isEmpty()) {
+            throw new ErreurMetierException("Choisissez un modèle Marketing.");
+        }
+        Tuple modele = modeles.getFirst();
+        listeDiffusionService.consulterDefinition(demande.getListeId());
+        PerimetreDTO perimetre = perimetreService.perimetreCourant();
+        Tuple auteur = (Tuple) em.createNativeQuery("select nom_complet as nom, numero_whatsapp as numero, email from crm_utilisateur where id = :id", Tuple.class)
+                .setParameter("id", perimetre.getUtilisateurId()).getSingleResult();
+        CampagneMarketingDTO dto = CampagneMarketingDTO.builder()
+                .listeId(demande.getListeId()).modeleId(demande.getModeleId()).canal(modele.get("canal", String.class))
+                .typeCampagne(modele.get("typeCampagne", String.class))
+                .promotionIds(promotions(demande)).produitIds(produits(demande))
+                .evenementId(demande.getEvenementId()).informationId(demande.getInformationId()).dateExecution(demande.getDateExecution())
+                .creeParId(perimetre.getUtilisateurId()).creePar(auteur.get("nom", String.class)).numeroExpediteur(auteur.get("numero", String.class))
+                .build();
+        Campagne campagne = new Campagne(dto, modele.get("objet", String.class), modele.get("contenu", String.class), modele.get("statut", String.class),
+                auteur.get("email", String.class), true, perimetre.isVisionGlobale() ? null : perimetre.getAgenceIds(), null);
+        List<MessageCampagneDTO> messages = generer(campagne).stream().map(Ligne::message).toList();
+        List<MessageCampagneDTO> envoyables = messages.stream().filter(m -> A_ENVOYER.equals(m.getStatut())).toList();
+        List<MessageCampagneDTO> exclus = messages.stream().filter(m -> EXCLU.equals(m.getStatut())).toList();
+        return RecapitulatifMarketingDTO.builder()
+                .nbClients(envoyables.stream().map(MessageCampagneDTO::getClientId).distinct().count())
+                .nbMessages(envoyables.size())
+                .nbExclus(exclus.size())
+                .expediteur(dto.getCreePar())
+                .numeroExpediteur(dto.getNumeroExpediteur())
                 .emailReponse(campagne.emailAuteur())
                 .exclusions(exclus.stream().collect(Collectors.groupingBy(MessageCampagneDTO::getMotif, Collectors.counting()))
                         .entrySet().stream()

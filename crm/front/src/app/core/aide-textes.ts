@@ -153,7 +153,9 @@ export const AIDE_BOUTONS: Record<string, TexteAide> = {
   'historique-envois|Exporter en CSV': b('Exporter en CSV', 'Télécharge les messages affichés, avec leur statut, dans un fichier CSV.'),
 
   // ---------- Marketing ----------
-  'marketing/campagnes|Créer la campagne': b('Créer la campagne', 'Enregistre la campagne en brouillon ; elle partira après validation.'),
+  'marketing/campagnes|Enregistrer en brouillon': b('Enregistrer en brouillon', 'Garde la campagne sans la soumettre ; vous la reprendrez plus tard.'),
+  'marketing/campagnes|Programmer': b('Programmer', 'Soumet la campagne à validation ; une fois validée, elle part à la date et à l\'heure choisies.'),
+  'marketing/campagnes|Envoyer dès la création': b('Envoyer dès la création', 'Soumet la campagne à validation ; elle part dès qu\'elle est validée.'),
   'marketing/listes|Nouvelle liste': b('Nouvelle liste', 'Crée une liste de clients par critères (agence, segment, ville…), à corriger client par client.'),
   'marketing/listes|Voir la liste': b('Voir la liste', 'Ouvre la liste pour voir ses clients et la corriger.'),
   'marketing/listes|Créer la liste': b('Créer la liste', 'Enregistre la liste ; elle est aussitôt utilisable dans une campagne.'),
@@ -182,7 +184,7 @@ export const AIDE_BOUTONS: Record<string, TexteAide> = {
   'marketing/informations|Nouvelle information': b('Nouvelle information', 'Saisit une information pour les clients : livraison, garde, fermeture, alerte produit…'),
   'marketing/informations|Annoncer': b('Annoncer', "Prépare la campagne qui envoie cette information aux clients concernés, à la date et à l'heure voulues."),
   'marketing/evenements|Nouvel événement': b('Nouvel événement', 'Ajoute une fête, un jour férié ou une fermeture à annoncer aux clients.'),
-  'marketing/tableau-de-bord|Campagnes promotionnelles': b('Campagnes promotionnelles', 'Ouvre la liste des campagnes marketing.'),
+  'marketing/tableau-de-bord|Campagnes': b('Campagnes', 'Ouvre la liste des campagnes marketing.'),
 
   // ---------- Administration ----------
   'utilisateurs|Nouveau compte': b('Nouveau compte', 'Crée un utilisateur avec un rôle par module. Un mot de passe provisoire lui est donné.'),
@@ -316,9 +318,13 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 1. « Scanner le QR code » puis, sur le téléphone : WhatsApp > Appareils connectés > Connecter un appareil.
 2. Le téléphone doit rester allumé et connecté à internet.
 3. En cas de souci, « Mettre en pause » puis « Vérifier et reprendre ».`),
-  'marketing': p('Accueil Marketing', `Les raccourcis du module Marketing : campagnes promotionnelles, listes de diffusion, catalogue, promotions, informations et événements.`),
+  'marketing': p('Ma journée Marketing', `Votre page d'arrivée dans le Marketing.
+
+- Les campagnes à valider ou à corriger, celles en cours et programmées aujourd'hui.
+- Les réponses des clients reçues aujourd'hui.
+- Les promotions qui commencent ou finissent et les événements à venir, sur le nombre de jours réglé dans Paramètres > Marketing.`),
   'marketing/tableau-de-bord': p('Tableau de bord Marketing', `Messages envoyés, lus, réponses et désabonnements sur la période, par campagne et par canal.`),
-  'marketing/campagnes': p('Campagnes promotionnelles', `Une liste de diffusion, un modèle, une date. Le message part du numéro de la personne qui prépare la campagne, après validation.
+  'marketing/campagnes': p('Campagnes', `Un type (promotion, information ou événement), une liste de diffusion, un modèle, une date. Le message part du numéro de la personne qui prépare la campagne, après validation.
 
 1. « Nouvelle campagne » : liste, modèle, promotion éventuelle, affiche et date.
 2. Soumettez à validation.

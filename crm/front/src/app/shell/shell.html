@@ -79,12 +79,17 @@
       </div>
     }
     } @else {
+      <div class="section" routerLinkActive #sActiviteM="routerLinkActive" [routerLinkActiveOptions]="{ exact: true }" [class.fermee]="!estOuverte('sActiviteM', sActiviteM.isActive)">
+        <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sActiviteM', sActiviteM.isActive) : null" (click)="basculer('sActiviteM', sActiviteM.isActive)"><span class="glt"><i class="pi pi-user ic" aria-hidden="true"></i>Mon activité</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
+        <div class="liens" [attr.inert]="estOuverte('sActiviteM', sActiviteM.isActive) ? null : ''"><div>
+          <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }"><i class="pi pi-sun ic" aria-hidden="true"></i>Ma journée</a>
+          @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on"><i class="pi pi-chart-bar ic" aria-hidden="true"></i>Tableau de bord</a> }
+        </div></div>
+      </div>
       <div class="section" routerLinkActive #sMarketing="routerLinkActive" [class.fermee]="!estOuverte('sMarketing', sMarketing.isActive)">
         <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sMarketing', sMarketing.isActive) : null" (click)="basculer('sMarketing', sMarketing.isActive)"><span class="glt"><i class="pi pi-shopping-bag ic" aria-hidden="true"></i>Marketing</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
         <div class="liens" [attr.inert]="estOuverte('sMarketing', sMarketing.isActive) ? null : ''"><div>
-          <a class="nv" routerLink="/marketing" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }"><i class="pi pi-home ic" aria-hidden="true"></i>Accueil</a>
-          @if (auth.peut('TABLEAU_BORD_MARKETING')) { <a class="nv" routerLink="/marketing/tableau-de-bord" routerLinkActive="on"><i class="pi pi-chart-bar ic" aria-hidden="true"></i>Tableau de bord</a> }
-          @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on"><i class="pi pi-megaphone ic" aria-hidden="true"></i>Campagnes promotionnelles</a> }
+          @if (auth.peut('CAMPAGNES_MARKETING')) { <a class="nv" routerLink="/marketing/campagnes" routerLinkActive="on"><i class="pi pi-megaphone ic" aria-hidden="true"></i>Campagnes</a> }
           @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on"><i class="pi pi-list ic" aria-hidden="true"></i>Listes de diffusion</a> }
           @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on"><i class="pi pi-box ic" aria-hidden="true"></i>Catalogue des produits</a> }
           @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on"><i class="pi pi-percentage ic" aria-hidden="true"></i>Promotions</a> }

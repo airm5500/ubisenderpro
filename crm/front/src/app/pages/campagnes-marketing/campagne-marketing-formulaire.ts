@@ -1,27 +1,40 @@
-import { Component, inject, input, model, output, signal } from '@angular/core';
+import { Component, computed, inject, input, model, output, signal } from '@angular/core';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, catchError, of } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Api } from '../../core/api';
-import { CampagneMarketing, Evenement, Information, ListeDiffusion, ModeleMessage, Page, PieceJointe, Produit, Promotion } from '../../core/modeles';
-import { JourPipe } from '../../core/format';
-import { LIBELLES } from '../../core/format';
+import { CampagneMarketing, Evenement, Information, ListeDiffusion, ModeleMessage, Page, PieceJointe, Produit, Promotion, RecapitulatifMarketing } from '../../core/modeles';
+import { JourPipe, LIBELLES, TelephonePipe } from '../../core/format';
+
+type TypeCampagne = 'PROMOTION' | 'INFORMATION' | 'EVENEMENT';
+
+/** Types proposes a la creation (remarque 13 du 22/10/2026) ; le modele se choisit ensuite parmi ceux du type. */
+export const TYPES_CAMPAGNE: { code: TypeCampagne; libelle: string; detail: string }[] = [
+  { code: 'PROMOTION', libelle: 'Promotion', detail: 'Promotions en cours, produits de retour en stock' },
+  { code: 'INFORMATION', libelle: 'Information', detail: 'Retard de livraison, garde, horaires…' },
+  { code: 'EVENEMENT', libelle: 'Événement', detail: 'Fête, jour férié, fermeture' }
+];
 
 interface Formulaire {
-  nom: string; listeId: number | null; modeleId: number | null; evenementId: number | null; informationId: number | null; promotionIds: Set<number>; produitIds: Set<number>; dateExecution: string; recurrence: string; finRecurrence: string;
+  type: TypeCampagne; nom: string; listeId: number | null; modeleId: number | null; evenementId: number | null; informationId: number | null; promotionIds: Set<number>; produitIds: Set<number>; dateExecution: string; recurrence: string; finRecurrence: string;
   afficheId: number | null; afficheNom: string; joindreProduits: boolean;
 }
 
-/** Creation ou modification d'une campagne promotionnelle : une liste, un modele, des promotions actives, une date. */
+/**
+ * Creation ou modification d'une campagne Marketing : un type, une liste, un modele, une date ; l'apercu a droite montre le
+ * message d'un vrai client de la liste. « Programmer » et « Envoyer des la creation » la soumettent aussitot a validation.
+ */
 @Component({
   selector: 'app-campagne-marketing-formulaire',
-  imports: [FormsModule, DialogModule, JourPipe],
+  imports: [FormsModule, DialogModule, JourPipe, TelephonePipe],
   templateUrl: './campagne-marketing-formulaire.html'
 })
 export class CampagneMarketingFormulaire {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly L = LIBELLES;
+  protected readonly TYPES = TYPES_CAMPAGNE;
 
   readonly ouvert = model(false);
   readonly campagne = input<CampagneMarketing | null>(null);
@@ -42,22 +55,64 @@ export class CampagneMarketingFormulaire {
   protected readonly erreur = signal<string | null>(null);
   formulaire: Formulaire = this.vide();
   protected readonly depot = signal(false);
+  protected readonly type = signal<TypeCampagne>('PROMOTION');
+  protected readonly modelesDuType = computed(() => this.modeles().filter(m => m.typeCampagne === this.type()));
+  /** Apercu du message pour de vrais clients de la liste ; null tant que liste et modele ne sont pas choisis. */
+  protected readonly apercu = signal<RecapitulatifMarketing | null>(null);
+  protected readonly erreurApercu = signal<string | null>(null);
+  protected readonly exemple = signal(0);
+  private readonly saisies = new Subject<string>();
+
+  constructor() {
+    this.saisies.pipe(debounceTime(400), distinctUntilChanged(), switchMap(corps => {
+      const c = JSON.parse(corps);
+      if (!c.listeId || !c.modeleId) return of(null);
+      return this.api.postSilencieux<RecapitulatifMarketing>('/api/marketing/campagnes/apercu', c).pipe(
+        catchError(e => { this.erreurApercu.set(e?.error?.message ?? 'Aperçu indisponible.'); return of(null); }));
+    })).subscribe(a => {
+      if (a) this.erreurApercu.set(null);
+      this.apercu.set(a);
+      this.exemple.set(0);
+    });
+  }
+
+  /** Relance l'apercu apres chaque saisie (liste, modele, promotions, evenement, information, date). */
+  actualiser(): void {
+    const f = this.formulaire;
+    this.saisies.next(JSON.stringify({ listeId: f.listeId, modeleId: f.modeleId, evenementId: f.evenementId, informationId: f.informationId,
+      promotionIds: [...f.promotionIds].sort(), produitIds: [...f.produitIds].sort(), dateExecution: f.dateExecution ? f.dateExecution + ':00' : null }));
+  }
+
+  choisirType(type: TypeCampagne): void {
+    this.type.set(type);
+    this.formulaire.type = type;
+    if (this.modeles().find(m => m.id === this.formulaire.modeleId)?.typeCampagne !== type) this.formulaire.modeleId = null;
+    if (type !== 'EVENEMENT') this.formulaire.evenementId = null;
+    if (type !== 'INFORMATION') this.formulaire.informationId = null;
+    if (type !== 'PROMOTION') { this.formulaire.promotionIds.clear(); this.formulaire.produitIds.clear(); }
+    this.actualiser();
+  }
 
   preparer(): void {
     const c = this.campagne();
     this.erreur.set(null);
     this.formulaire = c
-      ? { nom: c.nom, listeId: c.listeId, modeleId: c.modeleId, evenementId: c.evenementId, informationId: c.informationId, promotionIds: new Set(c.promotionIds), produitIds: new Set(c.produitIds ?? []),
+      ? { type: (c.typeCampagne as TypeCampagne) ?? 'PROMOTION', nom: c.nom, listeId: c.listeId, modeleId: c.modeleId, evenementId: c.evenementId, informationId: c.informationId, promotionIds: new Set(c.promotionIds), produitIds: new Set(c.produitIds ?? []),
           dateExecution: c.dateExecution ? c.dateExecution.substring(0, 16) : '', recurrence: c.recurrence ?? '', finRecurrence: c.finRecurrence ?? '',
           afficheId: c.afficheId, afficheNom: c.afficheNom ?? '', joindreProduits: c.joindreProduits }
-      : { ...this.vide(), produitIds: new Set(this.produitsInitiaux()) };
+      : { ...this.vide(), produitIds: new Set(this.produitsInitiaux()), type: this.informationInitiale() ? 'INFORMATION' : 'PROMOTION' };
+    this.type.set(this.formulaire.type);
+    this.apercu.set(null);
+    this.erreurApercu.set(null);
     this.api.get<ListeDiffusion[]>('/api/marketing/listes').subscribe(l => this.listes.set(l));
+    this.actualiser();
     const information = c ? null : this.informationInitiale();
     this.api.get<ModeleMessage[]>('/api/marketing/modeles').subscribe(m => {
       this.modeles.set(m);
       this.api.get<Information[]>('/api/marketing/informations').subscribe(i => {
         this.informations.set(i.filter(x => !x.expiree || x.id === this.formulaire.informationId));
         if (information) this.choisirInformation(information);
+        this.actualiser();
       });
     });
     this.api.get<Promotion[]>('/api/marketing/promotions', { statut: 'ACTIVE' }).subscribe(p => this.promotions.set(p));
@@ -89,7 +144,7 @@ export class CampagneMarketingFormulaire {
   }
 
   private vide(): Formulaire {
-    return { nom: '', listeId: null, modeleId: null, evenementId: null, informationId: null, promotionIds: new Set(), produitIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '',
+    return { type: 'PROMOTION', nom: '', listeId: null, modeleId: null, evenementId: null, informationId: null, promotionIds: new Set(), produitIds: new Set(), dateExecution: '', recurrence: '', finRecurrence: '',
       afficheId: null, afficheNom: '', joindreProduits: false };
   }
 
@@ -98,6 +153,7 @@ export class CampagneMarketingFormulaire {
     this.formulaire.evenementId = id;
     const e = this.evenements().find(x => x.id === id);
     if (e?.envoiPropose) this.formulaire.dateExecution = e.envoiPropose.substring(0, 16);
+    this.actualiser();
   }
 
   /** L'information choisie propose le modele prevu pour son type, son titre comme nom et un envoi a l'heure suivante. */
@@ -119,6 +175,11 @@ export class CampagneMarketingFormulaire {
       const z = (n: number) => String(n).padStart(2, '0');
       this.formulaire.dateExecution = `${h.getFullYear()}-${z(h.getMonth() + 1)}-${z(h.getDate())}T${z(h.getHours())}:00`;
     }
+    this.actualiser();
+  }
+
+  protected pret(): boolean {
+    return !!this.formulaire.nom.trim() && !!this.formulaire.listeId && !!this.formulaire.modeleId;
   }
 
   protected modeleInformation(): boolean {
@@ -135,16 +196,20 @@ export class CampagneMarketingFormulaire {
 
   basculer(id: number, coche: boolean): void {
     if (coche) this.formulaire.promotionIds.add(id); else this.formulaire.promotionIds.delete(id);
+    this.actualiser();
   }
 
   basculerProduit(id: number, coche: boolean): void {
     if (coche) this.formulaire.produitIds.add(id); else this.formulaire.produitIds.delete(id);
+    this.actualiser();
   }
 
-  enregistrer(): void {
+  /** Brouillon, programmation a la date choisie, ou envoi des la validation (sans date) ; les deux derniers soumettent a validation. */
+  enregistrer(mode: 'BROUILLON' | 'PROGRAMMER' | 'IMMEDIAT' = 'BROUILLON'): void {
     const c = this.campagne();
     const f = this.formulaire;
-    const corps = { nom: f.nom.trim(), listeId: f.listeId, modeleId: f.modeleId, evenementId: f.evenementId, informationId: f.informationId, promotionIds: [...f.promotionIds], produitIds: [...f.produitIds], dateExecution: f.dateExecution ? f.dateExecution + ':00' : null,
+    if (mode === 'IMMEDIAT') f.dateExecution = '';
+    const corps = { soumettre: mode !== 'BROUILLON', nom: f.nom.trim(), listeId: f.listeId, modeleId: f.modeleId, evenementId: f.evenementId, informationId: f.informationId, promotionIds: [...f.promotionIds], produitIds: [...f.produitIds], dateExecution: f.dateExecution ? f.dateExecution + ':00' : null,
       recurrence: f.recurrence || null, finRecurrence: f.recurrence && f.finRecurrence ? f.finRecurrence : null,
       afficheId: f.afficheId, joindreProduits: f.joindreProduits && (f.promotionIds.size > 0 || f.produitIds.size > 0) };
     this.enCours.set(true);
@@ -155,7 +220,8 @@ export class CampagneMarketingFormulaire {
       next: campagne => {
         this.enCours.set(false);
         this.ouvert.set(false);
-        this.messages.add({ severity: 'success', summary: c ? 'Campagne enregistrée' : 'Campagne créée', detail: campagne.nom });
+        this.messages.add({ severity: 'success', summary: mode === 'BROUILLON' ? (c ? 'Campagne enregistrée' : 'Brouillon créé')
+          : campagne.statut === 'A_VALIDER' ? 'Campagne envoyée en validation' : 'Campagne enregistrée', detail: campagne.nom });
         this.enregistre.emit(campagne);
       },
       error: e => {

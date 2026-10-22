@@ -65,6 +65,12 @@ public class CampagneMarketingRessource {
         return campagneMarketingService.creer(demande);
     }
 
+    @PostMapping("/apercu")
+    @PreAuthorize(AUTEURS)
+    public RecapitulatifMarketingDTO apercu(@RequestBody CampagneMarketingDemandeDTO demande) {
+        return campagneMarketingService.apercu(demande);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize(AUTEURS)
     public CampagneMarketingDTO modifier(@PathVariable Long id, @Valid @RequestBody CampagneMarketingDemandeDTO demande) {
