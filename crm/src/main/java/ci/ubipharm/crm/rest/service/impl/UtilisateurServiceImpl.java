@@ -166,6 +166,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         }
         String numero = numero(demande.getNumeroWhatsapp(), null);
         List<HabilitationVoulue> habilitations = habilitations(demande.getHabilitations());
+        verifierDroitsTransmis(habilitations.stream().map(HabilitationVoulue::roleId).toList());
         List<Long> agences = agences(demande.getAgenceIds());
 
         String motDePasse = motDePasseProvisoire();
@@ -190,8 +191,10 @@ public class UtilisateurServiceImpl implements UtilisateurService {
     @Transactional
     public UtilisateurDTO modifier(Long id, UtilisateurDemandeDTO demande) {
         UtilisateurDTO avant = verrouiller(id);
+        verifierCompteGerable(id);
         String numero = numero(demande.getNumeroWhatsapp(), id);
         List<HabilitationVoulue> habilitations = habilitations(demande.getHabilitations());
+        verifierDroitsTransmis(habilitations.stream().map(HabilitationVoulue::roleId).toList());
         List<Long> agences = agences(demande.getAgenceIds());
         boolean resteAdmin = habilitations.stream().anyMatch(h -> "ADMIN".equals(h.roleCode()));
         if (!resteAdmin && estAdmin(avant)) {
@@ -229,6 +232,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
     @Transactional
     public UtilisateurDTO desactiver(Long id) {
         UtilisateurDTO utilisateur = verrouiller(id);
+        verifierCompteGerable(id);
         if (id.equals(utilisateurCourantService.utilisateur().getId())) {
             throw new ErreurMetierException("Vous ne pouvez pas désactiver votre propre compte.");
         }
@@ -249,6 +253,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
     @Transactional
     public UtilisateurDTO reactiver(Long id) {
         UtilisateurDTO utilisateur = verrouiller(id);
+        verifierCompteGerable(id);
         if ("ACTIF".equals(utilisateur.getStatut())) {
             throw new ErreurMetierException("Ce compte est déjà actif.");
         }
@@ -262,6 +267,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
     @Transactional
     public CompteProvisoireDTO reinitialiserMotDePasse(Long id) {
         UtilisateurDTO utilisateur = verrouiller(id);
+        verifierCompteGerable(id);
         String motDePasse = motDePasseProvisoire();
         // Un compte bloque apres trop d'echecs est debloque : c'est le cas le plus courant de reinitialisation
         em.createNativeQuery("""
@@ -427,6 +433,54 @@ public class UtilisateurServiceImpl implements UtilisateurService {
             throw new RessourceIntrouvableException("Utilisateur introuvable");
         }
         return consulter(id);
+    }
+
+    /**
+     * On ne donne que ce qu'on a : hors administrateur, un gestionnaire de comptes ne peut attribuer un role
+     * portant un droit qu'il n'a pas lui-meme (sinon il pourrait se creer un compte administrateur).
+     */
+    private void verifierDroitsTransmis(List<Long> roleIds) {
+        Long moi = utilisateurCourantService.utilisateur().getId();
+        if (roleIds.isEmpty() || estAdministrateur(moi)) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<String> manquants = em.createNativeQuery("""
+                select distinct r.libelle from crm_role r
+                join crm_role_droit rd on rd.role_id = r.id
+                where r.id in (:roles) and rd.droit_id not in (
+                    select rd2.droit_id from crm_habilitation h join crm_role_droit rd2 on rd2.role_id = h.role_id
+                    where h.utilisateur_id = :moi and h.actif = true)
+                order by r.libelle
+                """).setParameter("roles", roleIds).setParameter("moi", moi).getResultList();
+        if (!manquants.isEmpty()) {
+            throw new ErreurMetierException("Vous ne pouvez pas attribuer le rôle « " + String.join(" », « ", manquants)
+                    + " » : il donne des droits que vous n'avez pas.");
+        }
+    }
+
+    /** Un compte qui a plus de droits que le gestionnaire ne peut etre modifie, desactive ou reinitialise que par un administrateur. */
+    private void verifierCompteGerable(Long id) {
+        @SuppressWarnings("unchecked")
+        List<Number> roles = em.createNativeQuery("select role_id from crm_habilitation where utilisateur_id = :id and actif = true")
+                .setParameter("id", id).getResultList();
+        Long moi = utilisateurCourantService.utilisateur().getId();
+        if (id.equals(moi) || roles.isEmpty() || estAdministrateur(moi)) {
+            return;
+        }
+        try {
+            verifierDroitsTransmis(roles.stream().map(Number::longValue).toList());
+        } catch (ErreurMetierException e) {
+            throw new ErreurMetierException("Seul un administrateur peut gérer ce compte : il a des droits que vous n'avez pas.");
+        }
+    }
+
+    private boolean estAdministrateur(Long utilisateurId) {
+        Number n = (Number) em.createNativeQuery("""
+                select count(*) from crm_habilitation h join crm_role r on r.id = h.role_id and r.code = 'ADMIN'
+                where h.utilisateur_id = :id and h.actif = true
+                """).setParameter("id", utilisateurId).getSingleResult();
+        return n.longValue() > 0;
     }
 
     private boolean estAdmin(UtilisateurDTO utilisateur) {

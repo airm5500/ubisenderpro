@@ -143,6 +143,10 @@ class PortefeuilleIT extends IntegrationBase {
         mvc.perform(get("/api/recouvrement/factures").session(remplacant)).andExpect(jsonPath("$.total").value(2));
         mvc.perform(get("/api/recouvrement/delegations").param("enCours", "true").session(remplacant))
                 .andExpect(jsonPath("$", hasSize(1)));
+        // Un directeur d'agence (vision limitee a ses agences) voit les delegations de son agence
+        creerUtilisateur("it-dir-yop", "DIR_AGENCE", "RECOUVREMENT", 1L);
+        mvc.perform(get("/api/recouvrement/delegations").session(connecter("it-dir-yop", MOT_DE_PASSE_ADMIN)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)));
         mvc.perform(get("/api/recouvrement/agents").session(admin))
                 .andExpect(jsonPath("$[?(@.login == 'it-agent1')].remplacant", contains("Test it-agent2")));
 

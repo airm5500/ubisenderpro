@@ -127,6 +127,34 @@ class UtilisateurIT extends IntegrationBase {
     }
 
     @Test
+    void unGestionnaireNonAdministrateurNeDonnePasDeDroitsQuIlNaPas() throws Exception {
+        // Role cree par l'administrateur : gestion des comptes, sans les droits d'administration
+        jdbc.update("insert ignore into crm_role (code, libelle, vision_globale, created_at) values ('IT_GESTION', 'Gestion des comptes', true, utc_timestamp())");
+        jdbc.update("""
+                insert ignore into crm_role_droit (role_id, droit_id, created_at)
+                select g.id, rd.droit_id, utc_timestamp() from crm_role g, crm_role_droit rd join crm_role a on a.id = rd.role_id
+                where g.code = 'IT_GESTION' and a.code = 'AGENT'
+                union select g.id, d.id, utc_timestamp() from crm_role g, crm_droit d where g.code = 'IT_GESTION' and d.code = 'UTILISATEURS'
+                """);
+        creerUtilisateur("it-gestion", "IT_GESTION", "RECOUVREMENT", null);
+        jdbc.update("update crm_habilitation set module_id = null where utilisateur_id = (select id from crm_utilisateur where login = 'it-gestion')");
+        MockHttpSession gestion = connecter("it-gestion", MOT_DE_PASSE_ADMIN);
+        String demandeAdmin = DEMANDE.replace("{\"roleCode\":\"AGENT\",\"moduleCode\":\"RECOUVREMENT\"},{\"roleCode\":\"AGENT\",\"moduleCode\":\"RECOUVREMENT\"}",
+                "{\"roleCode\":\"ADMIN\",\"moduleCode\":null}");
+        mvc.perform(post("/api/utilisateurs").session(gestion).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(demandeAdmin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("droits que vous n'avez pas")));
+        assertThat(jdbc.queryForObject("select count(*) from crm_utilisateur where login = 'awa.kone'", Integer.class)).isZero();
+        // Un role dont il a tous les droits reste attribuable
+        mvc.perform(post("/api/utilisateurs").session(gestion).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(DEMANDE))
+                .andExpect(status().isOk());
+        // Le compte administrateur, plus puissant que lui, ne peut etre ni reinitialise ni desactive
+        Long adminId = jdbc.queryForObject("select id from crm_utilisateur where login = 'admin'", Long.class);
+        mvc.perform(post("/api/utilisateurs/" + adminId + "/desactivation").session(gestion).with(csrf())).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/utilisateurs/" + adminId + "/reinitialisation-mot-de-passe").session(gestion).with(csrf())).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void ilResteToujoursUnAdministrateur() throws Exception {
         Long adminId = jdbc.queryForObject("select id from crm_utilisateur where login = 'admin'", Long.class);
         mvc.perform(post("/api/utilisateurs/" + adminId + "/desactivation").session(admin).with(csrf()))

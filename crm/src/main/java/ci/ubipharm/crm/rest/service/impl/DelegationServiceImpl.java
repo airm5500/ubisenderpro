@@ -121,7 +121,7 @@ public class DelegationServiceImpl implements DelegationService {
                     return List.of();
                 }
                 where.append("""
-                         and exists (select 1 from crm_utilisateur_agence ua where ua.utilisateur_id = d.titulaire_id
+                        \sand exists (select 1 from crm_utilisateur_agence ua where ua.utilisateur_id = d.titulaire_id
                            and ua.agence_id in (:agencesVisibles) and ua.date_debut <= utc_date()
                            and (ua.date_fin is null or ua.date_fin >= utc_date()))""");
                 parametres.put("agencesVisibles", perimetre.getAgenceIds());
