@@ -178,3 +178,36 @@ test('envoi en masse : la barre d avancement suit l envoi', async ({ page }) => 
   await expect(barre).toHaveAttribute('aria-valuemax', '100');
   expect(incidents).toEqual([]);
 });
+
+test('creer ou modifier s ouvre en fenetre, par-dessus l ecran qui reste affiche', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  // Campagne de relance : depuis la liste, puis le brouillon se modifie depuis son suivi
+  await page.goto('campagnes');
+  await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+  const fenetre = page.getByRole('dialog', { name: 'Nouvelle campagne' });
+  await expect(fenetre).toBeVisible();
+  await expect(page).toHaveURL(/\/campagnes$/);
+  await expect(page.getByRole('heading', { name: 'Campagnes de relance' })).toBeAttached();
+  const nom = 'E2E-fenetre ' + suffixe();
+  await fenetre.locator('input[name=nom]').fill(nom);
+  await fenetre.getByRole('button', { name: 'Enregistrer le brouillon' }).click();
+  await expect(page.getByRole('heading', { name: nom })).toBeVisible();
+  await expect(fenetre).toBeHidden();
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click();
+  const modification = page.getByRole('dialog', { name: 'Modifier la campagne' });
+  await expect(modification.locator('input[name=nom]')).toHaveValue(nom);
+  await modification.locator('input[name=nom]').fill(nom + ' bis');
+  await modification.getByRole('button', { name: 'Enregistrer le brouillon' }).click();
+  await expect(page.getByRole('heading', { name: nom + ' bis' })).toBeVisible();
+
+  // Envoi en masse et fournisseurs SMS
+  await page.goto('envoi-masse');
+  await page.getByRole('button', { name: 'Nouvel envoi' }).click();
+  await expect(page.getByRole('dialog', { name: 'Nouvel envoi' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.goto('parametres');
+  await page.getByText('Fournisseurs SMS', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Nouveau fournisseur' }).click();
+  await expect(page.getByRole('dialog', { name: 'Nouveau fournisseur' })).toBeVisible();
+  expect(incidents).toEqual([]);
+});

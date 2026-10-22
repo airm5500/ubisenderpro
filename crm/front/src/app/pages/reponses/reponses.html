@@ -23,7 +23,7 @@
       @let estOuvert = ouvert() === cle(r);
       <div class="reponse" [class.ouverte]="estOuvert">
         <div class="qui">
-          @if (r.clientId) { <a class="ref" [routerLink]="['/clients', r.clientId]">{{ r.clientRaisonSociale }}</a> <span class="second">{{ r.clientCode }}</span> }
+          @if (r.clientId) { <a class="ref" [routerLink]="['/clients', r.clientId]">{{ r.clientRaisonSociale }}</a> <span class="second" style="margin-left: 6px">{{ r.clientCode }}</span> }
           @else { <strong>{{ r.nomAffiche || (r.numeroClient | telephone) }}</strong> <span class="second">numéro inconnu du CRM</span> }
           <div class="second">de {{ r.numeroClient | telephone }} vers {{ r.agentNom || (r.numeroAgent | telephone) }}</div>
           <div class="second">{{ r.nbReponses }} réponse{{ (r.nbReponses ?? 0) > 1 ? 's' : '' }} · dernière {{ r.recuLe | jour: true }}</div>

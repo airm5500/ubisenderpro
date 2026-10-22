@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -18,7 +19,7 @@ const VIDE: Edition = {
 /** Fournisseurs SMS : chacun est decrit par son API HTTP, un nouveau se parametre ici sans developpement. */
 @Component({
   selector: 'app-fournisseurs-sms',
-  imports: [TooltipModule, FormsModule, JourPipe],
+  imports: [TooltipModule, DialogModule, FormsModule, JourPipe],
   templateUrl: './fournisseurs-sms.html'
 })
 export class FournisseursSms implements OnInit {
@@ -30,6 +31,8 @@ export class FournisseursSms implements OnInit {
   protected readonly fournisseurs = signal<FournisseurSms[]>([]);
   protected readonly choisi = signal<FournisseurSms | null>(null);
   protected readonly nouveau = signal(false);
+  /** Fenetre de saisie (creation, duplication ou modification) ouverte. */
+  protected readonly fenetre = signal(false);
   protected readonly avance = signal(false);
   protected readonly essai = signal<ResultatAppelSms | null>(null);
   protected readonly solde = signal<ResultatAppelSms | null>(null);
@@ -43,19 +46,24 @@ export class FournisseursSms implements OnInit {
 
   choisir(f: FournisseurSms): void {
     this.choisi.set(f);
-    this.nouveau.set(false);
     this.essai.set(null);
     this.solde.set(null);
+  }
+
+  modifier(): void {
+    const f = this.choisi();
+    if (!f) return;
     const { id, parDefaut, cleRenseignee, urlAccuse, modifiePar, modifieLe, ...reste } = f;
     this.edition = { ...reste, cleApi: '' };
+    this.nouveau.set(false);
+    this.avance.set(false);
+    this.fenetre.set(true);
   }
 
   creer(modele: FournisseurSms | null = null): void {
-    this.choisi.set(null);
     this.nouveau.set(true);
-    this.essai.set(null);
-    this.solde.set(null);
     this.avance.set(true);
+    this.fenetre.set(true);
     if (modele) {
       const { id, parDefaut, cleRenseignee, urlAccuse, modifiePar, modifieLe, ...reste } = modele;
       this.edition = { ...reste, code: '', libelle: modele.libelle + ' (copie)', cleApi: '' };
@@ -65,12 +73,13 @@ export class FournisseursSms implements OnInit {
   }
 
   enregistrer(): void {
-    const f = this.choisi();
+    const f = this.nouveau() ? null : this.choisi();
     const requete = f
       ? this.api.put<FournisseurSms>(`/api/sms/fournisseurs/${f.id}`, this.edition)
       : this.api.post<FournisseurSms>('/api/sms/fournisseurs', this.edition);
     requete.subscribe(r => {
       this.messages.add({ severity: 'success', summary: 'Fournisseur enregistré', detail: r.libelle });
+      this.fenetre.set(false);
       this.charger(r.id);
     });
   }

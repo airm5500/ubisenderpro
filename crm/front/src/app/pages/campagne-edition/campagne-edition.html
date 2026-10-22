@@ -1,10 +1,12 @@
-<div class="page">
+<div [class.page]="!fenetre()">
   <div class="deux-colonnes">
     <form (ngSubmit)="soumettre()" style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
-      <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px">
-        <a class="retour" routerLink="/campagnes">← Campagnes</a>
-        <h1>{{ id() ? 'Modifier la campagne' : 'Nouvelle campagne' }}</h1>
-      </div>
+      @if (!fenetre()) {
+        <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px">
+          <a class="retour" routerLink="/campagnes">← Campagnes</a>
+          <h1>{{ id() ? 'Modifier la campagne' : 'Nouvelle campagne' }}</h1>
+        </div>
+      }
       @if (motifRejet()) {
         <div class="avert"><i class="pi pi-replay"></i><span>Renvoyée pour modification : {{ motifRejet() }}</span></div>
       }

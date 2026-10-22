@@ -9,9 +9,11 @@
     <div class="actions"><button class="bp" type="button" (click)="nouveau()"><i class="pi pi-plus"></i> Nouvel envoi</button></div>
   </div>
 
+  <!-- La saisie s'ouvre en fenetre, par-dessus l'ecran (regle d'Airman du 22/10/2026) -->
+  <p-dialog header="Nouvel envoi" [visible]="saisie()" (visibleChange)="!$event && saisie.set(false)" [modal]="true"
+            [style]="{ width: '1000px', maxWidth: '96vw' }">
   @if (saisie()) {
-    <section class="bloc">
-      <div class="titre"><h2 class="h2">Nouvel envoi</h2></div>
+    <div class="formulaire">
       <div class="grille">
         <label class="f large">Nom de l'envoi<input class="sel" name="nom" [(ngModel)]="formulaire.nom" placeholder="Ex. Nouvel arrivage de novembre"></label>
         <label class="f large">Modèle de message (facultatif)
@@ -117,9 +119,10 @@
         <button class="bp" type="button" (click)="envoyer()" [disabled]="enCours() || !apercu() || !apercu()!.nbRetenus || !formulaire.nom.trim() || (programme && !formulaire.departLe)">
           {{ programme ? 'Programmer' : 'Envoyer' }} à {{ apercu()?.nbRetenus ?? 0 }} destinataire(s)</button>
       </div>
-    </section>
-    <app-selecteur-clients [(ouvert)]="selecteur" [deja]="clients()" (choisir)="ajouterClients($event)" />
+    </div>
   }
+  </p-dialog>
+  <app-selecteur-clients [(ouvert)]="selecteur" [deja]="clients()" (choisir)="ajouterClients($event)" />
 
   @if (detail(); as e) {
     <section class="bloc">

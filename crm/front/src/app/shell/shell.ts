@@ -7,15 +7,18 @@ import { CharteService } from '../core/charte';
 import { ModuleCourant } from '../core/module-courant';
 import { apresClic, sectionOuverte } from '../core/menu-sections';
 import { Guidage } from './guidage';
+import { FenetreCampagne } from '../core/fenetre-campagne';
+import { FenetreCampagneComponent } from '../pages/campagne-edition/fenetre-campagne';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Guidage],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Guidage, FenetreCampagneComponent],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
   host: { '[class.repliable]': 'repliable()' }
 })
 export class Shell {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   protected readonly auth = inject(Auth);
   protected readonly charte = inject(CharteService);
   protected readonly nomEntreprise = 'UBIPHARM CI';

@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
@@ -15,6 +16,7 @@ const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
   templateUrl: './ma-journee.html'
 })
 export class MaJournee implements OnInit {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;

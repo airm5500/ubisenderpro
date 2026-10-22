@@ -16,7 +16,7 @@
         @if (auth.peut('CLIENTS_GERER') && c.statut === 'INACTIF') { <button class="bp" type="button" (click)="reactiver()">Réactiver</button> }
         @if (auth.peut('FACTURES_GERER') && c.statut === 'ACTIF') { <button class="bs" type="button" (click)="saisieFacture.set(true)">Nouvelle facture</button> }
         @if (auth.peut('CAMPAGNES_PREPARER') && ouvertes().length && c.statut === 'ACTIF') {
-          <a class="ba" routerLink="/campagnes/nouvelle" [queryParams]="{ clients: c.id }">Relancer ce client</a>
+          <button type="button" class="ba" (click)="fenetreCampagne.ouvrir({ clients: '' + c.id })">Relancer ce client</button>
         }
       </div>
     </div>

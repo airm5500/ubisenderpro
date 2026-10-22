@@ -1,8 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
@@ -30,8 +31,8 @@ const ONGLETS: Onglet[] = [
   templateUrl: './factures.html'
 })
 export class Factures implements OnInit {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
-  private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly ref = inject(Referentiels);
   protected readonly L = LIBELLES;
@@ -132,7 +133,7 @@ export class Factures implements OnInit {
   /** Relance des clients des factures choisies : campagne personnalisee pre-remplie. */
   relancerSelection(): void {
     const clients = [...new Set([...this.selection().values()].map(f => f.clientId))];
-    this.router.navigate(['/campagnes/nouvelle'], { queryParams: { clients: clients.join(',') } });
+    this.fenetreCampagne.ouvrir({ clients: clients.join(',') });
   }
 
   private filtres(o: Onglet) {

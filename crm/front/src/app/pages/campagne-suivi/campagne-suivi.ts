@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -18,6 +19,7 @@ type Action = 'rejet' | 'annulation' | null;
   templateUrl: './campagne-suivi.html'
 })
 export class CampagneSuivi implements OnInit, OnDestroy {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
   private readonly messagesService = inject(MessageService);
   protected readonly auth = inject(Auth);
@@ -45,6 +47,14 @@ export class CampagneSuivi implements OnInit, OnDestroy {
     : [{ code: '', libelle: 'Tous' }, { code: 'A_ENVOYER', libelle: 'En attente' }, { code: 'ENVOYE', libelle: 'Envoyés' },
        { code: 'DISTRIBUE', libelle: 'Distribués' }, { code: 'LU', libelle: 'Lus' }, { code: 'ECHEC', libelle: 'Échecs' },
        { code: 'EXCLU', libelle: 'Exclues' }, { code: 'ANNULE', libelle: 'Annulés' }]);
+
+  constructor() {
+    // Brouillon modifie en fenetre depuis cet ecran : on recharge la campagne affichee
+    effect(() => {
+      const c = this.fenetreCampagne.enregistree();
+      if (c && String(c.id) === untracked(() => this.id())) untracked(() => this.charger());
+    });
+  }
 
   ngOnInit(): void {
     this.charger();

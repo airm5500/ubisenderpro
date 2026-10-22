@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -16,6 +17,7 @@ interface Onglet { statut: string; libelle: string; }
   templateUrl: './campagnes.html'
 })
 export class Campagnes implements OnInit {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly router = inject(Router);

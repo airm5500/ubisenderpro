@@ -6,7 +6,7 @@
       <p class="sous-titre">Votre portefeuille compte <strong>{{ nbClients() }} clients</strong> et <strong>{{ totaux().factures }} factures ouvertes</strong>,
         pour <strong>{{ totaux().solde | montant }} FCFA</strong> restant dû, dont <strong>{{ nbEchues() }} factures échues</strong>.</p>
     </div>
-    <a class="ba" routerLink="/campagnes/nouvelle">Nouvelle campagne</a>
+    <button type="button" class="ba" (click)="fenetreCampagne.ouvrir()">Nouvelle campagne</button>
   </div>
 
   <section class="bloc">

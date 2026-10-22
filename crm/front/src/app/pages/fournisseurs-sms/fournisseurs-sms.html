@@ -18,31 +18,71 @@
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
-      <div class="entete" style="margin: 0">
-        <div>
-          <h2 class="h2">{{ nouveau() ? 'Nouveau fournisseur' : edition.libelle }}</h2>
-          @if (choisi(); as f) {
+      @if (choisi(); as f) {
+        <div class="entete" style="margin: 0">
+          <div>
+            <h2 class="h2">{{ f.libelle }}</h2>
             <span class="discret">{{ f.parDefaut ? 'Fournisseur des relances SMS' : 'Pas utilisé pour les relances' }}{{ f.modifiePar ? ' · modifié le ' + (f.modifieLe | jour) + ' par ' + f.modifiePar : '' }}</span>
-          }
-        </div>
-        @if (choisi(); as f) {
+          </div>
           <div class="actions">
+            <button class="bp petit" (click)="modifier()"><i class="pi pi-pencil"></i> Modifier</button>
             <button class="bs petit" (click)="creer(f)">Dupliquer</button>
             @if (!f.parDefaut) { <button class="bs petit" (click)="parDefaut()" [disabled]="!f.actif">Utiliser par défaut</button> }
           </div>
-        }
-      </div>
+        </div>
 
-      @if (choisi() && !choisi()!.cleRenseignee) {
-        <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Saisissez la clé API fournie par {{ choisi()!.libelle }} : sans elle, aucun SMS ne part.</span></div>
+        @if (!f.cleRenseignee) {
+          <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>Saisissez la clé API fournie par {{ f.libelle }} : sans elle, aucun SMS ne part.</span></div>
+        }
+        <div class="kvs">
+          <div class="kv"><span>Code</span><strong>{{ f.code }}</strong></div>
+          <div class="kv"><span>Nom d'expéditeur</span><strong>{{ f.expediteur || '—' }}</strong></div>
+          <div class="kv"><span>Clé API</span><strong>{{ f.cleRenseignee ? 'Enregistrée' : 'À saisir' }}</strong></div>
+          <div class="kv"><span>État</span><strong>{{ f.actif ? 'Actif' : 'Désactivé' }}</strong></div>
+          <div class="kv"><span>Adresse d'envoi</span><strong style="word-break: break-all">{{ f.methodeEnvoi }} {{ f.urlEnvoi }}</strong></div>
+        </div>
+      } @else {
+        <p class="discret">Aucun fournisseur : cliquez sur « Nouveau fournisseur ».</p>
       }
 
+      @if (choisi(); as f) {
+        <section class="bloc">
+          <div class="titre"><h2 class="h2">Essayer</h2>
+            @if (f.urlSolde) { <a (click)="consulterSolde()">Consulter le solde</a> }
+          </div>
+          @if (solde(); as s) {
+            <p [class.avert]="!s.reussi" style="margin: 0">{{ s.reussi ? 'Solde : ' + (s.solde ?? 'non lu, voir la réponse') : 'Solde indisponible : ' + s.erreur }}</p>
+            @if (s.reponse && (!s.reussi || !s.solde)) { <pre class="brut">{{ s.reponse }}</pre> }
+          }
+          <p class="discret" style="margin: 0">Envoie un vrai SMS avec le paramétrage enregistré ; il est facturé par le fournisseur.</p>
+          <div class="grille">
+            <label class="f">Numéro<input class="sel" name="numero" [(ngModel)]="test.numero" placeholder="Ex. 07 08 12 34 56"></label>
+            <label class="f large">Texte<input class="sel" name="message" [(ngModel)]="test.message" maxlength="480"></label>
+          </div>
+          <div class="actions"><button class="bs" (click)="envoyerEssai()" [disabled]="occupe() || !test.numero.trim() || !test.message.trim()">Envoyer l'essai</button></div>
+          @if (essai(); as e) {
+            <p [class.avert]="!e.reussi" style="margin: 0">{{ e.reussi
+              ? 'Accepté par le fournisseur' + (e.identifiant ? ', identifiant ' + e.identifiant : '') + (e.nbSms ? ', ' + e.nbSms + ' SMS' : '') + '.'
+              : 'Refusé' + (e.statutHttp ? ' (HTTP ' + e.statutHttp + ')' : '') + ' : ' + e.erreur }}</p>
+            @if (e.reponse) { <pre class="brut">{{ e.reponse }}</pre> }
+          }
+        </section>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Creation et modification en fenetre, par-dessus la fiche (regle d'Airman du 22/10/2026) -->
+<p-dialog [header]="nouveau() ? 'Nouveau fournisseur' : 'Modifier ' + edition.libelle" [visible]="fenetre()" (visibleChange)="!$event && fenetre.set(false)"
+          [modal]="true" [style]="{ width: '860px', maxWidth: '96vw' }">
+  @if (fenetre()) {
+  <form class="formulaire" (ngSubmit)="enregistrer()">
       <div class="grille">
         <label class="f">Code<input class="sel" name="code" [(ngModel)]="edition.code" [disabled]="!nouveau()" placeholder="Ex. ORANGE" maxlength="30"></label>
         <label class="f large">Nom<input class="sel" name="libelle" [(ngModel)]="edition.libelle" maxlength="100"></label>
         <label class="f">Nom d'expéditeur<input class="sel" name="expediteur" [(ngModel)]="edition.expediteur" maxlength="11" placeholder="11 caractères au plus"></label>
         <label class="f large">Clé API<input class="sel" name="cleApi" type="password" autocomplete="new-password" [(ngModel)]="edition.cleApi"
-          [placeholder]="choisi()?.cleRenseignee ? 'Clé enregistrée : laissez vide pour la garder' : 'Clé fournie par le fournisseur'"></label>
+          [placeholder]="!nouveau() && choisi()?.cleRenseignee ? 'Clé enregistrée : laissez vide pour la garder' : 'Clé fournie par le fournisseur'"></label>
         <label class="f">Format des numéros
           <select class="sel" name="formatNumero" [(ngModel)]="edition.formatNumero">
             <option value="INTERNATIONAL">225 0707… (sans +)</option>
@@ -78,7 +118,7 @@
         </div>
 
         <h3 class="h" style="margin: 0">Accusés de réception</h3>
-        @if (choisi()?.urlAccuse; as url) {
+        @if (!nouveau() && choisi()?.urlAccuse; as url) {
           <div class="li"><span class="mono" style="word-break: break-all">{{ url }}</span><button type="button" class="bi" pTooltip="Copier l'adresse" tooltipPosition="top" aria-label="Copier l'adresse" (click)="copier(url)"><i class="pi pi-copy"></i></button></div>
           <p class="discret" style="margin: -8px 0 0">Adresse envoyée avec chaque SMS par {{ '{url_accuse}' }}, ou à déclarer chez le fournisseur.</p>
         } @else {
@@ -99,33 +139,10 @@
         </div>
       }
 
-      <div class="actions">
-        <button class="bp" (click)="enregistrer()" [disabled]="!edition.code.trim() || !edition.libelle.trim() || !edition.urlEnvoi.trim()">Enregistrer</button>
-      </div>
-
-      @if (choisi(); as f) {
-        <section class="bloc">
-          <div class="titre"><h2 class="h2">Essayer</h2>
-            @if (f.urlSolde) { <a (click)="consulterSolde()">Consulter le solde</a> }
-          </div>
-          @if (solde(); as s) {
-            <p [class.avert]="!s.reussi" style="margin: 0">{{ s.reussi ? 'Solde : ' + (s.solde ?? 'non lu, voir la réponse') : 'Solde indisponible : ' + s.erreur }}</p>
-            @if (s.reponse && (!s.reussi || !s.solde)) { <pre class="brut">{{ s.reponse }}</pre> }
-          }
-          <p class="discret" style="margin: 0">Envoie un vrai SMS avec le paramétrage enregistré ; il est facturé par le fournisseur.</p>
-          <div class="grille">
-            <label class="f">Numéro<input class="sel" name="numero" [(ngModel)]="test.numero" placeholder="Ex. 07 08 12 34 56"></label>
-            <label class="f large">Texte<input class="sel" name="message" [(ngModel)]="test.message" maxlength="480"></label>
-          </div>
-          <div class="actions"><button class="bs" (click)="envoyerEssai()" [disabled]="occupe() || !test.numero.trim() || !test.message.trim()">Envoyer l'essai</button></div>
-          @if (essai(); as e) {
-            <p [class.avert]="!e.reussi" style="margin: 0">{{ e.reussi
-              ? 'Accepté par le fournisseur' + (e.identifiant ? ', identifiant ' + e.identifiant : '') + (e.nbSms ? ', ' + e.nbSms + ' SMS' : '') + '.'
-              : 'Refusé' + (e.statutHttp ? ' (HTTP ' + e.statutHttp + ')' : '') + ' : ' + e.erreur }}</p>
-            @if (e.reponse) { <pre class="brut">{{ e.reponse }}</pre> }
-          }
-        </section>
-      }
+    <div class="pied">
+      <button class="bs" type="button" (click)="fenetre.set(false)">Annuler</button>
+      <button class="bp" type="submit" [disabled]="!edition.code.trim() || !edition.libelle.trim() || !edition.urlEnvoi.trim()">Enregistrer</button>
     </div>
-  </div>
-</div>
+  </form>
+  }
+</p-dialog>

@@ -1,4 +1,5 @@
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
 import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
@@ -19,7 +20,7 @@ interface LectureFichier { valides: DestinataireMasse[]; invalides: Destinataire
  */
 @Component({
   selector: 'app-envoi-masse',
-  imports: [FormsModule, JourPipe, TelephonePipe, TooltipModule, SelecteurClients, EnvoyerMaintenant],
+  imports: [FormsModule, DialogModule, JourPipe, TelephonePipe, TooltipModule, SelecteurClients, EnvoyerMaintenant],
   templateUrl: './envoi-masse.html'
 })
 export class EnvoiMassePage implements OnInit {

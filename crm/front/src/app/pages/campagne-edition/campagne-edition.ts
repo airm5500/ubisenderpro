@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Observable, of, switchMap } from 'rxjs';
@@ -32,6 +32,10 @@ export class CampagneEdition implements OnInit {
   /** Modification d'un brouillon ; clients = relance de clients choisis depuis les factures ou la fiche. */
   readonly id = input<string>();
   readonly clients = input<string>();
+  /** Ouverte en fenetre par-dessus l'ecran en cours (regle d'Airman du 22/10/2026) plutot qu'en page. */
+  readonly fenetre = input(false);
+  readonly fermer = output<void>();
+  readonly enregistree = output<Campagne>();
 
   protected campagneId: number | null = null;
   nom = '';
@@ -144,7 +148,7 @@ export class CampagneEdition implements OnInit {
       next: c => {
         this.occupe.set(false);
         this.messages.add({ severity: 'success', summary: 'Brouillon enregistré', detail: c.nom });
-        this.router.navigate(['/campagnes', c.id]);
+        this.terminer(c);
       },
       error: () => this.occupe.set(false)
     });
@@ -158,10 +162,16 @@ export class CampagneEdition implements OnInit {
       next: c => {
         this.occupe.set(false);
         this.messages.add({ severity: 'success', summary: 'Campagne soumise', detail: 'La Direction du Recouvrement doit maintenant la valider.' });
-        this.router.navigate(['/campagnes', c.id]);
+        this.terminer(c);
       },
       error: () => this.occupe.set(false)
     });
+  }
+
+  /** En page, on rejoint la campagne ; en fenetre, l'ecran qui l'a ouverte decide. */
+  private terminer(c: Campagne): void {
+    if (this.fenetre()) this.enregistree.emit(c);
+    else this.router.navigate(['/campagnes', c.id]);
   }
 
   exempleSuivant(): void {
@@ -183,6 +193,7 @@ export class CampagneEdition implements OnInit {
 
   private remplir(c: Campagne): void {
     if (c.statut !== 'BROUILLON' && c.statut !== 'A_VALIDER') {
+      if (this.fenetre()) this.fermer.emit();
       this.router.navigate(['/campagnes', c.id]);
       return;
     }

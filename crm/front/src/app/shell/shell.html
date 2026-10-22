@@ -133,4 +133,6 @@
   </main>
   <!-- Bulles des boutons, « ? » de chaque ecran et retours animes de saisie -->
   <app-guidage />
+  <!-- Saisie d'une campagne de relance en fenetre, chargee a la premiere ouverture -->
+  @defer (when fenetreCampagne.demande()) { <app-fenetre-campagne /> }
 </div>

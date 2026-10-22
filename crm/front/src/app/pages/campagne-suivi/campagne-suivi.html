@@ -13,7 +13,7 @@
       </div>
       <div class="actions">
         @if (c.statut === 'BROUILLON' && (estAuteur() || auth.peut('CAMPAGNES_VALIDER'))) {
-          <a class="bs" [routerLink]="['/campagnes', c.id, 'modifier']">Modifier</a>
+          <button type="button" class="bs" (click)="fenetreCampagne.ouvrir({ id: c.id })">Modifier</button>
           <button class="bp" (click)="soumettre()">Soumettre à validation</button>
         }
         @if (c.statut === 'A_VALIDER' && auth.peut('CAMPAGNES_VALIDER')) {

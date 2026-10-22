@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { FenetreCampagne } from '../../core/fenetre-campagne';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DialogModule } from 'primeng/dialog';
@@ -24,6 +25,7 @@ const PALETTE = ['#05253D', '#51D78E', '#0B5C8E', '#F4B740', '#9DB0BF'];
   styleUrl: './fiche-client.css'
 })
 export class FicheClient implements OnInit {
+  protected readonly fenetreCampagne = inject(FenetreCampagne);
   private readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   protected readonly L = LIBELLES;
