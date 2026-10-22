@@ -24,7 +24,10 @@ export class CampagneEdition implements OnInit {
   private readonly ref = inject(Referentiels);
   protected readonly L = LIBELLES;
   protected readonly segments = SEGMENTS;
-  protected readonly types = Object.entries(LIBELLES.typeCampagne);
+  /** La promotion releve du Marketing : elle n'est proposee ici que pour une ancienne campagne deja de ce type. */
+  protected get types(): [string, string | undefined][] {
+    return Object.entries(LIBELLES.typeCampagne).filter(([code]) => code !== 'PROMOTION' || this.typeCampagne === 'PROMOTION');
+  }
 
   /** Modification d'un brouillon ; clients = relance de clients choisis depuis les factures ou la fiche. */
   readonly id = input<string>();

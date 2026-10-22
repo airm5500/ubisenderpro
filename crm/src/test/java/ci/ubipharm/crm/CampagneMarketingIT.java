@@ -94,9 +94,10 @@ class CampagneMarketingIT extends IntegrationBase {
                 .andExpect(jsonPath("$.message").value("Une promotion ne porte sur aucune facture ni agent de recouvrement : retirez {solde}."));
 
         Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), campagne("Semaine 43", modele)));
+        // Le Marketing vise toutes les agences (decision du 22/10/2026) : Yopougon et Vridi
         mvc.perform(get("/api/marketing/campagnes/" + campagne + "/recapitulatif").session(charge))
-                .andExpect(jsonPath("$.nbClients").value(1))
-                .andExpect(jsonPath("$.nbMessages").value(2))
+                .andExpect(jsonPath("$.nbClients").value(2))
+                .andExpect(jsonPath("$.nbMessages").value(3))
                 .andExpect(jsonPath("$.nbExclus").value(2))
                 .andExpect(jsonPath("$.numeroExpediteur").value(NUMERO_MARKETING))
                 .andExpect(jsonPath("$.exemples[0].contenu").value("Bonjour Pharmacie Deux Numeros, promotion de la semaine. Test it-marketing"))
@@ -112,7 +113,7 @@ class CampagneMarketingIT extends IntegrationBase {
         envoyer(directeur, post("/api/marketing/campagnes/" + campagne + "/validation"), "")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statut").value("EN_COURS"))
-                .andExpect(jsonPath("$.nbMessages").value(2));
+                .andExpect(jsonPath("$.nbMessages").value(3));
 
         jdbc.update("insert into crm_session_whatsapp (numero, statut, updated_at) values (?, 'CONNECTE', utc_timestamp())", NUMERO_MARKETING);
         when(passerelle.envoyerTexte(eq(NUMERO_MARKETING), anyString(), anyString()))
@@ -122,17 +123,19 @@ class CampagneMarketingIT extends IntegrationBase {
         Long second = jdbc.queryForObject("select max(id) from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER'", Long.class, campagne);
         envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(jsonPath("$.statut").value("ENVOYE"));
         envoyer(charge, post("/api/envois/C" + second + "/immediat"), "").andExpect(status().isBadRequest());
+        // Un message par lot et par numero : les deux restants partent en deux lots
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
         assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
         assertThat(envoiWhatsappService.envoyerLot()).isZero();
         assertThat(jdbc.queryForList("select numero_destinataire from crm_campagne_message where campagne_id = ? and statut = 'ENVOYE' order by id",
-                String.class, campagne)).containsExactly("2250700000001", "2250700000002");
+                String.class, campagne)).containsExactlyInAnyOrder("2250700000001", "2250700000002", "2250700000004");
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))
                 .andExpect(jsonPath("$.statut").value("TERMINEE"))
-                .andExpect(jsonPath("$.nbEnvoyes").value(2));
+                .andExpect(jsonPath("$.nbEnvoyes").value(3));
     }
 
     @Test
-    void sansNumeroWhatsappRienNeSeSoumetEtUnDirecteurNeValidePasHorsDeSesAgences() throws Exception {
+    void sansNumeroWhatsappRienNeSeSoumetEtUnDirecteurMarketingValideToutesAgences() throws Exception {
         jdbc.update("update crm_utilisateur set numero_whatsapp = null where login = 'it-marketing'");
         Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), campagne("Sans numero", modele)));
         envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "")
@@ -149,13 +152,11 @@ class CampagneMarketingIT extends IntegrationBase {
 
         creerUtilisateur("it-directeur", "DIR_AGENCE", "MARKETING", 1L);
         MockHttpSession directeur = connecter("it-directeur", MOT_DE_PASSE_ADMIN);
+        // Le Marketing n'est pas cloisonne par agence : le directeur voit et valide la campagne de toutes les agences
         mvc.perform(get("/api/marketing/campagnes/" + globale + "/messages").session(directeur))
-                .andExpect(jsonPath("$.total").value(3))
-                .andExpect(jsonPath("$.elements[?(@.statut == 'A_ENVOYER')].emailDestinataire").value(org.hamcrest.Matchers.contains("p3@exemple.ci")));
-        envoyer(directeur, post("/api/marketing/campagnes/" + globale + "/validation"), "")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("La campagne vise des clients d'autres agences que les vôtres : elle se valide par la direction."));
-        envoyer(admin, post("/api/marketing/campagnes/" + globale + "/validation"), "").andExpect(jsonPath("$.statut").value("EN_COURS"));
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.elements[?(@.statut == 'A_ENVOYER')].emailDestinataire").value(org.hamcrest.Matchers.containsInAnyOrder("p3@exemple.ci", "p4@exemple.ci")));
+        envoyer(directeur, post("/api/marketing/campagnes/" + globale + "/validation"), "").andExpect(jsonPath("$.statut").value("EN_COURS"));
         assertThat(jdbc.queryForList("select objet from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER' order by id",
                 String.class, globale)).containsExactly("Offre Yopougon", "Offre Vridi");
 
@@ -181,7 +182,7 @@ class CampagneMarketingIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/campagnes/" + campagne).session(charge))
                 .andExpect(jsonPath("$.statut").value("EN_COURS"))
                 .andExpect(jsonPath("$.nbExecutions").value(2))
-                .andExpect(jsonPath("$.nbMessages").value(4));
+                .andExpect(jsonPath("$.nbMessages").value(6));
 
         jdbc.update("update crm_campagne_message set statut = 'ENVOYE' where campagne_id = ? and statut = 'A_ENVOYER'", campagne);
         suiviEnvoiService.recompter(campagne);

@@ -74,3 +74,61 @@ test('sur un grand ecran (27 pouces), les pages occupent toute la largeur', asyn
   const menu = await page.locator('nav').first().evaluate(e => e.getBoundingClientRect().width);
   expect(largeur).toBeGreaterThan(2560 - menu - 40);
 });
+
+test('creation d un compte : agences toutes cochees pour une direction, pas d ajout de role au-dela des modules', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('utilisateurs');
+  await page.getByRole('button', { name: 'Nouveau compte' }).click();
+  const fenetre = page.getByRole('dialog').filter({ hasText: 'Rôles par module' });
+  await fenetre.getByLabel('Rôle').first().selectOption('DIR_AGENCE');
+  const cases = fenetre.locator('label.case input');
+  await expect(cases.first()).toBeChecked();
+  const total = await cases.count();
+  await expect(fenetre.locator('label.case input:checked')).toHaveCount(total);
+  await fenetre.getByRole('button', { name: 'Tout décocher' }).click();
+  await expect(fenetre.locator('label.case input:checked')).toHaveCount(0);
+  await fenetre.getByRole('button', { name: 'Tout cocher' }).click();
+  await expect(fenetre.locator('label.case input:checked')).toHaveCount(total);
+  // Un role sur un module laisse ajouter l'autre ; « Tous les modules » couvre tout
+  await expect(fenetre.getByRole('button', { name: /Ajouter un rôle sur un autre module/ })).toBeVisible();
+  await fenetre.getByLabel('Module').first().selectOption('');
+  await expect(fenetre.getByRole('button', { name: /Ajouter un rôle sur un autre module/ })).toHaveCount(0);
+  expect(incidents).toEqual([]);
+});
+
+test('le bas du menu (se deconnecter) reste visible sans faire defiler', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 560 });
+  await seConnecterEn(page, LOGIN);
+  await page.goto('factures');
+  const sortie = page.getByRole('button', { name: 'Se déconnecter' });
+  await expect(sortie).toBeInViewport();
+});
+
+test('le Marketing voit les clients de toutes les agences, l ecran Clients se charge', async ({ page }) => {
+  const incidents = await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('clients');
+  await expect(page.getByRole('heading', { name: 'Clients', exact: true })).toBeVisible();
+  await page.getByLabel(/Pharmacie, pharmacien/).fill('E2E-');
+  await page.getByRole('button', { name: 'Rechercher' }).click();
+  await expect(page.getByText('E2E Pharmacie Yopougon')).toBeVisible();
+  await expect(page.getByText('E2E Pharmacie Vridi')).toBeVisible();
+  await expect(page.getByText('Chargement…')).toHaveCount(0);
+  expect(incidents).toEqual([]);
+});
+
+test('un compte du seul Recouvrement n entre pas dans le Marketing', async ({ page }) => {
+  await seConnecterEn(page, jeu.comptes.agentYop);
+  await page.goto('marketing');
+  await expect(page).not.toHaveURL(/\/marketing/);
+});
+
+test('Parametres > Charte : rien ne deborde, meme sur un ecran etroit', async ({ page }) => {
+  await seConnecterEn(page, LOGIN);
+  for (const largeur of [1440, 1100]) {
+    await page.setViewportSize({ width: largeur, height: 900 });
+    await page.goto('parametres');
+    await page.getByText('Charte', { exact: true }).first().click();
+    await expect(page.getByText('Choisir une bannière')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `largeur ${largeur}`).toBe(true);
+  }
+});

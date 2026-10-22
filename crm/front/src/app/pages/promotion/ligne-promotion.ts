@@ -2,7 +2,7 @@ import { Component, inject, input, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
-import { Subject, debounceTime, switchMap } from 'rxjs';
+import { Subject, debounceTime, map, switchMap } from 'rxjs';
 import { Api } from '../../core/api';
 import { Page, Produit, PromotionProduit } from '../../core/modeles';
 import { MontantPipe } from '../../core/format';
@@ -28,6 +28,8 @@ export class LignePromotion {
   readonly enregistre = output<PromotionProduit>();
 
   protected readonly resultats = signal<Produit[]>([]);
+  /** Recherche terminee sans resultat : on le dit, au lieu de laisser le bouton grise sans explication. */
+  protected readonly aucun = signal(false);
   protected readonly enCours = signal(false);
   protected readonly erreur = signal<string | null>(null);
   recherche = '';
@@ -35,8 +37,17 @@ export class LignePromotion {
   private readonly frappe = new Subject<string>();
 
   constructor() {
-    this.frappe.pipe(debounceTime(250), switchMap(q => this.api.get<Page<Produit>>('/api/marketing/produits', { q, taille: 8 })))
-      .subscribe(p => this.resultats.set(p.elements));
+    this.frappe.pipe(debounceTime(250), switchMap(q => this.api.get<Page<Produit>>('/api/marketing/produits', { q, taille: 8 })
+      .pipe(map(p => ({ q, produits: p.elements })))))
+      .subscribe(({ q, produits }) => {
+        const exact = produits.filter(p => [p.code, `${p.code} ${p.libelle}`].some(t => t.toLowerCase() === q.toLowerCase()));
+        if (exact.length === 1) {
+          this.choisir(exact[0]);
+          return;
+        }
+        this.resultats.set(produits);
+        this.aucun.set(!!q && !produits.length);
+      });
   }
 
   preparer(): void {
@@ -52,12 +63,19 @@ export class LignePromotion {
   }
 
   chercher(): void {
-    this.frappe.next(this.recherche.trim());
+    this.aucun.set(false);
+    const q = this.recherche.trim();
+    if (!q) {
+      this.resultats.set([]);
+      return;
+    }
+    this.frappe.next(q);
   }
 
   choisir(p: Produit): void {
     this.formulaire.produit = p;
     this.resultats.set([]);
+    this.aucun.set(false);
     this.recherche = '';
   }
 

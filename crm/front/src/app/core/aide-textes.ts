@@ -347,7 +347,7 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 3. Activez-la ou programmez-la ; elle se termine d'elle-même après sa date de fin.`),
   'marketing/promotions/import': p('Importer des produits en promotion', `Choisissez le fichier, associez les colonnes, lancez la simulation, puis validez l'import.`),
   'marketing/promotions/:id': p('Promotion', `Les produits de la promotion et leur avantage. Ajoutez ou retirez des produits, exportez la liste, activez ou programmez la promotion.`),
-  'marketing/modeles': p('Modèles promotionnels', `Les messages types des campagnes marketing, avec leurs variables et leur affiche.
+  'marketing/modeles': p('Modèles de messages', `Les messages types des campagnes marketing, avec leurs variables et leur affiche.
 
 - Les variables s'écrivent entre accolades, par exemple {nom_pharmacie}.
 - Un modèle n'est jamais supprimé : il est archivé.`),
@@ -359,7 +359,7 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 
 - Un événement annuel revient chaque année à la même date.
 - Les fêtes à date variable (Pâques, Ramadan, Tabaski…) se saisissent pour l'année.`),
-  'marketing/numero': p('Mon numéro WhatsApp', `Le numéro depuis lequel partent vos campagnes marketing. Reliez-le en scannant le QR code avec votre téléphone, qui doit rester allumé et connecté.`),
+  'marketing/numero': p('Numéros WhatsApp', `Le numéro depuis lequel partent vos campagnes marketing. Reliez-le en scannant le QR code avec votre téléphone, qui doit rester allumé et connecté.`),
   'agences': p('Agences', `Les agences du réseau. Le code d'import est celui des fichiers de clients et de factures. Une agence archivée sort des listes de choix et garde son historique.`),
   'parametres': p('Paramètres', `Les réglages de l'application, rangés par thème à gauche. Chaque changement prend effet tout de suite et reste tracé dans le journal.
 

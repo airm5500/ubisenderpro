@@ -8,4 +8,10 @@ public interface PerimetreService {
     PerimetreDTO perimetreCourant();
 
     PerimetreDTO perimetre(Long utilisateurId);
+
+    /**
+     * Vrai quand la requete en cours vient du module Marketing d'un utilisateur habilite sur ce module :
+     * le Marketing agit sur toutes les agences (decision d'Airman du 22/10/2026), le Recouvrement reste cloisonne.
+     */
+    boolean contexteMarketing();
 }

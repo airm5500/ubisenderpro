@@ -25,12 +25,16 @@ export const accueil: CanActivateFn = async () => {
   return router.createUrlTree([auth.utilisateur() ? auth.accueil() : '/connexion']);
 };
 
-/** Un compte sans le module Recouvrement ne voit que l'espace Marketing. */
+/** Un compte sans le module Recouvrement ne voit que l'espace Marketing, et un compte sans le Marketing n'y entre pas. */
 export const moduleRecouvrement: CanActivateFn = async (_route, etat) => {
   const auth = inject(Auth);
   const router = inject(Router);
   await auth.verifier();
   const libre = ['/marketing', '/mot-de-passe', '/utilisateurs', '/roles', '/fournisseurs-sms', '/parametres', '/support', '/journal', '/discussions', '/envoi-masse', '/historique-envois', '/clients', '/agences'].some(u => etat.url.startsWith(u));
+  // Et reciproquement : sans le module Marketing, ses ecrans ne s'ouvrent pas
+  if (etat.url.startsWith('/marketing') && !auth.marketing()) {
+    return router.createUrlTree([auth.accueil()]);
+  }
   return auth.recouvrement() || libre ? true : router.createUrlTree(['/marketing']);
 };
 

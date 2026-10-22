@@ -19,6 +19,9 @@ interface Formulaire {
 
 type Fenetre = 'compte' | 'mot-de-passe' | 'desactivation' | null;
 
+/** Roles qui voient toutes les agences : DG, Direction du Recouvrement, Directeur d'agence. */
+const ROLES_TOUTES_AGENCES = ['DG', 'DIR_RECOUVREMENT', 'DIR_AGENCE'];
+
 @Component({
   selector: 'app-utilisateurs',
   imports: [TooltipModule, FormsModule, RouterLink, AsyncPipe, DialogModule, JourPipe, TelephonePipe, HistoriqueUtilisateur],
@@ -29,6 +32,7 @@ export class Utilisateurs implements OnInit {
   private readonly messages = inject(MessageService);
   protected readonly auth = inject(Auth);
   protected readonly ref = inject(Referentiels);
+  protected readonly agences = signal<{ id: number; libelle: string }[]>([]);
 
   protected readonly page = signal<Page<CompteUtilisateur> | null>(null);
   protected readonly referentiel = signal<ReferentielHabilitation>({ roles: [], modules: [] });
@@ -52,6 +56,7 @@ export class Utilisateurs implements OnInit {
 
   ngOnInit(): void {
     this.api.get<ReferentielHabilitation>('/api/utilisateurs/referentiel').subscribe(r => this.referentiel.set(r));
+    this.ref.agences.subscribe(a => this.agences.set(a));
     this.rechercher();
   }
 
@@ -81,8 +86,26 @@ export class Utilisateurs implements OnInit {
     this.fenetre.set('compte');
   }
 
+  /** Modules qui n'ont pas encore de role ; aucun si un role couvre deja « Tous les modules ». */
+  protected modulesLibres(): string[] {
+    const pris = this.formulaire.habilitations.map(h => h.moduleCode || '');
+    return pris.includes('') ? [] : this.referentiel().modules.map(m => m.code).filter(m => !pris.includes(m));
+  }
+
   ajouterRole(): void {
-    this.formulaire.habilitations.push({ moduleCode: 'RECOUVREMENT', roleCode: '' });
+    const libre = this.modulesLibres()[0];
+    if (libre) this.formulaire.habilitations.push({ moduleCode: libre, roleCode: '' });
+  }
+
+  /** Les directions et le Marketing agissent sur toutes les agences : elles sont alors toutes cochees (decision du 22/10/2026). */
+  roleChoisi(): void {
+    const toutes = this.formulaire.habilitations.some(h => ROLES_TOUTES_AGENCES.includes(h.roleCode) || h.moduleCode === 'MARKETING');
+    if (toutes) this.toutesLesAgences(true);
+  }
+
+  toutesLesAgences(cocher: boolean): void {
+    const ids = this.agences().map(a => a.id);
+    this.formulaire.agenceIds = cocher ? new Set(ids) : new Set();
   }
 
   retirerRole(i: number): void {

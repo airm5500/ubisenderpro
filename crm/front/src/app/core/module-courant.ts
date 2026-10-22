@@ -1,3 +1,4 @@
+import { HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
@@ -40,3 +41,11 @@ export class ModuleCourant {
     try { return sessionStorage.getItem(CLE) === 'MARKETING' ? 'MARKETING' : 'RECOUVREMENT'; } catch { return 'RECOUVREMENT'; }
   }
 }
+
+/** Dit au serveur depuis quel module part la requete : le Marketing voit toutes les agences, le Recouvrement reste cloisonne. */
+export const intercepteurModule: HttpInterceptorFn = (requete, suivant) => {
+  if (!requete.url.startsWith('/api/')) {
+    return suivant(requete);
+  }
+  return suivant(requete.clone({ setHeaders: { 'X-Module': inject(ModuleCourant).courant() } }));
+};

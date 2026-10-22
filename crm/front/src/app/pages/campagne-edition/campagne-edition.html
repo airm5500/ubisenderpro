@@ -52,6 +52,7 @@
             </div>
           }
           <div class="f">Sous-types de compte
+            <span class="discret">Compte comptable de la facture (cahier des charges, §3.3) : un même client peut devoir sur « Normal » et sur « Renforcement de stock ». La liste se règle dans les référentiels.</span>
             <div class="chips">@for (s of sousTypes(); track s.id) {
               <label class="opt" [class.optn]="criteres.sousTypeIds?.includes(s.id)" style="padding: 8px 12px"><input type="checkbox" [checked]="criteres.sousTypeIds?.includes(s.id)" (change)="basculer('sousTypeIds', s.id)">{{ s.libelle }}</label>
             }</div>

@@ -87,12 +87,14 @@ class ListeDiffusionIT extends IntegrationBase {
     }
 
     @Test
-    void leChargeMarketingNeVoitQueSonAgenceEtLAgentPasLesListes() throws Exception {
+    void leChargeMarketingAgitSurToutesLesAgencesEtLAgentPasSurLesListes() throws Exception {
+        // Le Marketing n'est pas cloisonne par agence (decision d'Airman du 22/10/2026)
         creerUtilisateur("it-marketing", "CHARGE_MARKETING", "MARKETING", 1L);
         MockHttpSession charge = connecter("it-marketing", MOT_DE_PASSE_ADMIN);
-        Long liste = liste(charge, "{\"nom\":\"Mon agence\",\"parCriteres\":true}");
-        mvc.perform(get("/api/marketing/listes/" + liste).session(charge)).andExpect(jsonPath("$.nbClients").value(2));
-        clients(charge, liste, "AJOUT", autreAgence).andExpect(status().isNotFound());
+        Long liste = liste(charge, "{\"nom\":\"Toutes agences\",\"parCriteres\":true}");
+        mvc.perform(get("/api/marketing/listes/" + liste).session(charge)).andExpect(jsonPath("$.nbClients").value(3));
+        Long manuelle = liste(charge, "{\"nom\":\"Choisis\",\"parCriteres\":false}");
+        clients(charge, manuelle, "AJOUT", autreAgence).andExpect(status().isOk());
 
         creerUtilisateur("it-agent", "AGENT", "RECOUVREMENT", 1L);
         mvc.perform(get("/api/marketing/listes").session(connecter("it-agent", MOT_DE_PASSE_ADMIN))).andExpect(status().isForbidden());

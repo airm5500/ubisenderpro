@@ -96,22 +96,28 @@
     <div class="sous-sec">Rôles par module</div>
     @for (h of formulaire.habilitations; track $index; let i = $index) {
       <div class="hab">
-        <select class="sel" [name]="'module' + i" [(ngModel)]="h.moduleCode" aria-label="Module">
+        <select class="sel" [name]="'module' + i" [(ngModel)]="h.moduleCode" (ngModelChange)="roleChoisi()" aria-label="Module">
           @for (m of referentiel().modules; track m.code) { <option [value]="m.code">{{ m.libelle }}</option> }
           <option value="">Tous les modules</option>
         </select>
-        <select class="sel" [name]="'role' + i" [(ngModel)]="h.roleCode" aria-label="Rôle" required>
+        <select class="sel" [name]="'role' + i" [(ngModel)]="h.roleCode" (ngModelChange)="roleChoisi()" aria-label="Rôle" required>
           <option value="" disabled>Choisir un rôle</option>
           @for (r of referentiel().roles; track r.code) { <option [value]="r.code">{{ r.libelle }}</option> }
         </select>
         <button class="bs petit" type="button" (click)="retirerRole(i)" [disabled]="formulaire.habilitations.length === 1" aria-label="Retirer ce rôle"><i class="pi pi-times"></i></button>
       </div>
     }
-    <div><button class="bs petit" type="button" (click)="ajouterRole()"><i class="pi pi-plus"></i> Ajouter un rôle sur un autre module</button></div>
+    @if (modulesLibres().length) {
+      <div><button class="bs petit" type="button" (click)="ajouterRole()"><i class="pi pi-plus"></i> Ajouter un rôle sur un autre module</button></div>
+    }
     <p class="discret">Un agent du Recouvrement peut avoir un rôle différent en Marketing. « Tous les modules » est réservé à la direction générale et à l'administrateur.
       Les écrans ouverts par chaque rôle se cochent dans @if (auth.peut('ROLES')) { <a routerLink="/roles" (click)="fenetre.set(null)">Rôles et droits</a> } @else { Rôles et droits }.</p>
 
-    <div class="sous-sec">Agences</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+      <div class="sous-sec">Agences</div>
+      <span class="actions"><button class="bs petit" type="button" (click)="toutesLesAgences(true)">Tout cocher</button>
+        <button class="bs petit" type="button" (click)="toutesLesAgences(false)">Tout décocher</button></span>
+    </div>
     @if (visionGlobale()) {
       <div class="info"><i class="pi pi-info-circle"></i><span>Ce rôle voit toutes les agences. Les agences cochées servent seulement à le classer.</span></div>
     }
@@ -132,12 +138,12 @@
   </form>
 </p-dialog>
 
-<p-dialog header="Mot de passe provisoire" [visible]="fenetre() === 'mot-de-passe'" (visibleChange)="!$event && fenetre.set(null)" [modal]="true" [style]="{ width: '480px' }">
+<p-dialog header="Mot de passe provisoire" [visible]="fenetre() === 'mot-de-passe'" (visibleChange)="!$event && fenetre.set(null)" [modal]="true" [style]="{ width: '560px', maxWidth: '96vw' }">
   @if (provisoire; as c) {
     <div class="formulaire">
       <p class="sous-titre">Transmettez ce mot de passe à <strong>{{ c.utilisateur.nomComplet }}</strong> (identifiant <strong>{{ c.utilisateur.login }}</strong>).
         Il ne sera plus affiché ensuite ; il devra être remplacé à la première connexion.</p>
-      <div class="mdp">{{ c.motDePasseProvisoire }}</div>
+      <div class="mdp" style="font-size: 18px; letter-spacing: 1px; overflow-wrap: anywhere">{{ c.motDePasseProvisoire }}</div>
       <div class="pied">
         <button class="bs" type="button" (click)="copier()"><i class="pi pi-copy"></i> Copier</button>
         <button class="bp" type="button" (click)="fenetre.set(null)">C'est noté</button>

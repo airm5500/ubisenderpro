@@ -15,6 +15,10 @@
               <b>{{ r.libelle }}</b> <span class="discret">{{ r.code }}@if (r.prix !== null) { · {{ r.prix | montant }} F }</span></a>
           }
         </div>
+      } @else if (aucun()) {
+        <div class="avert"><i class="pi pi-info-circle"></i><span>Aucun produit du catalogue ne correspond à « {{ recherche.trim() }} ». Tapez le code ou une partie du libellé.</span></div>
+      } @else if (!recherche.trim()) {
+        <p class="discret" style="margin: 0">Tapez le code ou le libellé, puis cliquez sur le produit dans la liste.</p>
       }
     }
 

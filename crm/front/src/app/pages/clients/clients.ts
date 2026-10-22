@@ -6,7 +6,8 @@ import { Observable, of } from 'rxjs';
 import { Api } from '../../core/api';
 import { Auth } from '../../core/auth';
 import { Referentiels } from '../../core/referentiels';
-import { Agent, Page, PortefeuilleClient } from '../../core/modeles';
+import { Agent, Client, Page, PortefeuilleClient } from '../../core/modeles';
+import { ModuleCourant } from '../../core/module-courant';
 import { MontantPipe, TelephonePipe } from '../../core/format';
 import { ClientFormulaire } from './client-formulaire';
 import { MiseAJourSelective } from './mise-a-jour-selective';
@@ -25,6 +26,9 @@ export class Clients implements OnInit {
   protected readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly ref = inject(Referentiels);
+  /** Depuis le Marketing : toutes les pharmacies de toutes les agences, sans les colonnes du recouvrement. */
+  private readonly module = inject(ModuleCourant);
+  protected readonly surMarketing = computed(() => this.module.courant() === 'MARKETING');
 
   criteres = { q: '', agenceId: null as number | null, agentId: null as number | null, sansAgent: false, avecSolde: false, statut: 'ACTIF' };
   protected readonly page = signal<Page<PortefeuilleClient> | null>(null);
@@ -106,9 +110,23 @@ export class Clients implements OnInit {
 
   private charger(): void {
     this.selection.set(new Set());
+    if (this.surMarketing()) {
+      const { q, agenceId, statut } = this.criteres;
+      this.api.get<Page<Client>>('/api/clients', { q, agenceId, statut, page: this.numeroPage, taille: this.taille })
+        .subscribe(p => this.page.set({ ...p, elements: p.elements.map(versLigne) }));
+      return;
+    }
     this.api.get<Page<PortefeuilleClient>>('/api/recouvrement/portefeuille', { ...this.criteres, page: this.numeroPage, taille: this.taille })
       .subscribe(p => this.page.set(p));
   }
 
   protected get numero(): number { return this.numeroPage; }
+}
+
+function versLigne(c: Client): PortefeuilleClient {
+  return {
+    clientId: c.id, code: c.code, raisonSociale: c.raisonSociale, nomPharmacien: c.nomPharmacien, agenceId: c.agenceId, agenceLibelle: c.agenceLibelle,
+    segmentation: c.segmentation, segmentationLibelle: c.segmentationLibelle, segmentationBadge: c.segmentationBadge, numeroPrincipal: c.numeroPrincipal,
+    agentId: null, agentNom: null, affecteLe: null, nbFacturesOuvertes: 0, totalSolde: 0, retardMax: 0
+  };
 }

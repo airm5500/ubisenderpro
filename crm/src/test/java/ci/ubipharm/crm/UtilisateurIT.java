@@ -36,7 +36,7 @@ class UtilisateurIT extends IntegrationBase {
     @Test
     void lAdministrateurCreeUnCompteQuiDoitChangerSonMotDePasse() throws Exception {
         String motDePasse = creer(DEMANDE);
-        assertThat(motDePasse).hasSize(12).containsPattern("[a-zA-Z]").containsPattern("[0-9]");
+        assertThat(motDePasse).hasSize(10).containsPattern("[a-zA-Z]").containsPattern("[0-9]");
 
         mvc.perform(get("/api/utilisateurs").param("q", "awa").session(admin))
                 .andExpect(status().isOk())

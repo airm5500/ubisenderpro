@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => { await seConnecter(page); });
 
 test('les modeles promotionnels de depart se consultent et s exportent en Word', async ({ page }) => {
   await page.goto('marketing/modeles');
-  await expect(page.getByRole('heading', { name: 'Modèles promotionnels' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Modèles de messages' })).toBeVisible();
   for (const nom of ['Promo · Lancement', 'Dispo · Retour de rupture', 'Info · Rappel de garde', 'Anniversaire client']) {
     await expect(page.getByRole('button', { name: new RegExp(nom) })).toBeVisible();
   }

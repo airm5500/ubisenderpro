@@ -17,6 +17,8 @@
       }
       <div><div class="nom" [attr.aria-label]="nomEntreprise">@for (l of lettres; track $index) { <span [style.animation-delay.s]="$index * 0.06" aria-hidden="true">{{ l }}</span> }</div><div class="sous">Relation client</div></div>
     </div>
+    <!-- Seul le menu defile : la marque en haut et le bloc de deconnexion en bas restent fixes -->
+    <div class="menu-defile">
     <!-- Tant que le mot de passe provisoire n'est pas remplace, aucun autre ecran n'est accessible -->
     @if (!auth.utilisateur()?.motDePasseProvisoire) {
     <!-- Le selecteur n'existe que pour un utilisateur habilite sur les deux modules -->
@@ -70,7 +72,7 @@
           @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
           @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
           @if (auth.peut('NUMEROS', 'NUMEROS_TOUS')) {
-            <a class="nv" routerLink="/numeros" routerLinkActive="on">{{ auth.peut('NUMEROS_TOUS') ? 'Numéros WhatsApp' : 'Mon numéro WhatsApp' }}</a>
+            <a class="nv" routerLink="/numeros" routerLinkActive="on">Numéros WhatsApp</a>
           }
         </div></div>
       </div>
@@ -85,14 +87,14 @@
           @if (auth.peut('LISTES')) { <a class="nv" routerLink="/marketing/listes" routerLinkActive="on">Listes de diffusion</a> }
           @if (auth.peut('PRODUITS')) { <a class="nv" routerLink="/marketing/catalogue" routerLinkActive="on">Catalogue des produits</a> }
           @if (auth.peut('PROMOTIONS')) { <a class="nv" routerLink="/marketing/promotions" routerLinkActive="on">Promotions</a> }
-          @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles promotionnels</a> }
+          @if (auth.peut('MODELES_MARKETING')) { <a class="nv" routerLink="/marketing/modeles" routerLinkActive="on">Modèles de messages</a> }
           @if (auth.peut('CLIENTS')) { <a class="nv" routerLink="/clients" routerLinkActive="on">Clients</a> }
           @if (auth.peut('INFORMATIONS')) { <a class="nv" routerLink="/marketing/informations" routerLinkActive="on">Informations clients</a> }
           @if (auth.peut('EVENEMENTS')) { <a class="nv" routerLink="/marketing/evenements" routerLinkActive="on">Calendrier des événements</a> }
           @if (auth.peut('DISCUSSIONS')) { <a class="nv" routerLink="/discussions" routerLinkActive="on">Discussions</a> }
           @if (auth.peut('ENVOI_MASSE')) { <a class="nv" routerLink="/envoi-masse" routerLinkActive="on">Envoi WhatsApp en masse</a> }
           @if (auth.peut('HISTORIQUE_ENVOIS')) { <a class="nv" routerLink="/historique-envois" routerLinkActive="on">Historique des envois</a> }
-          @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Mon numéro WhatsApp</a> }
+          @if (auth.peut('NUMERO_MARKETING')) { <a class="nv" routerLink="/marketing/numero" routerLinkActive="on">Numéros WhatsApp</a> }
         </div></div>
       </div>
     }
@@ -118,6 +120,7 @@
     </div>
     }
 
+    </div>
     <div class="profil">
       <div class="qui">{{ auth.utilisateur()?.nomComplet }}</div>
       <div class="sous">{{ auth.libelleProfil() }}</div>

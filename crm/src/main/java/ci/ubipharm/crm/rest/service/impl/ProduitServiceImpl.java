@@ -57,7 +57,8 @@ public class ProduitServiceImpl implements ProduitService {
             parametres.put("statut", criteres.getStatut());
         }
         if (vide(criteres.getQ()) != null) {
-            where.append(" and (p.code like :q or p.libelle like :q or p.laboratoire like :q)");
+            // Le code et le libelle tapes ensemble (« 3232018 DOLIPRANE 500 ») retrouvent aussi le produit
+            where.append(" and (p.code like :q or p.libelle like :q or p.laboratoire like :q or concat(p.code, ' ', p.libelle) like :q)");
             parametres.put("q", "%" + criteres.getQ().trim() + "%");
         }
         if (vide(criteres.getCategorie()) != null) {

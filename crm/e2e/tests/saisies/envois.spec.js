@@ -61,3 +61,20 @@ test('client : un numero de telephone invalide est refuse avec un message', asyn
   await page.getByRole('button', { name: 'Créer le client' }).click();
   await expect(fenetre.getByText('Numéro WhatsApp invalide : 12 (10 chiffres attendus')).toBeVisible();
 });
+
+test('ajout d un produit a une promotion : « aucun produit » quand la recherche ne trouve rien', async ({ page }) => {
+  await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('marketing/promotions');
+  await page.getByRole('button', { name: 'Nouvelle promotion' }).click();
+  const creation = page.getByRole('dialog', { name: 'Nouvelle promotion' });
+  await expect(creation.locator('input[name=code]')).toBeFocused();
+  await creation.locator('input[name=code]').fill('E2E' + suffixe().slice(-6));
+  await creation.locator('input[name=nom]').fill('E2E recherche de produit');
+  await creation.locator('input[name=dateDebut]').fill('2026-11-01');
+  await creation.locator('input[name=dateFin]').fill('2026-11-30');
+  await page.getByRole('button', { name: 'Créer la promotion' }).click();
+  const ajout = page.getByRole('dialog', { name: 'Ajouter un produit' });
+  await ajout.locator('input[name=recherche]').fill('ZZZ-INTROUVABLE 999');
+  await expect(ajout.getByText(/Aucun produit du catalogue ne correspond/)).toBeVisible();
+  await expect(ajout.getByRole('button', { name: 'Ajouter à la promotion' })).toBeDisabled();
+});

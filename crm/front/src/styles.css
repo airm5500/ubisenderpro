@@ -235,9 +235,10 @@ details.faq summary { cursor: pointer; font-size: 14px; color: var(--bleu); }
   font-size: 12px; white-space: pre-wrap; word-break: break-all; color: #33434F; }
 
 /* Ecran Parametres : libelle a gauche, valeur a droite */
-.param { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--filet); }
+.param { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 440px); gap: 16px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--filet); }
 .param label { font-size: 14px; color: #1F2D38; display: flex; flex-direction: column; gap: 2px; }
-.param .champ { display: flex; align-items: center; gap: 8px; }
+.param .champ { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.param .champ > * { min-width: 0; max-width: 100%; }
 .param .champ label.bs { display: inline-flex; flex-direction: row; color: var(--bleu); }
 .apercu-logo { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 10px; background: var(--bleu); }
 .apercu-logo.clair, img.logo-perso { background: #fff; border-radius: 10px; padding: 4px; box-sizing: border-box; }

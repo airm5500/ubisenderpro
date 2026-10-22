@@ -57,7 +57,6 @@ public class UtilisateurServiceImpl implements UtilisateurService {
     // Sans caracteres ambigus (0/O, 1/l/I) : le mot de passe provisoire est souvent dicte ou recopie
     private static final String LETTRES = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
     private static final String CHIFFRES = "23456789";
-    private static final int LONGUEUR_PROVISOIRE = 12;
 
     private final SecureRandom aleatoire = new SecureRandom();
 
@@ -447,9 +446,9 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         @SuppressWarnings("unchecked")
         List<String> manquants = em.createNativeQuery("""
                 select distinct r.libelle from crm_role r
-                join crm_role_droit rd on rd.role_id = r.id
+                join crm_role_droit rd on rd.role_id = r.id and rd.actif = true
                 where r.id in (:roles) and rd.droit_id not in (
-                    select rd2.droit_id from crm_habilitation h join crm_role_droit rd2 on rd2.role_id = h.role_id
+                    select rd2.droit_id from crm_habilitation h join crm_role_droit rd2 on rd2.role_id = h.role_id and rd2.actif = true
                     where h.utilisateur_id = :moi and h.actif = true)
                 order by r.libelle
                 """).setParameter("roles", roleIds).setParameter("moi", moi).getResultList();
@@ -521,7 +520,9 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         StringBuilder mdp = new StringBuilder();
         mdp.append(LETTRES.charAt(aleatoire.nextInt(LETTRES.length())));
         mdp.append(CHIFFRES.charAt(aleatoire.nextInt(CHIFFRES.length())));
-        while (mdp.length() < LONGUEUR_PROVISOIRE) {
+        // Meme longueur que celle exigee des mots de passe choisis (Parametres > Securite, 10 par defaut)
+        int longueur = Math.max(8, parametreService.entier("securite.mot_de_passe_longueur_min", 10));
+        while (mdp.length() < longueur) {
             mdp.append(tous.charAt(aleatoire.nextInt(tous.length())));
         }
         // Melange pour ne pas toujours commencer par une lettre puis un chiffre

@@ -32,12 +32,14 @@ test.describe('session et CSRF', () => {
 });
 
 test.describe('droits par profil et cloisonnement par agence', () => {
-  test('un agent ne voit que les clients de son agence', async ({ baseURL }) => {
+  test('un agent ne voit que les clients de son portefeuille, jamais ceux d une autre agence', async ({ baseURL }) => {
     const agent = await Session.de(baseURL, jeu.comptes.agentYop);
     const codes = (await json(await agent.get('api/clients', { q: 'E2E-', taille: 50 }))).elements.map(c => c.code);
-    expect(codes).toContain('E2E-YOP');
+    // E2E-YOP est de son agence mais pas de son portefeuille (decision du 22/10/2026)
+    expect(codes).not.toContain('E2E-YOP');
     expect(codes).not.toContain('E2E-VRI');
     expect((await agent.get(`api/clients/${jeu.clients.vri}`)).status()).toBe(404);
+    expect((await agent.get(`api/clients/${jeu.clients.yop}`)).status()).toBe(404);
     await agent.fermer();
   });
 

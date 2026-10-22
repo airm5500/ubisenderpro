@@ -22,6 +22,7 @@ import ci.ubipharm.crm.rest.service.dto.ClientDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.SegmentDTO;
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.PerimetreService;
+import ci.ubipharm.crm.rest.service.PortefeuilleService;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.socle.dto.PageDTO;
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
@@ -65,6 +66,7 @@ public class ClientServiceImpl implements ClientService {
 
     private final EntityManager em;
     private final PerimetreService perimetreService;
+    private final PortefeuilleService portefeuilleService;
     private final ParametreService parametreService;
     private final ReferentielService referentielService;
     private final UtilisateurCourantService utilisateurCourantService;
@@ -85,6 +87,11 @@ public class ClientServiceImpl implements ClientService {
         if (!perimetre.isVisionGlobale()) {
             where.append(" and c.agence_id in (:agencesVisibles)");
             parametres.put("agencesVisibles", perimetre.getAgenceIds());
+        }
+        List<Long> portefeuille = portefeuille(perimetre);
+        if (portefeuille != null) {
+            where.append(" and exists (select 1 from crm_affectation af where af.client_id = c.id and af.date_fin is null and af.agent_id in (:portefeuille))");
+            parametres.put("portefeuille", portefeuille);
         }
         if (criteres.getAgenceId() != null) {
             where.append(" and c.agence_id = :agenceId");
@@ -119,12 +126,26 @@ public class ClientServiceImpl implements ClientService {
                 .build();
     }
 
+    /**
+     * Agents dont l'utilisateur voit seulement le portefeuille (lui et ceux qu'il remplace), ou null s'il voit ses agences :
+     * sans le droit PERIMETRE_AGENCES, un agent du Recouvrement ne voit que ses clients (decision d'Airman du 22/10/2026).
+     */
+    private List<Long> portefeuille(PerimetreDTO perimetre) {
+        return perimetre.isVisionGlobale() ? null : portefeuilleService.agentsGeres();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ClientDTO consulter(Long id) {
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
-        String sql = SELECT + " where c.id = :id" + (perimetre.isVisionGlobale() ? "" : " and c.agence_id in (:agencesVisibles)");
+        List<Long> portefeuille = portefeuille(perimetre);
+        String sql = SELECT + " where c.id = :id" + (perimetre.isVisionGlobale() ? "" : " and c.agence_id in (:agencesVisibles)")
+                + (portefeuille == null ? "" : " and exists (select 1 from crm_affectation af where af.client_id = c.id and af.date_fin is null"
+                        + " and af.agent_id in (:portefeuille))");
         Query requete = em.createNativeQuery(sql, Tuple.class).setParameter("id", id);
+        if (portefeuille != null) {
+            requete.setParameter("portefeuille", portefeuille);
+        }
         if (!perimetre.isVisionGlobale()) {
             if (perimetre.getAgenceIds().isEmpty()) {
                 throw new RessourceIntrouvableException("Client introuvable");

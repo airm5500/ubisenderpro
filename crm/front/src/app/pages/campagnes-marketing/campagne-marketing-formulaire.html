@@ -14,7 +14,7 @@
         @for (m of modeles(); track m.id) { <option [ngValue]="m.id">{{ m.nom }} · {{ L.typeCampagne[m.typeCampagne] }} · {{ L.canal[m.canal] }}</option> }
       </select>
     </label>
-    @if (!modeles().length) { <p class="discret" style="margin: 0">Aucun modèle promotionnel : créez-en un dans Modèles promotionnels.</p> }
+    @if (!modeles().length) { <p class="discret" style="margin: 0">Aucun modèle marketing : créez-en un dans Modèles de messages.</p> }
     @if (modeleEvenement() || formulaire.evenementId) {
       <label class="f">Événement annoncé
         <select class="sel" name="evenementId" [ngModel]="formulaire.evenementId" (ngModelChange)="choisirEvenement($event)">

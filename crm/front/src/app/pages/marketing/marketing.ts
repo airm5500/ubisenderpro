@@ -57,7 +57,6 @@ import { ModuleCourant } from '../../core/module-courant';
         </a>
       }
       </div>
-      @if (auth.recouvrement()) { <a routerLink="/" (click)="module.choisir('RECOUVREMENT')">Revenir au Recouvrement</a> }
     </div>`
 })
 export class Marketing {
