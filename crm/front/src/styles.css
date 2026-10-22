@@ -475,7 +475,7 @@ html[data-guidage="oui"] .etapes .st.courant .stn { animation: aide-pulse 1.6s e
 @media (max-width: 900px) { .redaction { grid-template-columns: 1fr; } .redaction-variables { position: static; max-height: 240px; } }
 
 /* Menu de gauche : seule la liste des ecrans defile, la marque et le bloc de deconnexion restent fixes */
-.menu-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px; }
+.menu-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px; }
 
 /* Icones du menu (remarque 6 du 22/10/2026) : devant chaque rubrique et chaque lien ; celle de la rubrique reste visible quand elle est repliee */
 nav .glt { display: inline-flex; align-items: center; gap: 8px; }

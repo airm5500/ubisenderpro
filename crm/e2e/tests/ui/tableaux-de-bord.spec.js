@@ -117,3 +117,21 @@ test('le menu reste entierement deplie par defaut', async ({ page }) => {
     await expect(page.getByRole('link', { name: lien })).toBeVisible();
   }
 });
+
+test('survoler un lien du menu ne fait jamais apparaitre d ascenseur horizontal', async ({ page }) => {
+  await seConnecter(page);
+  for (const module of ['Marketing', 'Recouvrement']) {
+    await page.locator('nav a.md', { hasText: module }).click();
+    const liens = page.locator('.menu-defile a.nv');
+    for (let i = 0; i < await liens.count(); i++) {
+      const lien = liens.nth(i);
+      if (!(await lien.isVisible())) continue;
+      await lien.hover();
+      await page.waitForTimeout(200);
+      // Le survol grossit le lien : s'il deborde, le menu ne doit pas le faire defiler en largeur (le navigateur sans ecran
+      // de Playwright masque les ascenseurs, on verifie donc que le debordement est coupe plutot que defilable)
+      const etat = await page.locator('.menu-defile').evaluate(m => ({ deborde: m.scrollWidth > m.clientWidth, x: getComputedStyle(m).overflowX }));
+      if (etat.deborde) expect(['hidden', 'clip'], await lien.innerText()).toContain(etat.x);
+    }
+  }
+});
