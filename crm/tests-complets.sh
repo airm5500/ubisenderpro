@@ -34,6 +34,8 @@ FRONT=$(grep -Eo 'Tests +[0-9]+ passed( \| [0-9]+ failed)?' "$JOURNAL/front.log"
 RESULTAT[1]="${RESULTAT[1]} ; front ${FRONT%% *} reussis ($ETAT)"
 
 echo "== Niveaux 2, 3 et 5 : Playwright contre une instance neuve sur le port $PORT"
+# Le jar embarque front/dist : on le reconstruit pour ne jamais tester une interface perimee
+(cd front && npx ng build > "../$JOURNAL/front-build.log" 2>&1)
 ./mvnw -B -q package -DskipTests > "$JOURNAL/package.log" 2>&1
 mysql -e "DROP DATABASE IF EXISTS ubicrm_e2e; CREATE DATABASE ubicrm_e2e CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 CRM_DB_URL=jdbc:mariadb://localhost:3306/ubicrm_e2e "$JAVA_HOME/bin/java" -jar target/ubipharm-crm-0.1.0-SNAPSHOT.jar \

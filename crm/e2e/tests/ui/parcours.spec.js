@@ -274,9 +274,9 @@ test('les listes des relances se rangent dans Relances', async ({ page }) => {
 test('une campagne lancee montre son analyse et la liste ses colonnes distribues et lus', async ({ page }) => {
   const incidents = await seConnecterEn(page, LOGIN);
   await page.goto('marketing/campagnes');
-  await expect(page.getByRole('columnheader', { name: 'Distribués' })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Lus' })).toBeVisible();
+  await expect(page.locator('table.t th', { hasText: 'Distribués' })).toBeVisible();
+  await expect(page.locator('table.t th', { hasText: /^Lus$/ })).toBeVisible();
   await page.goto('campagnes');
-  await expect(page.getByRole('columnheader', { name: 'Distribués' })).toBeVisible();
+  await expect(page.locator('table.t th', { hasText: 'Distribués' })).toBeVisible();
   expect(incidents).toEqual([]);
 });
