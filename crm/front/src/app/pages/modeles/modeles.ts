@@ -3,6 +3,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
+import { NgTemplateOutlet } from '@angular/common';
 import { Api } from '../../core/api';
 import { CharteService } from '../../core/charte';
 import { Auth } from '../../core/auth';
@@ -15,7 +16,7 @@ const VARIABLE = /\{([a-z][a-z0-9_]*)\}/g;
 
 @Component({
   selector: 'app-modeles',
-  imports: [TooltipModule, FormsModule, DialogModule, JourPipe],
+  imports: [TooltipModule, FormsModule, DialogModule, JourPipe, NgTemplateOutlet],
   templateUrl: './modeles.html'
 })
 export class Modeles implements OnInit {
@@ -49,6 +50,12 @@ export class Modeles implements OnInit {
   /** Variables qu'un modele de relance peut citer : ni promotion, ni produit disponible, ni evenement (Marketing). */
   protected readonly insertables = computed(() => this.marketing() ? this.variables()
     : this.variables().filter(v => !/^calcul\.(promotion_|produits_|evenement_)/.test(v.source)));
+  /** Recherche dans la colonne des variables de la fenetre d'ecriture. */
+  filtreVariables = '';
+  protected insertablesFiltrees() {
+    const f = this.filtreVariables.trim().toLowerCase();
+    return f ? this.insertables().filter(v => v.code.includes(f) || v.libelle.toLowerCase().includes(f)) : this.insertables();
+  }
   /** Parametres {{1}}, {{2}}... du modele Meta : les variables du message, dans leur ordre d'apparition. */
   protected readonly ordreMeta = computed(() => [...new Set([...this.contenu().matchAll(/\{([a-z][a-z0-9_]*)\}/g)].map(m => m[1]))]
     .map((v, i) => `{{${i + 1}}} = ${v}`));

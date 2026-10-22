@@ -9,6 +9,7 @@ import { Referentiels } from '../../core/referentiels';
 import { Agent, MessageRecu, Page } from '../../core/modeles';
 import { JourPipe, TelephonePipe } from '../../core/format';
 
+/** Reponses des clients : une ligne par client, la plus recente en haut ; un clic ouvre son fil dans l'ordre chronologique. */
 @Component({
   selector: 'app-reponses',
   imports: [FormsModule, AsyncPipe, RouterLink, JourPipe, TelephonePipe],
@@ -23,6 +24,9 @@ export class Reponses implements OnInit {
   agentId: number | null = null;
   protected agents: Observable<Agent[]> = of([]);
   protected readonly page = signal<Page<MessageRecu> | null>(null);
+  /** Cle du client ouvert (fiche ou numero inconnu) et son fil. */
+  protected readonly ouvert = signal<string | null>(null);
+  protected readonly fil = signal<MessageRecu[] | null>(null);
   private numeroPage = 0;
   private readonly taille = 50;
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.page()?.total ?? 0) / this.taille)));
@@ -42,9 +46,31 @@ export class Reponses implements OnInit {
     this.charger();
   }
 
+  protected cle(r: MessageRecu): string {
+    return r.clientId ? 'c' + r.clientId : 'n' + r.numeroClient;
+  }
+
+  basculer(r: MessageRecu): void {
+    const cle = this.cle(r);
+    if (this.ouvert() === cle) {
+      this.ouvert.set(null);
+      return;
+    }
+    this.ouvert.set(cle);
+    this.fil.set(null);
+    this.api.get<Page<MessageRecu>>('/api/recouvrement/reponses', {
+      clientId: r.clientId, numeroClient: r.clientId ? null : r.numeroClient, agentId: this.agentId, chronologique: true, taille: 200
+    }).subscribe(p => this.ouvert() === cle && this.fil.set(p.elements));
+  }
+
   private charger(): void {
-    this.api.get<Page<MessageRecu>>('/api/recouvrement/reponses', { clientId: this.clientId(), agentId: this.agentId, page: this.numeroPage, taille: this.taille })
-      .subscribe(p => this.page.set(p));
+    this.ouvert.set(null);
+    this.api.get<Page<MessageRecu>>('/api/recouvrement/reponses/par-client', { clientId: this.clientId(), agentId: this.agentId, page: this.numeroPage, taille: this.taille })
+      .subscribe(p => {
+        this.page.set(p);
+        // Arrivee depuis la fiche d'un client : son fil s'ouvre directement
+        if (this.clientId() && p.elements.length === 1) this.basculer(p.elements[0]);
+      });
   }
 
   protected get numero(): number { return this.numeroPage; }

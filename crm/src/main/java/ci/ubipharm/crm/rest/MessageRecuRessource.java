@@ -25,4 +25,9 @@ public class MessageRecuRessource {
     public PageDTO<MessageRecuDTO> rechercher(@Valid MessageRecuCriteresDTO criteres) {
         return messageRecuService.rechercher(criteres);
     }
+
+    @GetMapping("/par-client")
+    public PageDTO<MessageRecuDTO> parClient(@Valid MessageRecuCriteresDTO criteres) {
+        return messageRecuService.parClient(criteres);
+    }
 }

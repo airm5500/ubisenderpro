@@ -18,6 +18,10 @@ public class MessageRecuCriteresDTO {
 
     private Long clientId;
     private Long agentId;
+    /** Fil d'un numero inconnu du CRM (sans client rattache). */
+    private String numeroClient;
+    /** true : ordre chronologique, pour lire un fil (par defaut, la plus recente en haut). */
+    private boolean chronologique;
 
     @Min(value = 0, message = "La page doit être positive.")
     @Builder.Default

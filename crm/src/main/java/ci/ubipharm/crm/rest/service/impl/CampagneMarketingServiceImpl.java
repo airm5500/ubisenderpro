@@ -834,16 +834,19 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
         }
     }
 
-    /** Un valideur limite a ses agences ne valide pas une campagne qui en sort. */
+    /**
+     * Le Marketing voit toutes les agences, mais un valideur limite a ses agences (directeur d'agence) ne valide pas
+     * une campagne qui en sort, sauf si le parametre le permet : elle se valide alors par le Directeur Marketing.
+     */
     private void verifierAgencesDuValideur(List<Ligne> lignes) {
-        PerimetreDTO perimetre = perimetreService.perimetreCourant();
-        if (perimetre.isVisionGlobale()) {
+        PerimetreDTO perimetre = perimetreService.perimetre(utilisateurCourantService.utilisateur().getId());
+        if (perimetre.isVisionGlobale() || parametreService.oui("marketing.validation_directeur_agence_toutes_agences", false)) {
             return;
         }
         boolean horsPerimetre = lignes.stream().filter(Ligne::envoyable)
                 .anyMatch(l -> !perimetre.getAgenceIds().contains(l.message().getAgenceId()));
         if (horsPerimetre) {
-            throw new ErreurMetierException("La campagne vise des clients d'autres agences que les vôtres : elle se valide par la direction.");
+            throw new ErreurMetierException("La campagne vise des clients d'autres agences que les vôtres : elle se valide par le Directeur Marketing.");
         }
     }
 

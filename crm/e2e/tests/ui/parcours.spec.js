@@ -132,3 +132,49 @@ test('Parametres > Charte : rien ne deborde, meme sur un ecran etroit', async ({
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `largeur ${largeur}`).toBe(true);
   }
 });
+
+test('chaque lien et chaque rubrique du menu a son icone', async ({ page }) => {
+  await seConnecterEn(page, LOGIN);
+  for (const module of ['Recouvrement', 'Marketing']) {
+    await page.locator('nav a.md', { hasText: module }).click();
+    const sansIcone = await page.locator('nav a.nv, nav button.gl').evaluateAll(es => es.filter(e => !e.querySelector('i.ic')).map(e => e.textContent.trim()));
+    expect(sansIcone, module).toEqual([]);
+  }
+});
+
+test('reponses des clients : une ligne par client et le filtre « Tous les agents »', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('reponses');
+  await expect(page.getByRole('heading', { name: 'Réponses des clients' })).toBeVisible();
+  await expect(page.getByLabel('Agent')).toHaveText(/Tous les agents/);
+  await expect(page.getByText('Chargement…')).toHaveCount(0);
+  expect(incidents).toEqual([]);
+});
+
+test('delais de relance : le reglage standard se modifie depuis l ecran', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('delais-relance');
+  await page.getByRole('button', { name: 'Modifier les délais par défaut' }).click();
+  const fenetre = page.getByRole('dialog', { name: 'Délais par défaut' });
+  await expect(fenetre).toBeVisible();
+  await fenetre.getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(fenetre).toBeHidden();
+  expect(incidents).toEqual([]);
+});
+
+test('envoi en masse : la barre d avancement suit l envoi', async ({ page }) => {
+  const incidents = await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('envoi-masse');
+  await page.getByRole('button', { name: 'Nouvel envoi' }).click();
+  const nom = 'E2E-' + suffixe();
+  await page.fill('input[name=nom]', nom);
+  await page.fill('textarea[name=contenu]', 'Bonjour {nom}, test E2E.');
+  await page.fill('textarea[name=numeros]', '0799000031;Dr E2E Quatre');
+  await page.getByRole('button', { name: 'Vérifier les destinataires' }).click();
+  await page.getByRole('button', { name: /Envoyer à 1 destinataire/ }).click();
+  await expect(page.getByRole('heading', { name: nom })).toBeVisible();
+  const barre = page.getByRole('progressbar');
+  await expect(barre).toBeVisible();
+  await expect(barre).toHaveAttribute('aria-valuemax', '100');
+  expect(incidents).toEqual([]);
+});

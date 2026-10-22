@@ -135,7 +135,7 @@ class CampagneMarketingIT extends IntegrationBase {
     }
 
     @Test
-    void sansNumeroWhatsappRienNeSeSoumetEtUnDirecteurMarketingValideToutesAgences() throws Exception {
+    void sansNumeroWhatsappRienNeSeSoumetEtUnDirecteurDAgenceNeValidePasHorsDeSesAgencesSaufParametre() throws Exception {
         jdbc.update("update crm_utilisateur set numero_whatsapp = null where login = 'it-marketing'");
         Long campagne = idDe(envoyer(charge, post("/api/marketing/campagnes"), campagne("Sans numero", modele)));
         envoyer(charge, post("/api/marketing/campagnes/" + campagne + "/soumission"), "")
@@ -152,10 +152,15 @@ class CampagneMarketingIT extends IntegrationBase {
 
         creerUtilisateur("it-directeur", "DIR_AGENCE", "MARKETING", 1L);
         MockHttpSession directeur = connecter("it-directeur", MOT_DE_PASSE_ADMIN);
-        // Le Marketing n'est pas cloisonne par agence : le directeur voit et valide la campagne de toutes les agences
+        // Le Marketing n'est pas cloisonne par agence : le directeur d'agence voit la campagne de toutes les agences...
         mvc.perform(get("/api/marketing/campagnes/" + globale + "/messages").session(directeur))
                 .andExpect(jsonPath("$.total").value(4))
                 .andExpect(jsonPath("$.elements[?(@.statut == 'A_ENVOYER')].emailDestinataire").value(org.hamcrest.Matchers.containsInAnyOrder("p3@exemple.ci", "p4@exemple.ci")));
+        // ... mais par defaut ne la valide pas : elle sort de ses agences (decision d'Airman du 22/10/2026)
+        envoyer(directeur, post("/api/marketing/campagnes/" + globale + "/validation"), "")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("La campagne vise des clients d'autres agences que les vôtres : elle se valide par le Directeur Marketing."));
+        jdbc.update("update crm_parametre set valeur = 'OUI' where cle = 'marketing.validation_directeur_agence_toutes_agences'");
         envoyer(directeur, post("/api/marketing/campagnes/" + globale + "/validation"), "").andExpect(jsonPath("$.statut").value("EN_COURS"));
         assertThat(jdbc.queryForList("select objet from crm_campagne_message where campagne_id = ? and statut = 'A_ENVOYER' order by id",
                 String.class, globale)).containsExactly("Offre Yopougon", "Offre Vridi");

@@ -1,5 +1,5 @@
 <p-dialog [header]="facture() ? 'Modifier la facture' : 'Nouvelle facture'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
-          (onShow)="preparer()" [modal]="true" [style]="{ width: '680px' }">
+          (onShow)="preparer()" [modal]="true" [style]="{ width: '680px' }" [contentStyle]="{ overflow: 'visible' }">
   <form class="formulaire" (ngSubmit)="enregistrer()">
     <div class="f large">Client
       @if (clientChoisi(); as c) {
@@ -8,15 +8,17 @@
           @if (!facture() && !client()) { <a (click)="changerClient()">Changer</a> }
         </div>
       } @else {
-        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher($event)"
-               placeholder="Pharmacie, pharmacien ou numéro de compte" aria-label="Rechercher le client" autocomplete="off">
-        @if (clients().length) {
-          <div class="choix-client">
-            @for (c of clients(); track c.id) {
-              <button type="button" class="ligne-choix" (click)="choisir(c)">{{ c.raisonSociale }}<span class="discret"> · {{ c.code }} · {{ c.agenceLibelle }}</span></button>
-            }
-          </div>
-        } @else if (recherche.trim().length >= 2) { <span class="discret">Aucun client trouvé.</span> }
+        <div class="recherche-flottante">
+          <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher($event)"
+                 placeholder="Pharmacie, pharmacien ou numéro de compte" aria-label="Rechercher le client" autocomplete="off">
+          @if (clients().length) {
+            <div class="deroulant">
+              @for (c of clients(); track c.id) {
+                <button type="button" class="ligne-choix" (click)="choisir(c)">{{ c.raisonSociale }}<span class="discret"> · {{ c.code }} · {{ c.agenceLibelle }}</span></button>
+              }
+            </div>
+          } @else if (recherche.trim().length >= 2) { <div class="deroulant"><span class="discret deroulant-vide">Aucun client trouvé.</span></div> }
+        </div>
       }
     </div>
     <div class="grille">

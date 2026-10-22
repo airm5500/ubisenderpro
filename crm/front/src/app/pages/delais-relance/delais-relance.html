@@ -11,8 +11,11 @@
   <div class="defile">
     <table class="t">
       <thead><tr>
-        <th>Agence</th><th>Segment</th><th class="n">Avant échéance, de</th><th class="n">à</th><th class="n">Après échéance, dès</th>
-        <th class="n">Entre deux relances</th><th>Modifié</th><th></th>
+        <th>Agence</th><th>Segment</th>
+        <th class="n" pTooltip="Premier jour où une facture peut être relancée avant son échéance. J-5 : cinq jours avant." tooltipPosition="top">Avant échéance, de</th>
+        <th class="n" pTooltip="Dernier jour de relance avant l'échéance. J-1 : la veille." tooltipPosition="top">à</th>
+        <th class="n" pTooltip="Une facture échue est relancée à partir de ce jour. J+0 : le jour même de l'échéance." tooltipPosition="top">Après échéance, dès</th>
+        <th class="n" pTooltip="Nombre de jours minimum avant de relancer à nouveau la même facture, toutes campagnes confondues." tooltipPosition="top">Entre deux relances</th><th>Modifié</th><th></th>
       </tr></thead>
       <tbody>
         @if (defauts(); as d) {
@@ -22,7 +25,7 @@
               <td class="n">J-{{ d.avantJoursMax }}</td><td class="n">J-{{ d.avantJoursMin }}</td><td class="n">J+{{ d.retardJoursMin }}</td>
               <td class="n">{{ d.intervalleJours ? d.intervalleJours + ' j' : 'sans minimum' }}</td>
               <td class="second">Paramètres</td>
-              <td class="nw">@if (auth.peut('PARAMETRES')) { <a class="bi" routerLink="/parametres" pTooltip="Modifier dans les paramètres" tooltipPosition="top" aria-label="Modifier dans les paramètres"><i class="pi pi-pencil"></i></a> }</td>
+              <td class="nw">@if (auth.peut('PARAMETRES')) { <button type="button" class="bi" (click)="modifierStandard()" pTooltip="Modifier les délais par défaut" tooltipPosition="top" aria-label="Modifier les délais par défaut"><i class="pi pi-pencil"></i></button> }</td>
             </tr>
           }
         }
@@ -52,10 +55,15 @@
   <a style="font-size: 13px" (click)="basculerArchives()">{{ archives() ? 'Revenir aux règles actives' : 'Voir les règles archivées' }}</a>
 </div>
 
-<p-dialog [header]="cible() ? 'Modifier la règle' : 'Nouvelle règle de délais'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
+<p-dialog [header]="standard() ? 'Délais par défaut' : cible() ? 'Modifier la règle' : 'Nouvelle règle de délais'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
           [modal]="true" [style]="{ width: '620px' }">
   <form class="formulaire" (ngSubmit)="enregistrer()">
+    @if (standard()) {
+      <div class="info"><i class="pi pi-info-circle"></i><span>Ces délais s'appliquent à toutes les agences et à tous les segments qui n'ont pas de règle propre.
+        Ils sont aussi dans Paramètres &gt; Campagnes.</span></div>
+    }
     <div class="grille">
+      @if (!standard()) {
       <label class="f">Agence
         <select class="sel" name="agenceId" [(ngModel)]="edition.agenceId" [disabled]="!!cible()">
           @if (auth.utilisateur()?.visionGlobale) { <option [ngValue]="null">Toutes les agences</option> }
@@ -68,20 +76,25 @@
           @for (s of ref.segments | async; track s.code) { <option [value]="s.code">{{ s.libelle }}</option> }
         </select>
       </label>
+      }
       <label class="f">Avant échéance, à partir de J-
+        <span class="second">Premier jour de relance avant l'échéance. Ex. 5 : la relance peut partir cinq jours avant.</span>
         <input class="sel" type="number" min="1" max="90" name="avantJoursMax" [(ngModel)]="edition.avantJoursMax" [placeholder]="'défaut : ' + (defauts()?.avantJoursMax ?? '')">
       </label>
       <label class="f">jusqu'à J-
+        <span class="second">Dernier jour de relance avant l'échéance. Ex. 1 : au plus tard la veille.</span>
         <input class="sel" type="number" min="1" max="90" name="avantJoursMin" [(ngModel)]="edition.avantJoursMin" [placeholder]="'défaut : ' + (defauts()?.avantJoursMin ?? '')">
       </label>
       <label class="f">Après échéance, dès J+
+        <span class="second">Une facture échue est relancée à partir de ce jour. Ex. 0 : dès le jour de l'échéance, 15 : quinze jours après.</span>
         <input class="sel" type="number" min="0" max="365" name="retardJoursMin" [(ngModel)]="edition.retardJoursMin" [placeholder]="'défaut : ' + (defauts()?.retardJoursMin ?? '')">
       </label>
       <label class="f">Jours minimum entre deux relances
+        <span class="second">Une même facture n'est pas relancée deux fois dans ce délai, toutes campagnes confondues. 0 : sans minimum.</span>
         <input class="sel" type="number" min="0" max="90" name="intervalleJours" [(ngModel)]="edition.intervalleJours" [placeholder]="'défaut : ' + (defauts()?.intervalleJours ?? '')">
       </label>
     </div>
-    <p class="discret" style="margin: 0">Laissez vide ce qui ne change pas : la valeur du niveau au-dessus s'applique.</p>
+    @if (!standard()) { <p class="discret" style="margin: 0">Laissez vide ce qui ne change pas : la valeur du niveau au-dessus s'applique.</p> }
     @if (erreur(); as e) { <div class="avert"><i class="pi pi-exclamation-triangle"></i><span>{{ e }}</span></div> }
     <div class="pied">
       <button class="bs" type="button" (click)="ouvert.set(false)">Annuler</button>

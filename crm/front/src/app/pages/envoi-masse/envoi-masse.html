@@ -136,6 +136,15 @@
       @if (e.statut === 'EN_COURS' && e.horsPlage && e.nbEnAttente) {
         <div class="info"><i class="pi pi-clock"></i><span>En attente de la plage des envois en masse (entre {{ e.plageHoraire }}, heure d'Abidjan) : les {{ e.nbEnAttente }} message(s) partiront à son ouverture, après les campagnes.</span></div>
       }
+      @if (progression(); as p) {
+        @if (p.total) {
+          <div class="progression" role="progressbar" [attr.aria-valuenow]="p.pourcent" aria-valuemin="0" aria-valuemax="100"
+               [attr.aria-label]="'Avancement de l\'envoi : ' + p.faits + ' sur ' + p.total">
+            <div class="progression-texte"><strong>{{ p.faits }} / {{ p.total }}</strong><span>{{ p.pourcent }} %@if (e.nbEchecs) { · {{ e.nbEchecs }} échec(s) }</span></div>
+            <div class="progression-piste"><div class="progression-barre" [class.active]="e.statut === 'EN_COURS' && e.nbEnAttente" [style.width.%]="p.pourcent"></div></div>
+          </div>
+        }
+      }
       <div class="kvs bandeau">
         <div class="kv"><span>À envoyer</span><strong>{{ e.nbEnAttente }}</strong></div>
         <div class="kv"><span>Envoyés</span><strong>{{ e.nbEnvoyes }}</strong></div>

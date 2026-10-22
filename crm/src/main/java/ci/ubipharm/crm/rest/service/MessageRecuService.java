@@ -8,4 +8,7 @@ public interface MessageRecuService {
 
     /** Reponses des clients, dans le perimetre de l'utilisateur (un agent : ses numeros et ceux qu'il remplace). */
     PageDTO<MessageRecuDTO> rechercher(MessageRecuCriteresDTO criteres);
+
+    /** Une ligne par client (ou par numero inconnu) : sa derniere reponse et leur nombre, la plus recente en haut. */
+    PageDTO<MessageRecuDTO> parClient(MessageRecuCriteresDTO criteres);
 }

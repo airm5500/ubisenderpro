@@ -163,6 +163,25 @@ class WhatsappIT extends IntegrationBase {
                 .andExpect(jsonPath("$.elements[?(@.contenu == 'Je passe payer demain')].campagneNom").value("Retards"))
                 .andExpect(jsonPath("$.elements[?(@.contenu == 'Qui est-ce ?')].clientId").value(org.hamcrest.Matchers.contains((Object) null)));
         mvc.perform(get("/api/recouvrement/reponses").session(connecter("it-agent2", MOT_DE_PASSE_ADMIN))).andExpect(jsonPath("$.total").value(0));
+
+        // Vue par client (remarque 12 du 22/10/2026) : une ligne par client avec sa derniere reponse, puis le fil dans l'ordre
+        evenement("message", JETON, "{\"sessionId\":\"" + NUMERO_AGENT + "\",\"from\":\"" + NUMERO_CLIENT
+                + "\",\"type\":\"TEXTE\",\"text\":\"Finalement ce soir\",\"id\":\"IN-3\"}").andExpect(status().isNoContent());
+        jdbc.update("update crm_message_recu set recu_le = date_sub(utc_timestamp(), interval 1 hour) where contenu = 'Je passe payer demain'");
+        MockHttpSession agent1 = connecter("it-agent1", MOT_DE_PASSE_ADMIN);
+        mvc.perform(get("/api/recouvrement/reponses/par-client").session(agent1))
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.elements.length()").value(2))
+                .andExpect(jsonPath("$.elements[?(@.nbReponses == 2)].contenu").value(org.hamcrest.Matchers.contains("Finalement ce soir")))
+                .andExpect(jsonPath("$.elements[?(@.nbReponses == 1)].contenu").value(org.hamcrest.Matchers.contains("Qui est-ce ?")));
+        Long clientId = jdbc.queryForObject("select client_id from crm_message_recu where contenu = 'Finalement ce soir'", Long.class);
+        mvc.perform(get("/api/recouvrement/reponses").param("clientId", clientId.toString()).param("chronologique", "true").session(agent1))
+                .andExpect(jsonPath("$.elements[0].contenu").value("Je passe payer demain"))
+                .andExpect(jsonPath("$.elements[1].contenu").value("Finalement ce soir"));
+        mvc.perform(get("/api/recouvrement/reponses").param("numeroClient", "2250999999999").session(agent1))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.elements[0].contenu").value("Qui est-ce ?"));
+        mvc.perform(get("/api/recouvrement/reponses/par-client").session(connecter("it-agent2", MOT_DE_PASSE_ADMIN))).andExpect(jsonPath("$.total").value(0));
     }
 
     @Test

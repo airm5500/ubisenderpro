@@ -134,3 +134,25 @@ test.describe('discussions', () => {
     await admin.fermer();
   });
 });
+
+test.describe('campagnes Marketing et reponses des clients', () => {
+  test('le reglage « directeur d agence : toutes agences » existe, desactive par defaut', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const reglage = (await json(await admin.get('api/parametres'))).find(p => p.cle === 'marketing.validation_directeur_agence_toutes_agences');
+    expect(reglage).toMatchObject({ valeur: 'NON', typeValeur: 'OUI_NON', categorie: 'MARKETING' });
+    await admin.fermer();
+  });
+
+  test('les reponses se lisent une ligne par client, et le fil dans l ordre chronologique', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const parClient = await json(await admin.get('api/recouvrement/reponses/par-client'));
+    expect(parClient).toMatchObject({ page: 0, taille: 50 });
+    const cles = parClient.elements.map(r => r.clientId ? 'c' + r.clientId : 'n' + r.numeroClient);
+    expect(new Set(cles).size).toBe(cles.length);
+    for (const r of parClient.elements) expect(r.nbReponses).toBeGreaterThan(0);
+    const fil = await json(await admin.get('api/recouvrement/reponses?chronologique=true&taille=200'));
+    const dates = fil.elements.map(r => r.recuLe);
+    expect(dates).toEqual([...dates].sort());
+    await admin.fermer();
+  });
+});

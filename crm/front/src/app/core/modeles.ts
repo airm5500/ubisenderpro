@@ -264,6 +264,8 @@ export interface MessageRecu {
   id: number; numeroAgent: string; agentNom: string; numeroClient: string; nomAffiche: string | null; clientId: number | null;
   clientCode: string | null; clientRaisonSociale: string | null; factureReference: string | null; campagneNom: string | null;
   type: string; contenu: string; recuLe: string;
+  /** Vue par client : nombre de reponses du client, la ligne portant la plus recente. */
+  nbReponses?: number;
 }
 
 /** Marketing : liste de diffusion, par criteres et/ou clients choisis un par un. */

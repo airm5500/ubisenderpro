@@ -29,4 +29,6 @@ public class MessageRecuDTO {
     private String type;
     private String contenu;
     private LocalDateTime recuLe;
+    /** Vue par client seulement : nombre de reponses de ce client (la ligne porte la plus recente). */
+    private Long nbReponses;
 }

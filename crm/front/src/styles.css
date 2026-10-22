@@ -451,3 +451,43 @@ html[data-guidage="oui"] .etapes .st.courant .stn { animation: aide-pulse 1.6s e
 @media (prefers-reduced-motion: reduce) {
   .aide-q, html[data-guidage="oui"] .aide-champ-ko, html[data-guidage="oui"] .etapes .st.courant .stn { animation: none !important; transition: none !important; }
 }
+
+/* Barre d'avancement d'un envoi (envoi en masse, campagne) : rayures qui defilent tant que l'envoi avance */
+.progression { display: flex; flex-direction: column; gap: 6px; }
+.progression-texte { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; color: var(--bleu); }
+.progression-texte span { font-size: 13px; color: var(--texte-2); }
+.progression-piste { height: 12px; border-radius: 999px; background: #E3EAF0; overflow: hidden; }
+.progression-barre { height: 100%; border-radius: 999px; background: var(--vert); transition: width .6s ease; }
+.progression-barre.active { background-image: linear-gradient(45deg, rgba(255,255,255,.35) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.35) 50%, rgba(255,255,255,.35) 75%, transparent 75%);
+  background-size: 24px 24px; animation: progression-rayures 1s linear infinite; }
+@keyframes progression-rayures { from { background-position: 0 0; } to { background-position: 24px 0; } }
+@media (prefers-reduced-motion: reduce) { .progression-barre.active { animation: none; } .progression-barre { transition: none; } }
+
+/* Fenetre d'ecriture d'un modele : variables a gauche, message et apercu a droite */
+.redaction { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+.redaction-variables { position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; max-height: 70vh; }
+.redaction-liste { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; }
+.redaction-var { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 1px solid var(--filet); background: #fff; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.redaction-var code { font-size: 13px; font-weight: 700; color: var(--bleu); }
+.redaction-var span { font-size: 12px; color: var(--texte-2); }
+.redaction-var:hover { border-color: var(--vert); background: #F2FBF6; }
+.redaction-corps { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 900px) { .redaction { grid-template-columns: 1fr; } .redaction-variables { position: static; max-height: 240px; } }
+
+/* Menu de gauche : seule la liste des ecrans defile, la marque et le bloc de deconnexion restent fixes */
+.menu-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px; }
+
+/* Icones du menu (remarque 6 du 22/10/2026) : devant chaque rubrique et chaque lien ; celle de la rubrique reste visible quand elle est repliee */
+nav .glt { display: inline-flex; align-items: center; gap: 8px; }
+nav .gl .ic { font-size: 12px; }
+nav .nv .ic { flex: none; width: 16px; font-size: 14px; text-align: center; opacity: .85; }
+nav .nv.on .ic, nav .nv:hover .ic { opacity: 1; color: var(--vert); }
+
+/* Recherche avec liste de choix : resultats et « aucun resultat » s'ouvrent PAR-DESSUS les champs suivants
+   (remarque d'Airman du 22/10/2026 : une indication de ce genre ne fait jamais descendre le reste de l'ecran) */
+.recherche-flottante { position: relative; }
+.deroulant { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40; display: flex; flex-direction: column; background: #fff;
+  border: 1px solid var(--bordure); border-radius: 8px; box-shadow: 0 10px 28px rgba(5, 37, 61, .18); max-height: 300px; overflow-y: auto; }
+.deroulant-vide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; color: var(--texte-2, #5B6B78); }
+/* Hors de la recherche, la liste se cache (avec un court delai pour que le clic sur un choix aboutisse) et ne masque plus les champs */
+.recherche-flottante:not(:focus-within) .deroulant { visibility: hidden; transition: visibility 0s .2s; }

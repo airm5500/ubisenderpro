@@ -1,24 +1,43 @@
 <p-dialog [header]="ligne() ? 'Modifier l\'avantage' : 'Ajouter un produit'" [visible]="ouvert()" (visibleChange)="!$event && ouvert.set(false)"
-          (onShow)="preparer()" [modal]="true" [style]="{ width: '600px' }">
+          [modal]="true" [style]="{ width: '600px' }" [contentStyle]="{ overflow: 'visible' }">
   <form class="formulaire" (ngSubmit)="enregistrer()">
     @if (formulaire.produit; as p) {
       <div class="info"><i class="pi pi-box"></i><span><b>{{ p.libelle }}</b> · {{ p.code }}@if (p.prix !== null && p.prix !== undefined) { · prix public {{ p.prix | montant }} F }</span>
         @if (!ligne()) { <a (click)="formulaire.produit = null">Changer</a> }</div>
     } @else {
-      <label class="f">Produit du catalogue
-        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher()" placeholder="Code, libellé ou laboratoire" autocomplete="off">
-      </label>
-      @if (resultats().length) {
-        <div class="bloc" style="padding: 0">
-          @for (r of resultats(); track r.id) {
-            <a class="ligne-choix" (click)="choisir(r)" style="display: block; padding: 10px 14px; border-bottom: 1px solid var(--filet)">
-              <b>{{ r.libelle }}</b> <span class="discret">{{ r.code }}@if (r.prix !== null) { · {{ r.prix | montant }} F }</span></a>
+      <div class="f">Produit du catalogue
+        <!-- Resultats et « aucun produit » s'ouvrent par-dessus les champs suivants, sans les decaler (remarque d'Airman du 22/10/2026) -->
+        <div class="recherche-flottante">
+          <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercher()" placeholder="Code ou libellé" autocomplete="off" aria-label="Produit du catalogue">
+          @if (resultats().length) {
+            <div class="deroulant">
+              @for (r of resultats(); track r.id) {
+                <button type="button" class="ligne-choix" (click)="choisir(r)"><b>{{ r.libelle }}</b> <span class="discret">{{ r.code }}@if (r.prix !== null) { · {{ r.prix | montant }} F }</span></button>
+              }
+            </div>
+          } @else if (aucun() && !nouveau) {
+            <div class="deroulant"><div class="deroulant-vide"><i class="pi pi-info-circle"></i> Aucun produit du catalogue ne correspond à « {{ recherche.trim() }} ».
+              @if (auth.peut('PRODUITS_GERER')) { <button type="button" class="bs petit" (click)="creerProduit()"><i class="pi pi-plus"></i> Créer ce produit</button> }
+              @else { Demandez à un gestionnaire du catalogue de le créer. }</div></div>
           }
         </div>
-      } @else if (aucun()) {
-        <div class="avert"><i class="pi pi-info-circle"></i><span>Aucun produit du catalogue ne correspond à « {{ recherche.trim() }} ». Tapez le code ou une partie du libellé.</span></div>
-      } @else if (!recherche.trim()) {
-        <p class="discret" style="margin: 0">Tapez le code ou le libellé, puis cliquez sur le produit dans la liste.</p>
+        <span class="discret">Tapez le code ou le libellé, puis cliquez sur le produit dans la liste.</span>
+      </div>
+      @if (nouveau; as n) {
+        <!-- Creation rapide : le produit rejoint le catalogue et se choisit aussitot -->
+        <div class="bloc" style="padding: 14px 16px">
+          <h3 style="margin: 0 0 10px">Nouveau produit du catalogue</h3>
+          <div class="grille">
+            <label class="f">Code<input class="sel" name="nouveauCode" [(ngModel)]="n.code" maxlength="50"></label>
+            <label class="f">Libellé<input class="sel" name="nouveauLibelle" [(ngModel)]="n.libelle" maxlength="200"></label>
+            <label class="f">Laboratoire<input class="sel" name="nouveauLabo" [(ngModel)]="n.laboratoire" maxlength="150" placeholder="Facultatif"></label>
+            <label class="f">Prix public (FCFA)<input class="sel" type="number" min="0" step="1" name="nouveauPrix" [(ngModel)]="n.prix" placeholder="Facultatif"></label>
+          </div>
+          <div class="pied" style="margin-top: 10px">
+            <button class="bs petit" type="button" (click)="nouveau = null">Annuler</button>
+            <button class="bp petit" type="button" (click)="enregistrerProduit()" [disabled]="enCours() || !n.code.trim() || !n.libelle.trim()">Créer le produit</button>
+          </div>
+        </div>
       }
     }
 

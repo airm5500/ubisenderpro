@@ -78,3 +78,30 @@ test('ajout d un produit a une promotion : « aucun produit » quand la recherch
   await expect(ajout.getByText(/Aucun produit du catalogue ne correspond/)).toBeVisible();
   await expect(ajout.getByRole('button', { name: 'Ajouter à la promotion' })).toBeDisabled();
 });
+
+test('un produit absent du catalogue se cree depuis la promotion, et la liste ne decale pas les champs', async ({ page }) => {
+  await seConnecterEn(page, jeu.comptes.chargeMarketing);
+  await page.goto('marketing/promotions');
+  await page.getByRole('button', { name: 'Nouvelle promotion' }).click();
+  const creation = page.getByRole('dialog', { name: 'Nouvelle promotion' });
+  await expect(creation.locator('input[name=code]')).toBeFocused();
+  await creation.locator('input[name=code]').fill('E2E' + suffixe().slice(-6));
+  await creation.locator('input[name=nom]').fill('E2E creation rapide de produit');
+  await creation.locator('input[name=dateDebut]').fill('2026-11-01');
+  await creation.locator('input[name=dateFin]').fill('2026-11-30');
+  await page.getByRole('button', { name: 'Créer la promotion' }).click();
+  const ajout = page.getByRole('dialog', { name: 'Ajouter un produit' });
+  const avantage = ajout.locator('select[name=avantage]');
+  const avant = (await avantage.boundingBox()).y;
+  const code = 'E2EP' + suffixe().slice(-6);
+  await ajout.locator('input[name=recherche]').fill(code);
+  await expect(ajout.getByText(/Aucun produit du catalogue ne correspond/)).toBeVisible();
+  expect(Math.abs((await avantage.boundingBox()).y - avant)).toBeLessThan(2);
+  await ajout.getByRole('button', { name: 'Créer ce produit' }).click();
+  await expect(ajout.locator('input[name=nouveauCode]')).toHaveValue(code);
+  await ajout.locator('input[name=nouveauLibelle]').fill('E2E Produit cree a la volee');
+  await ajout.getByRole('button', { name: 'Créer le produit' }).click();
+  await expect(ajout.getByText('E2E Produit cree a la volee')).toBeVisible();
+  await ajout.locator('input[name=ugQuantite]').fill('1');
+  await expect(ajout.getByRole('button', { name: 'Ajouter à la promotion' })).toBeEnabled();
+});

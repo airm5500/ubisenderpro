@@ -43,11 +43,41 @@ public class MessageRecuServiceImpl implements MessageRecuService {
     private final PerimetreService perimetreService;
     private final PortefeuilleService portefeuilleService;
 
+    /** Un client connu se regroupe par sa fiche, un numero inconnu par lui-meme. */
+    private static final String CLE_CLIENT = "coalesce(concat('c', r.client_id), concat('n', r.numero_client))";
+
     @Override
     @Transactional(readOnly = true)
     public PageDTO<MessageRecuDTO> rechercher(MessageRecuCriteresDTO criteres) {
-        StringBuilder where = new StringBuilder(" where 1 = 1");
         Map<String, Object> parametres = new LinkedHashMap<>();
+        String where = filtres(criteres, parametres);
+        Query comptage = em.createNativeQuery("select count(*) " + FROM + where);
+        parametres.forEach(comptage::setParameter);
+        long total = ((Number) comptage.getSingleResult()).longValue();
+
+        String ordre = criteres.isChronologique() ? " order by r.recu_le, r.id" : " order by r.recu_le desc, r.id desc";
+        Query requete = em.createNativeQuery(SELECT + FROM + where + ordre, Tuple.class);
+        return page(requete, parametres, criteres, total, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageDTO<MessageRecuDTO> parClient(MessageRecuCriteresDTO criteres) {
+        Map<String, Object> parametres = new LinkedHashMap<>();
+        String where = filtres(criteres, parametres);
+        Query comptage = em.createNativeQuery("select count(distinct " + CLE_CLIENT + ") " + FROM + where);
+        parametres.forEach(comptage::setParameter);
+        long total = ((Number) comptage.getSingleResult()).longValue();
+
+        Query requete = em.createNativeQuery("select * from (" + SELECT
+                + ", count(*) over (partition by " + CLE_CLIENT + ") as nbReponses"
+                + ", row_number() over (partition by " + CLE_CLIENT + " order by r.recu_le desc, r.id desc) as rang "
+                + FROM + where + ") x where x.rang = 1 order by x.recuLe desc, x.id desc", Tuple.class);
+        return page(requete, parametres, criteres, total, true);
+    }
+
+    private String filtres(MessageRecuCriteresDTO criteres, Map<String, Object> parametres) {
+        StringBuilder where = new StringBuilder(" where 1 = 1");
         List<Long> agentsGeres = portefeuilleService.agentsGeres();
         PerimetreDTO perimetre = perimetreService.perimetreCourant();
         if (agentsGeres != null) {
@@ -61,22 +91,31 @@ public class MessageRecuServiceImpl implements MessageRecuService {
             where.append(" and r.client_id = :clientId");
             parametres.put("clientId", criteres.getClientId());
         }
+        if (criteres.getNumeroClient() != null && !criteres.getNumeroClient().isBlank()) {
+            where.append(" and r.client_id is null and r.numero_client = :numeroClient");
+            parametres.put("numeroClient", criteres.getNumeroClient().trim());
+        }
         if (criteres.getAgentId() != null) {
             where.append(" and u.id = :agentId");
             parametres.put("agentId", criteres.getAgentId());
         }
-        Query comptage = em.createNativeQuery("select count(*) " + FROM + where);
-        parametres.forEach(comptage::setParameter);
-        long total = ((Number) comptage.getSingleResult()).longValue();
+        return where.toString();
+    }
 
-        Query requete = em.createNativeQuery(SELECT + FROM + where + " order by r.recu_le desc, r.id desc", Tuple.class);
+    private PageDTO<MessageRecuDTO> page(Query requete, Map<String, Object> parametres, MessageRecuCriteresDTO criteres, long total, boolean parClient) {
         parametres.forEach(requete::setParameter);
         requete.setFirstResult(criteres.getPage() * criteres.getTaille());
         requete.setMaxResults(criteres.getTaille());
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = requete.getResultList();
         return PageDTO.<MessageRecuDTO>builder()
-                .elements(lignes.stream().map(this::mapTupleToDto).toList())
+                .elements(lignes.stream().map(t -> {
+                    MessageRecuDTO dto = mapTupleToDto(t);
+                    if (parClient) {
+                        dto.setNbReponses(((Number) t.get("nbReponses")).longValue());
+                    }
+                    return dto;
+                }).toList())
                 .total(total)
                 .page(criteres.getPage())
                 .taille(criteres.getTaille())

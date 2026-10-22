@@ -21,18 +21,18 @@
 
   @if (modifiable()) {
     <section class="bloc" style="padding: 16px">
-      <label class="f">Ajouter un client à la main
-        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercherClient($event)" placeholder="Nom de la pharmacie ou numéro de compte" autocomplete="off">
-      </label>
-      @if (trouves(); as liste) {
-        @if (liste.length) {
-          <div class="choix-client">
+      <div class="f">Ajouter un client à la main
+      <div class="recherche-flottante">
+        <input class="sel" name="recherche" [(ngModel)]="recherche" (ngModelChange)="chercherClient($event)" placeholder="Nom de la pharmacie ou numéro de compte" autocomplete="off" aria-label="Ajouter un client à la main">
+        @if (trouves(); as liste) {
+          <div class="deroulant">
             @for (c of liste; track c.id) {
               <button type="button" class="ligne-choix" (click)="ajouter(c)">{{ c.raisonSociale }}<span class="discret"> · {{ c.code }} · {{ c.agenceLibelle }}</span></button>
-            }
+            } @empty { <span class="discret deroulant-vide">Aucun client trouvé.</span> }
           </div>
-        } @else { <span class="discret">Aucun client trouvé.</span> }
-      }
+        }
+      </div>
+      </div>
     </section>
   }
 

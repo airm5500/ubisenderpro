@@ -1,9 +1,10 @@
-import { Component, inject, input, model, output, signal } from '@angular/core';
+import { Component, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { Subject, debounceTime, map, switchMap } from 'rxjs';
 import { Api } from '../../core/api';
+import { Auth } from '../../core/auth';
 import { Page, Produit, PromotionProduit } from '../../core/modeles';
 import { MontantPipe } from '../../core/format';
 
@@ -21,6 +22,7 @@ interface Formulaire {
 export class LignePromotion {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
+  protected readonly auth = inject(Auth);
 
   readonly ouvert = model(false);
   readonly promotionId = input.required<number>();
@@ -34,9 +36,13 @@ export class LignePromotion {
   protected readonly erreur = signal<string | null>(null);
   recherche = '';
   formulaire: Formulaire = vide();
+  /** Creation rapide d'un produit absent du catalogue (remarque d'Airman du 22/10/2026), pour qui gere le catalogue. */
+  nouveau: { code: string; libelle: string; laboratoire: string; prix: number | null } | null = null;
   private readonly frappe = new Subject<string>();
 
   constructor() {
+    // Le formulaire se prepare des l'ouverture, pas a la fin de l'animation : une saisie rapide n'est plus effacee
+    effect(() => { if (this.ouvert()) untracked(() => this.preparer()); });
     this.frappe.pipe(debounceTime(250), switchMap(q => this.api.get<Page<Produit>>('/api/marketing/produits', { q, taille: 8 })
       .pipe(map(p => ({ q, produits: p.elements })))))
       .subscribe(({ q, produits }) => {
@@ -54,7 +60,9 @@ export class LignePromotion {
     const l = this.ligne();
     this.erreur.set(null);
     this.recherche = '';
+    this.nouveau = null;
     this.resultats.set([]);
+    this.aucun.set(false);
     this.formulaire = l ? {
       produit: { id: l.produitId, code: l.produitCode, libelle: l.produitLibelle, prix: l.prixPublic } as Produit,
       quantiteMin: l.quantiteMin, avantage: l.avantage, ugQuantite: l.ugQuantite, ugPourcentage: l.ugPourcentage, ugPlafond: l.ugPlafond,
@@ -64,6 +72,7 @@ export class LignePromotion {
 
   chercher(): void {
     this.aucun.set(false);
+    this.nouveau = null;
     const q = this.recherche.trim();
     if (!q) {
       this.resultats.set([]);
@@ -77,6 +86,34 @@ export class LignePromotion {
     this.resultats.set([]);
     this.aucun.set(false);
     this.recherche = '';
+  }
+
+  /** Le texte cherche sert de code s'il tient en un mot avec un chiffre, sinon de libelle. */
+  creerProduit(): void {
+    const q = this.recherche.trim();
+    const code = /^\S*\d\S*$/.test(q);
+    this.nouveau = { code: code ? q : '', libelle: code ? '' : q, laboratoire: '', prix: null };
+    this.erreur.set(null);
+  }
+
+  enregistrerProduit(): void {
+    const n = this.nouveau!;
+    this.enCours.set(true);
+    this.erreur.set(null);
+    this.api.postSilencieux<Produit>('/api/marketing/produits', {
+      code: n.code.trim(), libelle: n.libelle.trim(), laboratoire: n.laboratoire.trim() || null, prix: n.prix
+    }).subscribe({
+      next: p => {
+        this.enCours.set(false);
+        this.nouveau = null;
+        this.choisir(p);
+        this.messages.add({ severity: 'success', summary: 'Produit créé', detail: `${p.libelle} · ${p.code} est ajouté au catalogue.` });
+      },
+      error: e => {
+        this.enCours.set(false);
+        this.erreur.set(e?.error?.champs?.[0]?.message ?? e?.error?.message ?? 'Création impossible.');
+      }
+    });
   }
 
   enregistrer(): void {

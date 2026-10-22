@@ -1,5 +1,5 @@
 import { TooltipModule } from 'primeng/tooltip';
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { Api } from '../../core/api';
@@ -50,8 +50,32 @@ export class EnvoiMassePage implements OnInit {
   protected readonly enCours = signal(false);
   protected readonly detail = signal<EnvoiMasse | null>(null);
   protected readonly destinataires = signal<Page<DestinataireMasse> | null>(null);
+  /** Avancement de l'envoi ouvert : messages traites (envoyes ou en echec) sur le total a envoyer. */
+  protected readonly progression = computed(() => {
+    const e = this.detail();
+    if (!e) return null;
+    const faits = e.nbEnvoyes + e.nbEchecs;
+    const total = faits + e.nbEnAttente;
+    return { faits, total, pourcent: total ? Math.round(faits * 100 / total) : 100 };
+  });
   formulaire = vide();
   filtreStatut = '';
+
+  constructor() {
+    // Tant que l'envoi ouvert est en cours, ses compteurs se mettent a jour tout seuls
+    const minuteur = setInterval(() => this.suivreAvancement(), 4000);
+    inject(DestroyRef).onDestroy(() => clearInterval(minuteur));
+  }
+
+  private suivreAvancement(): void {
+    const e = this.detail();
+    if (!e || e.statut !== 'EN_COURS' || !e.nbEnAttente || document.hidden) return;
+    this.api.getSilencieux<EnvoiMasse>(`/api/envois-masse/${e.id}`).subscribe(d => {
+      if (this.detail()?.id !== d.id) return;
+      this.detail.set(d);
+      if (!d.nbEnAttente) this.chargerDestinataires();
+    });
+  }
 
   ngOnInit(): void {
     this.charger();
