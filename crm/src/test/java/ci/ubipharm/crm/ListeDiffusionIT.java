@@ -100,6 +100,38 @@ class ListeDiffusionIT extends IntegrationBase {
         mvc.perform(get("/api/marketing/listes").session(connecter("it-agent", MOT_DE_PASSE_ADMIN))).andExpect(status().isForbidden());
     }
 
+    @Test
+    void chaqueModuleASesListesSansVoirCellesDeLAutre() throws Exception {
+        // Q7 du 22/10/2026 : les listes du Recouvrement (Relances) et du Marketing ne se croisent jamais ; un meme nom sert dans chacun
+        Long marketing = liste(admin, "{\"nom\":\"Tous\",\"parCriteres\":true}");
+        String r = envoyer(admin, post("/api/recouvrement/listes"), "{\"nom\":\"Tous\",\"parCriteres\":true}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.module").value("RECOUVREMENT")).andReturn().getResponse().getContentAsString();
+        Long relances = ((Number) JsonPath.read(r, "$.id")).longValue();
+        envoyer(admin, post("/api/recouvrement/listes"), "{\"nom\":\"tous\",\"parCriteres\":true}").andExpect(status().is4xxClientError());
+
+        mvc.perform(get("/api/marketing/listes").session(admin)).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(marketing));
+        mvc.perform(get("/api/recouvrement/listes").session(admin)).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(relances));
+        mvc.perform(get("/api/marketing/listes/" + relances).session(admin)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/recouvrement/listes/" + marketing).session(admin)).andExpect(status().isNotFound());
+        envoyer(admin, post("/api/marketing/listes/" + relances + "/archivage"), "").andExpect(status().isNotFound());
+
+        // L'envoi en masse propose les listes du module affiche
+        mvc.perform(get("/api/envois-masse/references").header("X-Module", "RECOUVREMENT").session(admin))
+                .andExpect(jsonPath("$.listes.length()").value(1)).andExpect(jsonPath("$.listes[0].id").value(relances));
+        mvc.perform(get("/api/envois-masse/references").header("X-Module", "MARKETING").session(admin))
+                .andExpect(jsonPath("$.listes.length()").value(1)).andExpect(jsonPath("$.listes[0].id").value(marketing));
+
+        // Le STOP retire du Marketing, pas des relances
+        jdbc.update("update crm_client set desabonne_marketing_le = utc_timestamp() where id = ?", platine);
+        int joignablesMarketing = JsonPath.read(mvc.perform(get("/api/marketing/listes/" + marketing).session(admin)).andReturn().getResponse().getContentAsString(), "$.nbJoignables");
+        int joignablesRelances = JsonPath.read(mvc.perform(get("/api/recouvrement/listes/" + relances).session(admin)).andReturn().getResponse().getContentAsString(), "$.nbJoignables");
+        org.assertj.core.api.Assertions.assertThat(joignablesRelances).isEqualTo(joignablesMarketing + 1);
+
+        // Droits distincts : le chargé marketing ne voit pas les listes des relances
+        creerUtilisateur("it-marketing", "CHARGE_MARKETING", "MARKETING", 1L);
+        mvc.perform(get("/api/recouvrement/listes").session(connecter("it-marketing", MOT_DE_PASSE_ADMIN))).andExpect(status().isForbidden());
+    }
+
     private Long client(MockHttpSession session, String json) throws Exception {
         String r = envoyer(session, post("/api/clients"), json).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(r, "$.id")).longValue();

@@ -53,12 +53,13 @@
         </div></div>
       </div>
     }
-    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER', 'DELAIS_RELANCE')) {
+    @if (auth.peut('CAMPAGNES', 'MODELES', 'MODELES_GERER', 'DELAIS_RELANCE', 'LISTES_RELANCES')) {
       <div class="section" routerLinkActive #sRelances="routerLinkActive" [class.fermee]="!estOuverte('sRelances', sRelances.isActive)">
         <button type="button" class="gl" [attr.tabindex]="repliable() ? null : -1" [attr.aria-expanded]="repliable() ? estOuverte('sRelances', sRelances.isActive) : null" (click)="basculer('sRelances', sRelances.isActive)"><span class="glt"><i class="pi pi-bell ic" aria-hidden="true"></i>Relances</span><i class="pi pi-chevron-down chevron" aria-hidden="true"></i></button>
         <div class="liens" [attr.inert]="estOuverte('sRelances', sRelances.isActive) ? null : ''"><div>
           @if (auth.peut('CAMPAGNES')) { <a class="nv" routerLink="/campagnes" routerLinkActive="on"><i class="pi pi-megaphone ic" aria-hidden="true"></i>Campagnes</a> }
           @if (auth.peut('MODELES', 'MODELES_GERER')) { <a class="nv" routerLink="/modeles" routerLinkActive="on"><i class="pi pi-file-edit ic" aria-hidden="true"></i>Modèles de messages</a> }
+          @if (auth.peut('LISTES_RELANCES')) { <a class="nv" routerLink="/relances/listes" routerLinkActive="on"><i class="pi pi-list ic" aria-hidden="true"></i>Listes de diffusion</a> }
           @if (auth.peut('DELAIS_RELANCE')) { <a class="nv" routerLink="/delais-relance" routerLinkActive="on"><i class="pi pi-clock ic" aria-hidden="true"></i>Délais de relance</a> }
         </div></div>
       </div>

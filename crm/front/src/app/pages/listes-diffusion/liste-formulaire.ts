@@ -1,3 +1,4 @@
+import { espaceListes } from '../../core/listes-module';
 import { Component, inject, input, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe } from '@angular/common';
@@ -33,6 +34,7 @@ export class ListeFormulaire {
   private readonly api = inject(Api);
   private readonly messages = inject(MessageService);
   protected readonly ref = inject(Referentiels);
+  private readonly espace = espaceListes();
   protected readonly FONCTIONS = FONCTIONS;
 
   readonly ouvert = model(false);
@@ -40,7 +42,7 @@ export class ListeFormulaire {
   readonly enregistre = output<ListeDiffusion>();
 
   protected readonly segments = this.api.get<Segment[]>('/api/clients/segments');
-  protected readonly valeurs = this.api.get<ValeursCriteres>('/api/marketing/listes/criteres');
+  protected readonly valeurs = this.api.get<ValeursCriteres>(this.espace.api + '/criteres');
   protected readonly apercu = signal<ApercuListe | null>(null);
   protected readonly enCours = signal(false);
   protected readonly erreur = signal<string | null>(null);
@@ -49,7 +51,7 @@ export class ListeFormulaire {
   private readonly simulation = new Subject<void>();
 
   constructor() {
-    this.simulation.pipe(debounceTime(300), switchMap(() => this.api.postSilencieux<ApercuListe>('/api/marketing/listes/simulation', this.corps())))
+    this.simulation.pipe(debounceTime(300), switchMap(() => this.api.postSilencieux<ApercuListe>(this.espace.api + '/simulation', this.corps())))
       .subscribe({ next: a => this.apercu.set(a), error: () => this.apercu.set(null) });
   }
 
@@ -87,8 +89,8 @@ export class ListeFormulaire {
     const l = this.liste();
     this.enCours.set(true);
     this.erreur.set(null);
-    const requete = l ? this.api.putSilencieux<ListeDiffusion>(`/api/marketing/listes/${l.id}`, this.corps())
-      : this.api.postSilencieux<ListeDiffusion>('/api/marketing/listes', this.corps());
+    const requete = l ? this.api.putSilencieux<ListeDiffusion>(`${this.espace.api}/${l.id}`, this.corps())
+      : this.api.postSilencieux<ListeDiffusion>(this.espace.api, this.corps());
     requete.subscribe({
       next: liste => {
         this.enCours.set(false);

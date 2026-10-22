@@ -331,6 +331,12 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 - Les clients qui ont répondu STOP sont toujours écartés.
 - Une liste n'est jamais supprimée : elle est archivée.`),
   'marketing/listes/:id': p('Liste de diffusion', `Les clients de la liste. Excluez, ajoutez ou réintégrez des clients un par un ; désabonnez ou réabonnez à la demande du client.`),
+  'relances/listes': p('Listes de diffusion des relances', `Les listes du Recouvrement, choisies dans l'envoi en masse : par critères, complétées ou corrigées client par client.
+
+- Elles ne se voient jamais depuis le Marketing, et celles du Marketing ne se voient pas ici.
+- Le STOP marketing n'en retire personne.
+- Une liste n'est jamais supprimée : elle est archivée.`),
+  'relances/listes/:id': p('Liste de diffusion des relances', `Les clients de la liste. Excluez, ajoutez ou réintégrez des clients un par un.`),
   'marketing/catalogue': p('Catalogue des produits', `Les produits mis en avant dans les promotions.
 
 - Importez le fichier Excel ou saisissez les produits un par un.
@@ -376,3 +382,10 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 - Si un message d'erreur affiche une référence, recopiez-la.`),
   'mot-de-passe': p('Mon mot de passe', `Choisissez un mot de passe que vous êtes seul à connaître. Il doit respecter les règles de sécurité affichées.`)
 };
+
+// Les listes des relances reprennent les textes de celles du Marketing (meme ecran, autre module)
+for (const table of [AIDE_BOUTONS, AIDE_PAGES]) {
+  for (const cle of Object.keys(table).filter(c => c.startsWith('marketing/listes'))) {
+    table['relances/' + cle.slice('marketing/'.length)] ??= table[cle];
+  }
+}

@@ -9,6 +9,8 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', canActivate: [accueil], children: [] },
       { path: 'marketing', loadComponent: () => import('./pages/marketing/marketing').then(m => m.Marketing), title: 'Marketing' },
+      { path: 'relances/listes', canActivate: [droit('LISTES_RELANCES')], data: { module: 'RECOUVREMENT' }, loadComponent: () => import('./pages/listes-diffusion/listes-diffusion').then(m => m.ListesDiffusion), title: 'Listes de diffusion des relances' },
+      { path: 'relances/listes/:id', canActivate: [droit('LISTES_RELANCES')], data: { module: 'RECOUVREMENT' }, loadComponent: () => import('./pages/liste-diffusion/liste-diffusion').then(m => m.ListeDiffusionDetail), title: 'Liste de diffusion des relances' },
       { path: 'marketing/listes', canActivate: [droit('LISTES')], loadComponent: () => import('./pages/listes-diffusion/listes-diffusion').then(m => m.ListesDiffusion), title: 'Listes de diffusion' },
       { path: 'marketing/campagnes', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagnes-marketing/campagnes-marketing').then(m => m.CampagnesMarketing), title: 'Campagnes promotionnelles' },
       { path: 'marketing/campagnes/:id', canActivate: [droit('CAMPAGNES_MARKETING')], loadComponent: () => import('./pages/campagne-marketing/campagne-marketing').then(m => m.CampagneMarketingSuivi), title: 'Campagne promotionnelle' },

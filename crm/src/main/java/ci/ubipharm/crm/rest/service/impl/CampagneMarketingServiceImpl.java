@@ -726,7 +726,7 @@ public class CampagneMarketingServiceImpl implements CampagneMarketingService {
             throw new ErreurMetierException("Choisissez un modèle Marketing actif.");
         }
         @SuppressWarnings("unchecked")
-        List<String> listes = em.createNativeQuery("select statut from crm_liste_diffusion where id = :id")
+        List<String> listes = em.createNativeQuery("select statut from crm_liste_diffusion where id = :id and module = 'MARKETING'")
                 .setParameter("id", demande.getListeId()).getResultList();
         if (listes.isEmpty() || !"ACTIF".equals(listes.getFirst())) {
             throw new ErreurMetierException("Choisissez une liste de diffusion active.");

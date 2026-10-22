@@ -1,5 +1,5 @@
 <div class="page">
-  <a class="discret" routerLink="/marketing/listes"><i class="pi pi-arrow-left"></i> Listes de diffusion</a>
+  <a class="discret" [routerLink]="espace.ecran"><i class="pi pi-arrow-left"></i> Listes de diffusion</a>
   @if (liste(); as l) {
     <div class="entete">
       <div>
@@ -14,7 +14,7 @@
     <div class="grille">
       <div class="bloc tuile"><div class="discret">Clients dans la liste</div><b>{{ a.nbClients }}</b></div>
       <div class="bloc tuile"><div class="discret">Joignables</div><b>{{ a.nbJoignables }}</b></div>
-      <div class="bloc tuile"><div class="discret">Désabonnés (STOP)</div><b>{{ a.nbDesabonnes }}</b></div>
+      @if (espace.marketing) { <div class="bloc tuile"><div class="discret">Désabonnés (STOP)</div><b>{{ a.nbDesabonnes }}</b></div> }
       <div class="bloc tuile"><div class="discret">Sans numéro ni e-mail</div><b>{{ a.nbSansCoordonnees }}</b></div>
     </div>
   }
@@ -73,7 +73,7 @@
                   @if (m.origine === 'AJOUT') { <button type="button" class="bi bi-danger" pTooltip="Retirer de la liste" tooltipPosition="top" aria-label="Retirer de la liste" (click)="retirer(m)"><i class="pi pi-times"></i></button> }
                   @if (m.origine === 'EXCLUSION') { <button type="button" class="bi" pTooltip="Réintégrer dans la liste" tooltipPosition="top" aria-label="Réintégrer dans la liste" (click)="retirer(m)"><i class="pi pi-replay"></i></button> }
                 }
-                @if (auth.peut('LISTES_GERER')) {
+                @if (espace.marketing && auth.peut(espace.droitGerer)) {
                   @if (m.motifExclusion === 'DESABONNE') { <button type="button" class="bi" pTooltip="Réabonner" tooltipPosition="top" aria-label="Réabonner" (click)="reabonner(m)"><i class="pi pi-bell"></i></button> }
                   @else { <button type="button" class="bi bi-danger" pTooltip="Désabonner" tooltipPosition="top" aria-label="Désabonner" (click)="desabonner(m)"><i class="pi pi-bell-slash"></i></button> }
                 }</span>

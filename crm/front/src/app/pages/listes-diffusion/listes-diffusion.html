@@ -2,10 +2,15 @@
   <div class="entete">
     <div>
       <h1>Listes de diffusion</h1>
-      <p class="sous-titre">Les clients visés par les campagnes marketing : par critères, complétés ou corrigés client par client.
-        Les clients qui ont répondu STOP sont toujours écartés. Une liste n'est jamais supprimée : elle est archivée.</p>
+      @if (espace.marketing) {
+        <p class="sous-titre">Les clients visés par les campagnes marketing : par critères, complétés ou corrigés client par client.
+          Les clients qui ont répondu STOP sont toujours écartés. Une liste n'est jamais supprimée : elle est archivée.</p>
+      } @else {
+        <p class="sous-titre">Les listes du Recouvrement, pour l'envoi en masse : par critères, complétées ou corrigées client par client.
+          Elles ne se voient pas depuis le Marketing. Le STOP marketing n'en retire personne. Une liste n'est jamais supprimée : elle est archivée.</p>
+      }
     </div>
-    @if (auth.peut('LISTES_GERER')) { <button class="bp" type="button" (click)="nouvelle()"><i class="pi pi-plus"></i> Nouvelle liste</button> }
+    @if (auth.peut(espace.droitGerer)) { <button class="bp" type="button" (click)="nouvelle()"><i class="pi pi-plus"></i> Nouvelle liste</button> }
   </div>
 
   <label class="case"><input type="checkbox" name="avecArchivees" [(ngModel)]="avecArchivees" (ngModelChange)="charger()">Afficher les listes archivées</label>
@@ -17,7 +22,7 @@
         <tbody>
           @for (l of listes(); track l.id) {
             <tr>
-              <td><a class="ref" [routerLink]="['/marketing/listes', l.id]">{{ l.nom }}</a>@if (l.description) { <div class="second">{{ l.description }}</div> }</td>
+              <td><a class="ref" [routerLink]="[espace.ecran, l.id]">{{ l.nom }}</a>@if (l.description) { <div class="second">{{ l.description }}</div> }</td>
               <td>{{ resume(l, (ref.agences | async) ?? []) }}<div class="second">Numéros : {{ numeros(l) }}</div></td>
               <td class="nw">{{ l.nbClients }}</td>
               <td class="nw">{{ l.nbJoignables }}</td>
@@ -27,8 +32,8 @@
                 <span class="etat-compte"><span class="dot" [style.background]="l.statut === 'ACTIF' ? '#51D78E' : '#9AA5AE'"></span>{{ l.statut === 'ACTIF' ? 'Active' : 'Archivée' }}</span>
               </td>
               <td class="nw"><span class="actions-ligne">
-                <a class="bi" [routerLink]="['/marketing/listes', l.id]" pTooltip="Voir la liste" tooltipPosition="top" aria-label="Voir la liste"><i class="pi pi-eye"></i></a>
-                @if (auth.peut('LISTES_GERER')) {
+                <a class="bi" [routerLink]="[espace.ecran, l.id]" pTooltip="Voir la liste" tooltipPosition="top" aria-label="Voir la liste"><i class="pi pi-eye"></i></a>
+                @if (auth.peut(espace.droitGerer)) {
                   @if (l.statut === 'ACTIF') { <button type="button" class="bi" pTooltip="Modifier" tooltipPosition="top" aria-label="Modifier" (click)="modifier(l)"><i class="pi pi-pencil"></i></button><button type="button" class="bi bi-danger" pTooltip="Archiver" tooltipPosition="top" aria-label="Archiver" (click)="archiver(l)"><i class="pi pi-inbox"></i></button> }
                   @else { <button type="button" class="bi" pTooltip="Réactiver" tooltipPosition="top" aria-label="Réactiver" (click)="reactiver(l)"><i class="pi pi-replay"></i></button> }
                 }</span>
@@ -43,6 +48,6 @@
   </section>
 </div>
 
-@if (auth.peut('LISTES_GERER')) {
+@if (auth.peut(espace.droitGerer)) {
   <app-liste-formulaire [(ouvert)]="saisie" [liste]="cible()" (enregistre)="enregistree($event)" />
 }

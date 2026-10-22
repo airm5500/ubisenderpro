@@ -1,3 +1,4 @@
+import { espaceListes } from '../../core/listes-module';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +23,7 @@ export class ListesDiffusion implements OnInit {
   private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly ref = inject(Referentiels);
+  protected readonly espace = espaceListes();
 
   protected readonly listes = signal<ListeDiffusion[] | null>(null);
   protected readonly saisie = signal(false);
@@ -33,7 +35,7 @@ export class ListesDiffusion implements OnInit {
   }
 
   charger(): void {
-    this.api.get<ListeDiffusion[]>('/api/marketing/listes', { avecArchivees: this.avecArchivees }).subscribe(l => this.listes.set(l));
+    this.api.get<ListeDiffusion[]>(this.espace.api, { avecArchivees: this.avecArchivees }).subscribe(l => this.listes.set(l));
   }
 
   nouvelle(): void {
@@ -47,18 +49,18 @@ export class ListesDiffusion implements OnInit {
   }
 
   enregistree(l: ListeDiffusion): void {
-    if (this.cible()) this.charger(); else this.router.navigate(['/marketing/listes', l.id]);
+    if (this.cible()) this.charger(); else this.router.navigate([this.espace.ecran, l.id]);
   }
 
   archiver(l: ListeDiffusion): void {
-    this.api.post(`/api/marketing/listes/${l.id}/archivage`).subscribe(() => {
+    this.api.post(`${this.espace.api}/${l.id}/archivage`).subscribe(() => {
       this.messages.add({ severity: 'success', summary: 'Liste archivée', detail: l.nom });
       this.charger();
     });
   }
 
   reactiver(l: ListeDiffusion): void {
-    this.api.post(`/api/marketing/listes/${l.id}/reactivation`).subscribe(() => {
+    this.api.post(`${this.espace.api}/${l.id}/reactivation`).subscribe(() => {
       this.messages.add({ severity: 'success', summary: 'Liste réactivée', detail: l.nom });
       this.charger();
     });

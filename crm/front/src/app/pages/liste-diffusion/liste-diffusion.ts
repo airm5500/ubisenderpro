@@ -1,3 +1,4 @@
+import { espaceListes } from '../../core/listes-module';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { FormsModule } from '@angular/forms';
@@ -27,6 +28,7 @@ export class ListeDiffusionDetail implements OnInit {
   private readonly confirmation = inject(ConfirmationService);
   protected readonly auth = inject(Auth);
   protected readonly onglets = ONGLETS;
+  protected readonly espace = espaceListes();
 
   /** Parametre de route. */
   readonly id = input.required<string>();
@@ -35,7 +37,7 @@ export class ListeDiffusionDetail implements OnInit {
   protected readonly apercu = signal<ApercuListe | null>(null);
   protected readonly onglet = signal<Onglet>(ONGLETS[0]);
   protected readonly saisie = signal(false);
-  protected readonly modifiable = computed(() => this.auth.peut('LISTES_GERER') && this.liste()?.statut === 'ACTIF');
+  protected readonly modifiable = computed(() => this.auth.peut(this.espace.droitGerer) && this.liste()?.statut === 'ACTIF');
   protected readonly nbPages = computed(() => Math.max(1, Math.ceil((this.apercu()?.membres.total ?? 0) / this.taille)));
   protected readonly trouves = signal<Client[] | null>(null);
   q = '';
@@ -57,11 +59,11 @@ export class ListeDiffusionDetail implements OnInit {
   }
 
   chargerListe(): void {
-    this.api.get<ListeDiffusion>(`/api/marketing/listes/${this.id()}`).subscribe(l => this.liste.set(l));
+    this.api.get<ListeDiffusion>(`${this.espace.api}/${this.id()}`).subscribe(l => this.liste.set(l));
   }
 
   charger(): void {
-    this.api.get<ApercuListe>(`/api/marketing/listes/${this.id()}/membres`, { q: this.q, filtre: this.onglet().code, page: this.numero, taille: this.taille })
+    this.api.get<ApercuListe>(`${this.espace.api}/${this.id()}/membres`, { q: this.q, filtre: this.onglet().code, page: this.numero, taille: this.taille })
       .subscribe(a => this.apercu.set(a));
   }
 
@@ -124,7 +126,7 @@ export class ListeDiffusionDetail implements OnInit {
   }
 
   private changer(clientIds: number[], sens: string, detail: string): void {
-    this.api.post<ListeDiffusion>(`/api/marketing/listes/${this.id()}/clients`, { clientIds, sens }).subscribe(l => {
+    this.api.post<ListeDiffusion>(`${this.espace.api}/${this.id()}/clients`, { clientIds, sens }).subscribe(l => {
       this.liste.set(l);
       this.messages.add({ severity: 'success', summary: 'Liste mise à jour', detail });
       this.charger();

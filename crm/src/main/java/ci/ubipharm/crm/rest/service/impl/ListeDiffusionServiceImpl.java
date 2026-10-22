@@ -12,6 +12,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import ci.ubipharm.crm.rest.service.JournalActionService;
 import ci.ubipharm.crm.rest.service.ListeDiffusionService;
@@ -37,7 +39,7 @@ import lombok.RequiredArgsConstructor;
 public class ListeDiffusionServiceImpl implements ListeDiffusionService {
 
     private static final String SELECT_LISTE = """
-            select l.id as id, l.nom as nom, l.description as description, l.par_criteres as parCriteres, l.agence_ids as agenceIds,
+            select l.id as id, l.module as module, l.nom as nom, l.description as description, l.par_criteres as parCriteres, l.agence_ids as agenceIds,
                    l.sous_agences as sousAgences, l.villes as villes, l.segments as segments, l.fonctions as fonctions, l.statut as statut,
                    u.nom_complet as creePar, l.created_at as creeLe, l.updated_at as modifieLe,
                    (select count(*) from crm_liste_diffusion_client x where x.liste_id = l.id and x.actif = true and x.sens = 'AJOUT') as nbAjouts,
@@ -54,12 +56,30 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
                               List<String> segments, List<String> fonctions) {
     }
 
+    /**
+     * Module dont on lit les listes (Q7 du 22/10/2026) : celui de l'adresse appelee, sinon celui de l'ecran affiche (en-tete
+     * X-Module, Marketing par defaut) ; null hors requete, pour les envois planifies qui relisent une liste deja choisie.
+     */
+    static String moduleCourant() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributs)) {
+            return null;
+        }
+        String chemin = attributs.getRequest().getRequestURI();
+        if (chemin.startsWith("/api/recouvrement/")) {
+            return "RECOUVREMENT";
+        }
+        if (chemin.startsWith("/api/marketing/")) {
+            return "MARKETING";
+        }
+        return "RECOUVREMENT".equals(attributs.getRequest().getHeader(PerimetreServiceImpl.EN_TETE_MODULE)) ? "RECOUVREMENT" : "MARKETING";
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<ListeDiffusionDTO> lister(boolean avecArchivees) {
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + (avecArchivees ? "" : " where l.statut = 'ACTIF'") + " order by l.statut, l.nom",
-                Tuple.class).getResultList();
+        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.module = :module" + (avecArchivees ? "" : " and l.statut = 'ACTIF'")
+                + " order by l.statut, l.nom", Tuple.class).setParameter("module", Objects.requireNonNullElse(moduleCourant(), "MARKETING")).getResultList();
         return lignes.stream().map(this::avecCompteurs).toList();
     }
 
@@ -67,7 +87,8 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
     @Transactional(readOnly = true)
     public ListeDiffusionDTO consulter(Long id) {
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.id = :id", Tuple.class).setParameter("id", id).getResultList();
+        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.id = :id and (:module is null or l.module = :module)", Tuple.class)
+                .setParameter("id", id).setParameter("module", moduleCourant()).getResultList();
         if (lignes.isEmpty()) {
             throw new RessourceIntrouvableException("Liste introuvable");
         }
@@ -79,10 +100,11 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
     public ListeDiffusionDTO creer(ListeDiffusionDemandeDTO demande) {
         Definition d = verifier(null, demande);
         em.createNativeQuery("""
-                insert into crm_liste_diffusion (nom, description, par_criteres, agence_ids, sous_agences, villes, segments, fonctions, statut,
+                insert into crm_liste_diffusion (module, nom, description, par_criteres, agence_ids, sous_agences, villes, segments, fonctions, statut,
                                                  cree_par, created_at)
-                values (:nom, :description, :parCriteres, :agenceIds, :sousAgences, :villes, :segments, :fonctions, 'ACTIF', :par, utc_timestamp())
+                values (:module, :nom, :description, :parCriteres, :agenceIds, :sousAgences, :villes, :segments, :fonctions, 'ACTIF', :par, utc_timestamp())
                 """)
+                .setParameter("module", Objects.requireNonNullElse(moduleCourant(), "MARKETING"))
                 .setParameter("nom", demande.getNom().trim())
                 .setParameter("description", vide(demande.getDescription()))
                 .setParameter("parCriteres", d.parCriteres())
@@ -151,7 +173,8 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
     @Transactional(readOnly = true)
     public ListeDiffusionDTO consulterDefinition(Long id) {
         @SuppressWarnings("unchecked")
-        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.id = :id", Tuple.class).setParameter("id", id).getResultList();
+        List<Tuple> lignes = em.createNativeQuery(SELECT_LISTE + " where l.id = :id and (:module is null or l.module = :module)", Tuple.class)
+                .setParameter("id", id).setParameter("module", moduleCourant()).getResultList();
         if (lignes.isEmpty()) {
             throw new RessourceIntrouvableException("Liste introuvable");
         }
@@ -244,7 +267,8 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
     private ApercuListeDTO apercu(Definition d, MembresCriteresDTO criteres) {
         Map<String, Object> parametres = new LinkedHashMap<>();
         String membres = requeteMembres(d, parametres);
-        String motif = "case when c.desabonne_marketing_le is not null then 'DESABONNE'"
+        // Le STOP ne vaut que pour le Marketing : il ne retire pas un client d'une liste des relances
+        String motif = "case" + ("RECOUVREMENT".equals(moduleCourant()) ? "" : " when c.desabonne_marketing_le is not null then 'DESABONNE'")
                 + " when not exists (select 1 from crm_contact n where n.client_id = c.id and n.statut = 'ACTIF' and n.fonction in (:fonctions))"
                 + " and (c.email is null or c.email = '') then 'SANS_COORDONNEES' end";
         parametres.put("fonctions", d.fonctions());
@@ -370,8 +394,8 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
 
     private Definition verifier(Long id, ListeDiffusionDemandeDTO demande) {
         List<String> motifs = new ArrayList<>();
-        Number homonymes = (Number) em.createNativeQuery("select count(*) from crm_liste_diffusion where upper(nom) = upper(:nom) and id <> :id")
-                .setParameter("nom", demande.getNom().trim()).setParameter("id", id == null ? -1L : id).getSingleResult();
+        Number homonymes = (Number) em.createNativeQuery("select count(*) from crm_liste_diffusion where upper(nom) = upper(:nom) and id <> :id and module = :module")
+                .setParameter("module", Objects.requireNonNullElse(moduleCourant(), "MARKETING")).setParameter("nom", demande.getNom().trim()).setParameter("id", id == null ? -1L : id).getSingleResult();
         if (homonymes.longValue() > 0) {
             motifs.add("Une liste « " + demande.getNom().trim() + " » existe déjà.");
         }
@@ -437,6 +461,7 @@ public class ListeDiffusionServiceImpl implements ListeDiffusionService {
         Object parCriteres = tuple.get("parCriteres");
         return ListeDiffusionDTO.builder()
                 .id(tuple.get("id", Long.class))
+                .module(tuple.get("module", String.class))
                 .nom(tuple.get("nom", String.class))
                 .description(tuple.get("description", String.class))
                 .parCriteres(parCriteres instanceof Boolean b ? b : parCriteres instanceof Number n && n.intValue() != 0)

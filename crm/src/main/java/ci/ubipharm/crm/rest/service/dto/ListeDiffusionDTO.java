@@ -17,6 +17,8 @@ import lombok.Setter;
 public class ListeDiffusionDTO {
 
     private Long id;
+    /** RECOUVREMENT ou MARKETING : une liste ne se voit que depuis son module. */
+    private String module;
     private String nom;
     private String description;
     private boolean parCriteres;
