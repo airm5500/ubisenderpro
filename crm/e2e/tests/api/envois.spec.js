@@ -222,3 +222,45 @@ test.describe('lot 3 : analyse, listes par module, journee et campagnes Marketin
     await admin.fermer();
   });
 });
+
+test.describe('rythme anti-blocage des numeros WhatsApp', () => {
+  test('les reglages sont livres avec des valeurs prudentes et STOP reconnait aussi DESINSCRIRE et UNSUBSCRIBE', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const parametres = await json(await admin.get('api/parametres'));
+    const valeur = cle => parametres.find(p => p.cle === cle)?.valeur;
+    expect({
+      heure: valeur('whatsapp.envoi.plafond_heure'), serie: valeur('whatsapp.envoi.pause_apres_messages'),
+      pauseMin: valeur('whatsapp.envoi.pause_min_minutes'), pauseMax: valeur('whatsapp.envoi.pause_max_minutes'),
+      depart: valeur('whatsapp.envoi.montee_depart'), pas: valeur('whatsapp.envoi.montee_pas'),
+      echecs: valeur('whatsapp.envoi.echecs_avant_pause'), repos: valeur('whatsapp.envoi.pause_echec_minutes'),
+    }).toEqual({ heure: '40', serie: '15', pauseMin: '5', pauseMax: '12', depart: '20', pas: '20', echecs: '3', repos: '30' });
+    expect(valeur('marketing.mots_desabonnement')).toMatch(/DESINSCRIRE.*UNSUBSCRIBE/);
+    const r = await admin.request.put('api/parametres', { data: [{ cle: 'whatsapp.envoi.plafond_heure', valeur: '0' }], headers: await admin.entetes() });
+    expect(r.status()).toBe(400);
+    expect((await r.json()).message).toContain('entre 1 et 500');
+    await admin.fermer();
+  });
+
+  test('la montee en charge d un numero se regle par la direction seulement, et reduit son plafond du jour', async ({ baseURL }) => {
+    const admin = await Session.de(baseURL, 'admin');
+    const ligne = (await json(await admin.get('api/whatsapp/sessions'))).find(s => s.agentNom === 'E2E Agent Yopougon');
+    expect(ligne).toMatchObject({ plafondJour: 200, monteeDepuis: null, rythme: null });
+    const chemin = `api/whatsapp/sessions/${ligne.agentId}/montee-en-charge`;
+
+    const agent = await Session.de(baseURL, jeu.comptes.agentYop);
+    expect((await agent.post(chemin, { active: true })).status()).toBe(403);
+    await agent.fermer();
+    expect((await admin.post(chemin, {})).status()).toBe(400);
+    expect((await admin.post('api/whatsapp/sessions/999999999/montee-en-charge', { active: true })).status()).toBe(404);
+
+    try {
+      const active = await json(await admin.post(chemin, { active: true }));
+      expect(active.plafondJour).toBe(20);
+      expect(active.monteeDepuis).toBe(new Date().toISOString().slice(0, 10));
+    } finally {
+      const coupee = await json(await admin.post(chemin, { active: false }));
+      expect(coupee).toMatchObject({ plafondJour: 200, monteeDepuis: null });
+    }
+    await admin.fermer();
+  });
+});

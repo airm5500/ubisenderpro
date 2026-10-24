@@ -252,6 +252,135 @@ class WhatsappIT extends IntegrationBase {
         assertThat(campagne()).isEqualTo("TERMINEE");
     }
 
+    @Test
+    void laLonguePauseEstGardeeEnBaseEtBloqueAussiLEnvoiImmediat() throws Exception {
+        connecterSession();
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WA-P").build());
+        parametre("whatsapp.envoi.pause_apres_messages", "1");
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiWhatsappService.envoyerLot()).as("longue pause apres la serie").isZero();
+        assertThat(jdbc.queryForObject("select reprise_motif from crm_session_whatsapp where numero = ?", String.class, NUMERO_AGENT))
+                .isEqualTo("Pause longue après 1 messages");
+        assertThat(jdbc.queryForObject("select reprise_le > utc_timestamp() + interval 4 minute from crm_session_whatsapp where numero = ?",
+                Boolean.class, NUMERO_AGENT)).isTrue();
+        assertThat(jdbc.queryForObject("select serie from crm_session_whatsapp where numero = ?", Integer.class, NUMERO_AGENT)).isZero();
+        mvc.perform(get("/api/whatsapp/sessions").session(admin))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].rythme").value(org.hamcrest.Matchers.contains(
+                        org.hamcrest.Matchers.startsWith("Pause longue après 1 messages, reprise à "))))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].envoyesAujourdhui").value(org.hamcrest.Matchers.contains(1)));
+
+        // « Envoyer maintenant » attend aussi la fin de la pause : le message reste en attente
+        Long enAttente = jdbc.queryForObject("select id from crm_campagne_message where statut = 'A_ENVOYER'", Long.class);
+        mvc.perform(post("/api/envois/C" + enAttente + "/immediat").session(admin).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.startsWith("Pause longue après 1 messages : ce numéro pourra envoyer à "),
+                        org.hamcrest.Matchers.endsWith("Le message reste en attente et partira à son tour."))));
+        assertThat(jdbc.queryForObject("select statut from crm_campagne_message where id = ?", String.class, enAttente)).isEqualTo("A_ENVOYER");
+
+        jdbc.update("update crm_session_whatsapp set reprise_le = utc_timestamp() - interval 1 second where numero = ?", NUMERO_AGENT);
+        mvc.perform(post("/api/envois/C" + enAttente + "/immediat").session(admin).with(csrf())).andExpect(jsonPath("$.statut").value("ENVOYE"));
+    }
+
+    @Test
+    void lePlafondParHeureArreteLeNumeroJusquALHeureSuivante() throws Exception {
+        connecterSession();
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WA-H").build());
+        parametre("whatsapp.envoi.plafond_heure", "1");
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiWhatsappService.envoyerLot()).as("plafond par heure").isZero();
+        mvc.perform(get("/api/whatsapp/sessions").session(admin))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].rythme").value(org.hamcrest.Matchers.contains(
+                        org.hamcrest.Matchers.startsWith("Plafond par heure atteint (1), reprise à "))));
+        jdbc.update("update crm_campagne_message set envoye_le = utc_timestamp() - interval 61 minute where statut = 'ENVOYE'");
+        assertThat(envoiWhatsappService.envoyerLot()).as("une heure plus tard").isEqualTo(1);
+    }
+
+    @Test
+    void laMonteeEnChargeSActiveNumeroParNumeroParLaDirection() throws Exception {
+        connecterSession();
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WA-M").build());
+        parametre("whatsapp.envoi.montee_depart", "1");
+        mvc.perform(get("/api/whatsapp/sessions").session(admin))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].plafondJour").value(org.hamcrest.Matchers.contains(200)))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].rythme").value(org.hamcrest.Matchers.contains((Object) null)));
+
+        // Un agent ne regle pas son propre debit
+        mvc.perform(post("/api/whatsapp/sessions/" + agent1 + "/montee-en-charge").session(connecter("it-agent1", MOT_DE_PASSE_ADMIN)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/whatsapp/sessions/" + agent1 + "/montee-en-charge").session(admin).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/whatsapp/sessions/" + agent1 + "/montee-en-charge").session(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
+                .andExpect(jsonPath("$.plafondJour").value(1))
+                .andExpect(jsonPath("$.monteeDepuis").value(LocalDate.now(ZoneOffset.UTC).toString()));
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(envoiWhatsappService.envoyerLot()).as("montee en charge : 1 message le premier jour").isZero();
+        mvc.perform(get("/api/whatsapp/sessions").session(admin))
+                .andExpect(jsonPath("$[?(@.numero == '" + NUMERO_AGENT + "')].rythme").value(org.hamcrest.Matchers.contains(
+                        "Montée en charge : 1 messages aujourd'hui, reprise demain")));
+
+        // Commencee hier : 1 + 20 aujourd'hui
+        jdbc.update("update crm_session_whatsapp set montee_depuis = utc_date() - interval 1 day where numero = ?", NUMERO_AGENT);
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        mvc.perform(post("/api/whatsapp/sessions/" + agent1 + "/montee-en-charge").session(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(jsonPath("$.plafondJour").value(200))
+                .andExpect(jsonPath("$.monteeDepuis").doesNotExist());
+        assertThat(jdbc.queryForObject("select count(*) from crm_journal_action where action like 'WHATSAPP_MONTEE_%'", Long.class)).isEqualTo(2);
+    }
+
+    @Test
+    void desEchecsTechniquesEnSerieMettentLeNumeroAuReposMaisPasUnNumeroAbsent() throws Exception {
+        connecterSession();
+        parametre("whatsapp.envoi.echecs_avant_pause", "2");
+        parametre("whatsapp.envoi.tentatives_max", "5");
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString()))
+                .thenReturn(ResultatEnvoiDTO.builder().erreur("Numero absent de WhatsApp").build())
+                .thenReturn(ResultatEnvoiDTO.builder().erreurTechnique(true).erreur("Service WhatsApp injoignable").build());
+        envoiWhatsappService.envoyerLot();
+        assertThat(jdbc.queryForObject("select echecs_consecutifs from crm_session_whatsapp where numero = ?", Integer.class, NUMERO_AGENT))
+                .as("un numero absent n'est pas un echec technique").isZero();
+        envoiWhatsappService.envoyerLot();
+        assertThat(jdbc.queryForObject("select echecs_consecutifs from crm_session_whatsapp where numero = ?", Integer.class, NUMERO_AGENT)).isEqualTo(1);
+        envoiWhatsappService.envoyerLot();
+        assertThat(jdbc.queryForObject("select reprise_motif from crm_session_whatsapp where numero = ?", String.class, NUMERO_AGENT))
+                .isEqualTo("Pause de protection après 2 échecs techniques de suite");
+        assertThat(jdbc.queryForObject("select reprise_le > utc_timestamp() + interval 29 minute from crm_session_whatsapp where numero = ?",
+                Boolean.class, NUMERO_AGENT)).isTrue();
+        assertThat(envoiWhatsappService.envoyerLot()).as("numero au repos").isZero();
+
+        // Un envoi reussi remet le compteur a zero
+        jdbc.update("update crm_session_whatsapp set reprise_le = null, echecs_consecutifs = 1 where numero = ?", NUMERO_AGENT);
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WA-E").build());
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select echecs_consecutifs from crm_session_whatsapp where numero = ?", Integer.class, NUMERO_AGENT)).isZero();
+    }
+
+    @Test
+    void unMessageIdentiqueDejaPartiAujourdhuiEstAnnuleSansEtreRenvoye() throws Exception {
+        connecterSession();
+        when(passerelle.envoyerTexte(anyString(), anyString(), anyString())).thenReturn(ResultatEnvoiDTO.builder().succes(true).identifiant("WA-D").build());
+        String texte = jdbc.queryForObject("select contenu from crm_campagne_message where statut = 'A_ENVOYER' order by id limit 1", String.class);
+        jdbc.update("""
+                insert into crm_message_sortant (origine, numero_expediteur, numero_destinataire, contenu, statut, cree_par, created_at, envoye_le)
+                values ('DISCUSSION', '2250722222222', ?, ?, 'ENVOYE', (select id from crm_utilisateur where login = 'admin'), utc_timestamp(), utc_timestamp())
+                """, NUMERO_CLIENT, texte);
+        assertThat(envoiWhatsappService.envoyerLot()).as("le doublon ne compte pas comme un envoi").isZero();
+        assertThat(jdbc.queryForObject("select statut from crm_campagne_message where contenu = ? and campagne_id = ?", String.class, texte, campagne))
+                .isEqualTo("ANNULE");
+        assertThat(jdbc.queryForObject("select motif from crm_campagne_message where contenu = ? and campagne_id = ?", String.class, texte, campagne))
+                .startsWith("Doublon");
+        verify(passerelle, never()).envoyerTexte(anyString(), anyString(), eq(texte));
+        assertThat(envoiWhatsappService.envoyerLot()).as("l'autre facture part").isEqualTo(1);
+
+        // Le lendemain, le meme texte peut repartir
+        jdbc.update("update crm_message_sortant set envoye_le = utc_timestamp() - interval 1 day");
+        jdbc.update("update crm_campagne_message set statut = 'A_ENVOYER', motif = null where statut = 'ANNULE'");
+        jdbc.update("update crm_campagne set statut = 'EN_COURS' where id = ?", campagne);
+        assertThat(envoiWhatsappService.envoyerLot()).isEqualTo(1);
+        verify(passerelle).envoyerTexte(anyString(), anyString(), eq(texte));
+    }
+
     private void connecterSession() throws Exception {
         evenement("status", JETON, "{\"sessionId\":\"" + NUMERO_AGENT + "\",\"status\":\"CONNECTE\",\"health\":\"OK\"}").andExpect(status().isNoContent());
     }

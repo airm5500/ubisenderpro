@@ -102,6 +102,17 @@ export class Numeros implements OnInit, OnDestroy {
     });
   }
 
+  /** Montee en charge d'un numero neuf : plafond du jour reduit les premiers jours, puis normal. */
+  basculerMontee(s: SessionAgent): void {
+    const active = !s.monteeDepuis;
+    this.api.post<SessionAgent>(`/api/whatsapp/sessions/${s.agentId}/montee-en-charge`, { active }).subscribe(r => {
+      this.messages.add(active
+        ? { severity: 'success', summary: 'Montée en charge activée', detail: `${s.agentNom} : ${r.plafondJour} messages permis aujourd'hui, davantage chaque jour.` }
+        : { severity: 'info', summary: 'Montée en charge coupée', detail: `${s.agentNom} retrouve le plafond du jour complet.` });
+      this.charger();
+    });
+  }
+
   fermer(): void {
     this.arreterSuivi();
     this.liaison.set(null);

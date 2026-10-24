@@ -60,7 +60,13 @@ class ParametreIT extends IntegrationBase {
     @Test
     void chaqueTypeEstControle() throws Exception {
         modifier("[{\"cle\":\"whatsapp.envoi.plafond_jour\",\"valeur\":\"beaucoup\"}]")
-                .andExpect(jsonPath("$.message").value("« Messages de relance par numéro d'agent et par jour » : saisissez un nombre entier entre 1 et 1000."));
+                .andExpect(jsonPath("$.message").value("« Messages par numéro et par jour, tous envois confondus » : saisissez un nombre entier entre 1 et 1000."));
+        // Regles anti-blocage : bornes et ordre des durees de la longue pause
+        modifier("[{\"cle\":\"whatsapp.envoi.plafond_heure\",\"valeur\":\"0\"}]")
+                .andExpect(jsonPath("$.message").value("« Messages par numéro et par heure, tous envois confondus » : saisissez un nombre entier entre 1 et 500."));
+        modifier("[{\"cle\":\"whatsapp.envoi.pause_min_minutes\",\"valeur\":\"20\"},{\"cle\":\"whatsapp.envoi.pause_max_minutes\",\"valeur\":\"10\"}]")
+                .andExpect(jsonPath("$.message").value("WhatsApp : la durée minimale de la longue pause dépasse sa durée maximale."));
+        assertThat(valeur("whatsapp.envoi.pause_min_minutes")).isEqualTo("5");
         modifier("[{\"cle\":\"application.url_publique\",\"valeur\":\"http://crm\"}]")
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.endsWith(": l'adresse commence par https://.")));
         modifier("[{\"cle\":\"email.expediteur\",\"valeur\":\"relances\"}]").andExpect(status().isBadRequest());

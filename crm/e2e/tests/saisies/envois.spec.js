@@ -105,3 +105,23 @@ test('un produit absent du catalogue se cree depuis la promotion, et la liste ne
   await ajout.locator('input[name=ugQuantite]').fill('1');
   await expect(ajout.getByRole('button', { name: 'Ajouter à la promotion' })).toBeEnabled();
 });
+
+test('Parametres > WhatsApp : un plafond par heure nul et une longue pause inversee sont refuses avec un message', async ({ page }) => {
+  await seConnecterEn(page, LOGIN);
+  await page.goto('parametres?categorie=WHATSAPP');
+  const plafond = page.locator('[id="whatsapp.envoi.plafond_heure"]');
+  await expect(plafond).toHaveValue('40');
+  await expect(page.locator('.param', { has: plafond })).toContainText('Messages par numéro et par heure');
+  await plafond.fill('0');
+  await page.getByRole('button', { name: /^Enregistrer( \(\d+\))?$/ }).click();
+  await expect(page.getByText('« Messages par numéro et par heure, tous envois confondus » : saisissez un nombre entier entre 1 et 500.')).toBeVisible();
+  await plafond.fill('40');
+
+  await page.locator('[id="whatsapp.envoi.pause_min_minutes"]').fill('20');
+  await page.locator('[id="whatsapp.envoi.pause_max_minutes"]').fill('10');
+  await page.getByRole('button', { name: /^Enregistrer( \(\d+\))?$/ }).click();
+  await expect(page.getByText('WhatsApp : la durée minimale de la longue pause dépasse sa durée maximale.')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('[id="whatsapp.envoi.pause_min_minutes"]')).toHaveValue('5');
+  await expect(page.locator('[id="whatsapp.envoi.plafond_heure"]')).toHaveValue('40');
+});

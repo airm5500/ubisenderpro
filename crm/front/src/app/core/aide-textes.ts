@@ -57,7 +57,7 @@ export const AIDE_BOUTONS: Record<string, TexteAide> = {
   '*|Fiche client': b('Fiche client', 'Ouvre la fiche du client : coordonnées, factures, relances et échanges.'),
   '*|Se déconnecter': b('Se déconnecter', "Ferme votre session. Pensez-y sur un poste partagé."),
   '*|Mon mot de passe': b('Mon mot de passe', 'Remplacer votre mot de passe par un nouveau que vous êtes seul à connaître.'),
-  '*|Envoyer maintenant': b('Envoyer maintenant', 'Le message part tout de suite, sans attendre la plage horaire ni le rythme d\'envoi.',
+  '*|Envoyer maintenant': b('Envoyer maintenant', 'Le message part tout de suite, même hors de la plage horaire. Le rythme anti-blocage du numéro (attente, pauses, plafonds) reste respecté : s\'il n\'est pas encore permis, le CRM dit quand le numéro pourra reprendre.',
     'Ce message est déjà parti, annulé ou en échec : il ne peut plus être envoyé à la main.'),
   '*|Voir le message': b('Voir le message', 'Affiche le message tel que le client le reçoit, variables remplacées.'),
   '*|Importer': b('Importer', 'Charge un fichier Excel ou CSV. Une simulation montre ce qui sera créé ou modifié avant toute validation.'),
@@ -149,6 +149,8 @@ export const AIDE_BOUTONS: Record<string, TexteAide> = {
   'numeros|Passer à l\'API officielle': b("Passer à l'API officielle", 'Bascule ce numéro sur le compte Meta enregistré.'),
   'numeros|Revenir à WhatsApp Web': b('Revenir à WhatsApp Web', "Abandonne l'API officielle pour ce numéro et repasse par le téléphone relié."),
   'numeros|Enregistrer le compte Meta': b('Enregistrer le compte Meta', 'Enregistre les identifiants du compte WhatsApp Business fournis par Meta.'),
+  'numeros|Activer la montée en charge (numéro neuf)': b('Activer la montée en charge', "Pour un numéro neuf : il n'envoie que quelques messages le premier jour (20 par défaut), puis davantage chaque jour jusqu'au plafond du jour. C'est la meilleure protection contre le blocage d'un numéro récent."),
+  'numeros|Couper la montée en charge': b('Couper la montée en charge', 'Le numéro retrouve tout de suite son plafond du jour complet.'),
   'numeros|Changer le numéro d\'un agent': b("Changer le numéro d'un agent", 'Remplace le numéro professionnel d\'un agent ; l\'historique des échanges est conservé.'),
   'historique-envois|Exporter en CSV': b('Exporter en CSV', 'Télécharge les messages affichés, avec leur statut, dans un fichier CSV.'),
 
@@ -317,7 +319,9 @@ export const AIDE_PAGES: Record<string, TexteAide> = {
 
 1. « Scanner le QR code » puis, sur le téléphone : WhatsApp > Appareils connectés > Connecter un appareil.
 2. Le téléphone doit rester allumé et connecté à internet.
-3. En cas de souci, « Mettre en pause » puis « Vérifier et reprendre ».`),
+3. En cas de souci, « Mettre en pause » puis « Vérifier et reprendre ».
+
+La colonne Rythme dit pourquoi un numéro attend : longue pause après une série de messages, plafond par heure ou par jour atteint, ou repos après des échecs répétés. Les envois reprennent seuls à l'heure indiquée. Pour un numéro neuf, activez la montée en charge.`),
   'marketing': p('Ma journée Marketing', `Votre page d'arrivée dans le Marketing.
 
 - Les campagnes à valider ou à corriger, celles en cours et programmées aujourd'hui.

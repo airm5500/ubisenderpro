@@ -22,4 +22,7 @@ public interface SessionWhatsappService {
 
     /** Ramene le numero a WhatsApp Web : il faudra de nouveau scanner le QR code. */
     SessionAgentDTO passerWhatsappWeb(Long agentId);
+
+    /** Active (a partir d'aujourd'hui) ou coupe la montee en charge du numero : plafond du jour reduit les premiers jours. */
+    SessionAgentDTO monteeEnCharge(Long agentId, boolean active);
 }

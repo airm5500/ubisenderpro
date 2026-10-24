@@ -41,6 +41,8 @@ public class ParametreServiceImpl implements ParametreService {
             new String[] {"sms.envoi.heure_debut", "sms.envoi.heure_fin", "SMS : l'heure de fin d'envoi doit suivre l'heure de début."},
             new String[] {"whatsapp.envoi.delai_min_secondes", "whatsapp.envoi.delai_max_secondes",
                 "WhatsApp : l'attente minimale entre deux messages dépasse l'attente maximale."},
+            new String[] {"whatsapp.envoi.pause_min_minutes", "whatsapp.envoi.pause_max_minutes",
+                "WhatsApp : la durée minimale de la longue pause dépasse sa durée maximale."},
             new String[] {"campagne.avant_echeance_jours_min", "campagne.avant_echeance_jours_max",
                 "Relance avant échéance : le dernier jour (J-n) doit être plus proche de l'échéance que le premier."});
 

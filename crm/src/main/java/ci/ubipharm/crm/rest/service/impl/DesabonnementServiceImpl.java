@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DesabonnementServiceImpl implements DesabonnementService {
 
-    static final String MOTS_PAR_DEFAUT = "STOP, ARRET, DESABONNER";
+    static final String MOTS_PAR_DEFAUT = "STOP, ARRET, DESABONNER, DESINSCRIRE, UNSUBSCRIBE";
 
     private final EntityManager em;
     private final PerimetreService perimetreService;
