@@ -28,6 +28,7 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
 
     /** WhatsApp coupe les legendes d'image trop longues : au-dela, le texte part a part. */
     private static final int LEGENDE_MAX = 1000;
+    static final String MOTIF_DOUBLON = "Doublon : ce message est déjà parti aujourd'hui vers ce numéro";
     private static final String CLASSEUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -67,12 +68,13 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
                 continue;
             }
             Message message = reserver(numero, null);
-            if (message == null) {
+            String phoneNumberId = phoneNumberIdMeta(numero);
+            if (message == null || phoneNumberId == null && doublon(message)) {
                 continue;
             }
-            ResultatEnvoiDTO resultat = envoyer(numero, phoneNumberIdMeta(numero), message);
+            ResultatEnvoiDTO resultat = envoyer(numero, phoneNumberId, message);
             transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
-            cadence.envoye(numero);
+            cadence.apres(numero, resultat);
             envoyes++;
         }
         return envoyes;
@@ -81,13 +83,31 @@ public class EnvoiWhatsappServiceImpl implements EnvoiWhatsappService {
     @Override
     public boolean envoyerMaintenant(Long messageId) {
         Message message = reserver(null, messageId);
-        if (message == null) {
+        String phoneNumberId = message == null ? null : phoneNumberIdMeta(message.numeroExpediteur());
+        if (message == null || phoneNumberId == null && doublon(message)) {
             return false;
         }
-        ResultatEnvoiDTO resultat = envoyer(message.numeroExpediteur(), phoneNumberIdMeta(message.numeroExpediteur()), message);
+        ResultatEnvoiDTO resultat = envoyer(message.numeroExpediteur(), phoneNumberId, message);
         transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
-        cadence.envoye(message.numeroExpediteur());
+        cadence.apres(message.numeroExpediteur(), resultat);
         return resultat.isSucces();
+    }
+
+    /**
+     * Le meme texte est deja parti aujourd'hui vers ce client : le message est annule au lieu d'etre renvoye. Regle de
+     * WhatsApp Web seulement : l'API officielle (Meta) a ses propres controles de qualite.
+     */
+    private boolean doublon(Message message) {
+        if (!cadence.doublonDuJour(message.numeroDestinataire(), message.contenu())) {
+            return false;
+        }
+        transaction.executeWithoutResult(statut -> {
+            jdbc.update("update crm_campagne_message set statut = 'ANNULE', motif = :motif, updated_at = utc_timestamp() where id = :id",
+                    Map.of("id", message.id(), "motif", MOTIF_DOUBLON));
+            suiviEnvoi.factureNonRelancee(message.factureId());
+            suiviEnvoi.recompter(message.campagneId());
+        });
+        return true;
     }
 
     /**

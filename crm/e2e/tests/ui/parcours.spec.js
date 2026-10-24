@@ -280,3 +280,22 @@ test('une campagne lancee montre son analyse et la liste ses colonnes distribues
   await expect(page.locator('table.t th', { hasText: 'Distribués' })).toBeVisible();
   expect(incidents).toEqual([]);
 });
+
+test('Numeros WhatsApp montre le rythme de chaque numero et la direction y active la montee en charge', async ({ page }) => {
+  const incidents = await seConnecterEn(page, LOGIN);
+  await page.goto('numeros');
+  await expect(page.locator('thead th', { hasText: 'Rythme' })).toBeVisible();
+  await expect(page.locator('.avert')).toContainText('une pause de quelques minutes tous les 15 messages, 40 par heure');
+  const ligne = page.locator('tr', { hasText: 'E2E Agent Yopougon' });
+  await expect(ligne).toContainText('0 / 200');
+  await expect(ligne).toContainText('Normal');
+  await ligne.getByRole('button', { name: 'Activer la montée en charge' }).click();
+  await expect(page.getByText('Montée en charge activée')).toBeVisible();
+  await expect(ligne).toContainText('0 / 20');
+  await expect(ligne).toContainText('Montée en charge depuis le');
+  await ligne.getByRole('button', { name: 'Couper la montée en charge' }).click();
+  await expect(page.getByText('Montée en charge coupée')).toBeVisible();
+  await expect(ligne).toContainText('0 / 200');
+  await expect(ligne).not.toContainText('Montée en charge depuis le');
+  expect(incidents).toEqual([]);
+});

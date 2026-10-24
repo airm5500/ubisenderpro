@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import ci.ubipharm.crm.rest.service.SessionWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
+import ci.ubipharm.crm.rest.service.dto.MonteeEnChargeDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.NumeroMetaDemandeDTO;
 import ci.ubipharm.crm.rest.service.dto.SessionAgentDTO;
 import jakarta.validation.Valid;
@@ -52,6 +53,12 @@ public class SessionWhatsappRessource {
     @PreAuthorize("hasAuthority('DROIT_WHATSAPP_META')")
     public SessionAgentDTO passerWhatsappWeb(@PathVariable Long agentId) {
         return sessionWhatsappService.passerWhatsappWeb(agentId);
+    }
+
+    @PostMapping("/{agentId}/montee-en-charge")
+    @PreAuthorize("hasAuthority('DROIT_NUMEROS_TOUS')")
+    public SessionAgentDTO monteeEnCharge(@PathVariable Long agentId, @Valid @RequestBody MonteeEnChargeDemandeDTO demande) {
+        return sessionWhatsappService.monteeEnCharge(agentId, demande.getActive());
     }
 
     @PostMapping("/{agentId}/deconnexion")

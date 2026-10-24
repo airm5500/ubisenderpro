@@ -250,6 +250,8 @@ export interface Recapitulatif {
 export interface SessionAgent {
   agentId: number; agentNom: string; numero: string | null; fournisseur: 'WA_WEB' | 'META'; metaPhoneNumberId: string | null; statut: string; sante: string | null; raison: string | null;
   connecteLe: string | null; envoyesAujourdhui: number; enAttente: number;
+  /** Plafond du jour (reduit pendant la montee en charge), date de debut de la montee, raison d'une pause en cours. */
+  plafondJour: number; monteeDepuis: string | null; rythme: string | null;
 }
 export interface AgenceGestion {
   id: number; code: string; codeImport: string | null; libelle: string; statut: string; nbClients: number; nbUtilisateurs: number;

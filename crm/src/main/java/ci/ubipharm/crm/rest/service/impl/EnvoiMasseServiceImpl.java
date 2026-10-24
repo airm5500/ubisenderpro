@@ -271,13 +271,13 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
                 continue;
             }
             Map<String, Object> message = reserver(numero, null);
-            if (message == null) {
+            if (message == null || doublon(message)) {
                 continue;
             }
             ResultatEnvoiDTO resultat = envoyer(numero, (String) message.get("numero_destinataire"), (String) message.get("contenu"),
                     pieceJointeService.piecesDEnvoiMasse(((Number) message.get("envoi_masse_id")).longValue()));
             transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
-            cadence.envoye(numero);
+            cadence.apres(numero, resultat);
             envoyes++;
         }
         return envoyes;
@@ -378,15 +378,24 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
     @Override
     public boolean envoyerMaintenant(Long messageId) {
         Map<String, Object> message = reserver(null, messageId);
-        if (message == null) {
+        if (message == null || doublon(message)) {
             return false;
         }
         String numero = (String) message.get("numero_expediteur");
         ResultatEnvoiDTO resultat = envoyer(numero, (String) message.get("numero_destinataire"), (String) message.get("contenu"),
                 pieceJointeService.piecesDEnvoiMasse(((Number) message.get("envoi_masse_id")).longValue()));
         transaction.executeWithoutResult(statut -> enregistrer(message, resultat));
-        cadence.envoye(numero);
+        cadence.apres(numero, resultat);
         return resultat.isSucces();
+    }
+
+    /** Le meme texte est deja parti aujourd'hui vers ce numero : le message est annule au lieu d'etre renvoye. */
+    private boolean doublon(Map<String, Object> message) {
+        if (!cadence.doublonDuJour((String) message.get("numero_destinataire"), (String) message.get("contenu"))) {
+            return false;
+        }
+        transaction.executeWithoutResult(statut -> enregistrer(message, ResultatEnvoiDTO.builder().erreur(EnvoiWhatsappServiceImpl.MOTIF_DOUBLON).build(), "ANNULE"));
+        return true;
     }
 
     private Map<String, Object> reserver(String numero, Long id) {
@@ -408,6 +417,11 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
     }
 
     private void enregistrer(Map<String, Object> message, ResultatEnvoiDTO resultat) {
+        enregistrer(message, resultat, "ECHEC");
+    }
+
+    /** issueEchec : ECHEC, ou ANNULE pour un doublon du jour. */
+    private void enregistrer(Map<String, Object> message, ResultatEnvoiDTO resultat, String issueEchec) {
         MapSqlParameterSource p = new MapSqlParameterSource("id", message.get("id")).addValue("identifiant", resultat.getIdentifiant())
                 .addValue("motif", resultat.getErreur() == null ? null : resultat.getErreur().substring(0, Math.min(255, resultat.getErreur().length())));
         if (resultat.isSucces()) {
@@ -420,7 +434,8 @@ public class EnvoiMasseServiceImpl implements EnvoiMasseService {
         } else if (resultat.isErreurTechnique() && ((Number) message.get("tentatives")).intValue() + 1 < parametreService.entier("whatsapp.envoi.tentatives_max", 3)) {
             jdbc.update("update crm_message_sortant set statut = 'A_ENVOYER', tentatives = tentatives + 1, motif = :motif, updated_at = utc_timestamp() where id = :id", p);
         } else {
-            jdbc.update("update crm_message_sortant set statut = 'ECHEC', tentatives = tentatives + 1, motif = :motif, updated_at = utc_timestamp() where id = :id", p);
+            jdbc.update("update crm_message_sortant set statut = :issue, tentatives = tentatives + :essai, motif = :motif, updated_at = utc_timestamp() where id = :id",
+                    p.addValue("issue", issueEchec).addValue("essai", "ECHEC".equals(issueEchec) ? 1 : 0));
         }
         jdbc.update("""
                 update crm_envoi_masse set statut = 'TERMINE', termine_le = utc_timestamp(), updated_at = utc_timestamp()

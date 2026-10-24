@@ -1,5 +1,8 @@
 package ci.ubipharm.crm.rest.service.impl;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +19,7 @@ import ci.ubipharm.crm.rest.service.PerimetreService;
 import ci.ubipharm.crm.rest.service.dto.EnvoiImmediatDTO;
 import ci.ubipharm.crm.rest.service.dto.PerimetreDTO;
 import ci.ubipharm.crm.socle.erreur.ErreurMetierException;
+import ci.ubipharm.crm.rest.service.impl.ReglesCadence.Verdict;
 import ci.ubipharm.crm.socle.erreur.RessourceIntrouvableException;
 import lombok.RequiredArgsConstructor;
 
@@ -30,6 +34,7 @@ public class EnvoiImmediatServiceImpl implements EnvoiImmediatService {
     private final EnvoiEmailService envoiEmailService;
     private final EnvoiMasseService envoiMasseService;
     private final JournalActionService journalActionService;
+    private final CadenceWhatsapp cadence;
 
     @Override
     public EnvoiImmediatDTO envoyer(String cle) {
@@ -64,6 +69,14 @@ public class EnvoiImmediatServiceImpl implements EnvoiImmediatService {
                 Map.of("numero", String.valueOf(m.get("numero_expediteur"))), Integer.class) == 0) {
             throw new ErreurMetierException("Le numéro d'envoi n'est pas connecté : reliez le téléphone dans Numéros WhatsApp.");
         }
+        if ("WHATSAPP".equals(canal)) {
+            // Hors plage horaire, oui ; mais jamais en rafale : attente, pauses et plafonds du numero restent dus
+            Verdict verdict = cadence.verdict(String.valueOf(m.get("numero_expediteur")));
+            if (!verdict.autorise()) {
+                throw new ErreurMetierException(verdict.motif() + " : ce numéro pourra envoyer " + reprise(verdict.reprise())
+                        + ". Le message reste en attente et partira à son tour.");
+            }
+        }
         boolean parti = !campagne ? envoiMasseService.envoyerMaintenant(id) : switch (canal) {
             case "SMS" -> envoiSmsService.envoyerMaintenant(id);
             case "EMAIL" -> envoiEmailService.envoyerMaintenant(id);
@@ -74,6 +87,19 @@ public class EnvoiImmediatServiceImpl implements EnvoiImmediatService {
         journalActionService.enregistrer("ENVOI_IMMEDIAT", campagne ? "crm_campagne_message" : "crm_message_sortant", id,
                 canal + (parti ? " : envoyé" : " : " + apres.get("statut")));
         return EnvoiImmediatDTO.builder().cle(cle).statut((String) apres.get("statut")).motif((String) apres.get("motif")).build();
+    }
+
+    /** « dans 25 s », « à 14 h 05 » ou « demain », heure d'Abidjan (UTC). */
+    static String reprise(LocalDateTime reprise) {
+        LocalDateTime maintenant = LocalDateTime.now(ZoneOffset.UTC);
+        long secondes = Duration.between(maintenant, reprise).getSeconds();
+        if (secondes < 60) {
+            return "dans " + Math.max(1, secondes) + " s";
+        }
+        if (!reprise.toLocalDate().equals(maintenant.toLocalDate())) {
+            return "demain";
+        }
+        return "à " + reprise.getHour() + " h " + String.format("%02d", reprise.getMinute());
     }
 
     /** Son auteur, l'expediteur du numero, ou une vision globale. */

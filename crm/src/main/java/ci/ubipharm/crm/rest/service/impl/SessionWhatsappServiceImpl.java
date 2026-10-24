@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service.impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +25,7 @@ import ci.ubipharm.crm.rest.service.SessionWhatsappService;
 import ci.ubipharm.crm.rest.service.dto.EtatSessionDTO;
 import ci.ubipharm.crm.rest.service.dto.EvenementStatutDTO;
 import ci.ubipharm.crm.rest.service.dto.SessionAgentDTO;
+import ci.ubipharm.crm.rest.service.impl.ReglesCadence.Verdict;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
@@ -39,8 +41,9 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     private static final String SELECT = """
             select u.id as agentId, u.nom_complet as agentNom, u.numero_whatsapp as numero, coalesce(s.statut, 'DECONNECTE') as statut,
                    coalesce(s.fournisseur, 'WA_WEB') as fournisseur, s.meta_phone_number_id as metaPhoneNumberId,
-                   coalesce(s.sante, 'OK') as sante, s.raison as raison, s.connecte_le as connecteLe,
+                   coalesce(s.sante, 'OK') as sante, s.raison as raison, s.connecte_le as connecteLe, s.montee_depuis as monteeDepuis,
                    (select count(*) from crm_campagne_message m where m.numero_expediteur = u.numero_whatsapp and m.envoye_le >= utc_date())
+                 + (select count(*) from crm_message_sortant m where m.numero_expediteur = u.numero_whatsapp and m.envoye_le >= utc_date())
                        as envoyesAujourdhui,
                    (select count(*) from crm_campagne_message m join crm_campagne c on c.id = m.campagne_id
                     where m.numero_expediteur = u.numero_whatsapp and m.statut = 'A_ENVOYER' and c.statut = 'EN_COURS') as enAttente
@@ -56,6 +59,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     private final PerimetreService perimetreService;
     private final UtilisateurCourantService utilisateurCourantService;
     private final JournalActionService journalActionService;
+    private final CadenceWhatsapp cadence;
 
     @Override
     @Transactional(readOnly = true)
@@ -158,6 +162,19 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
         return session(agentId);
     }
 
+    @Override
+    @Transactional
+    public SessionAgentDTO monteeEnCharge(Long agentId, boolean active) {
+        String numero = numeroAutorise(agentId);
+        em.createNativeQuery("""
+                insert into crm_session_whatsapp (numero, statut, sante, montee_depuis, updated_at)
+                values (:numero, 'DECONNECTE', 'OK', case when :active then utc_date() end, utc_timestamp())
+                on duplicate key update montee_depuis = case when :active then coalesce(montee_depuis, utc_date()) end, updated_at = utc_timestamp()
+                """).setParameter("numero", numero).setParameter("active", active).executeUpdate();
+        journalActionService.enregistrer(active ? "WHATSAPP_MONTEE_ACTIVEE" : "WHATSAPP_MONTEE_COUPEE", "crm_utilisateur", agentId, numero);
+        return session(agentId);
+    }
+
     private SessionAgentDTO session(Long agentId) {
         @SuppressWarnings("unchecked")
         List<Tuple> lignes = em.createNativeQuery(SELECT + " and u.id = :id", Tuple.class).setParameter("id", agentId).getResultList();
@@ -203,7 +220,7 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
     }
 
     SessionAgentDTO mapTupleToDto(Tuple tuple) {
-        return SessionAgentDTO.builder()
+        SessionAgentDTO dto = SessionAgentDTO.builder()
                 .agentId(tuple.get("agentId", Long.class))
                 .agentNom(tuple.get("agentNom", String.class))
                 .numero(tuple.get("numero", String.class))
@@ -215,6 +232,13 @@ public class SessionWhatsappServiceImpl implements SessionWhatsappService {
                 .connecteLe(tuple.get("connecteLe", LocalDateTime.class))
                 .envoyesAujourdhui(((Number) tuple.get("envoyesAujourdhui")).longValue())
                 .enAttente(((Number) tuple.get("enAttente")).longValue())
+                .monteeDepuis(tuple.get("monteeDepuis", LocalDate.class))
                 .build();
+        if (dto.getNumero() != null) {
+            dto.setPlafondJour(cadence.plafondDuJour(dto.getNumero()));
+            Verdict verdict = cadence.verdict(dto.getNumero());
+            dto.setRythme(verdict.autorise() ? null : verdict.motif() + ", reprise " + EnvoiImmediatServiceImpl.reprise(verdict.reprise()));
+        }
+        return dto;
     }
 }

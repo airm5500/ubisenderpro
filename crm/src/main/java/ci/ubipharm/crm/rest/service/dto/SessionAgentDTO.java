@@ -1,5 +1,6 @@
 package ci.ubipharm.crm.rest.service.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -28,4 +29,10 @@ public class SessionAgentDTO {
     private LocalDateTime connecteLe;
     private long envoyesAujourdhui;
     private long enAttente;
+    /** Plafond du jour du numero, reduit pendant la montee en charge. */
+    private int plafondJour;
+    /** Montee en charge active depuis ce jour, sinon null. */
+    private LocalDate monteeDepuis;
+    /** Pourquoi le numero n'envoie pas en ce moment (pause, plafond), sinon null. */
+    private String rythme;
 }

@@ -67,6 +67,14 @@ abstract class IntegrationBase {
         jdbc.update("update crm_evenement set statut = 'ACTIF', modifie_par = null, updated_at = null");
         jdbc.update("delete from crm_delai_relance");
         jdbc.update("update crm_parametre set valeur = '0' where cle = 'campagne.relance_intervalle_jours'");
+        // Regles anti-blocage WhatsApp aux valeurs livrees (WhatsappIT les resserre)
+        jdbc.update("""
+                update crm_parametre set valeur = case cle when 'whatsapp.envoi.plafond_heure' then '40' when 'whatsapp.envoi.pause_apres_messages' then '15'
+                    when 'whatsapp.envoi.montee_depart' then '20' when 'whatsapp.envoi.echecs_avant_pause' then '3'
+                    when 'whatsapp.envoi.tentatives_max' then '3' end
+                where cle in ('whatsapp.envoi.plafond_heure', 'whatsapp.envoi.pause_apres_messages', 'whatsapp.envoi.montee_depart',
+                              'whatsapp.envoi.echecs_avant_pause', 'whatsapp.envoi.tentatives_max')
+                """);
         jdbc.update("update crm_parametre set valeur = '1' where cle = 'campagne.apres_echeance_jours_min'");
         jdbc.update("update crm_parametre set valeur = '7' where cle = 'marketing.journee_horizon_jours'");
         jdbc.update("delete from crm_piece_jointe");

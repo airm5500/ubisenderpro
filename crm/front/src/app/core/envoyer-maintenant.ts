@@ -36,7 +36,9 @@ export class EnvoyerMaintenant {
         this.encours.set(false);
         this.messages.add(r.statut === 'ECHEC'
           ? { severity: 'error', summary: 'Envoi échoué', detail: r.motif ?? '' }
-          : { severity: 'success', summary: 'Message envoyé' });
+          : r.statut === 'ANNULE'
+            ? { severity: 'warn', summary: 'Message non envoyé', detail: r.motif ?? '' }
+            : { severity: 'success', summary: 'Message envoyé' });
         this.envoye.emit(r);
       },
       error: () => this.encours.set(false)

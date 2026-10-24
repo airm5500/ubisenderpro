@@ -19,6 +19,8 @@ crm:
   whatsapp:
     envoi: false
     jeton: jeton-de-test
+    # Les tests enchainent les envois d'un meme numero sans attendre (le plancher de 5 s se teste a part)
+    plancher-secondes: 0
   email:
     envoi: false
   sms:

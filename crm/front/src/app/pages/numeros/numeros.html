@@ -9,11 +9,13 @@
   </div>
 
   <div class="avert"><i class="pi pi-info-circle"></i>
-    <span>WhatsApp Web est un canal non officiel : ses messages partent lentement (20 à 45 secondes d'écart, 200 par jour et par numéro, de 8 h à 18 h) pour limiter le risque de blocage du numéro par WhatsApp.</span></div>
+    <span>WhatsApp Web est un canal non officiel : ses messages partent lentement pour limiter le risque de blocage du numéro par WhatsApp
+      (20 à 45 secondes d'écart, une pause de quelques minutes tous les 15 messages, 40 par heure et 200 par jour et par numéro, de 8 h à 18 h ;
+      réglages dans Paramètres &gt; WhatsApp). Un numéro neuf démarre doucement avec la montée en charge.</span></div>
 
   <div class="defile">
     <table class="t">
-      <thead><tr><th>Agent</th><th>Numéro</th><th>Canal et état</th><th>Connecté depuis</th><th class="n">Envoyés aujourd'hui</th><th class="n">En attente</th><th></th></tr></thead>
+      <thead><tr><th>Agent</th><th>Numéro</th><th>Canal et état</th><th>Connecté depuis</th><th class="n">Envoyés aujourd'hui</th><th>Rythme</th><th class="n">En attente</th><th></th></tr></thead>
       <tbody>
         @for (s of sessions(); track s.agentId) {
           <tr>
@@ -24,9 +26,16 @@
               @else { {{ L.statutSession[s.statut] ?? s.statut }} }
               <div class="second">{{ s.fournisseur === 'META' ? 'Meta · ' + (s.raison ?? s.metaPhoneNumberId) : (s.statut !== 'CONNECTE' && s.raison ? s.raison : 'WhatsApp Web') }}</div></td>
             <td class="nw">{{ s.statut === 'CONNECTE' ? (s.connecteLe | jour: true) : '—' }}</td>
-            <td class="n">{{ s.envoyesAujourdhui }}</td>
+            <td class="n">{{ s.envoyesAujourdhui }} / {{ s.plafondJour }}</td>
+            <td>{{ s.rythme ?? (s.numero ? 'Normal' : '—') }}
+              @if (s.monteeDepuis) { <div class="second">Montée en charge depuis le {{ s.monteeDepuis | jour }}</div> }</td>
             <td class="n">{{ s.enAttente }}</td>
             <td class="nw">
+              @if (s.numero && auth.peut('NUMEROS_TOUS')) {
+                <button type="button" class="bi" [class.bi-plein]="s.monteeDepuis" style="margin-right: 4px"
+                        [pTooltip]="s.monteeDepuis ? 'Couper la montée en charge' : 'Activer la montée en charge (numéro neuf)'" tooltipPosition="top"
+                        [attr.aria-label]="s.monteeDepuis ? 'Couper la montée en charge' : 'Activer la montée en charge'" (click)="basculerMontee(s)"><i class="pi pi-chart-line"></i></button>
+              }
               @if (!s.numero) { <span class="discret">Numéro à renseigner</span> }
               @else if (s.fournisseur === 'META') {
                 <span class="actions-ligne">@if (s.statut === 'CONNECTE') { <button type="button" class="bi bi-danger" pTooltip="Mettre en pause" tooltipPosition="top" aria-label="Mettre en pause" (click)="deconnecter(s)"><i class="pi pi-pause"></i></button> }
@@ -43,7 +52,7 @@
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="7" class="vide">
+          <tr><td colspan="8" class="vide">
             @if (!sessions()) { Chargement… }
             @else {
               Aucun agent n'a encore de numéro WhatsApp. Créez le compte de l'agent avec le rôle Agent du Recouvrement et son numéro professionnel
